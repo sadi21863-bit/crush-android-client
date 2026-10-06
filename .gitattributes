@@ -1,0 +1,13 @@
+# Normalise line endings: this repo is developed on Windows, and the engine
+# paths in .ps1/.bat are sensitive to CRLF.
+* text=auto eol=lf
+
+# Binary assets that must never be line-ending mangled.
+*.jar binary
+*.so binary
+*.png binary
+*.jks binary
+*.keystore binary
+
+# The engine binary is fetched, never committed (see tools/fetch-crush.ps1).
+app/src/main/jniLibs/** binary

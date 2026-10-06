@@ -1,0 +1,41 @@
+*.iml
+.gradle/
+.idea/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# SECRETS - never commit.
+# Matches any key/secret/token file regardless of extension, plus the specific
+# local file used to paste an OpenCode Zen key onto the test device.
+*key*.txt
+*secret*.txt
+*.env
+*.key
+*.pem
+secrets/
+tools/secrets/
+
+# Local scratch
+run.log
+*.log
+build-install.bat
+setup-emu.bat
+
+# 92MB arm64 engine binary - fetched by tools/fetch-crush.ps1, not committed
+app/src/main/jniLibs/
+
+# Vendored toolchains (438MB total). Machine-local; see README for the
+# JDK 17 / Gradle requirements.
+gradle-dist/
+jdk17-dist/
+
+# Release signing material. The keystore and its passwords must never be committed.
+keystore/
+*.jks
+*.keystore
+

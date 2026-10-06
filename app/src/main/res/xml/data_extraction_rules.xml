@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Belt-and-braces alongside android:allowBackup="false".
+
+  The engine writes crush.json containing the provider API key in plaintext, and
+  SecureKeyStore holds the master key in the Android Keystore. Neither should
+  ever leave the device via cloud backup or device-to-device transfer.
+
+  crush.json is plaintext by Crush's own design and is deliberately excluded
+  from every cloud channel; the Keystore master key is non-exportable and would
+  be useless on another device regardless.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

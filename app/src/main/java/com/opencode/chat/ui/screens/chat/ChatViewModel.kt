@@ -137,6 +137,18 @@ private var streamJob: Job? = null
      * while it is paired with the workspace that created it. Without this the
      * send path would reuse a session against a re-attached (different) workspace
      * and 404 on the session instead of the workspace.
+     *
+     * OBSOLETE, and kept only so the assignments still compile.
+     *
+     * That comment stated the wrong model. Sessions do NOT die with their
+     * workspace: they are persistent engine state keyed by the workspace's cwd,
+     * and the workspace is an attachment handle that the ~30s reap takes away and
+     * hands back. The send path used to require `existingSessionWorkspace == ws`
+     * before reusing a session, so every re-attach failed that check and started
+     * a new chat - the "only 2-3 messages per session" bug. The path now reuses
+     * whatever session id it holds and detects a genuinely missing session from
+     * the server's own "session not found" response. Delete this field and its
+     * assignments once nothing references it.
      */
     private var existingSessionWorkspace: String? = null
 
@@ -714,12 +726,21 @@ private var streamJob: Job? = null
             // throwaway session per send was why there was never anything to
             // resume, list, or show in a history drawer - each turn was an
             // isolated conversation with its own auto-generated title.
+            //
+            // The guard used to be `existingSessionWorkspace == ws`, which looked
+            // defensive but caused the exact bug it was meant to prevent: every
+            // re-attach produces a NEW workspace id, so the comparison failed
+            // after roughly 30s of inactivity and a new session was minted. That
+            // is why the app appeared to hold only 2-3 messages - the 3rd landed
+            // in a fresh chat, the 4th in another.
+            //
+            // The workspace is an ATTACHMENT HANDLE that comes and goes with the
+            // reap; the session is persistent engine state. A session id we
+            // already hold stays valid across a re-attach, so the only question
+            // is whether we have one. If the server has genuinely lost it, the
+            // send path detects "session not found" and starts a new one there.
             val existing = sessionId
-            val sid = if (existing != null && existingSessionWorkspace == ws) {
-                existing
-            } else {
-                runCatching { mgr.newSession("chat").id }.getOrNull()
-            }
+            val sid = existing ?: runCatching { mgr.newSession("chat").id }.getOrNull()
             if (sid == null) {
                 AppLog.w(TAG, "could not obtain a session; re-bootstrapping")
                 bootstrap()
@@ -808,18 +829,42 @@ private var streamJob: Job? = null
                         AppLog.w(TAG, "workspace reaped mid-send; re-attaching and retrying once")
                         if (runCatching { mgr.reattachIfStale(force = true) }.getOrDefault(false)) {
                             val ws2 = mgr.currentWorkspaceId
-                            // A fresh session is required: the old one belonged to
-                            // the reaped workspace and will 404 identically.
-                            val sid2 = runCatching { mgr.newSession("chat").id }.getOrNull()
-                            if (ws2 != null && sid2 != null) {
+                            if (ws2 != null) {
+                                // KEEP THE SAME SESSION.
+                                //
+                                // This used to mint a new one, with the comment
+                                // "a fresh session is required: the old one
+                                // belonged to the reaped workspace". That premise
+                                // is wrong and it silently destroyed conversation
+                                // continuity: sessions are persistent engine state
+                                // keyed by the workspace's cwd, while the workspace
+                                // is only an attachment handle that comes and goes
+                                // with the ~30s reap. So the old session id is still
+                                // valid after re-attaching, and replacing it meant a
+                                // user's 3rd message landed in a brand-new chat,
+                                // then their 4th in another - which looked exactly
+                                // like the app could only hold 2-3 messages.
+                                //
+                                // Only the WORKSPACE id changes here.
                                 targetWs = ws2
-                                targetSid = sid2
                                 wsId = ws2
-                                sessionId = sid2
                                 existingSessionWorkspace = ws2
                                 attempt++
                                 continue
                             }
+                        }
+                    }
+                    // A 404 that names the SESSION (not the workspace) means the
+                    // session itself is genuinely gone, which is the one case
+                    // where starting over is correct.
+                    if (msg.contains("session not found", ignoreCase = true) && attempt == 0) {
+                        AppLog.w(TAG, "session gone; starting a new one")
+                        val sid2 = runCatching { mgr.newSession("chat").id }.getOrNull()
+                        if (sid2 != null) {
+                            targetSid = sid2
+                            sessionId = sid2
+                            attempt++
+                            continue
                         }
                     }
                     break

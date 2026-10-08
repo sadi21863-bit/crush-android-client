@@ -342,7 +342,7 @@ private fun Bubble(m: ChatMessage) {
                         style = MaterialTheme.typography.bodyMedium
                     )
                 } else {
-                    Text(m.text, style = MaterialTheme.typography.bodyMedium)
+                    MarkdownText(m.text, modifier = Modifier.fillMaxWidth())
                 }
                 m.error?.let {
                     Text(

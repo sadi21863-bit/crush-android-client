@@ -54,10 +54,19 @@ private val json = "application/json".toMediaType()
 
     suspend fun version(): VersionInfo = get("/v1/version")
 
-    /** 200 with an empty body; use [version] for anything meaningful. */
-suspend fun health(): Boolean = runCatching {
-        newCall("/v1/health").execute().code == 200
-    }.getOrDefault(false)
+/**
+     * Liveness probe. 200 with an empty body; use [version] for anything
+     * meaningful.
+     *
+     * `suspend` does not move threads. Without withContext(Dispatchers.IO) this
+     * throws NetworkOnMainThreadException when called from a ViewModel - the
+     * same defect that silently broke deleteSession.
+     */
+    suspend fun health(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            newCall("/v1/health").execute().code == 200
+        }.getOrDefault(false)
+    }
 
     // ---------------------------------------------------------- workspace
 
@@ -120,29 +129,35 @@ suspend fun agentInfo(workspaceId: String): AgentInfo =
      */
     suspend fun deleteSession(workspaceId: String, sessionId: String) {
         val path = "/v1/workspaces/$workspaceId/sessions/$sessionId"
-        // A dropped connection here is SUCCESS, not failure.
+        // withContext(Dispatchers.IO) is LOAD-BEARING here, and was missing.
         //
-        // Crush reaps an unattached workspace after ~30s, and by the time a user
-        // opens the chat list, taps delete and the request lands, the workspace
-        // can already be gone - which closes the socket and surfaces as an
-        // IOException with a null message. Observed on device as
-        // "deleteSession failed: null" four times in a row.
+        // OkHttp's execute() is synchronous. Being a `suspend fun` does NOT move
+        // the thread - it only allows suspension. Called from viewModelScope
+        // (Main by default) this threw NetworkOnMainThreadException, so the
+        // request never left the device and delete silently did nothing.
         //
-        // The session cannot outlive its workspace, so the user's intent - that
-        // the chat is gone - is already satisfied. Reporting failure here would
-        // tell someone their chat still exists when it does not.
-        runCatching {
-            streamClient.newCall(
-                Request.Builder().url(base + path).delete().build()
-            ).execute().use { resp ->
-                if (resp.code == 404) return@use
-                requireSuccess(resp, path)
+        // It was invisible because NetworkOnMainThreadException has a NULL
+        // message, and the log only printed the message: every attempt read
+        // "deleteSession failed: null". Logging the exception TYPE is what
+        // finally exposed it. Every other method here goes through get/post,
+        // which already do this - this one called execute() directly.
+        withContext(Dispatchers.IO) {
+            runCatching {
+                streamClient.newCall(
+                    Request.Builder().url(base + path).delete().build()
+                ).execute().use { resp ->
+                    if (resp.code == 404) return@use
+                    requireSuccess(resp, path)
+                }
+            }.onFailure { e ->
+                // A dropped connection is treated as success: the session cannot
+                // outlive a reaped workspace, so the user's intent is satisfied
+                // even when the socket died before the response.
+                val gone = e is java.io.InterruptedIOException ||
+                    e is java.io.EOFException ||
+                    (e.message ?: "").contains("workspace not found", ignoreCase = true)
+                if (!gone) throw e
             }
-        }.onFailure { e ->
-            val gone = e is java.io.InterruptedIOException ||
-                e is java.io.EOFException ||
-                (e.message ?: "").contains("workspace not found", ignoreCase = true)
-            if (!gone) throw e
         }
     }
 

@@ -84,7 +84,16 @@ object ToolActivityParser {
      * to the user. Every other field is optional by design.
      */
     fun from(part: JsonObject): ToolActivity? {
-        val name = pickString(part, WIRE_NAME)?.takeIf { it.isNotBlank() } ?: return null
+        val name = pickString(part, WIRE_NAME)?.takeIf { it.isNotBlank() }
+        // Record which KEYS the engine actually sent, once per distinct shape.
+        // The candidate lists above are guesses; this is how they get corrected
+        // without guessing again on a device.
+        //
+        // Keys only, never values: argument values can contain file paths and
+        // command text, and a log is the wrong place for those. Once the real
+        // key names are known, WIRE_* can be trimmed to match and this removed.
+        recordShape(part, name)
+        if (name == null) return null
         val rawArgs = pickElement(part, WIRE_ARGS)
         return ToolActivity(
             id = pickString(part, WIRE_ID) ?: "tool-$name-${part.hashCode()}",
@@ -94,6 +103,29 @@ object ToolActivityParser {
             output = truncate(pickString(part, WIRE_OUTPUT).orEmpty()),
             error = pickString(part, WIRE_ERROR)
         )
+    }
+
+    private val seenShapes = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /** Test seam: cleared between cases so the log-once behaviour is testable. */
+    internal fun resetShapeLog() = seenShapes.clear()
+
+    private fun recordShape(part: JsonObject, name: String?) {
+        val keys = part.keySet().sorted().joinToString(",")
+        val shape = "keys=[$keys] name=${name ?: "<none>"}"
+        // Log once per distinct key-set. Verbose per-frame logging of a shape
+        // that arrives on every message frame would drown the log for no gain.
+        if (seenShapes.add(shape)) {
+            // Logging must never be able to break parsing. android.util.Log
+            // throws in plain JVM unit tests, and a diagnostics aid that can
+            // crash the feature it is diagnosing is worse than no aid at all.
+            runCatching {
+                com.opencode.chat.util.AppLog.i(
+                    "ToolActivity",
+                    "observed tool_call shape: $shape"
+                )
+            }
+        }
     }
 
     /**

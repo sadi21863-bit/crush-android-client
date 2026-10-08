@@ -41,6 +41,44 @@ data class LiveZenModel(
     val isFree: Boolean
 )
 
+/**
+     * Cost per million tokens, per direction, with UNKNOWN represented as null.
+ *
+ * Modelling absence as a nullable rather than defaulting to 0.0 is the whole
+ * point: 0.0 means "free" and null means "we were not told", and those must not
+ * collapse into each other. Defaulting an unknown price to zero made
+ * free-first ordering prefer models whose cost was simply undocumented, which
+ * could route a paid request through a model we believed was free.
+ */
+data class ModelPrice(
+    val costIn: Double?,
+    val costOut: Double?
+) {
+    /**
+     * True only when BOTH directions are explicitly priced at zero.
+     *
+     * Both are required, not just the ones we happen to know. A model that is
+     * free to send but whose output price is undocumented is NOT known-free: the
+     * reply itself is generated output, and treating a half-known price as free
+     * is how an unknown cost becomes a real bill.
+     */
+    val isKnownZero: Boolean
+        get() {
+            val inPrice = costIn ?: return false
+            val outPrice = costOut ?: return false
+            return inPrice <= 0.0 && outPrice <= 0.0
+        }
+
+    /** Best-effort human summary; distinguishes "unknown" from "free". */
+    fun describe(): String = when {
+        costIn == null && costOut == null -> "price unknown"
+        isKnownZero -> "free"
+        costIn == null -> "output cost ${costOut} per 1M tokens, input unknown"
+        costOut == null -> "input cost ${costIn} per 1M tokens, output unknown"
+        else -> "from ${costIn} per 1M tokens in, ${costOut} out"
+    }
+}
+
 /** Why a probed model did or did not answer. */
 enum class ProbeVerdict { WORKS, RETIRED, NOT_ENTITLED, BAD_KEY, UNKNOWN }
 
@@ -85,11 +123,11 @@ data class Result(
      *
      * Call it BEFORE fetch so the prices are available when models are parsed.
      */
-    fun applyPricing(pricesById: Map<String, Pair<Double, Double>>) {
+    fun applyPricing(pricesById: Map<String, ModelPrice>) {
         cachedPricing = pricesById
     }
 
-    private var cachedPricing: Map<String, Pair<Double, Double>> = emptyMap()
+    private var cachedPricing: Map<String, ModelPrice> = emptyMap()
 
 /**
      * Fetches the live catalogue. Sorted free-first, then alphabetically, so the
@@ -147,17 +185,17 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
         // engine will actually charge. Preferred over anything inferrable from
         // the id, because "-free" in a name is a naming convention, not a price.
         val id = o.get("id")?.asString.orEmpty()
-        cachedPricing[id]?.let { (inPrice, outPrice) ->
-            return inPrice <= 0.0 && outPrice <= 0.0
+        cachedPricing[id]?.let { price ->
+            // Only an EXPLICIT zero is free. An absent side means we do not know
+            // what it costs, and claiming otherwise is exactly the bug MODEL-02
+            // describes.
+            return price.isKnownZero
         }
         // Zen's own /models carries no price. If no price is known, say nothing
         // rather than claim a model is free.
         val inPrice = o.get("cost_per_1m_in")?.takeIf { !it.isJsonNull }?.asDouble
         val outPrice = o.get("cost_per_1m_out")?.takeIf { !it.isJsonNull }?.asDouble
-        if (inPrice != null || outPrice != null) {
-            return (inPrice ?: 0.0) <= 0.0 && (outPrice ?: 0.0) <= 0.0
-        }
-        return false
+        return ModelPrice(inPrice, outPrice).isKnownZero
     }
 
     /**
@@ -184,20 +222,26 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
         fun pricesFromProviders(
             providers: List<JsonObject>,
             providerId: String
-        ): Map<String, Pair<Double, Double>> {
-        val out = mutableMapOf<String, Pair<Double, Double>>()
-        for (p in providers) {
-            if (p.get("id")?.asString != providerId) continue
-            val models = p.getAsJsonArray("models") ?: continue
-            for (m in models) {
-                val mo = m.asJsonObject
-                val id = mo.get("id")?.asString ?: continue
-                val cin = mo.get("cost_per_1m_in")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0
-                val cout = mo.get("cost_per_1m_out")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0
-                out[id] = cin to cout
+        ): Map<String, ModelPrice> {
+            val out = mutableMapOf<String, ModelPrice>()
+            for (p in providers) {
+                if (p.get("id")?.asString != providerId) continue
+                val models = p.getAsJsonArray("models") ?: continue
+                for (m in models) {
+                    val mo = m.asJsonObject
+                    val id = mo.get("id")?.asString ?: continue
+                    // UNKNOWN is not zero (audit MODEL-02).
+                    //
+                    // These used to coerce a missing or null price to 0.0, which
+                    // made "we have no pricing data" indistinguishable from
+                    // "this model is genuinely free". Free-first ordering then
+                    // preferred models whose cost was merely undocumented.
+                    val cin = mo.get("cost_per_1m_in")?.takeIf { !it.isJsonNull }?.asDouble
+                    val cout = mo.get("cost_per_1m_out")?.takeIf { !it.isJsonNull }?.asDouble
+                    out[id] = ModelPrice(cin, cout)
+                }
             }
-        }
-return out
+            return out
         }
     }
 

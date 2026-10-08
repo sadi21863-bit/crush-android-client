@@ -19,12 +19,19 @@ plugins {
 // therefore hands them the key.
 //
 // Falls back to unsigned when the file is absent so a fresh clone still builds.
-val releaseSigning: Properties? = Properties().also { props ->
-    val f = rootProject.file("keystore/credentials.properties")
-    if (f.exists()) {
-        f.inputStream().use { props.load(it) }
-    }
-}
+//
+// CORRECTION (audit BUILD-01): the previous form was
+//     Properties().also { if (f.exists()) load(it) }
+// `also` returns the receiver regardless, so this was NEVER null. Both later
+// checks therefore always entered, and with the file absent the code read null
+// property values and passed a null storeFile to rootProject.file(...). The
+// comment above promised an unsigned fallback that could not happen.
+//
+// takeIf { isFile } is what actually yields null, so the checks downstream
+// behave as documented.
+val releaseSigning: Properties? = rootProject.file("keystore/credentials.properties")
+    .takeIf { it.isFile }
+    ?.let { f -> Properties().also { props -> f.inputStream().use { props.load(it) } } }
 
 android {
     namespace = "com.opencode.chat"
@@ -59,6 +66,18 @@ android {
 
     signingConfigs {
         if (releaseSigning != null) {
+            // Fail loudly on a PARTIAL credentials file. Previously a missing
+            // key silently produced a null storeFile / null password, which
+            // either threw deep inside AGP or produced an unsigned release that
+            // looked fine.
+            val missing = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+                .filter { releaseSigning.getProperty(it).isNullOrBlank() }
+            if (missing.isNotEmpty()) {
+                throw GradleException(
+                    "keystore/credentials.properties exists but is missing: ${missing.joinToString()}. " +
+                        "Delete the file to build unsigned, or supply all four values."
+                )
+            }
             create("release") {
                 storeFile = rootProject.file(releaseSigning.getProperty("storeFile"))
                 storePassword = releaseSigning.getProperty("storePassword")
@@ -79,6 +98,22 @@ android {
             )
             if (releaseSigning != null) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Unsigned by ABSENCE OF CREDENTIALS, not by a silent fallback
+                // inside a broken Properties(). Also refuse for anything that
+                // actually ships, so an unsigned release can never be mistaken
+                // for a distributable one.
+                logger.warn(
+                    "WARNING: building an UNSIGNED release. This build is for local testing only " +
+                        "and must not be shared - see README, 'Why debug builds are not shareable'."
+                )
+                if (gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) } &&
+                    project.hasProperty("requireReleaseSigning")
+                ) {
+                    throw GradleException(
+                        "requireReleaseSigning is set but keystore/credentials.properties is absent."
+                    )
+                }
             }
         }
     }

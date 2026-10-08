@@ -229,5 +229,23 @@ There is no `androidTest` instrumentation suite yet.
 
 ## Licence and attribution
 
-Crush is MIT-licensed, © Charm. This repository is not affiliated with Charm or
-OpenCode Zen. You supply your own OpenCode Zen API key; it is never committed.
+**Crush is licensed under FSL-1.1-MIT, not MIT.** See
+[charmbracelet/crush LICENSE.md](https://github.com/charmbracelet/crush/blob/main/LICENSE.md).
+This app redistributes the Crush binary, so its terms apply directly.
+
+FSL-1.1-MIT grants use and redistribution for permitted purposes, requires that
+redistributions retain and link the licence and copyright notices, restricts
+competing commercial use, and **converts each version to MIT on the second
+anniversary of its availability**. The bundled build is **v0.97.1**; confirm its
+future-MIT date before relying on MIT terms for that version.
+
+> An earlier revision of this README stated "Crush is MIT-licensed". That was
+> wrong. Verify licence claims against upstream before repeating them.
+
+There is **no root `LICENSE` file** yet — the third-party notice for the embedded
+engine still needs to be added, and legal review of FSL "Competing Use" is
+recommended before any commercial distribution.
+
+Bubble Tea (a Go TUI framework Crush depends on, and an architectural influence
+here) is MIT-licensed. This repository is not affiliated with Charm or OpenCode
+Zen. You supply your own OpenCode Zen API key; it is never committed.

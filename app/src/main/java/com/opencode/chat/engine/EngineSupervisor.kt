@@ -1,4 +1,4 @@
-package com.opencode.chat.engine
+﻿package com.opencode.chat.engine
 
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
@@ -157,7 +157,21 @@ private suspend fun monitorUntilUnhealthy(port: Int): Boolean {
         // rather than compounding on top of an already-shrunk value. Without this,
         // repeated CRITICAL samples would divide the idle timeout down to the
         // floor and it could never recover.
-        var baseTuning = tuning
+        // The USER/AUTO-resolved policy, before any pressure adjustment.
+        //
+        // CORRECTION (audit SUP-01): the comment here already claimed this was
+        // captured "so a pressure change can be recomputed from the SAME base",
+        // but the code below assigned the pressure-adjusted RESULT back into
+        // this variable. Repeated CRITICAL samples therefore divided the idle
+        // timeout repeatedly and it could never recover - and a later settings
+        // change was compared against, and overwritten by, a stale shrunk base.
+        //
+        // `desiredBase` is now only ever written when the effective policy
+        // changes, so it always holds the unadjusted user resolution.
+        var desiredBase = tuning
+        // The last value actually derived from desiredBase under pressure. Used
+        // only to distinguish "settings changed" from "we adjusted it ourselves".
+        var lastEffective = tuning
         while (currentCoroutineContext().isActive && isWanted()) {
             delay(tuning.healthIntervalSec * 1000L)
 
@@ -183,21 +197,28 @@ private suspend fun monitorUntilUnhealthy(port: Int): Boolean {
                     )
                 }.getOrNull()
                 if (signals != null) {
+                    // A settings change must update the BASE, never be compared
+                    // against a previously pressure-shrunk value.
+                    if (tuning != desiredBase && tuning != lastEffective) {
+                        desiredBase = tuning
+                    }
                     val observed = com.opencode.chat.domain.model.DynamicPolicy.pressureOf(signals)
                     // Hysteresis: escalate at once, relax only after sustained calm.
                     calmRun = if (observed == com.opencode.chat.domain.model.PressureLevel.OK) calmRun + 1 else 0
                     val effective = com.opencode.chat.domain.model.DynamicPolicy.next(
                         pressure, observed, calmRun
                     )
-                    if (effective != pressure || tuning != baseTuning) {
+                    // Derived fresh from the UNADJUSTED base on every poll, never
+                    // accumulated. This is the fix for audit SUP-01: the old code
+                    // assigned the pressure-adjusted result back into the base, so
+                    // repeated CRITICAL samples divided the idle timeout down to
+                    // the floor where it stuck permanently.
+                    val derived = effectiveTuningFor(desiredBase, signals, effective)
+                    if (effective != pressure || derived != tuning) {
                         pressure = effective
-                        baseTuning = com.opencode.chat.domain.model.DynamicPolicy.applySafely(
-                            baseTuning, signals, effective
-                        )
-                        // Only AUTO-sourced values move under pressure, so a user
-                        // override is never silently rewritten.
-                        tuning = baseTuning
-                        Log.i(TAG, "dynamic tuning: pressure=$effective idle=${baseTuning.engineIdleTimeoutSec}s")
+                        tuning = derived
+                        lastEffective = derived
+                        Log.i(TAG, "dynamic tuning: pressure=$effective idle=${derived.engineIdleTimeoutSec}s")
                     }
                 }
             }
@@ -283,6 +304,21 @@ private suspend fun monitorUntilUnhealthy(port: Int): Boolean {
 
     private companion object {
         const val TAG = "EngineSupervisor"
+
+        /**
+         * Applies current pressure to the UNADJUSTED base policy.
+         *
+         * Kept as a named function so the "derive, never mutate" rule has one
+         * place it lives. Every call must pass the resolved user/auto base, not
+         * a previously pressure-adjusted value - that mistake (audit SUP-01)
+         * compounded the reduction until it hit the floor and stuck there.
+         */
+        fun effectiveTuningFor(
+            base: com.opencode.chat.domain.model.TuningPolicy.Resolved,
+            signals: com.opencode.chat.domain.model.RuntimeSignals,
+            pressure: com.opencode.chat.domain.model.PressureLevel
+        ): com.opencode.chat.domain.model.TuningPolicy.Resolved =
+            com.opencode.chat.domain.model.DynamicPolicy.applySafely(base, signals, pressure)
         /**
          * Legacy defaults, kept only as the pre-tuning fallback. Live values
          * come from [tuning]. At 10s per probe a 60s grace is ~6 consecutive

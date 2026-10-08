@@ -39,3 +39,6 @@ keystore/
 *.jks
 *.keystore
 
+
+# Third-party audit reports (large binaries, not source)
+audit_*.docx

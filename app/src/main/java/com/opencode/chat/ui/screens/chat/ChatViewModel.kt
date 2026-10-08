@@ -55,6 +55,15 @@ data class ChatUiState(
     val models: List<LiveZenModel> = emptyList(),
     val modelsError: String? = null,
     /**
+     * Non-null when a stop was requested but the server did not confirm the run
+     * ended. Null means either nothing was stopped, or the stop was confirmed.
+     *
+     * Distinguishing these matters: the agent can keep generating and running
+     * tools after the UI stops listening, and saying "stopped" when it did not
+     * is a false claim about work still happening.
+     */
+    val stopNotice: String? = null,
+    /**
  * No default model id.
  *
  * It used to be "space-bunny-free", hardcoded in two places and written to both
@@ -649,7 +658,8 @@ private var streamJob: Job? = null
         // round-trips. The composable keeps the Send button enabled for that
         // whole window, so a double-tap started two runs; both wrote to the same
         // streamingId and the replies interleaved into one bubble.
-        _state.value = _state.value.copy(isStreaming = true)
+        // Clear any stale stop notice from a previous run.
+        _state.value = _state.value.copy(isStreaming = true, stopNotice = null)
         val p = port ?: run { _state.value = _state.value.copy(isStreaming = false); return }
         val mgr = workspaces ?: run {
             _state.value = _state.value.copy(isStreaming = false)
@@ -909,14 +919,61 @@ private var streamJob: Job? = null
     }
 
     /** Stop button: cancels the stream without tearing the engine down. */
+    /**
+     * Stops the in-flight run.
+     *
+     * CANCELLATION IS SERVER-SIDE FIRST (audit CANCEL-01).
+     *
+     * This previously cancelled only the local collection job. The engine kept
+     * generating tokens, could keep executing tools, and kept mutating the
+     * persisted session - so the UI said "stopped" while the agent was still
+     * working. It also cleared workActive immediately, which let the hang
+     * detector judge the engine idle and restart it mid-run.
+     *
+     * Now: ask the server to cancel, and only release workActive once that
+     * request has actually completed. If the cancel cannot be confirmed we
+     * still stop the UI, but say "stop requested" rather than claiming the
+     * agent has stopped.
+     */
     fun stopStreaming() {
-        streamJob?.cancel()
+        val job = streamJob
+        val ws = wsId
+        val sid = sessionId
+        val p = port
+
         streamJob = null
-        container.engineSupervisor.setWorkActive(false)
+        job?.cancel()
+
+        if (ws == null || sid == null || p == null) {
+            container.engineSupervisor.setWorkActive(false)
+            finalizeStoppedRun(requestConfirmed = true)
+            return
+        }
+
+        // Keep workActive true until the server acknowledges. A transient
+        // failure here must not be reported to the user as "stopped".
+        viewModelScope.launch {
+            val confirmed = runCatching { CrushApi(p).cancel(ws, sid) }.isSuccess
+            if (!confirmed) {
+                AppLog.w(TAG, "stop: server cancel not confirmed for $sid")
+            }
+            container.engineSupervisor.setWorkActive(false)
+            finalizeStoppedRun(requestConfirmed = confirmed)
+        }
+    }
+
+    private fun finalizeStoppedRun(requestConfirmed: Boolean) {
         _state.value = _state.value.copy(
             isStreaming = false,
             messages = _state.value.messages.map {
                 if (it.isStreaming) it.copy(isStreaming = false) else it
+            },
+            // Do not assert the agent has stopped when we could not tell the
+            // server to. The user is told the truth either way.
+            stopNotice = if (requestConfirmed) {
+                null
+            } else {
+                "Stop requested. The agent may still be finishing."
             }
         )
     }

@@ -1,6 +1,7 @@
-package com.opencode.chat.ui.screens.chat
+﻿package com.opencode.chat.ui.screens.chat
 
 import com.opencode.chat.data.api.LiveZenModel
+import com.opencode.chat.data.api.ModelPrice
 import com.google.gson.JsonParser
 import com.opencode.chat.data.api.ZenModelsApi
 import org.junit.Assert.assertEquals
@@ -84,10 +85,72 @@ class ModelChoiceTest {
         val list = JsonParser.parseString(providersJson).asJsonArray
             .map { it.asJsonObject }
         val prices = ZenModelsApi.pricesFromProviders(list, "opencode-zen")
-        val free = prices.getValue("space-bunny-free")
-        val paid = prices.getValue("some-paid")
-        assertTrue(free.first <= 0.0 && free.second <= 0.0)
-        assertTrue(paid.first > 0.0 || paid.second > 0.0)
+        assertTrue(prices.getValue("space-bunny-free").isKnownZero)
+        assertTrue(!prices.getValue("some-paid").isKnownZero)
+    }
+
+    // ---- MODEL-02: unknown price is NOT zero ---------------------------
+    //
+    // These used to coerce a missing price to 0.0, which made "we have no data"
+    // indistinguishable from "this model is free" and let free-first ordering
+    // prefer models whose cost was simply undocumented.
+
+    private val missingPriceJson = """
+        [
+          {"id":"opencode-zen","models":[
+            {"id":"no-price-at-all"},
+            {"id":"null-prices","cost_per_1m_in":null,"cost_per_1m_out":null},
+            {"id":"half-known","cost_per_1m_in":0}
+          ]}
+        ]
+    """.trimIndent()
+
+    private fun pricesOf(json: String): Map<String, ModelPrice> =
+        ZenModelsApi.pricesFromProviders(
+            JsonParser.parseString(json).asJsonArray.map { it.asJsonObject },
+            "opencode-zen"
+        )
+
+    @Test
+    fun `a model with no price fields is unknown, not free`() {
+        val p = pricesOf(missingPriceJson).getValue("no-price-at-all")
+        assertNull("absent price must stay null", p.costIn)
+        assertNull(p.costOut)
+        assertTrue("undocumented cost must not read as free", !p.isKnownZero)
+    }
+
+    @Test
+    fun `explicit null prices are unknown, not free`() {
+        val p = pricesOf(missingPriceJson).getValue("null-prices")
+        assertTrue(!p.isKnownZero)
+    }
+
+    @Test
+    fun `a zero in-cost with unknown out-cost is not known-free`() {
+        // Free to send, unknown to receive. Claiming "free" here could route a
+        // paid response through a model we believe costs nothing.
+        val p = pricesOf(missingPriceJson).getValue("half-known")
+        assertEquals(0.0, p.costIn!!, 0.0001)
+        assertNull(p.costOut)
+        assertTrue(!p.isKnownZero)
+    }
+
+    @Test
+    fun `both sides explicitly zero is free`() {
+        val list = JsonParser.parseString(providersJson).asJsonArray
+            .map { it.asJsonObject }
+        val p = ZenModelsApi.pricesFromProviders(list, "opencode-zen")
+            .getValue("space-bunny-free")
+        assertTrue(p.isKnownZero)
+    }
+
+    @Test
+    fun `describe separates unknown from free`() {
+        assertEquals("price unknown", ModelPrice(null, null).describe())
+        assertEquals("free", ModelPrice(0.0, 0.0).describe())
+        assertTrue(ModelPrice(1.25, 5.0).describe().contains("1.25"))
+        // Half-known must not be described as free either.
+        assertTrue(!ModelPrice(0.0, null).describe().contains("free"))
     }
 
     @Test
@@ -102,8 +165,8 @@ class ModelChoiceTest {
         val list = JsonParser.parseString(providersJson).asJsonArray
             .map { it.asJsonObject }
         assertTrue(
-            ZenModelsApi.pricesFromProviders(list, "absent")
-                .getOrDefault("anything", 1.0 to 1.0).first > 0.0
+            !ZenModelsApi.pricesFromProviders(list, "absent")
+                .getOrDefault("anything", ModelPrice(1.0, 1.0)).isKnownZero
         )
     }
 

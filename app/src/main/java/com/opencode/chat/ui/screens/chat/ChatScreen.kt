@@ -15,6 +15,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -306,6 +310,16 @@ private fun Bubble(m: ChatMessage) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
+        // Tool activity sits ABOVE the reply bubble, and only for the agent.
+        //
+        // Placement matters: the agent reads files and runs commands, and the
+        // user must see that happening before the summary, not buried inside
+        // it. Previously this was parsed and discarded, so all of it was
+        // invisible.
+        if (!isUser && m.tools.isNotEmpty()) {
+            ToolActivityList(m.tools)
+            Spacer(Modifier.height(6.dp))
+        }
         Box(
             modifier = Modifier
                 .clip(
@@ -323,7 +337,10 @@ private fun Bubble(m: ChatMessage) {
         ) {
             Column {
                 if (m.text.isEmpty() && m.isStreaming && m.error == null) {
-                    Text("thinking...", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (m.tools.isEmpty()) "thinking..." else "working...",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 } else {
                     Text(m.text, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -334,6 +351,124 @@ private fun Bubble(m: ChatMessage) {
                         color = MaterialTheme.colorScheme.error,
                         fontFamily = FontFamily.Monospace
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Collapsed-by-default rows, one per tool call.
+ *
+ * A coding agent runs a lot of tools; expanding all of them by default would
+ * bury the conversation. But the count and the names are always visible, because
+ * the point is supervision - you should always be able to see that the agent did
+ * something, and what, without tapping.
+ */
+@Composable
+private fun ToolActivityList(tools: List<ToolActivity>) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        tools.forEach { tool ->
+            ToolRow(tool)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ToolRow(tool: ToolActivity) {
+    // Expand automatically only while the tool is mid-flight, so live progress
+    // is visible without the user hunting. A finished tool collapses again.
+    var expanded by remember(tool.id) { mutableStateOf(tool.isRunning) }
+
+    val tint = when (tool.state) {
+        ToolState.FAILED -> MaterialTheme.colorScheme.error
+        ToolState.COMPLETED -> MaterialTheme.colorScheme.onSurfaceVariant
+        ToolState.RUNNING, ToolState.PENDING -> MaterialTheme.colorScheme.primary
+        ToolState.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(vertical = 2.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = when (tool.state) {
+                        ToolState.FAILED -> Icons.Default.Warning
+                        ToolState.COMPLETED -> Icons.Default.CheckCircle
+                        ToolState.RUNNING -> Icons.Default.Refresh
+                        else -> Icons.Default.Info
+                    },
+                    contentDescription = tool.state.name,
+                    tint = tint,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    tool.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontFamily = FontFamily.Monospace,
+                    color = tint
+                )
+                Spacer(Modifier.width(7.dp))
+                if (tool.isRunning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(11.dp),
+                        strokeWidth = 1.5.dp
+                    )
+                    Spacer(Modifier.width(7.dp))
+                }
+                Text(
+                    tool.args.take(70).replace('\n', ' '),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            }
+
+            if (expanded && (tool.args.isNotBlank() || tool.output.isNotBlank() || tool.error != null)) {
+                Column(Modifier.padding(start = 32.dp, end = 10.dp, bottom = 6.dp)) {
+                    if (tool.args.isNotBlank()) {
+                        Text(
+                            tool.args,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (tool.output.isNotBlank() || tool.error != null) {
+                            Spacer(Modifier.height(6.dp))
+                        }
+                    }
+                    tool.error?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    if (tool.output.isNotBlank()) {
+                        Text(
+                            tool.output,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }

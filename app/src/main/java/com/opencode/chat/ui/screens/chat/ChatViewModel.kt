@@ -44,7 +44,20 @@ data class ChatMessage(
     val text: String,
     val thinking: String = "",
     val isStreaming: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /**
+     * Tool invocations made by the agent, in the order it made them.
+     *
+     * Populated from the engine's `tool_call` parts. The engine already emitted
+     * these and the client already parsed them into `StreamMessage.toolCalls`;
+     * they were then dropped on the floor, so the agent read files and ran
+     * commands with nothing on screen to show for it.
+     *
+     * The engine republishes WHOLE messages, so this is replaced wholesale on
+     * every frame rather than appended to - appending would duplicate rows
+     * every time a tool's state advanced.
+     */
+    val tools: List<ToolActivity> = emptyList()
 )
 
 data class ChatUiState(
@@ -502,14 +515,25 @@ private var streamJob: Job? = null
 
             val replayed = history.mapNotNull { m ->
                 val text = m.text
+                // Tool activity is replayed too. A reopened chat that showed the
+                // answer but hid the fact that the agent read six files to
+                // produce it would misrepresent what happened.
+                val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
                 // Skip empty assistant placeholders; they are mid-stream rows,
-                // not something the user ever saw.
-                if (m.role == "user" && text.isNotBlank()) {
-                    ChatMessage(id = "h-u-${m.id}", role = "user", text = text)
-                } else if (m.role == "assistant" && text.isNotBlank()) {
-                    ChatMessage(id = "h-a-${m.id}", role = "assistant", text = text)
-                } else {
-                    null
+                // not something the user ever saw. An assistant turn that ONLY
+                // used tools is kept - dropping it would erase the trace of the
+                // work entirely.
+                when {
+                    m.role == "user" && text.isNotBlank() ->
+                        ChatMessage(id = "h-u-${m.id}", role = "user", text = text)
+                    m.role == "assistant" && (text.isNotBlank() || tools.isNotEmpty()) ->
+                        ChatMessage(
+                            id = "h-a-${m.id}",
+                            role = "assistant",
+                            text = text,
+                            tools = tools
+                        )
+                    else -> null
                 }
             }
 
@@ -850,10 +874,15 @@ private var streamJob: Job? = null
                         val m = gson.fromJson(ev.body, StreamMessage::class.java)
                         if (m.role == "assistant") {
                             // Crush republishes the WHOLE message, so replace.
+                            // Tools are replaced with it, never appended: each
+                            // frame carries the full set, and appending would
+                            // stack a duplicate row every time a tool advanced.
+                            val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
                             updateStreaming {
                                 it.copy(
                                     text = m.text.ifBlank { it.text },
                                     thinking = m.thinking.ifBlank { it.thinking },
+                                    tools = tools.ifEmpty { it.tools },
                                     error = m.finishError ?: it.error
                                 )
                             }

@@ -4,6 +4,24 @@ Written 2026-10-03 from real sources, not taste. Reference implementations
 reviewed: `lovechat` (`:chatui` library), `MaterialChat`, Androidify (Google's
 M3 Expressive reference app), plus Material 3 Expressive research.
 
+> **Status update, 2026-10-09.** The P0 items below were open when this was
+> written. All three are now closed and verified on device:
+>
+> | P0 item | State |
+> |---|---|
+> | 1. Markdown rendering | ✅ Done. `MarkdownParser` + `MarkdownText`; streaming-safe, hand-rolled, 25 tests |
+> | 2. Send path unverified | ✅ Verified end-to-end, twice over (multiple messages; context carried across turns) |
+> | 3. Unlock flow missing | ✅ Done. Platform credential screen, mandatory once a key exists |
+>
+> Sections below are preserved as the original design rationale, not as a current
+> status report. For what works and what does not, see
+> [`capabilities.md`](capabilities.md).
+>
+> The current P0 is different: **file diffs**. The agent writes files and the
+> user sees prose describing the change, which is the same class of problem the
+> Markdown gap was — a capability that exists in the engine but is invisible in
+> the product.
+
 ## Research findings that change our decisions
 
 1. **M3 Expressive measurably works.** Google's eye-tracking study (46 studies,

@@ -12,6 +12,22 @@
 | Bytecode target | 17 | see "Why bytecode stays 17" |
 
 Warm build: **1m46s**. Cold build from empty caches: ~1h (one-time).
+Measured on this host, warm `testDebugUnitTest + assembleRelease` runs
+**4–10 minutes** depending on what changed.
+
+### On the KGP / Compose-compiler version split
+
+The two versions differ (`2.4.10` vs `2.4.20`) **by design, not by accident.**
+`gradle.properties` sets `android.builtInKotlin=false`, so this project owns the
+Kotlin version instead of inheriting AGP's, and the Compose compiler plugin is
+versioned on its own track.
+
+An external audit recommended matching them at a tested version, on the grounds
+that Kotlin's own guidance treats them as sharing one version reference. That is
+a reasonable de-risking step, but it is a **change to be made deliberately**, not
+a bug to be fixed: the build is green across 213 unit tests and repeated signed
+release builds on AGP 9.4.1 / Gradle 9.8 with the split in place. If aligning,
+change both to 2.4.20 in one commit and re-run the full suite.
 
 ## The AGP 10 problem
 

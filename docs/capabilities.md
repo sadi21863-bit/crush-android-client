@@ -1,132 +1,145 @@
-# Chat system capabilities
+# Capabilities
 
-Status as of 2026-10-04. **120 unit tests, 0 failures.** Single reference device:
-Redmi Note 7 Pro, API 29, arm64-v8a.
+What this app actually does, and — just as important — what it does not.
 
-"Engine" = the bundled Crush `libcrush.so`. "App" = what the Android UI actually
-exposes. The gap between those two columns is the roadmap.
+Verification is against a physical arm64 device (Redmi Note 7 Pro, API 29).
+"Implemented but unverified" means the code is written and compiles, and has not
+been exercised on hardware. That distinction has bitten this project repeatedly:
+two defects that looked finished (`NetworkOnMainThreadException` in delete, and
+minting a new session on every re-attach) passed every unit test and only
+surfaced on a phone.
 
----
+**arm64-v8a only · minSdk 29 · API 29+**
 
-## Verified working on device
+## Verified working
 
 | Capability | Evidence |
 |---|---|
-| Streaming replies | SSE, `run_complete` + `run_id` match confirmed |
-| Free models | `space-bunny-free` live |
-| Model picker | Live Zen catalogue, free-first, with cost / context / reasoning levels |
-| Multi-turn threads | Sessions reused instead of one-per-send |
-| Chat list | Drawer with auto-titles, message count, cost, relative time |
-| Reopen chat + history | Replayed from `GET /sessions/{sid}/messages` |
-| Delete chat | Confirmation dialog, clears local binding |
-| New chat | History preserved |
-| Stop mid-stream | Cancels without tearing down the engine |
-| App lock | Fingerprint **or** PIN / pattern / password |
-| Encrypted API key | AES-256-GCM, Keystore-gated, `auth-legacy` tier on API 29 |
-| Crash + event log | `files/app.log` |
-| Auto-tuning | Static (RAM/cores) + dynamic (thermal / low-memory / power-saver) |
-| Self-healing | Reaped workspace → auto re-attach + one retry |
+| Chat with streamed replies | Real replies received; Markdown rendered |
+| Multi-message conversations | 64 messages accumulated in one session |
+| Context carried across turns | Assistant answered "Which word?" to an instruction only completed in the prior turn |
+| Long-lived workspace SSE | 3 messages over ~90s with pauses past the ~30s reap window; zero reap symptoms |
+| App lock | Credential prompt on cold resume; cancelling and tapping around does **not** unlock |
+| Session history, resume, delete | Verified on device by the user |
+| Auto-titles | "New chat" became "Ping" automatically |
+| Live model discovery | `probed 10 candidate(s), using space-bunny-free (of 43 listed)` |
+| Real price loading | `catalogue prices loaded for 87 models` |
+| Permission mode persistence | `permissionMode=ASK` survives restarts |
+| Engine lifecycle | Crash/restart, health probing, dynamic thermal tuning |
 
-## Engine supports it, app does not surface it
+## Implemented, unverified on device
 
-| Capability | Endpoint | State |
-|---|---|---|
-| Edit / resend | `prompts/clear`, `messages` | not wired |
-| Regenerate | re-POST `messages/user` | not wired |
-| Tool-call timeline | `tool_call` parts | parsed, not rendered |
-| Thinking / reasoning | `reasoning` parts | parsed, not rendered |
-| Per-turn token + cost | session DTO | list only |
-| Server-side run cancel | `agent/sessions/{sid}/cancel` | client-side only |
-| Context compaction | `config/compact` | not wired |
-| Session summarization | `sessions/{sid}/summarize` | not wired |
-| Prompt queue | `prompts/queued` | not wired |
-| File tracker | `sessions/{sid}/filetracker/files` | not wired |
-| Permission prompts | `permissions/grant` | **bypassed by yolo** |
-| Ask-user questions | `questions/answer` | not wired |
-| MCP servers | 16 endpoints | not wired |
-| Skills | `skills/read` | not wired |
-| LSP | `lsps/start` | not wired |
-| Shell | `sessions/{sid}/shell` | not wired |
-| Multi-provider + OAuth | `config/provider-key`, `refresh-oauth` | Zen only. 42 providers live |
+| Capability | Notes |
+|---|---|
+| Tool-call visibility | Collapsed rows with name, state, arguments, output. **Wire format unconfirmed** — see below |
+| Markdown rendering | Hand-rolled, streaming-safe. Fenced code, inline code, headings, lists, quotes, rules, emphasis, links |
+| In-app diagnostics | Device/ABI/engine status, archived crash, log tail, copy/share report |
+| Settings | Key replace/delete, permission mode, diagnostics entry point |
+| Prewarm | Eager engine start when enabled; lazy on first keystroke otherwise |
 
-## Cannot do at all
+## Not implemented
 
-- Markdown rendering — replies are plain text
-- Syntax highlighting
-- Image / file attachments (engine supports; no UI)
-- Voice input beyond the IME microphone
-- Switching between projects (sessions are workspace-scoped, one workspace)
-- Offline use — requires Zen reachable
-- Sending while backgrounded
-- Session forking — `parent_session_id` exists, no UI
-- Search across chats — no endpoint
+These are the real gaps, ordered by how much they matter for a coding agent.
 
-## Verified only on API 29
+| Gap | Impact |
+|---|---|
+| **File diffs** | The agent writes files; the user sees prose describing the change, not the change. Largest gap against Claude Code / Codex |
+| **Tool-call timeline** | Tool activity is a per-message summary, not a live view of what the agent is doing turn by turn |
+| **Per-turn cost display** | Cost is parsed and shown in the drawer only |
+| **Multi-provider** | Only `opencode-zen`. The engine advertises 42 providers |
+| **Multi-project / workspaces** | One app-private workspace, path-derived id |
+| **Attachments / image input** | Text only |
+| **Instrumentation tests** | No `androidTest` suite at all |
+| **Remote crash reporting** | In-app export only |
 
-The Keystore tier ladder and the authentication path both **change at API 30**:
+## Known defects
 
-- API < 30 → `KeyguardManager.createConfirmDeviceCredentialIntent` (tested)
-- API >= 30 → `BiometricPrompt` with combined authenticators (**never executed**)
+Open issues that are implemented-but-wrong, distinct from the gaps above.
 
-`minSdk` is 26. API 26–28 is likewise unexercised.
+### Tool-call wire format is unconfirmed
 
----
+The engine emits `tool_call` parts and the client parses them, but the exact
+field names were never read off a real tool-using turn. The only fixture
+available was `{"name":"read"}`.
 
-# Prototype readiness
+`ToolActivityParser` therefore reads each field through a list of candidate wire
+names (`WIRE_NAME = ["name", "tool", "tool_name", "toolName"]`, and similarly
+for arguments, state, output, error) and returns `null` when none match. A
+`runCatching`-guarded log records the **key names** the engine actually sends,
+once per distinct shape, so the list can be corrected without guessing again.
 
-## Verdict: not ready to hand to friends yet
+An unrecognised state maps to `UNKNOWN`, never `COMPLETED`. Claiming a tool
+finished when it may not have is the same class of lie as reporting a Stop that
+never happened.
 
-Three blockers, in order of severity.
+### Delete treats transport failure as success
 
-### 1. arm64-v8a only — this is the disqualifier
+`CrushApi.deleteSession` converts a dropped connection, `InterruptedIOException`,
+`EOFException`, and anything containing "workspace not found" into success, on
+the reasoning that "a session cannot outlive its workspace".
 
-The APK ships a single ABI. On a 32-bit device (`armeabi-v7a`) the app installs
-and then **cannot run the engine at all** — no chat, no error worth reading.
-Plenty of budget Android phones are still 32-bit.
+That reasoning is wrong. Sessions are persistent engine state keyed by the
+workspace's cwd; the workspace is only an attachment handle. So a timeout or a
+reaped workspace does **not** prove the session was deleted, and the conversation
+can reappear in the drawer later.
 
-Either ship `armeabi-v7a` or gate the Play listing and tell testers up front.
+Correct behaviour: re-acquire the workspace, retry, and only mutate local state
+once the server confirms. The workspace re-acquisition is now in place; the
+"swallow as success" part is not yet fixed.
 
-### 2. Debug build
+### The engine API is unauthenticated and cross-app reachable
 
-`assembleDebug` means `android:debuggable=true`. Anyone with adb can `run-as` the
-app and read `files/crush.json`, which stores the provider key **in plaintext by
-Crush's design**. Handing a debuggable build to a friend hands them the key.
+Confirmed: `GET /v1/version` and `GET /v1/workspaces` return `HTTP 200` to a
+different app UID (`adb shell`, uid 2000) with no credentials. Android's
+loopback is shared by all apps on the device, so binding to `127.0.0.1` excludes
+the network but not local apps.
 
-A release build needs a signing config that does not exist yet.
+Not confirmed: command execution or key exfiltration. Workspace creation
+requires a registered `client_id` and an unregistered one is refused, so no
+shell command could be attached during testing. Treat as a known architectural
+limitation, not a proven RCE.
 
-### 3. `SpikeActivity` is still a launcher entry
+### First-launch lock bypass
 
-The test harness (`CrushSmokeTest`, `FullE2ETest`, fault injection) appears in the
-app drawer as a second icon. Confusing at best; it exposes a debug surface at
-worst.
+On a fresh install the first session opens without a lock prompt, because
+`AppLockPolicy` returns `OPEN` when there is no stored ciphertext. Later cold
+starts do prompt. Whether onboarding itself warrants a gate is a product
+decision, not settled.
 
-## Also outstanding, lower severity
+### Redundant workspace-lease scaffolding
 
-- **Permission mode is `yolo`** — the agent auto-approves its own tool calls.
-  Blast radius is limited to the app-private workspace, so it cannot reach a
-  friend's photos or messages, but it is the wrong default to ship. Settings
-  should expose *ask* vs *auto-approve*.
-- **The API key has been exposed twice in tool transcripts** via
-  `GET /v1/workspaces`, which embeds `config.providers.*.api_key` in plaintext.
-  Redaction tooling exists in `tools/probe-send.ps1` and `probe-sse-dump.ps1`.
-  Rotation is still pending.
-- **Unverified by a human**: two consecutive sends, PIN unlock, the chat list,
-  delete, and history reopen are all unconfirmed end-to-end.
-- **No crash reporting.** If a friend's phone fails, we learn nothing unless they
-  send `app.log`.
+`WorkspaceLease`, `reattachIfStale`, and the force-retry paths in the send loop
+all predate the long-lived SSE connection, which removes the condition they
+existed to handle. They are now redundant and remain as dead scaffolding. Left
+in place deliberately until the connection has proven stable, to avoid removing
+a fallback that is still the active path when the connection is not `CONNECTED`.
 
-## Minimum bar before handing it over
+## Engine facts this project depends on
 
-1. Release-signed build with `debuggable=false`
-2. Remove `SpikeActivity` from the launcher
-3. Permission mode default changed from yolo to ask
-4. One human pass: unlock → send → send again → open list → reopen → delete
-5. Decide the ABI question, and say so to testers
+All verified on-device against Crush v0.97.1, not read from docs.
 
-## Notes for testers
+| Fact | Detail |
+|---|---|
+| Workspace lifetime | Reaped after ~30s with **no attached client**. Not a fixed interval — it is attachment-based |
+| Workspace identity | Keyed by resolved cwd. The id is an attachment handle that changes on re-attach |
+| Session lifetime | Persistent engine state, independent of the workspace handle |
+| SSE | Only `data:` lines. No `event:`, `id:`, or heartbeat |
+| SSE resume | Impossible (no `id:`). Reconnect and resync from `/messages` |
+| Message updates | Whole message republished, not deltas |
+| Event envelope | `{"type":…,"payload":{"type":…,"payload":{…}}}` |
+| Auth | None |
+| Provider id | `opencode-zen` |
+| `api_key` | Must be sent **bare**; a `NAME=` prefix yields 401 |
+| `scope` | An integer (0 = global), not a string |
+| `/v1/health` | 200 with an **empty body**; use `/v1/version` |
 
-- Needs Android 8.0+ (API 26); only API 29 is known to work
-- arm64 only
-- Requires an OpenCode Zen API key, entered on first run
-- The key is stored encrypted, but Crush keeps its own plaintext copy in
-  app-private storage
+## Testing posture
+
+- **213 JVM unit tests**, all passing.
+- Two `MockWebServer`-backed suites assert on real HTTP order and on requests
+  actually reaching the server — the latter exists because a method that throws
+  before the call produces a *passing-looking* no-op, which is exactly how
+  `deleteSession` failed silently for so long.
+- No instrumentation tests. The highest-risk areas — Keystore, device-credential
+  lifecycle, coroutine flow hot/cold ordering, child-process behaviour — remain
+  device-only.

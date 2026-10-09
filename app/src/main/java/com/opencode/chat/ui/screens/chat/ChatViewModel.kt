@@ -9,9 +9,12 @@ import com.google.gson.Gson
 import com.opencode.chat.data.api.LiveZenModel
 import com.opencode.chat.data.api.ZenModelsApi
 import com.opencode.chat.data.crush.AgentMessageRequest
+import kotlinx.coroutines.flow.receiveAsFlow
 import com.opencode.chat.data.crush.CreateSessionRequest
 import com.opencode.chat.data.crush.CrushApi
+import com.opencode.chat.data.crush.CrushConnection
 import com.opencode.chat.data.crush.CrushEvent
+import com.opencode.chat.data.crush.CrushEventRouter
 import com.opencode.chat.data.crush.CrushEventStream
 import com.opencode.chat.data.crush.CrushSession
 import com.opencode.chat.data.crush.PermissionGrant
@@ -116,9 +119,31 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
 
-private var streamJob: Job? = null
+    private var streamJob: Job? = null
     private var wsId: String? = null
     private var sessionId: String? = null
+
+    /**
+     * Long-lived workspace event connection, plus the router that feeds it.
+     *
+     * Crush reaps a workspace with no attached client after ~30s, so the app
+     * used to open a stream per turn and the workspace died between every pair
+     * of turns. Holding one connection open keeps the workspace attached and
+     * removes the reap, which in turn removes the re-attach-and-retry paths
+     * that existed only to cope with it.
+     *
+     * The per-turn [CrushEventStream] is kept as a fallback: if this connection
+     * is not healthy the app must still be able to run a turn rather than hang
+     * waiting on a socket that will never arrive.
+     */
+    @Volatile
+    private var eventRouter = CrushEventRouter()
+    @Volatile
+    private var eventConnection: CrushConnection? = null
+
+    /** Engine port the current connection is bound to; a change means a restart. */
+    @Volatile
+    private var connectionPort: Int? = null
     private var workspaces: WorkspaceManager? = null
     private var port: Int? = null
 
@@ -401,7 +426,50 @@ private var streamJob: Job? = null
             models = models
         )
         loadModels()
+        // Attach the long-lived stream LAST, once the agent is configured and
+        // the session is settled. Attaching earlier means a workspace that dies
+        // during the slow model probe leaves a socket pointed at nothing.
+        attachEventStream(freshWsOrCurrent(), mgr.clientId)
         resumable?.let { openSession(it) }
+    }
+
+    /**
+     * Keeps [CrushConnection] alive for [ws], reconnecting when the workspace id
+     * changes.
+     *
+     * Safe to call repeatedly: [CrushConnection.ensureAttached] is a no-op when
+     * already attached to the same workspace, and replaces the socket when the
+     * id differs.
+     */
+    private fun attachEventStream(ws: String?, clientId: String) {
+        if (ws.isNullOrBlank()) return
+        val p = port ?: return
+        val conn = eventConnection
+        if (conn != null && p == connectionPort) {
+            conn.ensureAttached(ws, clientId)
+            return
+        }
+        // Port changed means the engine restarted; the old connection is dead.
+        runCatching { conn?.stop() }
+        runCatching { eventRouter.close() }
+        val router = CrushEventRouter()
+        val fresh = CrushConnection(p, router, gson, CrushApi(p).streamClient)
+        // Assign before attaching so a send racing bootstrap sees a consistent
+        // (router, connection) pair.
+        eventRouter = router
+        eventConnection = fresh
+        connectionPort = p
+        fresh.ensureAttached(ws, clientId)
+        AppLog.i(TAG, "long-lived event stream attached to $ws")
+    }
+
+    /** The workspace we should be attached to right now, preferring the newest. */
+    private fun freshWsOrCurrent(): String? = wsId
+
+    override fun onCleared() {
+        runCatching { eventConnection?.stop() }
+        runCatching { eventRouter.close() }
+        super.onCleared()
     }
 
     /**
@@ -795,15 +863,41 @@ private var streamJob: Job? = null
             var attempt = 0
             var failure: String? = null
             var accepted = false
+            // A retried turn must not keep consuming the first attempt's
+            // subscription, or it would read a run id that was never posted.
+            var routerUsedHere = false
 
             // One retry, because a reaped workspace is routine rather than a
             // fault and the user's message must survive it. Two attempts max:
             // retrying more could duplicate a run that actually landed.
             while (attempt < 2 && !accepted) {
                 val runId = UUID.randomUUID().toString()
-                // Subscribe BEFORE prompting: Crush dispatches the run detached,
-                // so events can arrive before the POST even returns.
-                val events = CrushEventStream(api, gson).events(targetWs, mgr.clientId)
+                // Subscribe BEFORE prompting, on the long-lived connection when
+                // it is healthy.
+                //
+                // The engine dispatches a run detached, so an event can arrive
+                // before the POST even returns. The old per-turn callbackFlow
+                // only started reading on collection, i.e. AFTER the POST, which
+                // lost early frames - a race that worsens the faster the engine
+                // replies. Here registration happens first, so nothing is missed.
+                //
+                // Falls back to a dedicated per-turn stream if the shared
+                // connection is not up: waiting on a socket that will never
+                // arrive would hang the turn, and a degraded stream beats a
+                // frozen app.
+                val conn = eventConnection
+                val useShared = conn != null &&
+                    conn.state.value == CrushConnection.State.CONNECTED &&
+                    !routerUsedHere
+                var sharedChannel: kotlinx.coroutines.channels.Channel<CrushEvent>? = null
+                val events: kotlinx.coroutines.flow.Flow<CrushEvent> = if (useShared) {
+                    val ch = eventRouter.register(runId)
+                    sharedChannel = ch
+                    routerUsedHere = true
+                    ch.receiveAsFlow()
+                } else {
+                    CrushEventStream(api, gson).events(targetWs, mgr.clientId)
+                }
 
                 // MUST NOT use launch{} here. A launch creates an independent
                 // coroutine, so an exception thrown by api.send() escapes the
@@ -821,9 +915,18 @@ private var streamJob: Job? = null
                 if (msg == null) {
                     accepted = true
                     failure = null
-                    awaitStream(events, runId)
+                    try {
+                        awaitStream(events, runId)
+                    } finally {
+                        // Release the subscription either way. Completing the run
+                        // closes the channel; an abandoned one must be
+                        // unregistered or it leaks for the process lifetime.
+                        sharedChannel?.let { eventRouter.completeRun(runId) }
+                    }
                 } else {
                     failure = msg
+                    // A failed attempt must not leave a subscription behind.
+                    sharedChannel?.let { eventRouter.unregister(runId, it) }
                     val workspaceGone = msg.contains("workspace not found", ignoreCase = true)
                     if (workspaceGone && attempt == 0) {
                         AppLog.w(TAG, "workspace reaped mid-send; re-attaching and retrying once")

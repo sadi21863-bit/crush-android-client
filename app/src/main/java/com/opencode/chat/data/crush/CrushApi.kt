@@ -1,6 +1,7 @@
-﻿package com.opencode.chat.data.crush
+package com.opencode.chat.data.crush
 
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import com.google.gson.JsonObject
 import com.google.gson.JsonSyntaxException
 import com.google.gson.reflect.TypeToken
@@ -148,6 +149,52 @@ suspend fun agentInfo(workspaceId: String): AgentInfo =
 
     suspend fun messages(workspaceId: String, sessionId: String): List<StreamMessage> =
         getList("/v1/workspaces/$workspaceId/sessions/$sessionId/messages")
+
+    /**
+     * Paths the engine recorded this session touching.
+     *
+     * Confirmed from the spec, which is why this returns a plain `array[string]`
+     * and not a guessed object: `GET .../sessions/{sid}/filetracker/files`.
+     *
+     * Returns EMPTY on any failure rather than throwing, because the caller is
+     * finishing a turn and a missing file list must not fail the turn. But empty
+     * also means "nothing changed", so the caller must not present it as proof
+     * the agent edited nothing - [FileChangeCollector] has no way to tell the two
+     * apart either, and says so via its own unreadable/snapshot flags.
+     */
+    suspend fun trackedFiles(workspaceId: String, sessionId: String): List<String> =
+        runCatching {
+            withContext(Dispatchers.IO) {
+                streamClient.newCall(
+                    Request.Builder()
+                        .url(base + "/v1/workspaces/$workspaceId/sessions/$sessionId/filetracker/files")
+                        .get()
+                        .build()
+                ).execute().use { resp ->
+                    if (!resp.isSuccessful) emptyList()
+                    else parseStringArray(resp.body?.string())
+                }
+            }
+        }.getOrElse { emptyList() }
+
+    private fun parseStringArray(body: String?): List<String> {
+        if (body.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val arr = JsonParser.parseString(body).asJsonArray
+            (0 until arr.size()).mapNotNull { i ->
+                val el = arr.get(i)
+                when {
+                    el.isJsonNull -> null
+                    // `asString` on a JSON number returns "42" and on a boolean
+                    // returns "true", which would become a file PATH named 42. The
+                    // spec says array[string], so anything else is not a path and
+                    // is skipped rather than coerced into meaningless one.
+                    !el.isJsonPrimitive || !el.asJsonPrimitive.isString -> null
+                    else -> el.asString
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
 
     /**
      * Deletes a session.

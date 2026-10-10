@@ -155,4 +155,66 @@ class ToolActivityParserTest {
         val failed = parse("""{"type":"tool_call","data":{"name":"bash","state":"error"}}""")!!
         assertTrue(failed.summary().contains("failed"))
     }
+
+    // ---- the spec-confirmed shape -----------------------------------------
+    //
+    // `tool_name` / `tool_call_id` / `params` are CONFIRMED, not guessed: they are
+    // the REQUIRED properties of the `permission` object Crush sends when a tool
+    // needs approval (spec/crush-openapi.json). The reason for picking that source
+    // is that it is real evidence rather than another plausible guess.
+
+    @Test
+    fun `the spec-confirmed permission shape parses`() {
+        val t = parse(
+            """{"type":"tool_call","data":{
+                 "tool_name":"read",
+                 "tool_call_id":"call-1",
+                 "description":"read the entry point",
+                 "path":"app/src/main.kt",
+                 "params":{"start":1,"end":40}
+               }}"""
+        )
+        assertNotNull(t)
+        assertEquals("read", t!!.name)
+        assertEquals("call-1", t.id)
+        assertEquals("app/src/main.kt", t.path)
+        assertTrue("description should be surfaced", t.description!!.contains("entry point"))
+        // Gson's pretty printer emits `"start": 1` - no space before the colon.
+        assertTrue("params should be shown, got: " + t.args, t.args.contains("\"start\": 1"))
+    }
+
+    @Test
+    fun `the confirmed names win over the fallbacks when both are present`() {
+        // The dangerous case. `name` and `tool_name` can disagree, and whichever
+        // wins decides what the user is told the agent did. With the spec's
+        // `tool_name` at the head of the list, a payload carrying both must report
+        // the spec's name, never the fallback.
+        val t = parse("""{"type":"tool_call","data":{"name":"fallback","tool_name":"read"}}""")
+        assertEquals("read", t!!.name)
+    }
+
+    @Test
+    fun `the summary names the target, not just the tool`() {
+        val t = parse("""{"type":"tool_call","data":{"tool_name":"read","path":"app/src/main.kt"}}""")
+        assertEquals("read app/src/main.kt", t!!.summary())
+    }
+
+    @Test
+    fun `a completed row with a path does not read as a bare tool name`() {
+        val t = parse("""{"type":"tool_call","data":{"tool_name":"write","path":"a.kt","state":"completed"}}""")
+        assertEquals("write a.kt", t!!.summary())
+    }
+
+    @Test
+    fun `a description is used when there is no path`() {
+        val t = parse("""{"type":"tool_call","data":{"tool_name":"bash","description":"run tests"}}""")
+        assertEquals("bash run tests", t!!.summary())
+    }
+
+    @Test
+    fun `the known minimal shape still parses without inventing a target`() {
+        val t = parse("""{"type":"tool_call","data":{"name":"read"}}""")
+        assertNotNull(t)
+        assertEquals("read", t!!.summary())
+    }
 }

@@ -43,18 +43,38 @@ data class ToolActivity(
     val state: ToolState,
     /** Result or partial output. Truncated for display; full text is not kept. */
     val output: String,
+    /** Human-readable intent, when the engine supplies one. */
+    val description: String? = null,
+    /** File or target the call touches, when the engine supplies one. */
+    val path: String? = null,
     val error: String? = null
 ) {
     /** A running tool should read as live, not as finished. */
     val isRunning: Boolean get() = state == ToolState.RUNNING || state == ToolState.PENDING
 
-    /** One-line summary for the collapsed row. */
-    fun summary(): String = when (state) {
-        ToolState.COMPLETED -> name
-        ToolState.FAILED -> "$name failed"
-        ToolState.RUNNING -> "$name running"
-        ToolState.PENDING -> "$name pending"
-        ToolState.UNKNOWN -> name
+    /**
+     * One-line summary for the collapsed row.
+     *
+     * Prefers the path: "read src/main.kt" describes what happened, where
+     * "read" alone only names the tool. A user scanning a long run needs to see
+     * WHICH files were touched without expanding anything.
+     *
+     * The state word is appended to the whole "name target" phrase rather than
+     * formatted inline, because "$name $suffix running" leaves a double space
+     * when the engine sent no target - and trim() does not fix an inner one.
+     */
+    fun summary(): String {
+        val who = when {
+            path != null -> "$name $path"
+            description != null -> "$name $description"
+            else -> name
+        }
+        return when (state) {
+            ToolState.COMPLETED, ToolState.UNKNOWN -> who
+            ToolState.FAILED -> "$who failed"
+            ToolState.RUNNING -> "$who running"
+            ToolState.PENDING -> "$who pending"
+        }
     }
 }
 
@@ -67,13 +87,29 @@ object ToolActivityParser {
     // of showing a tool call is that a human can audit it.
     private val gson = GsonBuilder().setPrettyPrinting().create()
 
-    // ---- candidate wire names. Correct these once the format is confirmed. ----
-    private val WIRE_ID = listOf("id", "call_id", "tool_call_id", "callId", "toolCallId")
-    private val WIRE_NAME = listOf("name", "tool", "tool_name", "toolName")
-    private val WIRE_ARGS = listOf("arguments", "args", "input", "parameters", "params")
+    // ---- candidate wire names -------------------------------------------------
+    //
+    // `tool_name`, `tool_call_id` and `params` are CONFIRMED, not guessed. They
+    // are the required properties of the `permission` object that Crush sends
+    // when a tool needs approval - the same object that describes a tool call,
+    // reached by a different endpoint. See spec/crush-openapi.json.
+    //
+    // `description` and `path` are also from the spec and are worth showing: a
+    // row reading "read - read src/main.kt" tells the user what was touched
+    // without opening anything, which is the whole point of the view.
+    //
+    // The remaining entries are still fallbacks, kept because the message-part
+    // envelope that carries these fields has never been observed end to end.
+    // They cost nothing: [pickString] tries each in order and takes the first
+    // match. Once a real tool_call part is captured, delete what is unused.
+    private val WIRE_ID = listOf("tool_call_id", "id", "call_id", "callId", "toolCallId")
+    private val WIRE_NAME = listOf("tool_name", "name", "tool", "toolName")
+    private val WIRE_ARGS = listOf("params", "arguments", "args", "input", "parameters")
     private val WIRE_STATE = listOf("state", "status", "statuses")
     private val WIRE_OUTPUT = listOf("output", "result", "content", "response")
     private val WIRE_ERROR = listOf("error", "err", "error_message", "errorMessage")
+    private val WIRE_DESCRIPTION = listOf("description", "desc")
+    private val WIRE_PATH = listOf("path", "file", "file_path", "filePath")
 
     private const val MAX_OUTPUT_CHARS = 4000
 
@@ -101,6 +137,8 @@ object ToolActivityParser {
             args = prettify(rawArgs),
             state = parseState(pickString(part, WIRE_STATE)),
             output = truncate(pickString(part, WIRE_OUTPUT).orEmpty()),
+            description = pickString(part, WIRE_DESCRIPTION),
+            path = pickString(part, WIRE_PATH),
             error = pickString(part, WIRE_ERROR)
         )
     }

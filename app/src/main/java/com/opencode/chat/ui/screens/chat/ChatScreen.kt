@@ -116,7 +116,22 @@ val engineState by container.engineSupervisor.state.collectAsStateWithLifecycle(
         "Chat"
     }
 
+    // Notices the ViewModel raised that the user must actually see.
+    //
+    // Both of these describe a situation where the app previously said nothing
+    // and quietly did the wrong thing: a Stop that may not have stopped the
+    // agent, and a delete that may not have deleted the chat. A failure the user
+    // cannot see is still a failure.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(s.deleteError) {
+        s.deleteError?.let { snackbarHostState.showSnackbar(it) }
+    }
+    LaunchedEffect(s.stopNotice) {
+        s.stopNotice?.let { snackbarHostState.showSnackbar(it) }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {

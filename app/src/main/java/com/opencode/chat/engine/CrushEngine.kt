@@ -25,6 +25,25 @@ import java.util.concurrent.TimeUnit
  * Engine state (sessions, messages, config) lives in its own files under
  * [EnginePaths], so a process that dies with the UI costs nothing.
  */
+/**
+ * Converts a reflective `Process.pid()` result to a pid, or -1.
+ *
+ * `Process.pid()` returns a **`long`**, so reflection hands back a
+ * `java.lang.Long`. The previous code did `as? Int`, which can never succeed on
+ * a boxed Long, so it returned -1 on every platform that has `pid()` - and
+ * diagnostics then reported "engine ready pid=-1" for a perfectly healthy
+ * engine, while diagnostics, fault injection and the chaos scripts all worked
+ * from a fabricated value.
+ *
+ * Top-level rather than a member so it is directly testable without spawning a
+ * process.
+ */
+internal fun pidFromReflective(raw: Any?): Int {
+    val n = raw as? Number ?: return -1
+    val l = n.toLong()
+    return if (l > 0 && l <= Int.MAX_VALUE) l.toInt() else -1
+}
+
 class CrushEngine(private val paths: EnginePaths) {
 
     /** Engine idle linger, in seconds, from static auto-tuning. */
@@ -242,9 +261,8 @@ class CrushEngine(private val paths: EnginePaths) {
  * miss simply yields -1 rather than generating thousands of denials.
  */
 private fun readPid(proc: Process): Int = runCatching {
-        val pid = Process::class.java.getMethod("pid").invoke(proc) as? Int
-        if (pid != null && pid > 0) pid else -1
-    }.getOrDefault(-1)
+    pidFromReflective(Process::class.java.getMethod("pid").invoke(proc))
+}.getOrDefault(-1)
 
     /**
      * GET /v1/version. /v1/health returns 200 with an EMPTY body, so it cannot

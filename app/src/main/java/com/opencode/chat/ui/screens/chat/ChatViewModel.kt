@@ -11,6 +11,7 @@ import com.opencode.chat.data.api.ZenModelsApi
 import com.opencode.chat.data.crush.AgentMessageRequest
 import kotlinx.coroutines.flow.receiveAsFlow
 import com.opencode.chat.data.crush.CreateSessionRequest
+import com.opencode.chat.data.crush.DeleteOutcome
 import com.opencode.chat.data.crush.CrushApi
 import com.opencode.chat.data.crush.CrushConnection
 import com.opencode.chat.data.crush.CrushEvent
@@ -79,6 +80,13 @@ data class ChatUiState(
      * is a false claim about work still happening.
      */
     val stopNotice: String? = null,
+    /**
+     * Non-null when a delete could not be confirmed. The session may still
+     * exist, and the chat is deliberately left bound rather than optimistically
+     * removed - telling a user a conversation is gone when it is not is worse
+     * than showing them the failure.
+     */
+    val deleteError: String? = null,
     /**
  * No default model id.
  *
@@ -666,57 +674,70 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         val mgr = workspaces ?: return
         val p = port ?: return
         viewModelScope.launch {
+            // Clear any previous failure banner at the start of a new attempt.
+            _state.value = _state.value.copy(deleteError = null)
+
             if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
                 AppLog.w(TAG, "deleteSession: could not re-attach")
+                _state.value = _state.value.copy(
+                    deleteError = "Could not reach the engine. Try again."
+                )
                 return@launch
             }
-            val ws = mgr.currentWorkspaceId ?: return@launch
-            // Delete may be attempted minutes after the last send, by which point
-            // Crush has reaped the unattached workspace. Re-acquire it with
-            // force=true rather than trusting the lease: a "fresh" lease can
-            // still address a workspace the engine has already dropped, and the
-            // result was a silent no-op that left the chat in the list.
-            var deleted = runCatching { CrushApi(p).deleteSession(ws, sessionId) }
-                .onFailure {
-                    AppLog.w(
-                        TAG,
-                        "deleteSession attempt 1 failed: ${it::class.java.simpleName} " +
-                            "msg=${it.message}"
-                    )
-                }
-                .isSuccess
+            val ws = mgr.currentWorkspaceId
+            if (ws == null) {
+                _state.value = _state.value.copy(
+                    deleteError = "Could not reach the engine. Try again."
+                )
+                return@launch
+            }
 
-            if (!deleted) {
+            // Re-acquire with force=true on failure. A "fresh" lease can still
+            // address a workspace the engine has already dropped, because the
+            // lease is wall-clock based and the reap is attachment based.
+            var outcome = CrushApi(p).deleteSession(ws, sessionId)
+            if (outcome is DeleteOutcome.Failed) {
+                AppLog.w(TAG, "delete attempt 1 unknown: ${outcome.reason}")
                 val back = runCatching { mgr.reattachIfStale(force = true) }
                     .onFailure { AppLog.w(TAG, "delete re-open failed: ${it.message}") }
                     .getOrDefault(false)
                 val ws2 = mgr.currentWorkspaceId
                 if (back && ws2 != null) {
-                    deleted = runCatching { CrushApi(p).deleteSession(ws2, sessionId) }
-                        .onFailure {
-                            AppLog.w(
-                                TAG,
-                                "deleteSession attempt 2 failed: ${it::class.java.simpleName}"
-                            )
-                        }
-                        .isSuccess
-                    if (deleted) wsId = ws2
+                    outcome = CrushApi(p).deleteSession(ws2, sessionId)
+                    if (outcome !is DeleteOutcome.Failed) wsId = ws2
                 }
             }
 
-            if (!deleted) {
-                AppLog.w(TAG, "deleteSession: engine refused for $sessionId")
+            when (outcome) {
+                is DeleteOutcome.Failed -> {
+                    // The session may well still exist. Say so, and DO NOT touch
+                    // local state - clearing the bound session here is what
+                    // produced a conversation that reappeared after the app had
+                    // already told the user it was deleted.
+                    AppLog.w(TAG, "deleteSession unknown outcome: ${outcome.reason}")
+                    _state.value = _state.value.copy(
+                        deleteError = "Could not delete that chat. It may still exist."
+                    )
+                    loadSessions()
+                }
+                DeleteOutcome.Deleted, DeleteOutcome.AlreadyGone -> {
+                    // Confirmed gone, either by a successful delete or by a 404
+                    // on a workspace we know is live.
+                    AppLog.i(TAG, "deleteSession confirmed ($outcome) for $sessionId")
+                    if (sessionId == this@ChatViewModel.sessionId ||
+                        sessionId == _state.value.activeSessionId
+                    ) {
+                        this@ChatViewModel.sessionId = null
+                        existingSessionWorkspace = null
+                        _state.value = _state.value.copy(
+                            messages = emptyList(),
+                            activeSessionId = null
+                        )
+                        newThread()
+                    }
+                    loadSessions()
+                }
             }
-
-            // Deleting the session this chat is bound to would leave a cached id
-            // the engine no longer has, so the next send would 404. Start clean.
-            if (sessionId == this@ChatViewModel.sessionId || sessionId == _state.value.activeSessionId) {
-                this@ChatViewModel.sessionId = null
-                existingSessionWorkspace = null
-                _state.value = _state.value.copy(messages = emptyList(), activeSessionId = null)
-                newThread()
-            }
-            loadSessions()
         }
     }
 

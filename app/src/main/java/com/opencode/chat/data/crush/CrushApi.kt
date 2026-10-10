@@ -20,6 +20,37 @@ import java.util.concurrent.TimeUnit
  * 127.0.0.1. Binding Crush to a routable interface would expose an agent with
  * shell execution to the network.
  */
+/**
+ * Outcome of a delete, distinguishing "gone" from "unknown".
+ *
+ * WHY THIS IS A TYPE AND NOT A BOOLEAN
+ *
+ * This previously converted a dropped connection, `InterruptedIOException`,
+ * `EOFException`, and anything containing "workspace not found" into SUCCESS,
+ * justified by the comment that "a session cannot outlive its workspace". That
+ * premise is false: sessions are persistent engine state keyed by the
+ * workspace's cwd, and the workspace is only an attachment handle that comes and
+ * goes with the ~30s reap. So a timeout proved nothing, the app reported the
+ * chat deleted, and the conversation reappeared in the drawer later.
+ *
+ * A boolean cannot carry "we do not know", and a caller told "false" would
+ * prompt the user to retry something that had already succeeded. The three
+ * cases need three answers.
+ */
+sealed interface DeleteOutcome {
+    /** The server confirmed the session is gone. */
+    object Deleted : DeleteOutcome
+
+    /**
+     * The server said the session does not exist, on a workspace we have just
+     * confirmed is live. So it is genuinely gone - not merely unreachable.
+     */
+    object AlreadyGone : DeleteOutcome
+
+    /** We do not know. The session may or may not still exist. */
+    data class Failed(val reason: String) : DeleteOutcome
+}
+
 class CrushApi(
     @Volatile var port: Int,
     private val gson: Gson = Gson(),
@@ -127,39 +158,39 @@ suspend fun agentInfo(workspaceId: String): AgentInfo =
      * reported success - the row vanished from local state while the session
      * lived on and reappeared in the drawer on the next list.
      */
-    suspend fun deleteSession(workspaceId: String, sessionId: String) {
-        val path = "/v1/workspaces/$workspaceId/sessions/$sessionId"
-        // withContext(Dispatchers.IO) is LOAD-BEARING here, and was missing.
-        //
-        // OkHttp's execute() is synchronous. Being a `suspend fun` does NOT move
-        // the thread - it only allows suspension. Called from viewModelScope
-        // (Main by default) this threw NetworkOnMainThreadException, so the
-        // request never left the device and delete silently did nothing.
-        //
-        // It was invisible because NetworkOnMainThreadException has a NULL
-        // message, and the log only printed the message: every attempt read
-        // "deleteSession failed: null". Logging the exception TYPE is what
-        // finally exposed it. Every other method here goes through get/post,
-        // which already do this - this one called execute() directly.
-        withContext(Dispatchers.IO) {
-            runCatching {
-                streamClient.newCall(
-                    Request.Builder().url(base + path).delete().build()
-                ).execute().use { resp ->
-                    if (resp.code == 404) return@use
-                    requireSuccess(resp, path)
+    /**
+ * Deletes a session.
+ *
+ * Transport failures are reported, never swallowed. The caller re-acquires the
+ * workspace and retries; only a server-confirmed 404 counts as success.
+ */
+suspend fun deleteSession(workspaceId: String, sessionId: String): DeleteOutcome {
+    val path = "/v1/workspaces/$workspaceId/sessions/$sessionId"
+    // withContext(Dispatchers.IO) is LOAD-BEARING. OkHttp's execute() is
+    // synchronous and being `suspend` does not change threads; without this it
+    // throws NetworkOnMainThreadException from a ViewModel, so the request never
+    // leaves the device. It was invisible because that exception has a NULL
+    // message and the log printed only the message.
+    return withContext(Dispatchers.IO) {
+        runCatching {
+            streamClient.newCall(
+                Request.Builder().url(base + path).delete().build()
+            ).execute().use { resp ->
+                when {
+                    resp.isSuccessful -> DeleteOutcome.Deleted
+                    // 404 on a LIVE workspace means the session truly is gone.
+                    resp.code == 404 -> DeleteOutcome.AlreadyGone
+                    else -> DeleteOutcome.Failed("HTTP ${resp.code}")
                 }
-            }.onFailure { e ->
-                // A dropped connection is treated as success: the session cannot
-                // outlive a reaped workspace, so the user's intent is satisfied
-                // even when the socket died before the response.
-                val gone = e is java.io.InterruptedIOException ||
-                    e is java.io.EOFException ||
-                    (e.message ?: "").contains("workspace not found", ignoreCase = true)
-                if (!gone) throw e
             }
+        }.getOrElse { e ->
+            // Explicitly NOT success. A dropped socket is an unknown outcome,
+            // and reporting it as deleted is how a chat comes back from the
+            // dead after telling the user it was removed.
+            DeleteOutcome.Failed("${e.javaClass.simpleName}: ${e.message ?: "no detail"}")
         }
     }
+}
 
     // -------------------------------------------------------------- agent
 
@@ -328,3 +359,4 @@ internal fun normalizeApiKey(raw: String): String {
     if (!looksLikeEnvName) return trimmed
     return trimmed.substring(eq + 1).trim().ifEmpty { trimmed }
 }
+

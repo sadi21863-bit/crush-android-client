@@ -204,9 +204,18 @@ private suspend fun monitorUntilUnhealthy(port: Int): Boolean {
                     }
                     val observed = com.opencode.chat.domain.model.DynamicPolicy.pressureOf(signals)
                     // Hysteresis: escalate at once, relax only after sustained calm.
+                    // DynamicPolicy.next() compares `calmRun + 1 >= 3`, so it expects the count
+                    // from BEFORE this sample. The caller used to increment first
+                    // and pass the new value, so the +1 was applied twice and the
+                    // policy relaxed after TWO calm samples instead of three -
+                    // a device throttling during a short pause would shed its idle
+                    // linger a full sample early. The pure unit tests never
+                    // caught it because they pass a pre-incremented count
+                    // directly and so encode the same contract correctly.
+                    val priorCalm = calmRun
                     calmRun = if (observed == com.opencode.chat.domain.model.PressureLevel.OK) calmRun + 1 else 0
                     val effective = com.opencode.chat.domain.model.DynamicPolicy.next(
-                        pressure, observed, calmRun
+                        pressure, observed, priorCalm
                     )
                     // Derived fresh from the UNADJUSTED base on every poll, never
                     // accumulated. This is the fix for audit SUP-01: the old code

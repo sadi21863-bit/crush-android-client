@@ -670,10 +670,16 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             this@ChatViewModel.sessionId = sessionId
             existingSessionWorkspace = ws
             streamingId = ""
+            // Reopening a session is not the session the last diff was measured
+            // on. Clearing here prevents the drawer's diff from one chat being
+            // displayed under another - which reads as this session having made
+            // edits it never made.
+            workspaceSnapshot = null
             _state.value = _state.value.copy(
                 messages = replayed,
                 isStreaming = false,
-                activeSessionId = sessionId
+                activeSessionId = sessionId,
+                fileChanges = null
             )
         }
     }
@@ -691,10 +697,18 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             wsId = ws
             sessionId = sid
             existingSessionWorkspace = ws
+            // A fresh chat must not inherit the previous session's file changes.
+            // They describe what the agent did on the OTHER session, and showing
+            // them here would claim edits this session never made.
+            //
+            // The snapshot is dropped too, not just the rendered diff: keeping it
+            // would diff the new turn against files captured for the old one.
+            workspaceSnapshot = null
             _state.value = _state.value.copy(
                 messages = emptyList(),
                 isStreaming = false,
-                activeSessionId = sid
+                activeSessionId = sid,
+                fileChanges = null
             )
             loadSessions()
         }

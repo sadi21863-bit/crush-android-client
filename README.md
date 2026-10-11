@@ -19,12 +19,12 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 | Chat with streamed replies | ✅ verified |
 | Multi-message conversations | ✅ verified — 64 messages in one session |
 | App lock (PIN / pattern / password) | ✅ verified — cancelling no longer bypasses it |
-| Session history, resume, delete | ✅ verified |
+| Session history, resume, delete | ✅ verified — a failed delete no longer reports success |
 | Markdown rendering | ✅ verified — code blocks, inline code, emphasis, lists |
 | Live model discovery with probing | ✅ verified — never hardcoded |
 | Long-lived workspace SSE | ✅ verified — no ~30s reap between turns |
-| Tool-call visibility | ⚠️ built; engine wire format still unconfirmed |
-| File diffs | ⬜ not started |
+| Tool-call visibility | ✅ built — field names are spec-confirmed, the part envelope is not |
+| File diffs | ✅ built and tested — the wire path is verified on device |
 | Permission prompts (ask / always / never) | ⚠️ implemented, not device-tested |
 | In-app diagnostics + crash reports | ⚠️ implemented, not device-tested |
 
@@ -150,23 +150,35 @@ model can never reach `agent/init`.
 
 ## Security
 
-**The engine's API is unauthenticated.** Crush grants shell execution and its
-`crush.json` stores the provider key in **plaintext** (Crush's own design).
+**The engine's API is unauthenticated.** Crush grants shell execution, its
+`crush.json` stores the provider key in **plaintext** (Crush's own design), and
+`spec/crush-openapi.json` declares **no security scheme of any kind**.
+
+The bind address does not save you. The engine is launched with
+`server -H tcp://127.0.0.1:$port`, which looks like isolation but is not: on
+Android, loopback is shared by **every app on the device**. Any app holding
+`android.permission.INTERNET` can reach 127.0.0.1 on that port, so the only
+defence the port itself offers is that it must be guessed rather than looked up.
 
 Confirmed on-device: `GET /v1/version` and `GET /v1/workspaces` both return
 `HTTP 200` to a **different app UID** (`adb shell`, uid 2000) with no credentials.
-Android's loopback is shared by every app on the device, so it is not an
-isolation boundary.
 
 **Not confirmed:** command execution and key exfiltration. Creating a workspace
 requires a registered `client_id`, and an unregistered one is refused, so no
-shell command could be attached during testing. The exposure is real; total
-compromise is unproven. Treat it as a known limitation rather than a resolved
-item.
+shell command could be attached during testing. But `GET
+/v1/workspaces/{id}/config` returns the resolved workspace configuration, and
+the key is in it — so the step from "I can reach the server" to "I hold the
+user's Zen key" is a websocket-client registration away. It has not been
+demonstrated; it should be assumed.
+
+`client_id` is **not** a secret: registering a client requires no credential, so
+it cannot be used as a bearer token. Treat it as a claim handle.
 
 App-side mitigations:
 
 - API key encrypted with **AES-256/GCM**; master key in the **Android Keystore**.
+  This protects the key at rest in the app; it does nothing about the running
+  engine's plaintext copy.
 - The key is **not** auth-gated at the Keystore layer, so `KeySession.require()`
   must never mark the session unlocked — doing so is a full authentication
   bypass, since `isUnlocked` is what the lock gate trusts. Only the
@@ -175,6 +187,8 @@ App-side mitigations:
   `androidx.biometric`, which requires an AppCompat theme and crashed onboarding
   on an API 30+ device.
 - Backups disabled: `allowBackup=false` plus `data_extraction_rules.xml`.
+- The workspace is app-private (`filesDir/workspace`), so a local attacker cannot
+  drop a file in it through another app's storage.
 - **Debug builds are not shareable.** `debuggable=true` lets anyone with adb run
   `run-as` and read `crush.json`, which holds the plaintext key. Only sign and
   share release builds.
@@ -183,28 +197,41 @@ App-side mitigations:
 
 ## Known issues
 
-- **Tool-call wire format is unconfirmed.** The agent's tool activity is parsed
-  and rendered, but the engine's exact field names were not verified against a
-  real tool-using turn. The parser reads each field through a list of candidate
-  names and degrades to `null` rather than guessing, and logs the keys it
-  observes so the names can be corrected without guessing again.
-- **Delete treats transport failures as success.** A timeout or dropped
-  connection is reported as "deleted" on the grounds that a session cannot
-  outlive its workspace. Sessions are in fact persistent engine state, so that
-  reasoning is wrong and a failed delete can reappear.
-- **No file diffs.** When the agent writes a file, the user sees prose describing
-  it, not the change. This is the largest remaining gap against a real coding
-  agent.
+- **Tool-call wire format is half-confirmed.** The field names are confirmed from
+  `spec/crush-openapi.json` (`tool_name`, `tool_call_id`, `params`), but the
+  message-part envelope that carries them has never been captured from a real
+  tool-using turn. The parser reads each field through candidate lists and
+  degrades to `null` rather than guessing, and logs the keys it observes.
+- **Engine API is unauthenticated.** See [Security](#security). Not fixable in
+  the app layer: the engine offers no auth to enable.
+- **Delete's 404 is ambiguous.** A 404 on a workspace the ~30s reap has already
+  taken cannot be told apart from a 404 on the session itself. The flow
+  re-attaches first and force-retries once, but "session gone" is still inferred
+  rather than confirmed, so a stale `AlreadyGone` remains possible.
 - **No tool-call timeline or per-turn cost.** Tool activity is a per-message
   summary, not a live view of what the agent is doing.
+- **File diffs have never seen a real turn.** The whole path is built and
+  JVM-tested (snapshot → tracked files → diff → render) and the endpoint and
+  collector are verified running on device, but the only turn measured tracked
+  zero files. That confuses "it works" with "it works on edited files", so treat
+  it as untested until a turn that actually edits something has been checked.
+- **A slow turn still strands a bubble.** `streamSend`'s `finally` now finalises
+  the live bubble, but a turn whose provider simply never replies leaves an
+  empty bubble marked "no reply received". That is honest, not fixed.
 - **First-launch app lock bypass.** On a *fresh* install the first session opens
   without a lock prompt, because there is no stored key at that moment. Later
   cold starts do prompt.
 - **Permission prompts and diagnostics are unverified on device.**
+- **`FALLBACK_PROBE_MODEL` is a hardcoded model id.** It exists only to claim a
+  workspace before discovery runs, and is always replaced by a probed id before
+  the app reports ready — but it is still a literal in
+  `ChatViewModel.Companion`, and a user reading the code has to take that on
+  trust. It should be removed in favour of a discovery-first bootstrap.
 - **Single provider.** Only `opencode-zen` is wired up.
 - **`WorkspaceLease` and the force-retry paths are now redundant.** They predate
   the long-lived connection and remain as dead scaffolding.
-- **No `androidTest` instrumentation suite.** See [Testing](#testing).
+- **No `androidTest` instrumentation suite.** The app-lock flow is covered by a
+  JVM policy suite; the real credential + Keystore path can only run on device.
 
 ## Toolchain
 
@@ -239,13 +266,25 @@ terminal UI framework, compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest     # 213 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 296 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
 session continuity, Markdown, permission modes, tuning policy, lock policy,
-engine compatibility, and the real bootstrap HTTP order against a path-keyed
-`MockWebServer`.
+engine compatibility, line diffing, workspace snapshotting, and the real
+bootstrap HTTP order against a path-keyed `MockWebServer`.
+
+The suites worth naming, because each pins a defect a green build had hidden:
+
+| Suite | What it pins |
+|---|---|
+| `DeleteOutcomeTest` | a dropped socket is **not** a successful delete |
+| `CrushIoThreadingTest` | the request actually reaches the server |
+| `SupervisorHysteresisTest` | the **caller's** calm-run contract, where the off-by-one lived |
+| `LineDifferTest` | line numbers point at the line they describe |
+| `FileChangeCollectorTest` | a real before-image, on a real temp filesystem |
+| `RotateKeepingTailTest` | the newest log lines survive rotation |
+| `AppLockPolicyTest` | cancel never becomes an unlock |
 
 **Robolectric cannot test the things that actually break.** `SecureKeyStore`,
 `WorkspaceManager.reattachIfStale`, `ChatViewModel.send`, and the child-process

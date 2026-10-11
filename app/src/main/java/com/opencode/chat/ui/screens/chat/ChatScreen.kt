@@ -1,8 +1,12 @@
-﻿package com.opencode.chat.ui.screens.chat
+package com.opencode.chat.ui.screens.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.Color
+import com.opencode.chat.domain.file.DiffLine
+import com.opencode.chat.domain.file.FileChangeSet
+import com.opencode.chat.domain.file.FileDiff
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -226,6 +230,23 @@ bottomBar = {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(s.messages, key = { it.id }) { m -> Bubble(m) }
+
+                // What the agent actually changed, at the END of the turn.
+                //
+                // Below the reply, because the conversation is the point and the
+                // diff is the evidence. It is in the scroll rather than a dialog
+                // because the user needs to be able to read it against the reply
+                // that explains it.
+                s.fileChanges?.let { changes ->
+                    // fileCount, not isEmpty: a set with only unreadable files has
+                    // nothing to show a diff for but still has to SAY so, or the
+                    // user is left believing the agent changed nothing.
+                    if (changes.fileCount > 0 || changes.unreadable.isNotEmpty() ||
+                        changes.snapshotUnavailable
+                    ) {
+                        item(key = "file-changes") { FileChangesPanel(changes) }
+                    }
+                }
             }
         }
     }
@@ -388,6 +409,152 @@ private fun ToolActivityList(tools: List<ToolActivity>) {
     ) {
         tools.forEach { tool ->
             ToolRow(tool)
+        }
+    }
+}
+
+/**
+ * The files a turn changed, one collapsible row per file.
+ *
+ * Collapsed by default. An agent run can touch a dozen files and a wall of red and
+ * green pushes the reply itself off-screen, so the row is the summary and the diff
+ * is what you get when you ask for it. Expanding is remembered per file, so
+ * scrolling away and back does not lose it.
+ *
+ * Files we could not diff are listed EXPLICITLY rather than omitted. The whole
+ * point of this panel is that the user can see what the agent did; a silently
+ * dropped file is the same lie as a delete that reported success.
+ */
+@Composable
+private fun FileChangesPanel(changes: FileChangeSet) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            "${changes.fileCount} file${if (changes.fileCount == 1) "" else "s"} changed " +
+                "+${changes.totalAdded} -${changes.totalRemoved}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        if (changes.snapshotUnavailable) {
+            Text(
+                "No before-image was captured, so no diff is shown.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
+        changes.diffs.filter { it.hasChanges }.forEach { diff ->
+            FileDiffRow(diff)
+        }
+
+        if (changes.unreadable.isNotEmpty()) {
+            Text(
+                "${changes.unreadable.size} file(s) not shown (unreadable, binary, or too large): " +
+                    changes.unreadable.take(4).joinToString(", ") +
+                    if (changes.unreadable.size > 4) ", ..." else "",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FileDiffRow(diff: FileDiff) {
+    var expanded by remember(diff.path) { mutableStateOf(false) }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Path first, stat second: WHAT changed is more useful than how much.
+                Text(
+                    diff.path,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
+                )
+                val tint = when {
+                    diff.deleted -> MaterialTheme.colorScheme.error
+                    diff.created -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                Text(
+                    when {
+                        diff.created -> "new"
+                        diff.deleted -> "deleted"
+                        diff.tooLarge -> "${diff.stat()} (large)"
+                        else -> diff.stat()
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = tint
+                )
+            }
+
+            if (expanded) {
+                Column(
+                    Modifier
+                        .padding(horizontal = 10.dp)
+                        .padding(bottom = 8.dp)
+                ) {
+                    if (diff.hunks.isEmpty()) {
+                        Text(
+                            if (diff.tooLarge) "Too large to diff line by line."
+                            else "No line-level change.",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    } else {
+                        diff.hunks.forEach { hunk ->
+                            Text(
+                                "@@ ${hunk.beforeStart},${hunk.lines.size} " +
+                                    "+${hunk.afterStart},${hunk.lines.size} @@",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            // Monospace, and each line keeps its own number. A diff
+                            // without line numbers is decoration.
+                            hunk.lines.forEach { line ->
+                                Row {
+                                    Text(
+                                        (line.beforeLine ?: line.afterLine)?.toString() ?: "",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.width(34.dp)
+                                    )
+                                    val lineTint = when (line.kind) {
+                                        DiffLine.Kind.ADDED -> Color(0xFF1B5E20)
+                                        DiffLine.Kind.REMOVED -> Color(0xFFB71C1C)
+                                        DiffLine.Kind.CONTEXT -> MaterialTheme.colorScheme.onSurface
+                                    }
+                                    Text(
+                                        when (line.kind) {
+                                            DiffLine.Kind.ADDED -> "+ ${line.text}"
+                                            DiffLine.Kind.REMOVED -> "- ${line.text}"
+                                            DiffLine.Kind.CONTEXT -> "  ${line.text}"
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = lineTint
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

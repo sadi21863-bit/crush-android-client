@@ -1,4 +1,4 @@
-﻿package com.opencode.chat.ui.screens.chat
+package com.opencode.chat.ui.screens.chat
 
 import android.content.Context
 import android.util.Log
@@ -23,6 +23,9 @@ import com.opencode.chat.data.crush.PermissionRequest
 import com.opencode.chat.data.crush.RunComplete
 import com.opencode.chat.data.crush.SelectedModel
 import com.opencode.chat.data.crush.Session
+import com.opencode.chat.domain.file.FileChangeCollector
+import com.opencode.chat.domain.file.FileChangeSet
+import com.opencode.chat.domain.file.WorkspaceSnapshotter
 import com.opencode.chat.data.crush.SetModelRequest
 import com.opencode.chat.data.crush.StreamMessage
 import com.opencode.chat.data.crush.WorkspaceLease
@@ -30,6 +33,7 @@ import com.opencode.chat.data.crush.WorkspaceManager
 import com.opencode.chat.data.local.SecureKeyStore
 import com.opencode.chat.di.AppContainer
 import com.opencode.chat.domain.model.TuningPolicy
+import com.opencode.chat.engine.EnginePaths
 import com.opencode.chat.engine.EngineState
 import com.opencode.chat.util.AppLog
 import kotlinx.coroutines.Job
@@ -109,8 +113,27 @@ val selectedModel: String = "",
     val sessions: List<Session> = emptyList(),
     val sessionsLoading: Boolean = false,
     /** The session this chat is bound to. Survives re-attach via the session map. */
-    val activeSessionId: String? = null
-)
+    val activeSessionId: String? = null,
+    /**
+     * Files this session changed.
+     *
+     * Null means "not collected", which is NOT the same as "nothing changed". The
+     * UI must not render an empty list as proof the agent edited nothing: a missing
+     * pre-turn snapshot, or a file we could not read, leaves this null or reports
+     * the path in [FileChangeSet.unreadable].
+     */
+    val fileChanges: FileChangeSet? = null
+) {
+    val fileChangesLabel: String? get() {
+        val s = fileChanges ?: return null
+        if (s.isEmpty) return null
+        return buildString {
+            append("${s.fileCount} file(s) +${s.totalAdded} -${s.totalRemoved}")
+            if (s.unreadable.isNotEmpty()) append(", ${s.unreadable.size} unreadable")
+            if (s.snapshotUnavailable) append(" (no before-image)")
+        }
+    }
+}
 
 /**
  * Phase 4 chat: real sessions, real streaming, a live model picker.
@@ -130,6 +153,17 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     private var streamJob: Job? = null
     private var wsId: String? = null
     private var sessionId: String? = null
+
+    /**
+     * The workspace as it looked before the prompt in flight.
+     *
+     * Reused across turns rather than rebuilt: reading every file on every prompt
+     * would be a real cost, and WorkspaceSnapshotter skips files whose size and
+     * mtime are unchanged. Null when no turn is in flight.
+     */
+    private var workspaceSnapshot: WorkspaceSnapshotter.Snapshot? = null
+
+    private val collector: FileChangeCollector by lazy { FileChangeCollector() }
 
     /**
      * Long-lived workspace event connection, plus the router that feeds it.
@@ -434,6 +468,10 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             models = models
         )
         loadModels()
+        // A newly opened session has no measured diff. Null rather than an empty
+        // list, so the UI reports "not collected" instead of "no files changed".
+        workspaceSnapshot = null
+        _state.value = _state.value.copy(fileChanges = null)
         // Attach the long-lived stream LAST, once the agent is configured and
         // the session is settled. Attaching earlier means a workspace that dies
         // during the slow model probe leaves a socket pointed at nothing.
@@ -925,6 +963,22 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 // surrounding try/catch and kills the process. That is exactly
                 // how a 404 closed the app with no visible error.
                 val sent = withTimeoutOrNull(SEND_TIMEOUT_MS) {
+                    // CAPTURE THE WORKSPACE JUST BEFORE THE PROMPT.
+                    //
+                    // The engine's filetracker names the files a session touched but
+                    // carries no before-image, and the workspace is our own
+                    // filesDir/workspace. So the before side has to be read now: this
+                    // is the only moment the file exists in its pre-edit state.
+                    //
+                    // Snapshotting AFTER the turn would capture the after-image twice
+                    // and every touched file would render as "+N -0", telling the user
+                    // the agent rewrote a file when it changed one line. Clearing any
+                    // stale rows first means a failed turn leaves no phantom diff.
+                    workspaceSnapshot = collector.captureBefore(
+                        workspaceRoot(),
+                        workspaceSnapshot
+                    )
+                    _state.value = _state.value.copy(fileChanges = null)
                     runCatching { api.send(targetWs, AgentMessageRequest(targetSid, text, runId)) }
                 }
                 val msg = when {
@@ -1022,6 +1076,77 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         } finally {
             container.engineSupervisor.setWorkActive(false)
             _state.value = _state.value.copy(isStreaming = false)
+            // Finalise the live bubble no matter how the turn ended.
+            //
+            // Only state.isStreaming used to be cleared here. The bubble's own
+            // isStreaming flag was cleared by `run_complete` inside awaitStream, so
+            // any turn that ended WITHOUT one - the 180s timeout, an SSE that
+            // delivered nothing, an exception between the POST and the first frame -
+            // left a permanent "thinking..." bubble.
+            //
+            // Worse, the UI-level flag was clear, so send() accepted the next
+            // message: two turns then produced two bubbles streaming at once, which
+            // is exactly what a slow free model reproduces. Finalising here means
+            // the bubble is honest about having ended, and empty is shown as the
+            // timeout it is rather than as a reply that never arrived.
+            updateStreaming { m ->
+                m.copy(
+                    isStreaming = false,
+                    // Keep whatever text arrived. An empty bubble is finalised as
+                    // empty and marked, so the user is told the turn ended rather
+                    // than left watching "thinking..." forever.
+                    error = m.error ?: if (m.text.isBlank()) "no reply received" else null
+                )
+            }
+            // Collect the file changes AFTER the turn, however it ended - success,
+            // failure or Stop. Doing it in the success path only would mean a turn
+            // that errored halfway left the user with no record of what the agent had
+            // already written, which is exactly when they most want to see it.
+            //
+            // Runtime, not persisted: this is what the agent did on THIS turn, so a
+            // new session starts empty rather than inheriting a stale diff.
+            collectFileChanges()
+        }
+    }
+
+    private fun workspaceRoot(): File = EnginePaths(context).workspace
+
+    /**
+     * Reads the engine's tracked-file list and diffs it against the pre-turn
+     * snapshot.
+     *
+     * Every failure path leaves [ChatUiState.fileChanges] NULL rather than
+     * fabricating a diff, because a one-sided read would claim the agent wrote
+     * whole files. It also means the UI cannot distinguish "no changes" from "not
+     * measured" - which is why the UI says "not collected" instead of "no files
+     * changed" whenever this is null.
+     */
+    private suspend fun collectFileChanges() {
+        val snap = workspaceSnapshot ?: run {
+            AppLog.w(TAG, "no pre-turn snapshot; file changes not measured")
+            _state.value = _state.value.copy(fileChanges = null)
+            return
+        }
+        val ws = wsId ?: run {
+            _state.value = _state.value.copy(fileChanges = null)
+            return
+        }
+        val sid = sessionId ?: run {
+            _state.value = _state.value.copy(fileChanges = null)
+            return
+        }
+
+        val set = runCatching {
+            val api = CrushApi(port ?: return@runCatching null)
+            val tracked = api.trackedFiles(ws, sid)
+            collector.collect(workspaceRoot(), tracked, snap).copy(sessionId = sid)
+        }.getOrNull()
+
+        _state.value = _state.value.copy(fileChanges = set)
+        if (set == null) {
+            AppLog.w(TAG, "file-change collection failed; not reporting changes")
+        } else {
+            AppLog.i(TAG, "file changes: ${set.stat()}, ${set.unreadable.size} unreadable")
         }
     }
 

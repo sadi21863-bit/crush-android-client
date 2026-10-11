@@ -51,7 +51,14 @@ import javax.crypto.spec.GCMParameterSpec
  * If this ever ships to a store, reconsider: auth-gating belongs back, and the
  * failure modes above need solving properly rather than by removal.
  */
-class SecureKeyStore(context: Context) {
+/**
+ * `open` solely so [FakeSecureKeyStore] can substitute a stub `read()` in a JVM
+ * test. The bypass this covers (`require()` unlocking the app by caching its
+ * result) is the single worst security bug this project has had, and it is only
+ * observable by exercising the boundary between the two classes. A test that
+ * cannot reach that boundary cannot catch a regression in it.
+ */
+open class SecureKeyStore(context: Context) {
 
     private val appContext = context.applicationContext
 
@@ -77,7 +84,7 @@ class SecureKeyStore(context: Context) {
      * Cannot fail for want of authentication any more, so the result is
      * unambiguous: null means absent or corrupt, nothing else.
      */
-    fun read(): String? {
+    open fun read(): String? {
         val cipherText = prefs.getString(KEY_CIPHERTEXT, null) ?: run {
             isUnlocked = false
             return null

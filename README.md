@@ -266,7 +266,7 @@ terminal UI framework, compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 296 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 307 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -280,6 +280,7 @@ The suites worth naming, because each pins a defect a green build had hidden:
 |---|---|
 | `DeleteOutcomeTest` | a dropped socket is **not** a successful delete |
 | `CrushIoThreadingTest` | the request actually reaches the server |
+| `KeySessionLockTest` | `require()` never unlocks the app |
 | `SupervisorHysteresisTest` | the **caller's** calm-run contract, where the off-by-one lived |
 | `LineDifferTest` | line numbers point at the line they describe |
 | `FileChangeCollectorTest` | a real before-image, on a real temp filesystem |

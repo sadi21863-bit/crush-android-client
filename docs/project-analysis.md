@@ -14,15 +14,45 @@ Architecture, the defects that shaped it, and what is left.
 |---|---|
 | Engine lifecycle (boot, health, restart, shutdown) | Solid; supervised, with thermal tuning |
 | Crush protocol client | Solid; HTTP order pinned by `MockWebServer` tests |
-| Model selection | Solid; measured by probing, never hardcoded |
+| Model selection | Built and honest; **no callable model exists on the current key** |
 | Conversation continuity | Fixed and verified — was splitting every 2–3 messages |
 | Session management | Delete fixed; resume fixed; reuse now correct |
-| App lock | Fixed and verified; bypass removed |
+| App lock | Fixed and verified; bypass removed and now covered |
 | Markdown | Implemented, streaming-safe, hand-rolled |
-| Tool-call visibility | Implemented; engine wire format unconfirmed |
-| File diffs | Not started — the largest remaining gap |
+| Tool-call visibility | Built; inner field names spec-confirmed, envelope not |
+| File diffs | Built and JVM-tested; wire path verified, no edited-file turn yet |
 | Security | Key encrypted; **engine API unauthenticated and cross-app reachable** |
-| Test coverage | 213 JVM tests; **no instrumentation suite** |
+| Test coverage | 307 JVM tests; **no instrumentation suite** |
+
+## 1a. The Zen free tier is gone (measured 2026-10-11)
+
+This is an upstream change, not a bug in the app, and it blocks any end-to-end
+device test. Measured against a live key:
+
+| Request | Result |
+|---|---|
+| `GET /v1/models` | **HTTP 200**, 43 models listed |
+| `POST /v1/chat/completions` × all 43 | **0 usable** — 33 × HTTP 402, 10 × HTTP 403 |
+
+The split is unambiguous and is the whole story:
+
+- **33 models return 402** — payment required.
+- **10 models return 403** — and those 10 are *exactly* the models whose ids end
+  in `-free` (`ling-3.1-flash-free`, `cat-jam-free`, `mimo-v2.6-flash-free`,
+  `muse-spark-*.contributor-free`, `nemotron-3.5-lightning-free`, …).
+
+So the free tier is still **advertised** in the catalogue and no longer
+**granted**. A key that authenticates perfectly — which is why the provider's own
+dashboard reports it as active — can list models and call none of them.
+
+**Why the app's message was confusing.** "Model access is disabled" is accurate
+but hides the useful distinction: the key is not revoked, the *models* are. The
+next diagnostic step should say which of the two it found, and the model picker
+should never offer a model that has already been observed to fail.
+
+`FALLBACK_PROBE_MODEL = "space-bunny-free"` is now doubly wrong: that id is no
+longer in the catalogue at all, so even as a placeholder-for-discovery it cannot
+claim a workspace.
 
 The pattern worth naming: **almost every serious defect lived in the seam between
 the Android lifecycle and the engine process lifecycle**, not in pure logic. That

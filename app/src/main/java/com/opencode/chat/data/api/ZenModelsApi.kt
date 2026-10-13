@@ -1,4 +1,4 @@
-﻿package com.opencode.chat.data.api
+package com.opencode.chat.data.api
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -80,7 +80,7 @@ data class ModelPrice(
 }
 
 /** Why a probed model did or did not answer. */
-enum class ProbeVerdict { WORKS, RETIRED, NOT_ENTITLED, BAD_KEY, UNKNOWN }
+enum class ProbeVerdict { WORKS, RETIRED, NOT_ENTITLED, PAYMENT_REQUIRED, BAD_KEY, UNKNOWN }
 
 data class Probe(
     val model: String,
@@ -100,7 +100,18 @@ data class FirstWorking(
     val probed: Int,
     val retired: Int,
     val denied: Int,
-    val badKey: Boolean
+    val badKey: Boolean,
+    /**
+     * Models that answered 402 rather than 403.
+     *
+     * MEASURED 2026-10-11, and the split is the whole story: with the free tier
+     * withdrawn, all 43 models in the catalogue were probed and 33 answered 402
+     * (payment required) while exactly the 10 whose ids end in `-free` answered
+     * 403. Collapsing both into [denied] made a withdrawn free tier
+     * indistinguishable from a key that simply lacks a plan, and those need
+     * different advice: one is fixed upstream, the other is fixed by upgrading.
+     */
+    val paymentRequired: Int = 0
 )
 
 class ZenModelsApi(
@@ -293,7 +304,9 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
                         ProbeVerdict.BAD_KEY
                     } else if (msg.contains("Model is unavailable", true)) {
                         ProbeVerdict.RETIRED
-                    } else if (resp.code == 402 || resp.code == 403) {
+                    } else if (resp.code == 402) {
+                        ProbeVerdict.PAYMENT_REQUIRED
+                    } else if (resp.code == 403) {
                         ProbeVerdict.NOT_ENTITLED
                     } else {
                         ProbeVerdict.UNKNOWN
@@ -329,19 +342,21 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
         var probed = 0
         var retired = 0
         var denied = 0
+        var payment = 0
         for (m in candidates.take(maxProbes)) {
             if (m.isBlank()) continue
             probed++
-            when (val p = probe(m).verdict) {
-                ProbeVerdict.WORKS -> return FirstWorking(m, probed, 0, 0, false)
+            when (probe(m).verdict) {
+                ProbeVerdict.WORKS -> return FirstWorking(m, probed, 0, 0, false, 0)
                 ProbeVerdict.BAD_KEY ->
-                    return FirstWorking(null, probed, retired, denied, true)
+                    return FirstWorking(null, probed, retired, denied, true, payment)
                 ProbeVerdict.RETIRED -> retired++
                 ProbeVerdict.NOT_ENTITLED -> denied++
+                ProbeVerdict.PAYMENT_REQUIRED -> payment++
                 ProbeVerdict.UNKNOWN -> Unit
             }
         }
-        return FirstWorking(null, probed, retired, denied, false)
+        return FirstWorking(null, probed, retired, denied, false, payment)
     }
 }
 

@@ -76,7 +76,26 @@ object ModelChoice {
             return "OpenCode Zen rejected this API key while checking which models it can " +
                 "call. Replace it in Settings."
         }
+        // MEASURED 2026-10-11: a key that the provider's own dashboard calls
+        // "active" - it lists 43 models and is refused by none of the catalogue
+        // endpoints - was still unable to call ANY of them. 33 answered 402
+        // (payment required) and the 10 whose ids end in `-free` answered 403.
+        //
+        // That is a withdrawn free tier, and it is the case this message was
+        // written for. Reporting both statuses as one undifferentiated "access
+        // disabled" is what left the question "why does the website say it is
+        // active?" unanswerable: the key IS active, the models are not.
+        if (result.paymentRequired > 0 && result.denied > 0) {
+            return "Your API key works - Zen serves its model list to it - but no listed " +
+                "model is callable with it. ${result.paymentRequired} model(s) require " +
+                "payment and ${result.denied} (the *-free ones) returned \"model access " +
+                "is disabled\". The free tier appears to have been withdrawn; this key " +
+                "needs a plan that includes model access."
+        }
         return when {
+            result.paymentRequired > 0 ->
+                "This API key is valid, but every model Zen lists ($listed) requires " +
+                    "payment. A plan with model access is needed."
             result.denied > 0 && result.retired == 0 ->
                 "This API key cannot call any of the $listed models Zen lists - Zen answered " +
                     "\"Model access is disabled\" ${result.denied} time(s). It likely needs a " +

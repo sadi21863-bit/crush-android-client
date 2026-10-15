@@ -41,12 +41,27 @@ class CrushEventRouter {
     private var closed = false
 
     /**
-     * Channel for a run. Unbounded with a drop-oldest buffer: if a consumer is
-     * slow, the OLDEST event is the one to lose, because a stale token is worse
-     * than a late one and a stalled consumer must never block the engine reader.
+     * Channel for a run.
+     *
+     * BOUNDED, because `Channel.UNLIMITED` is not an overflow strategy - it is
+     * the absence of one. With DROP_OLDEST on an unbounded channel nothing is
+     * ever dropped, because nothing is ever full, so a consumer that is slow or
+     * absent accumulates every token frame for the life of the process. On a
+     * device with 0.7-1.0 GB free that is an OOM waiting for a long answer.
+     *
+     * 512 is roughly a thousand tokens of headroom, which is far more than the
+     * collector needs: it republishes WHOLE messages, so it coalesces as it
+     * goes and never falls behind by more than a frame or two. If it somehow
+     * does, dropping the OLDEST frame is correct - a stale token is worse than a
+     * late one, and a stalled consumer must never block the engine reader.
      */
     private fun newChannel(): Channel<CrushEvent> =
-        Channel(Channel.UNLIMITED, BufferOverflow.DROP_OLDEST)
+        Channel(QUEUE_CAPACITY, BufferOverflow.DROP_OLDEST)
+
+    companion object {
+        /** Bounded on purpose - see [newChannel]. */
+        const val QUEUE_CAPACITY = 512
+    }
 
     /**
      * Registers interest in [runId] and returns the channel to collect from.

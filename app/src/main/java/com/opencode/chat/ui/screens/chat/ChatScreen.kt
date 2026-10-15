@@ -41,13 +41,18 @@ import com.opencode.chat.engine.EngineState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(onOpenSettings: () -> Unit) {
+fun ChatScreen(onOpenSettings: () -> Unit, isLocked: Boolean = false) {
     val context = LocalContext.current
     val container: AppContainer = (context.applicationContext as OpenCodeChatApp).container
     val vm: ChatViewModel = viewModel(factory = ChatViewModel.Factory(context, container))
     val s by vm.state.collectAsState()
-val engineState by container.engineSupervisor.state.collectAsStateWithLifecycle()
+    val engineState by container.engineSupervisor.state.collectAsStateWithLifecycle()
     val keyAvailable by container.keyAvailable.collectAsStateWithLifecycle()
+
+    // Tell the ViewModel the gate is closed. It cannot infer this: the lock state
+    // lives in MainActivity, and composing this screen behind the overlay was
+    // exactly how the engine booted and the key decrypted while locked.
+    LaunchedEffect(isLocked) { vm.onLockStateChanged(isLocked) }
     val listState = rememberLazyListState()
     var showModels by remember { mutableStateOf(false) }
     var showSessions by remember { mutableStateOf(false) }

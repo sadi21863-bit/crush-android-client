@@ -20,6 +20,15 @@ sealed class Screen(val route: String) {
 fun NavGraph(
     navController: NavHostController,
     hasApiKey: Boolean,
+    /**
+     * True while the lock overlay demands authentication.
+     *
+     * Passed down rather than read from a singleton so the chat layer can refuse
+     * to bootstrap. Composing the chat tree behind a lock screen is fine for
+     * RENDERING, but the ViewModel it creates immediately boots the engine and
+     * decrypts the key - so without this the lock was purely cosmetic.
+     */
+    isLocked: Boolean = false,
     startDestination: String = if (hasApiKey) Screen.Chat.route else Screen.Onboarding.route
 ) {
     NavHost(
@@ -38,7 +47,8 @@ fun NavGraph(
 
         composable(Screen.Chat.route) {
             ChatScreen(
-                onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                isLocked = isLocked
             )
         }
 

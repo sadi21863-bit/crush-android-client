@@ -304,8 +304,49 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         if (wsId == null) bootstrap()
     }
 
+/**
+     * True while the lock gate demands authentication.
+     *
+     * The overlay used to be purely visual: NavGraph composes regardless of gate
+     * state, so this ViewModel booted the engine and decrypted the key BEHIND the
+     * lock screen. Cancelling the prompt therefore appeared to do nothing, because
+     * the privileged work had already started.
+     */
+    @Volatile
+    private var locked: Boolean = false
+
+    /**
+     * Called by the composition whenever the lock gate changes.
+     *
+     * On lock: no NEW work starts. This cannot retract work already in flight - an
+     * agent mid-turn is inside the engine and cancelling it is a separate problem
+     * - but it prevents the far worse case of the key being decrypted and the
+     * engine configured while the user has not authenticated.
+     *
+     * On unlock: resumes. The workspace was deliberately never built while locked,
+     * so it cannot already exist and nothing needs tearing down.
+     */
+    fun onLockStateChanged(isLocked: Boolean) {
+        if (locked == isLocked) return
+        locked = isLocked
+        if (isLocked) {
+            AppLog.i(TAG, "lock engaged; refusing to bootstrap")
+            return
+        }
+        if (port != null) {
+            AppLog.i(TAG, "lock released; resuming")
+            bootstrap()
+        }
+    }
+
     private fun bootstrap() {
         if (bootstrapping) return
+        // THE EXECUTION BOUNDARY. Checked before anything with a side effect: the
+        // whole point is that a locked app performs no privileged work at all.
+        if (locked) {
+            AppLog.i(TAG, "bootstrap refused: locked")
+            return
+        }
         bootstrapping = true
         viewModelScope.launch {
             try {

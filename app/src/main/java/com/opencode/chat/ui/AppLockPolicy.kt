@@ -9,11 +9,21 @@ package com.opencode.chat.ui
  * leaves the key reachable, so every branch is pinned in AppLockPolicyTest.
  *
  * The design goal was "never prompt when a prompt would not actually be
- * required". The Keystore master key is gated with a 300-second validity window,
- * so for the first [graceSeconds] after backgrounding the Cipher still works and
- * the key is already in memory. Prompting there would be pure friction. Once
- * that window lapses, a prompt is functionally required, which is exactly when
- * this policy asks for one.
+ * required". That goal has since become sharper, and the stale version of this
+ * comment was actively misleading.
+ *
+ * The Keystore master key is **NOT auth-gated** any more. It was, with a
+ * 300-second validity window, and removing that gate fixed an API 30+ onboarding
+ * crash. The consequence is that `SecureKeyStore.read()` now always succeeds,
+ * including while the app is locked - so a keystore read is no longer proof of
+ * anything, and the grace period below is a UX decision rather than a
+ * cryptographic one.
+ *
+ * What the grace period still buys: the in-memory key is not thrown away
+ * immediately on backgrounding, so a brief check-and-back does not force a
+ * biometric prompt. What it does NOT buy is protection of the key at rest - the
+ * ciphertext is decryptable throughout. See docs/project-analysis.md for the
+ * honest version of that trade-off.
  */
 object AppLockPolicy {
 

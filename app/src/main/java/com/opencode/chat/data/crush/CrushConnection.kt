@@ -66,14 +66,55 @@ class CrushConnection(
      */
     @Synchronized
     fun ensureAttached(ws: String, cid: String) {
+        val previousCid = clientId
         clientId = cid
-        if (workspaceId == ws && running.get()) {
-            // Already attached to the right workspace.
+        val previousWs = workspaceId
+
+        // A change of EITHER identity invalidates the socket. Client id is not
+        // cosmetic: Crush scopes workspace claims per client, so a stream opened
+        // under an old client is reading on behalf of claims the engine may have
+        // already released. Treating only a workspace change as a replacement
+        // leaves that socket attached indefinitely.
+        val identityChanged = (previousWs != null && previousWs != ws) ||
+            (previousCid.isNotEmpty() && previousCid != cid)
+
+        // Idempotent and safe to call repeatedly: same identity, live reader,
+        // nothing to do.
+        if (!identityChanged && previousWs == ws && running.get()) {
             if (_state.value == State.CONNECTED || _state.value == State.CONNECTING) return
-        } else if (workspaceId != null && workspaceId != ws) {
-            AppLog.i(TAG, "workspace changed ${workspaceId} -> $ws; reconnecting")
         }
+
+        if (previousWs != null && previousWs != ws) {
+            AppLog.i(TAG, "workspace changed $previousWs -> $ws; replacing reader")
+        } else if (previousCid.isNotEmpty() && previousCid != cid) {
+            AppLog.i(TAG, "client changed $previousCid -> $cid; replacing reader")
+        }
+
         workspaceId = ws
+
+        // THE BUG THIS FIXES.
+        //
+        // The old code updated `workspaceId` and then returned whenever the reader
+        // was alive. So a workspace change while a stream was open left the OLD
+        // reader thread blocked on the OLD workspace's socket, while the field
+        // claimed the new one. Every subsequent event was attributed to the new
+        // workspace, and because the thread never exited the reconnect never
+        // happened - so the workspace was reaped after ~30s and the app saw
+        // silence until a turn failed.
+        //
+        // Crush re-attaches with a NEW workspace id on every restart, so this is
+        // the common path, not an edge one.
+        //
+        // A change must REPLACE the reader, not reuse it. Cancelling the in-flight
+        // call is what unblocks the old thread; without it the thread sits in
+        // readUtf8Line() until the server closes, which is the leak the old
+        // `running` flag was hiding rather than fixing.
+        if (identityChanged) {
+            running.set(false)
+            _state.value = State.STOPPED
+            inFlight.getAndSet(null)?.cancel()
+        }
+
         if (running.get()) return
         running.set(true)
         _state.value = State.CONNECTING
@@ -82,6 +123,16 @@ class CrushConnection(
         thread.set(t)
         t.start()
     }
+
+    /**
+     * The reader thread identity, for tests.
+     *
+     * Identity is the whole point: the stale-socket bug was invisible to state
+     * assertions because the connection still reported CONNECTED while the thread
+     * belonged to the previous workspace. Comparing thread identity is what makes it
+     * observable.
+     */
+    internal fun readerThreadForTest(): Thread? = thread.get()
 
     /** Tears the connection down. The workspace will then be reaped by Crush. */
     @Synchronized

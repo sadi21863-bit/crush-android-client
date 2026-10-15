@@ -1,4 +1,4 @@
-﻿package com.opencode.chat
+package com.opencode.chat
 
 import android.content.Intent
 import android.os.Bundle
@@ -209,7 +209,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                         } else {
                             NavGraph(
                                 navController = navController,
-                                hasApiKey = hasApiKey
+                                hasApiKey = hasApiKey,
+                                // The chat tree must know the gate is closed, not
+                                // just render behind the overlay.
+                                isLocked = gateState.value == AppLockPolicy.Gate.PROMPT
                             )
                         }
                         // Deliberately OUTSIDE the branch above. The lock gate is
@@ -294,9 +297,19 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         const val ENGINE_BINARY = "libcrush.so"
 
         /**
-         * Matches the Keystore auth window in SecureKeyStore. Below this the Cipher
-         * still works, so prompting would be friction without security value.
-         * Set the manual lock setting to 0 for strict prompt-every-resume.
+         * How long the in-memory key survives backgrounding.
+         *
+         * WAS described as matching a Keystore auth window. It does not, and
+         * cannot: there is no auth window any more. `SecureKeyStore` no longer
+         * gates its key on authentication - removing that gate fixed an API 30+
+         * onboarding crash - so `read()` always succeeds and a keystore read proves
+         * nothing about whether the user is present.
+         *
+         * So this is purely a UX trade: a brief glance away and back should not
+         * cost a biometric prompt. It provides NO protection for the key at rest,
+         * which is decryptable whether or not this timer has lapsed.
+         *
+         * Set to 0 for strict prompt-on-every-resume.
          */
         const val LOCK_GRACE_SEC = 300L
     }

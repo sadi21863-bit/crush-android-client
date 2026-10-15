@@ -137,6 +137,21 @@ buildFeatures {
         compose = true
     }
 
+    testOptions {
+        // android.jar's Log/TextUtils methods throw "not mocked" under plain JVM
+        // tests, which makes any production line that logs untestable.
+        //
+        // The workaround that was in place instead wrapped individual log calls in
+        // runCatching. That swallowed real failures AND left every future log call
+        // a landmine - the SSE workspace-switch tests could not run at all until
+        // this was set properly.
+        //
+        // A no-op is the correct default for a unit test. Robolectric is still
+        // used where real Android behaviour matters; it supplies a real Context,
+        // which returnDefaultValues cannot.
+        unitTests.isReturnDefaultValues = true
+    }
+
     lint {
         // Lint's "vital" pass crashes the release build outright rather than
         // reporting a finding:
@@ -222,4 +237,21 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:5.5.0")
     testImplementation("androidx.compose.ui:ui-test-junit4:1.12.1")
     debugImplementation("androidx.compose.ui:ui-test-junit4:1.12.1")
+}
+
+/**
+ * JVM unit tests must not die on an android.util.Log call.
+ *
+ * Without this, android.jar's Log methods throw "not mocked" and take the whole
+ * test with them - so any production line that logs becomes untestable. The
+ * workaround used before was to wrap each log call in runCatching, which silently
+ * swallowed a real failure AND left every future log call a landmine: the SSE
+ * workspace-switch tests could not run until this was set.
+ *
+ * Return-defaults makes the no-op the RIGHT default for a unit test. Robolectric
+ * is still there for the cases that need real Android behaviour - it supplies a
+ * real Context, which returnDefaultValues cannot.
+ */
+tasks.withType<Test>().configureEach {
+    systemProperty("robolectric.logging", "stdout")
 }

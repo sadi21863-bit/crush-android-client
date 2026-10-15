@@ -4,9 +4,14 @@ package com.opencode.chat.data.local
  * Process-scoped holder for the decrypted API key.
  *
  * This exists to fix the "no API key - add one in Settings" bug (B2). The
- * Keystore master key is gated by a 300-second auth window, so every read of the
- * key is a Cipher operation that throws UserNotAuthenticatedException once that
- * window lapses. Before this class, three separate call sites each did their own
+ * Keystore master key WAS gated by a 300-second auth window, so every read of
+ * the key was a Cipher operation that threw UserNotAuthenticatedException once that
+ * window lapsed. IT IS NO LONGER AUTH-GATED - see [SecureKeyStore], where removing
+ * that gate fixed an API 30+ onboarding crash. The consequence is that read()
+ * now ALWAYS succeeds, including while the app is locked, which is exactly why
+ * [require] must not cache its result.
+ *
+ * Before this class, three separate call sites each did their own
  * `SecureKeyStore.read()`, so a single long session could decrypt the key at
  * bootstrap, fail 200 messages later when the window closed, and report that the
  * user had never supplied a key at all.

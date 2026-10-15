@@ -227,7 +227,8 @@ App-side mitigations:
   the app reports ready — but it is still a literal in
   `ChatViewModel.Companion`, and a user reading the code has to take that on
   trust. It should be removed in favour of a discovery-first bootstrap.
-- **Single provider.** Only `opencode-zen` is wired up.
+- **Multi-provider plumbing is in; only one provider is verified.** See [docs/providers.md](docs/providers.md). Twelve Catwalk ids are offered and the provider is chosen in Settings, but opencode-zen is the only one that has completed a handshake on a device - everything else is labelled unverified rather than claimed working.
+- **OAuth is not implemented.** Crush exposes /config/refresh-oauth and a Copilot import; the app calls neither. The endpoint that *initiates* an OAuth flow is not in the spec at all, so the redirect capture would have to be built from scratch.
 - **`WorkspaceLease` and the force-retry paths are now redundant.** They predate
   the long-lived connection and remain as dead scaffolding.
 - **No `androidTest` instrumentation suite.** The app-lock flow is covered by a
@@ -266,7 +267,7 @@ terminal UI framework, compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 307 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 331 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -308,6 +309,7 @@ Device scripts:
 | [`docs/capabilities.md`](docs/capabilities.md) | What works vs. what does not, per feature |
 | [`docs/toolchain.md`](docs/toolchain.md) | Versions, AGP 10 contingency, backup plan |
 | [`docs/project-analysis.md`](docs/project-analysis.md) | Architecture, known defects, capability plan |
+| [`docs/providers.md`](docs/providers.md) | Provider ids, adding one, and why OAuth is absent |
 | [`docs/dynamic-autotuning.md`](docs/dynamic-autotuning.md) | Thermal/memory tuning design and results |
 | [`docs/ui-spec.md`](docs/ui-spec.md) | UI/UX spec and roadmap |
 | [`docs/termux-project-plan.md`](docs/termux-project-plan.md) | Separate 32-bit / real-dev-environment project |

@@ -1,4 +1,4 @@
-﻿package com.opencode.chat.ui.screens.settings
+package com.opencode.chat.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -6,7 +6,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
+import com.opencode.chat.domain.provider.Providers
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -136,9 +138,9 @@ private fun TuningSection(
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 buildString {
-                    append("${profile.perfClass.name} Â· API ${profile.apiLevel} Â· ")
-                    append("${profile.totalRamMb}MB RAM Â· ${profile.cores} cores")
-                    if (profile.isLowRamDevice) append(" Â· low-RAM")
+                    append("${profile.perfClass.name} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· API ${profile.apiLevel} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ")
+                    append("${profile.totalRamMb}MB RAM ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${profile.cores} cores")
+                    if (profile.isLowRamDevice) append(" ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· low-RAM")
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -242,6 +244,7 @@ fun SettingsScreen(
     // demand. Showing "saved" plus a masked tail conveys everything the eye
     // button did, without the secret ever being present.
 val stored = settings.hasApiKey
+    val providerId = settings.providerId
     var replacing by remember { mutableStateOf(false) }
     var newKey by remember { mutableStateOf("") }
 
@@ -278,6 +281,56 @@ val stored = settings.hasApiKey
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Text(
+                "Provider",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            // The provider is chosen BEFORE the key, because the key belongs to a
+            // provider: a Zen key pasted while OpenCode Go is selected is stored
+            // fine and then fails every turn. Showing them as one "API" block
+            // encouraged exactly that.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Providers.ALL.forEach { p ->
+                        val selected = p.id == providerId
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.saveProviderId(p.id) }
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = selected, onClick = { viewModel.saveProviderId(p.id) })
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    p.displayName,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    buildString {
+                                        append("key from ").append(p.keyHint)
+                                        if (!p.isKnown) {
+                                            append(" - unverified on this build")
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        "Changing provider re-runs the whole handshake and clears the " +
+                            "model choice: a model id from one provider's catalogue is " +
+                            "meaningless to another.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             Text(
                 "API",
                 style = MaterialTheme.typography.titleMedium,

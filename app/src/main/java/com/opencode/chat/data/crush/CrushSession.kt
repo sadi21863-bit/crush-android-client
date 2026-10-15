@@ -33,7 +33,8 @@ class CrushSession(
         path: String,
         dataDir: String,
         permissionMode: com.opencode.chat.domain.model.PermissionMode =
-            com.opencode.chat.domain.model.PermissionMode.ASK
+            com.opencode.chat.domain.model.PermissionMode.ASK,
+        providerId: String = com.opencode.chat.domain.provider.Providers.DEFAULT.id
     ): Ready {
         val ws = workspaces.open(
             path,
@@ -43,7 +44,7 @@ class CrushSession(
             // (yolo) before, so the agent approved its own file edits silently.
             yolo = permissionMode == com.opencode.chat.domain.model.PermissionMode.AUTO_APPROVE
         )
-        return Ready(ws.id, "opencode-zen", false, listOf("workspace ${ws.id.take(8)} created"))
+        return Ready(ws.id, providerId, false, listOf("workspace ${ws.id.take(8)} created"))
     }
 
     /**

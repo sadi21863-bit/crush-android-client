@@ -45,7 +45,7 @@ fun NavGraph(
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onOpenDiagnostics = { navController.navigate(Screen.Diagnostics.route) }
+                onOpenDiagnostics = { navController.navigate(Screen.Diagnostics.route) },
             )
         }
 

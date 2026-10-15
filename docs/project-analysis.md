@@ -22,7 +22,7 @@ Architecture, the defects that shaped it, and what is left.
 | Tool-call visibility | Built; inner field names spec-confirmed, envelope not |
 | File diffs | Built and JVM-tested; wire path verified, no edited-file turn yet |
 | Security | Key encrypted; **engine API unauthenticated and cross-app reachable** |
-| Test coverage | 307 JVM tests; **no instrumentation suite** |
+| Test coverage | 331 JVM tests; **no instrumentation suite** |
 
 ## 1a. The Zen free tier is gone (measured 2026-10-11)
 
@@ -147,7 +147,7 @@ Ordered by how much each matters for a coding agent. Detail in
 1. **File diffs** — the agent writes files invisibly.
 2. **Tool-call timeline** — summary per message, not a live view.
 3. **Per-turn cost display**.
-4. **Multi-provider** — 42 advertised, 1 wired.
+4. **Verify a second provider** - 12 Catwalk ids are offered and the plumbing works, but only `opencode-zen` has completed a handshake. `openrouter` with a `:free` model is the obvious candidate, since Zen's own free tier is withdrawn. See [providers.md](providers.md).
 5. **Multi-project** — one app-private workspace.
 6. **Instrumentation tests**.
 7. **Remote crash reporting** — in-app export only.

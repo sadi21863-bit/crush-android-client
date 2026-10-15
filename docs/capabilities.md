@@ -46,7 +46,7 @@ These are the real gaps, ordered by how much they matter for a coding agent.
 | **File diffs** | The agent writes files; the user sees prose describing the change, not the change. Largest gap against Claude Code / Codex |
 | **Tool-call timeline** | Tool activity is a per-message summary, not a live view of what the agent is doing turn by turn |
 | **Per-turn cost display** | Cost is parsed and shown in the drawer only |
-| **Multi-provider** | Only `opencode-zen`. The engine advertises 42 providers |
+| **Multi-provider** | Plumbing in, 12 Catwalk ids offered, only `opencode-zen` verified. See [providers.md](providers.md) |
 | **Multi-project / workspaces** | One app-private workspace, path-derived id |
 | **Attachments / image input** | Text only |
 | **Instrumentation tests** | No `androidTest` suite at all |
@@ -135,7 +135,7 @@ All verified on-device against Crush v0.97.1, not read from docs.
 
 ## Testing posture
 
-- **213 JVM unit tests**, all passing.
+- **331 JVM unit tests**, all passing.
 - Two `MockWebServer`-backed suites assert on real HTTP order and on requests
   actually reaching the server — the latter exists because a method that throws
   before the call produces a *passing-looking* no-op, which is exactly how

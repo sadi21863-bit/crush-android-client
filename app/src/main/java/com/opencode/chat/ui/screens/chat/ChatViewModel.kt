@@ -9,6 +9,8 @@ import com.google.gson.Gson
 import com.opencode.chat.data.api.LiveZenModel
 import com.opencode.chat.data.api.ZenModelsApi
 import com.opencode.chat.data.crush.AgentMessageRequest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import com.opencode.chat.data.crush.CreateSessionRequest
 import com.opencode.chat.data.crush.DeleteOutcome
@@ -24,6 +26,8 @@ import com.opencode.chat.data.crush.RunComplete
 import com.opencode.chat.data.crush.SelectedModel
 import com.opencode.chat.data.crush.Session
 import com.opencode.chat.domain.file.FileChangeCollector
+import com.opencode.chat.domain.provider.Provider
+import com.opencode.chat.domain.provider.Providers
 import com.opencode.chat.domain.file.FileChangeSet
 import com.opencode.chat.domain.file.WorkspaceSnapshotter
 import com.opencode.chat.data.crush.SetModelRequest
@@ -122,7 +126,15 @@ val selectedModel: String = "",
      * pre-turn snapshot, or a file we could not read, leaves this null or reports
      * the path in [FileChangeSet.unreadable].
      */
-    val fileChanges: FileChangeSet? = null
+    val fileChanges: FileChangeSet? = null,
+    /**
+     * Crush provider id for this chat.
+     *
+     * Resolved through [Provider] rather than a literal at each call site. The
+     * id is the engine's vocabulary - `opencode` does not exist and 500s - so it
+     * is never assembled from a provider's public name.
+     */
+    val providerId: String = Providers.DEFAULT.id
 ) {
     val fileChangesLabel: String? get() {
         val s = fileChanges ?: return null
@@ -222,6 +234,10 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     /** Guards against two concurrent bootstraps racing to create two workspaces. */
     private var bootstrapping: Boolean = false
 
+    /** Latest persisted provider, fed by observeProviderChanges. */
+    @Volatile
+    private var observedProvider: String = ""
+
     /**
      * Called after a successful unlock. Retries bootstrap only when the key was
      * the thing blocking it, so this is cheap to call on every unlock.
@@ -230,6 +246,39 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         if (!keyBlocked || wsId != null) return
         bootstrap()
     }
+
+    /**
+     * Watches the persisted provider and re-bootstraps when it changes.
+     *
+     * Necessary because Settings is a different screen with a different
+     * ViewModel: it persists the choice and this screen never hears about it.
+     * Without this, switching provider in Settings appears to do nothing until
+     * the app is killed - and until then the chat keeps the OLD provider's model
+     * in the slots while the NEW provider key is injected, which fails with a
+     * message about the wrong provider.
+     *
+     * Guarded on the previous value rather than on any emission, because the
+     * settings flow re-emits on every other preference change too and rebuilding
+     * the workspace for a theme tweak would be absurd.
+     */
+    fun observeProviderChanges() {
+        viewModelScope.launch {
+            container.settingsRepository.settings
+                .map { it.providerId }
+                .distinctUntilChanged()
+                .collect { persisted ->
+                    observedProvider = persisted
+                    val resolved = Providers.resolve(persisted).id
+                    if (resolved == _state.value.providerId) return@collect
+                    if (wsId == null && !engineReadyNow()) return@collect
+                    AppLog.i(TAG, "provider changed to $resolved; re-bootstrapping")
+                    setProvider(resolved)
+                }
+        }
+    }
+
+    /** True only when a workspace is live, so an early emission is ignored. */
+    private fun engineReadyNow(): Boolean = _state.value.engineReady && wsId != null
 
     fun bindEngine(engineState: EngineState) {
         val p = (engineState as? EngineState.Running)?.port
@@ -288,6 +337,20 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         val session = CrushSession(api, mgr)
         val d = File(context.filesDir, "").absolutePath
 
+        // WHICH PROVIDER, resolved once for the whole handshake.
+        //
+        // Read from PERSISTED settings, not from in-memory state, because Settings
+        // is a different screen with its own ViewModel and the user can change the
+        // provider there while this one still holds the old value.
+        //
+        // Seven call sites used to pass the literal "opencode-zen". Resolving it
+        // here means the key, the model slots, the price lookup and the agent init
+        // can never disagree about which provider they are configuring - which is
+        // the failure mode when a provider is changed in only some of them: Zen
+        // prices read for one provider while the model is set on another, and
+        // nothing complains.
+        val providerId = Providers.resolve(currentPersistedProvider()).id
+
         // Read the persisted permission mode rather than assuming. Getting this
         // wrong in the AUTO_APPROVE direction silently grants the agent
         // unattended file edits, so it fails safe to ASK on any error.
@@ -296,7 +359,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         }.getOrDefault(com.opencode.chat.domain.model.PermissionMode.ASK)
         AppLog.i(TAG, "permissionMode=$permissionMode")
 
-        val opened = session.openWorkspace("$d/workspace", "$d/crush/state", permissionMode)
+        val opened = session.openWorkspace("$d/workspace", "$d/crush/state", permissionMode, providerId)
         val key = container.keySession.require(secureKeys)
         if (key.isBlank()) {
             // The old copy here was a lie. read() returns null for BOTH "the
@@ -332,7 +395,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         val preferred = _state.value.selectedModel.ifBlank { null }
         var ready = session.ensureAgentReady(
             key,
-            providerId = "opencode-zen",
+            providerId = providerId,
             modelId = preferred ?: FALLBACK_PROBE_MODEL
         )
         if (!ready.isReady) {
@@ -353,7 +416,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         val prices = runCatching {
             ZenModelsApi.pricesFromProviders(
                 api.providers(opened.workspaceId),
-                "opencode-zen"
+                providerId
             )
         }.getOrDefault(emptyMap())
         if (prices.isNotEmpty()) {
@@ -404,10 +467,10 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         // probed model and treat a 404 as "re-open", not as a fatal error.
         var wsNow = opened.workspaceId
         var init = runCatching {
-            session.ensureAgentReady(key, providerId = "opencode-zen", modelId = chosen)
+            session.ensureAgentReady(key, providerId = providerId, modelId = chosen)
         }.getOrElse {
             AppLog.w(TAG, "init with probed model threw: ${it.message}")
-            session.ensureAgentReady(key, providerId = "opencode-zen", modelId = chosen)
+            session.ensureAgentReady(key, providerId = providerId, modelId = chosen)
         }
 
         if (!init.isReady && init.notes.any { it.contains("workspace not found", true) }) {
@@ -423,7 +486,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 wsNow = freshWs
                 init = session.ensureAgentReady(
                     key,
-                    providerId = "opencode-zen",
+                    providerId = providerId,
                     modelId = chosen
                 )
                 if (init.isReady) AppLog.i(TAG, "recovered on workspace $freshWs")
@@ -557,10 +620,58 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         }
     }
 
+    /**
+     * The provider id as PERSISTED, read synchronously.
+     *
+     * Settings is a separate screen with a separate ViewModel, so a change there
+     * is invisible to the in-memory ChatUiState until something rebuilds it. The
+     * provider decides the key, both model slots and the agent init, so reading a
+     * stale value here would configure the old provider with the new provider key.
+     *
+     * Falls back to the in-memory value if the flow has not emitted yet, and to
+     * the default if there is nothing at all - never throws, because failing to
+     * read a preference must not stop the app from starting.
+     */
+    private fun currentPersistedProvider(): String =
+        observedProvider.takeIf { it.isNotBlank() } ?: _state.value.providerId
+
+    /**
+     * Switches provider and re-bootstraps.
+     *
+     * The whole handshake is redone rather than patched: the key, BOTH model
+     * slots, and the agent init are all provider-scoped, so changing only the
+     * provider id leaves the previous provider's model in the slots and the turn
+     * fails with a message about the wrong provider.
+     *
+     * A provider change invalidates the model choice - a model id from one
+     * provider's catalogue means nothing to another, and passing it through would
+     * reproduce "large model not found in provider" on a different route.
+     */
+    fun setProvider(id: String) {
+        val provider = Providers.resolve(id)
+        if (provider.id == _state.value.providerId) return
+        _state.value = _state.value.copy(
+            providerId = provider.id,
+            selectedModel = "",
+            models = emptyList(),
+            modelsError = null,
+            fileChanges = null
+        )
+        // Force a clean re-bootstrap: drop the workspace and any connection so
+        // nothing carries over from the previous provider.
+        wsId = null
+        sessionId = null
+        workspaces = null
+        workspaceSnapshot = null
+        eventConnection?.stop()
+        bootstrap()
+    }
+
     fun setModel(id: String) {
         _state.value = _state.value.copy(selectedModel = id)
         val ws = wsId ?: return
         val p = port ?: return
+        val providerId = Providers.resolve(_state.value.providerId).id
         viewModelScope.launch {
             // Verify before writing to the slots. The picker is fed the public
             // /models list, which contains retired ids, so a tap could otherwise
@@ -586,7 +697,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             runCatching {
                 val api = CrushApi(p)
                 for (slot in listOf(SetModelRequest.LARGE, SetModelRequest.SMALL)) {
-                    api.setModel(ws, slot, SelectedModel(model = id, provider = "opencode-zen"))
+                    api.setModel(ws, slot, SelectedModel(model = id, provider = providerId))
                 }
             }.onFailure { Log.w(TAG, "setModel failed: ${it.message}") }
         }

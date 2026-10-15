@@ -1,4 +1,4 @@
-﻿package com.opencode.chat.ui.screens.settings
+package com.opencode.chat.ui.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -77,6 +77,18 @@ class SettingsViewModel(
                 }
                 .onSuccess { _uiState.value = _uiState.value.copy(error = null) }
         }
+    }
+
+    /**
+     * Persists the provider the next agent start will use.
+     *
+     * Only writes the setting. The chat layer reads it when it opens a
+     * workspace, so this changes the NEXT bootstrap - not a session in flight.
+     * That is deliberate: swapping the provider mid-turn would leave the key,
+     * both model slots and the agent init describing three different providers.
+     */
+    fun saveProviderId(id: String) {
+        viewModelScope.launch { settingsRepository.saveProviderId(id) }
     }
 
     fun saveThemeMode(mode: String) {

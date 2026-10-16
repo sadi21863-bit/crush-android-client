@@ -42,11 +42,13 @@ class EnginePathsLogTest {
 
     @Test
     fun `the newest log wins when several server directories exist`() {
-        val old = File(cache, "server-tcp___127.0.0.1_1001/crush.log").apply {
-            mkdirs(); writeText("old")
+        val old = File(cache, "server-tcp___127.0.0.1_1001").let { dir ->
+            dir.mkdirs()
+            File(dir, "crush.log").apply { writeText("old") }
         }
-        val new = File(cache, "server-tcp___127.0.0.1_2002/crush.log").apply {
-            mkdirs(); writeText("new")
+        val new = File(cache, "server-tcp___127.0.0.1_2002").let { dir ->
+            dir.mkdirs()
+            File(dir, "crush.log").apply { writeText("new") }
         }
         old.setLastModified(1_000)
         new.setLastModified(2_000)
@@ -61,7 +63,10 @@ class EnginePathsLogTest {
 
     @Test
     fun `directories that do not look like server listeners are ignored`() {
-        File(cache, "workspace/crush.log").apply { mkdirs(); writeText("not an engine log") }
+        File(cache, "workspace").let { dir ->
+            dir.mkdirs()
+            File(dir, "crush.log").writeText("not an engine log")
+        }
         assertNull(EnginePaths.newestEngineLog(cache))
     }
 }

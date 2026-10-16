@@ -31,8 +31,10 @@ import java.util.concurrent.TimeUnit
  * The key is read from [com.opencode.chat.data.local.SecureKeyStore], never
  * from disk directly, and is never logged.
  *
- * Named LiveZenModel to avoid colliding with the older unused `LiveZenModel` in
- * ZenApi.kt, which lacks name/isFree and is part of the dead direct-API path.
+ * Named LiveZenModel because the legacy direct-API path once had its own
+ * ZenModel data class. That path (ZenApi.kt + ZenRepository.kt, the old
+ * opencode.ai/zen/v1 Retrofit client) is deleted - it never worked end to end
+ * and only duplicated what Crush now does properly.
  */
 data class LiveZenModel(
     val id: String,

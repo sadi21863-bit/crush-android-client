@@ -248,7 +248,7 @@ class CrushEngine(private val paths: EnginePaths) {
         synchronized(logBuffer) { logBuffer.toString() }
             .takeIf { it.isNotBlank() }
             ?.takeLast(2000)
-            ?: runCatching { paths.logFile().takeIf { it.exists() }?.readText()?.takeLast(2000) }
+            ?: runCatching { paths.logFile()?.readText()?.takeLast(2000) }
                 .getOrNull()
 
 /**

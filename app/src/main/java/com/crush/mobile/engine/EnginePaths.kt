@@ -76,7 +76,23 @@ class EnginePaths(
         this["CRUSH_SERVER_IDLE_TIMEOUT"] = idleTimeoutSec.toString()
     }
 
-    /** Engine log path. Crush writes here when stderr is not a tty, as on Android. */
-    fun logFile(): File =
-        File(cache, "server-tcp--127.0.0.1/crush.log")
+    /**
+     * Engine log path. Crush writes here when stderr is not a tty, as on Android.
+     *
+     * The directory name embeds the EPHEMERAL bind port
+     * (server-tcp___127.0.0.1_<port>), so it cannot be built up front - the
+     * former guessed path (server-tcp--127.0.0.1, no port) never existed and
+     * the fallback reader silently got nothing. Instead scan the cache dir and
+     * return the newest log across all server directories; null when the
+     * engine has not produced one yet.
+     */
+    fun logFile(): File? = newestEngineLog(cache)
+
+    companion object {
+        /** Newest crush.log under cache's server-*/ directories, or null. */
+        fun newestEngineLog(cacheDir: File): File? =
+            cacheDir.listFiles { f -> f.isDirectory && f.name.startsWith("server-") }
+                ?.mapNotNull { dir -> File(dir, "crush.log").takeIf { log -> log.isFile } }
+                ?.maxByOrNull { it.lastModified() }
+    }
 }

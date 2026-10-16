@@ -50,6 +50,14 @@ fun LockOverlay(
     store: SecureKeyStore,
     keySession: KeySession,
     onUnlocked: () -> Unit,
+    /**
+     * Which provider's credential is being unlocked.
+     *
+     * Required for correctness, not cosmetic: the store is per-provider, so
+     * unlocking while `hyper` is selected must fetch the Hyper key or the user
+     * reaches a chat that authenticates with the wrong provider's token.
+     */
+    providerId: String = SecureKeyStore.LEGACY_PROVIDER,
     modifier: Modifier = Modifier
 ) {
     val activity = LocalContext.current as? FragmentActivity
@@ -77,13 +85,23 @@ fun LockOverlay(
                 }
                 // Reading is unconditional now that the key is encrypted but not
                 // auth-gated, so this either yields the key or storage is broken.
-                val key = runCatching { store.read() }.getOrNull().orEmpty()
-                if (key.isBlank()) {
+                val key = runCatching { store.read(providerId) }.getOrNull().orEmpty()
+                if (key.isBlank() && store.hasStoredCiphertext(providerId)) {
+                    // A ciphertext EXISTS for this provider but could not be
+                    // decrypted: that is genuinely broken storage, and silently
+                    // opening would leave the user staring at "no API key".
                     AppLog.w(TAG, "unlocked but no key could be read")
                     errorText = "Could not read your saved key."
                     return@authenticate
                 }
-                keySession.put(key)
+                // No key for the selected provider is NOT a failure. The gate's
+                // question is "is this the owner?", not "do you have a key?" -
+                // the app can be unlocked with nothing to cache, and the chat
+                // will offer its no-key state. Treating it as an error trapped
+                // the user: the gate prompts when ANY provider has a credential,
+                // so a user whose selected provider has none could authenticate
+                // and still be unable to get past the overlay.
+                keySession.put(key, providerId)
                 AppLog.i(TAG, "unlocked")
                 onUnlocked()
             }

@@ -192,7 +192,15 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     // prompt - there is exactly one reason to be here: either a
                     // key is stored or one is not. Reading it before the user
                     // unlocks would defeat the app lock, so we deliberately do not.
-                    val hasApiKey = remember(store) { store.hasStoredCiphertext() }
+                    //
+                    // Scoped to the SELECTED provider, and recomputed when it
+                    // changes: on this screen the question is "can the chat for
+                    // this provider start?", not "is any credential stored?" -
+                    // the latter would route a user with only a Zen key into a
+                    // chat that then reports "no API key" for Hyper.
+                    val hasApiKey = remember(store, settings.providerId) {
+                        store.hasStoredCiphertext(settings.providerId)
+                    }
 
                     Box(Modifier.fillMaxSize()) {
                         // NavGraph is the ONLY thing that reaches ChatScreen,
@@ -224,6 +232,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                             LockOverlay(
                                 store = store,
                                 keySession = container.keySession,
+                                providerId = settings.providerId,
                                 onUnlocked = {
                                     // The gate IS the unlocked flag. An earlier
                                     // version kept a separate latched boolean that
@@ -250,7 +259,14 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     override fun onResume() {
         super.onResume()
         val container = (application as OpenCodeChatApp).container
-        val hasCiphertext = store.hasStoredCiphertext()
+        // ANY stored credential, not just the selected provider's. A key for a
+        // provider the user is not currently using is still a secret at rest, so
+        // it must still sit behind the gate. Scoping this to one provider would
+        // leave an at-rest credential after a provider switch unguarded.
+        //
+        // The unlock flow tolerates the selected provider having no key, so this
+        // cannot trap the user in the overlay; see LockOverlay.
+        val hasCiphertext = store.providersWithKeys().isNotEmpty()
         // Captured BEFORE the reset below. Logging after it meant every line read
         // "coldStart=false", so the log could not distinguish a cold launch from
         // a resume - which is precisely the distinction being debugged.

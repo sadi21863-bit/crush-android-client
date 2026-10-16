@@ -177,8 +177,10 @@ it cannot be used as a bearer token. Treat it as a claim handle.
 App-side mitigations:
 
 - API key encrypted with **AES-256/GCM**; master key in the **Android Keystore**.
-  This protects the key at rest in the app; it does nothing about the running
-  engine's plaintext copy.
+  Each provider's key is encrypted into **its own slot** (`ct.<providerId>`), so
+  holding a key for several providers is supported and one never overwrites
+  another. This protects keys at rest in the app; it does nothing about the
+  running engine's plaintext copy.
 - The key is **not** auth-gated at the Keystore layer, so `KeySession.require()`
   must never mark the session unlocked — doing so is a full authentication
   bypass, since `isUnlocked` is what the lock gate trusts. Only the
@@ -267,7 +269,7 @@ terminal UI framework, compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 331 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 346 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -287,10 +289,13 @@ The suites worth naming, because each pins a defect a green build had hidden:
 | `FileChangeCollectorTest` | a real before-image, on a real temp filesystem |
 | `RotateKeepingTailTest` | the newest log lines survive rotation |
 | `AppLockPolicyTest` | cancel never becomes an unlock |
+| `SecureKeyStoreProviderScopeTest` | one credential slot per provider — a second key never destroys the first |
 
-**Robolectric cannot test the things that actually break.** `SecureKeyStore`,
-`WorkspaceManager.reattachIfStale`, `ChatViewModel.send`, and the child-process
-engine have no automated coverage — every real crash in this project lived in
+**Robolectric cannot test the things that actually break.** The real Keystore
+cipher (Robolectric ships no AndroidKeyStore provider — the vault suite swaps in
+a reversible stand-in to reach the slot layout), `WorkspaceManager.reattachIfStale`,
+`ChatViewModel.send`, and the child-process engine have no automated coverage —
+every real crash in this project lived in
 exactly that gap. Two of them (`NetworkOnMainThreadException` in delete,
 `newSession` on every re-attach) were invisible to unit tests and only surfaced
 on a device.
@@ -311,6 +316,7 @@ Device scripts:
 | [`docs/project-analysis.md`](docs/project-analysis.md) | Architecture, known defects, capability plan |
 | [`docs/providers.md`](docs/providers.md) | Provider ids, adding one, and why OAuth is absent |
 | [`docs/dynamic-autotuning.md`](docs/dynamic-autotuning.md) | Thermal/memory tuning design and results |
+| [`docs/baseline-2026-10-16.md`](docs/baseline-2026-10-16.md) | What the pre-release checklist verified, measured, and did **not** |
 | [`docs/ui-spec.md`](docs/ui-spec.md) | UI/UX spec and roadmap |
 | [`docs/termux-project-plan.md`](docs/termux-project-plan.md) | Separate 32-bit / real-dev-environment project |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Attribution convention, build and test rules |

@@ -33,6 +33,10 @@ class KeySession {
     @Volatile
     private var cached: String? = null
 
+    /** Which provider [cached] belongs to. Empty means nothing is cached. */
+    @Volatile
+    private var cachedProviderId: String = ""
+
     val isUnlocked: Boolean
         get() = !cached.isNullOrBlank()
 
@@ -40,6 +44,17 @@ class KeySession {
      * The decrypted key, or null. Never log the result of this.
      */
     fun peek(): String? = cached?.takeIf { it.isNotBlank() }
+
+    /**
+     * The cached key ONLY when it belongs to [providerId].
+     *
+     * The cache holds one key at a time, so a plain [peek] while a different
+     * provider is selected describes the wrong credential - a masked hint built
+     * from it would show the user a fragment of a key that is not the one they
+     * are configuring.
+     */
+    fun peekFor(providerId: String): String? =
+        if (cachedProviderId == providerId) peek() else null
 
     /**
      * Marks the session unlocked. ONLY call this after the user has actually
@@ -50,14 +65,16 @@ class KeySession {
      * [isUnlocked] is the single input [com.opencode.chat.ui.AppLockPolicy] uses
      * to decide whether to show the lock screen.
      */
-    fun put(key: String) {
+    fun put(key: String, providerId: String = SecureKeyStore.LEGACY_PROVIDER) {
         if (key.isBlank()) return
         cached = key
+        cachedProviderId = providerId
     }
 
     /** Called when the app locks or the user removes the key. */
     fun clear() {
         cached = null
+        cachedProviderId = ""
     }
 
     /**
@@ -78,11 +95,19 @@ class KeySession {
      * serves the key to code that already decided it is allowed to run, and must
      * not change the lock state as a side effect.
      */
-    fun require(store: SecureKeyStore): String {
-        peek()?.let { return it }
-        // Deliberately NOT cached. Reading is a one-off decryption for work that
-        // is already authorised (a chat in progress, a settings screen the user
+    fun require(
+        store: SecureKeyStore,
+        providerId: String = SecureKeyStore.LEGACY_PROVIDER
+    ): String {
+        // Only serve the cache when it belongs to the provider being asked about.
+        // A cache shared across providers is the same class of bug as a single
+        // credential slot: switching provider and reading hands back the PREVIOUS
+        // provider's token, which then fails against the new provider - or worse,
+        // authenticates against the wrong account.
+        if (cachedProviderId == providerId) peek()?.let { return it }
+        // Deliberately NOT cached. Reading is a one-off decryption for work that is
+        // already authorised (a chat in progress, a settings screen the user
         // already unlocked); caching it here is what granted the bypass.
-        return runCatching { store.read() }.getOrNull().orEmpty()
+        return runCatching { store.read(providerId) }.getOrNull().orEmpty()
     }
 }

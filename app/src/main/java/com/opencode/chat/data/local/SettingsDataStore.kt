@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.opencode.chat.domain.model.AppSettings
+import com.opencode.chat.domain.provider.Providers
 import com.opencode.chat.domain.model.PermissionMode
 import com.opencode.chat.domain.model.TuningPolicy
 import kotlinx.coroutines.flow.Flow
@@ -56,9 +57,18 @@ class SettingsDataStore(context: Context, private val keySession: KeySession = K
         // Deliberately does NOT put the key in AppSettings. It reports only that
         // one exists, plus a masked tail. Callers that genuinely need the
         // credential ask KeySession, which is the single place it is held.
-        val storedKey = keySession.peek()
+        //
+        // Resolved to the SAME id the chat layer uses, so the flag, the hint and
+        // the stored slot always describe one provider. A raw persisted value
+        // would disagree with the chat layer for anything this build no longer
+        // knows - which is when "key saved" would show for a slot nothing reads.
+        val providerId = Providers.resolve(prefs[PROVIDER_ID] ?: Providers.DEFAULT.id).id
+        // Scoped peek: the in-memory cache holds ONE provider's key, and a hint
+        // built from a different provider's key would describe a credential the
+        // user is not looking at.
+        val storedKey = keySession.peekFor(providerId)
         AppSettings(
-            hasApiKey = !storedKey.isNullOrBlank() || secureKeys.hasStoredCiphertext(),
+            hasApiKey = secureKeys.hasStoredCiphertext(providerId),
             apiKeyHint = KeyMask.hint(storedKey),
             // No hardcoded fallback. A default model id is a guess, and this engine
             // rejects an unknown one at agent/init. The live catalogue decides;
@@ -67,7 +77,7 @@ class SettingsDataStore(context: Context, private val keySession: KeySession = K
             themeMode = prefs[THEME_MODE] ?: "system",
             enterSendMode = prefs[ENTER_SEND_MODE] ?: "newline",
             temperature = prefs[TEMPERATURE]?.toDoubleOrNull() ?: 0.7,
-            providerId = prefs[PROVIDER_ID] ?: "opencode-zen",
+            providerId = providerId,
             // parse() fails SAFE: an absent or corrupt value means ASK, never
             // auto-approve. A damaged preferences file must not be able to hand
             // the agent's permissions over silently.
@@ -96,18 +106,27 @@ class SettingsDataStore(context: Context, private val keySession: KeySession = K
         }
     }
 
-    suspend fun saveApiKey(key: String) {
-        secureKeys.write(key)
+    /**
+     * Stores a key for [providerId], never for "whatever provider is current".
+     *
+     * Provider-scoped on purpose. The store used to hold a single credential, so
+     * saving a second provider's key destroyed the first and switching back left
+     * the user with nothing - which is the normal case now that OpenCode Zen's
+     * free tier is withdrawn and a second provider is the way to test at all.
+     */
+    suspend fun saveApiKey(key: String, providerId: String) {
+        secureKeys.write(key, providerId)
         // Keep the in-memory copy in step, otherwise the very next settings
         // emission re-decrypts (or fails to) for a key we already hold.
-        keySession.put(key)
+        keySession.put(key, providerId)
     }
 
     /** Synchronous read for call sites that cannot suspend (engine bootstrap). */
-    fun readApiKey(): String = keySession.require(secureKeys)
+    fun readApiKey(providerId: String): String = keySession.require(secureKeys, providerId)
 
-    suspend fun clearApiKey() {
-        secureKeys.clear()
+    /** Removes ONE provider's credential, leaving the others intact. */
+    suspend fun clearApiKey(providerId: String) {
+        secureKeys.clear(providerId)
         keySession.clear()
     }
 

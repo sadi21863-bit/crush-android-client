@@ -47,8 +47,8 @@ class SettingsViewModel(
      * An uncaught exception here also killed the process outright (no FATAL
      * EXCEPTION in logcat), so the failure must never escape.
      */
-    suspend fun saveApiKeyAwait(key: String): Boolean =
-        runCatching { settingsRepository.saveApiKey(key) }
+    suspend fun saveApiKeyAwait(key: String, providerId: String): Boolean =
+        runCatching { settingsRepository.saveApiKey(key, providerId) }
             .onFailure {
                 AppLog.e(TAG, "saveApiKey failed", it)
                 _uiState.value = _uiState.value.copy(
@@ -58,19 +58,21 @@ class SettingsViewModel(
             .onSuccess { _uiState.value = _uiState.value.copy(error = null) }
             .isSuccess
 
-    fun saveApiKey(key: String) {
-        viewModelScope.launch { saveApiKeyAwait(key) }
+    fun saveApiKey(key: String, providerId: String) {
+        viewModelScope.launch { saveApiKeyAwait(key, providerId) }
     }
 
     /**
-     * Removes the stored credential.
+     * Removes the stored credential for [providerId].
      *
-     * Also clears the in-memory copy in KeySession, otherwise the app would keep
-     * serving a deleted key from the process heap until the next lock.
+     * Scoped, because the vault holds one key per provider: deleting the Hyper
+     * key must not take the Zen key with it. Also clears the in-memory copy in
+     * KeySession, otherwise the app would keep serving a deleted key from the
+     * process heap until the next lock.
      */
-    fun clearApiKey() {
+    fun clearApiKey(providerId: String) {
         viewModelScope.launch {
-            runCatching { settingsRepository.clearApiKey() }
+            runCatching { settingsRepository.clearApiKey(providerId) }
                 .onFailure {
                     AppLog.e(TAG, "clearApiKey failed", it)
                     _uiState.value = _uiState.value.copy(error = "Could not delete the key.")

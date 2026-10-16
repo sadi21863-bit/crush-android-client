@@ -401,14 +401,16 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         AppLog.i(TAG, "permissionMode=$permissionMode")
 
         val opened = session.openWorkspace("$d/workspace", "$d/crush/state", permissionMode, providerId)
-        val key = container.keySession.require(secureKeys)
+        // Read the key for the provider we are about to configure, not for whatever
+        // was cached last.
+        val key = container.keySession.require(secureKeys, providerId)
         if (key.isBlank()) {
             // The old copy here was a lie. read() returns null for BOTH "the
             // user never gave us a key" and "the key is fine, the auth window
             // lapsed", so telling the user to add a key they had already added
             // sent them to Settings for nothing. Now that the app locks at
             // entry, a blank key here almost always means we are locked.
-            keyBlocked = secureKeys.hasStoredCiphertext()
+            keyBlocked = secureKeys.hasStoredCiphertext(providerId)
             _state.value = _state.value.copy(
                 phase = if (keyBlocked) {
                     "unlocking your saved key..."
@@ -653,7 +655,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
 /** Live Zen catalogue, so the picker cannot offer a retired model. */
     fun loadModels() {
         viewModelScope.launch {
-            val r = ZenModelsApi({ container.keySession.require(secureKeys) }).fetch()
+            val r = ZenModelsApi({ container.keySession.require(secureKeys, currentProviderId()) }).fetch()
             _state.value = _state.value.copy(
                 models = r.models,
                 modelsError = r.error
@@ -675,6 +677,9 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      */
     private fun currentPersistedProvider(): String =
         observedProvider.takeIf { it.isNotBlank() } ?: _state.value.providerId
+
+    /** Resolved provider id, for call sites that need the key scoped to it. */
+    private fun currentProviderId(): String = Providers.resolve(currentPersistedProvider()).id
 
     /**
      * Switches provider and re-bootstraps.
@@ -698,6 +703,12 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             modelsError = null,
             fileChanges = null
         )
+        // Drop the cached decrypted key with the workspace. It belongs to the
+        // provider being left, and a stale key in memory is a usable credential
+        // for a provider the user is no longer looking at: switching back would
+        // serve it without a fresh unlock. Re-bootstrap reads the new provider's
+        // key from storage, and if it has none, the chat says so.
+        container.keySession.clear()
         // Force a clean re-bootstrap: drop the workspace and any connection so
         // nothing carries over from the previous provider.
         wsId = null
@@ -719,7 +730,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // configure a model that fails every later turn with
             // "Model is unavailable" - the same class of failure as the original
             // hardcoded default, just user-triggered.
-            val key = runCatching { container.keySession.require(secureKeys) }
+            val key = runCatching { container.keySession.require(secureKeys, currentProviderId()) }
                 .getOrNull()
             if (key == null) {
                 _state.value = _state.value.copy(

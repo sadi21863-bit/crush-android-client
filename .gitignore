@@ -25,6 +25,7 @@ run.log
 *.log
 build-install.bat
 setup-emu.bat
+.kotlin/
 
 # 92MB arm64 engine binary - fetched by tools/fetch-crush.ps1, not committed
 app/src/main/jniLibs/

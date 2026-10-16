@@ -41,6 +41,11 @@ fun OnboardingScreen(
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val secureKeys = remember { SecureKeyStore(ctx) }
+    // Onboarding is the FIRST place a key is stored, so the provider it is stored
+    // against is the default one. When the user later switches provider their
+    // existing key is still there - that is the whole point of the per-provider
+    // vault.
+    val providerId = remember { SecureKeyStore.LEGACY_PROVIDER }
     var errorText by remember { mutableStateOf<String?>(null) }
     var apiKey by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
@@ -142,7 +147,7 @@ fun OnboardingScreen(
                     // write and the app lock at Chat entry is the user-facing
                     // gate instead.
                     scope.launch {
-                        val ok = viewModel.saveApiKeyAwait(apiKey)
+                        val ok = viewModel.saveApiKeyAwait(apiKey, providerId)
                         AppLog.i("Onboarding", "saveApiKey ok=$ok")
                         if (ok) onCompleted()
                         else errorText = "Could not save key - please try again"

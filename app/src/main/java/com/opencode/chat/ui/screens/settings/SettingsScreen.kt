@@ -243,8 +243,12 @@ fun SettingsScreen(
     // it, which put the plaintext secret into Compose state and rendered it on
     // demand. Showing "saved" plus a masked tail conveys everything the eye
     // button did, without the secret ever being present.
-val stored = settings.hasApiKey
-    val providerId = settings.providerId
+    val stored = settings.hasApiKey
+    // Resolved the same way the chat layer resolves it, so "Delete" and the
+    // engine bootstrap can never disagree about which slot they are talking
+    // about. A raw persisted id would only differ for a value this build no
+    // longer knows, which is exactly when the wrong slot would be touched.
+    val providerId = Providers.resolve(settings.providerId).id
     var replacing by remember { mutableStateOf(false) }
     var newKey by remember { mutableStateOf("") }
 
@@ -395,7 +399,7 @@ Card(modifier = Modifier.fillMaxWidth()) {
                                 OutlinedButton(
                                     onClick = {
                                     viewModel.dismissError()
-                                    viewModel.clearApiKey()
+                                    viewModel.clearApiKey(providerId)
                                 },
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -412,7 +416,10 @@ Card(modifier = Modifier.fillMaxWidth()) {
                                     // the same string twice, which would not
                                     // re-trigger the LaunchedEffect above.
                                     viewModel.dismissError()
-                                    viewModel.saveApiKey(newKey.trim())
+                                    // Scoped to the selected provider, so saving
+                                    // a second key does not destroy the first.
+                                    // That is the point of the provider vault.
+                                    viewModel.saveApiKey(newKey.trim(), providerId)
                                     replacing = false
                                     newKey = ""
                                 },

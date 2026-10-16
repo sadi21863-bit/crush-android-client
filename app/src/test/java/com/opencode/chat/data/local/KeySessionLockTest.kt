@@ -31,7 +31,9 @@ private class FakeSecureKeyStore(context: Context, private val value: String?) :
     var readCalls = 0
         private set
 
-    override fun read(): String? {
+    // Ignore the provider id: this stub's job is to hand back a key without a
+    // real Keystore, and the lock behaviour it guards is provider-independent.
+    override fun read(providerId: String): String? {
         readCalls++
         return value
     }
@@ -148,7 +150,7 @@ class KeySessionLockTest {
         // "the user is authenticated".
         val session = KeySession()
         val throwing = object : SecureKeyStore(RuntimeEnvironment.getApplication()) {
-            override fun read(): String? = throw IllegalStateException("keystore gone")
+            override fun read(providerId: String): String? = throw IllegalStateException("keystore gone")
         }
 
         val key = session.require(throwing)

@@ -11,8 +11,8 @@ class SettingsRepository(private val dataStore: SettingsDataStore) {
 
     val settings: Flow<AppSettings> = dataStore.settingsFlow
 
-    suspend fun saveApiKey(key: String) = dataStore.saveApiKey(key)
-suspend fun clearApiKey() = dataStore.clearApiKey()
+    suspend fun saveApiKey(key: String, providerId: String) = dataStore.saveApiKey(key, providerId)
+suspend fun clearApiKey(providerId: String) = dataStore.clearApiKey(providerId)
     suspend fun saveProviderId(id: String) = dataStore.saveProviderId(id)
     suspend fun saveSelectedModel(model: String) = dataStore.saveSelectedModel(model)
     suspend fun saveThemeMode(mode: String) = dataStore.saveThemeMode(mode)

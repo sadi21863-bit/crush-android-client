@@ -340,7 +340,9 @@ future-MIT date before relying on MIT terms for that version.
 
 There is **no root `LICENSE` file** yet — the third-party notice for the embedded
 engine still needs adding, and legal review of FSL "Competing Use" is
-recommended before any commercial distribution.
+recommended before any commercial distribution. The app's own code is
+**unlicensed for now**: all rights are reserved by the repository owner, and a
+licence will be chosen when that notice is written.
 
 Bubble Tea is MIT-licensed. This repository is not affiliated with Charm or
 OpenCode Zen. You supply your own OpenCode Zen API key; it is never committed.

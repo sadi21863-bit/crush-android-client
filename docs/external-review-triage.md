@@ -13,6 +13,7 @@ turned out to be real, and two of those were bugs I had introduced.
 |---|---|---|
 | **P0-01** | Lock overlay is not an execution boundary | **fixed** |
 | **P1-03** | Workspace change keeps the stale SSE socket | **fixed** |
+| **P1-05** | Stop is not bound to the run it stops | **fixed** |
 | **P1-06** | `Channel.UNLIMITED` is not a bound | **fixed** |
 | **P2-09** | Comments still claim a 300s Keystore auth window | **fixed** |
 
@@ -75,6 +76,48 @@ worse than none, because it invites the reader to believe `read()` proves
 authentication. Rewritten to state that the grace period is a **UX** trade and
 provides no protection for the key at rest.
 
+### P1-05 — Stop was not bound to the run it stopped
+
+`stopStreaming()` read the view model's mutable fields at tap time:
+
+```kotlin
+val job = streamJob
+val ws = wsId
+val sid = sessionId
+```
+
+Through the whole preflight — re-attach plus `newSession`, two network
+round-trips — those fields still described the **previous** turn. So Stop in
+that window cancelled a job that had already finished, asked the engine to
+cancel the previous session, then the send path POSTED the new prompt anyway.
+The user pressed Stop and the agent ran regardless. The review's suggested fix
+was an immutable `RunHandle`.
+
+Now a `RunHandle` is created the instant `send()` claims the turn, and Stop
+reads only that. `stop()` is a CAS-claimed decision:
+
+- **before the target is frozen** → `NothingPosted`: the local jobs are
+  cancelled and `mayPost()` — checked on the way to the POST and per retry
+  attempt — suppresses it, instead of firing a cancel at a run that does not
+  exist yet;
+- **after the target is frozen** → `CancelOnServer(ws, sid, port)`: the exact
+  target this turn resolved to, immune to later field changes;
+- **already stopped** → `AlreadyStopped`: an impatient double-tap cannot fire a
+  second server cancel that might land after a newer run started.
+
+The preflight/stream jobs are recorded on the handle *before* they are started
+(`CoroutineStart.LAZY`), because a main-dispatcher `launch{}` runs eagerly to
+its first suspension and a Stop in that window would otherwise find no job
+recorded to cancel. `finalizeStoppedRun` now finishes only the handle's own
+bubble rather than every streaming row, the cancellation exception caught on
+stop is no longer painted as a model error, and a stopped turn keeps
+`workActive` true until the server cancel has actually completed — which makes
+CANCEL-01's promise true in the `finally` path too, not just the explicit one.
+
+`RunHandleTest` (6 JVM tests) pins the decision itself: stop-before-freeze,
+freeze-after-stop cannot resurrect the turn, the cancel names the frozen
+target, second stop is inert, jobs are cancelled exactly once.
+
 ## Already addressed before this review
 
 The review lists these as changes, and they are genuinely in place — but it
@@ -93,7 +136,6 @@ the caller that was not checking.
 |---|---|---|
 | **P0-02** | Engine loopback is cross-app reachable | **Not fixable in the app layer.** Crush's HTTP server has no auth to enable and the spec declares no security scheme. Documented honestly in README § Security. |
 | **P1-04** | SSE may not be `CONNECTED` before POST | Partly mitigated: `streamSend` checks `conn.state == CONNECTED` and falls back to a per-turn stream otherwise. A bounded readiness await would be better. |
-| **P1-05** | Stop is not bound to the run it stops | `stopStreaming` reads mutable `wsId`/`sessionId` and the job may not be assigned yet during preflight. Needs an immutable `RunHandle`. Not fixed. |
 | **P1-07** | Provider switch needs serialisation | `setProvider` was added this session and re-bootstraps, but it is not yet coordinated against an in-flight run by a single reducer. |
 | **P1-08** | Kotlin 2.4.10 vs Compose plugin 2.4.20 | Build risk, not a proven failure. Deliberate and documented in `docs/toolchain.md`. |
 | **P2-10** | Zen-specific model discovery remains | Real. `ZenApi`/`ZenRepository` are the legacy path; `ZenModelsApi` is now also used for provider-neutral probing but is still named for Zen. |

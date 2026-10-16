@@ -269,7 +269,7 @@ terminal UI framework, compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 346 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 352 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -290,6 +290,7 @@ The suites worth naming, because each pins a defect a green build had hidden:
 | `RotateKeepingTailTest` | the newest log lines survive rotation |
 | `AppLockPolicyTest` | cancel never becomes an unlock |
 | `SecureKeyStoreProviderScopeTest` | one credential slot per provider — a second key never destroys the first |
+| `RunHandleTest` | a stop during preflight suppresses the POST instead of cancelling the previous run |
 
 **Robolectric cannot test the things that actually break.** The real Keystore
 cipher (Robolectric ships no AndroidKeyStore provider — the vault suite swaps in

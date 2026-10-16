@@ -40,7 +40,8 @@ import com.opencode.chat.domain.model.TuningPolicy
 import com.opencode.chat.engine.EnginePaths
 import com.opencode.chat.engine.EngineState
 import com.opencode.chat.util.AppLog
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -162,9 +163,26 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
 
-    private var streamJob: Job? = null
+    /**
+     * The turn currently claimed by send(), or null when none is in flight.
+     *
+     * This is Stop's ONLY input (audit P1-05). Stop used to read the mutable
+     * streamJob/wsId/sessionId/port at tap time; through the whole preflight -
+     * re-attach plus newSession, two network round-trips - those still
+     * described the PREVIOUS turn, so Stop cancelled a job that had already
+     * finished and the new prompt was posted anyway. The handle is created in
+     * send() before any work starts and is immutable identity for that turn.
+     */
+    @Volatile
+    private var activeRun: RunHandle? = null
+
     private var wsId: String? = null
     private var sessionId: String? = null
+
+    /** Drops [handle] as the active run if it still is one; safe either way. */
+    private fun abandonRun(handle: RunHandle) {
+        if (activeRun === handle) activeRun = null
+    }
 
     /**
      * The workspace as it looked before the prompt in flight.
@@ -832,7 +850,11 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // so `sessionId = sessionId` cannot resolve either way.
             this@ChatViewModel.sessionId = sessionId
             existingSessionWorkspace = ws
-            streamingId = ""
+            // No streaming-id reset needed: a turn's bubble is identified by
+            // its own RunHandle, and the replayed message list contains none
+            // of the previous turn's rows, so a still-running old turn cannot
+            // touch it.
+            //
             // Reopening a session is not the session the last diff was measured
             // on. Clearing here prevents the drawer's diff from one chat being
             // displayed under another - which reads as this session having made
@@ -1007,7 +1029,17 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             return
         }
 
-        viewModelScope.launch {
+        // The stop identity for this turn, created before any work starts so a
+        // Stop can never race a half-initialised run (audit P1-05).
+        val handle = RunHandle(turnId = UUID.randomUUID().toString())
+        activeRun = handle
+
+        // LAZY + record-then-start: a main-dispatcher launch{} runs its body
+        // eagerly up to the first suspension, so a Stop landing during the
+        // preflight would find a coroutine already suspended in a network call
+        // with no job recorded to cancel. With LAZY the job exists on the
+        // handle before any body runs.
+        val preflight = viewModelScope.launch(start = CoroutineStart.LAZY) {
             // THE fix for "HTTP 404 /v1/workspaces/... workspace not found".
             //
             // Crush reaps an unattached workspace after ~30s (MEASURED: alive at
@@ -1017,11 +1049,13 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 AppLog.w(TAG, "could not re-attach workspace; re-bootstrapping")
                 workspaces = null
                 wsId = null
+                abandonRun(handle)
                 _state.value = _state.value.copy(isStreaming = false)
                 bootstrap()
                 return@launch
             }
             val ws = mgr.currentWorkspaceId ?: run {
+                abandonRun(handle)
                 _state.value = _state.value.copy(isStreaming = false)
                 return@launch
             }
@@ -1047,6 +1081,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             val sid = existing ?: runCatching { mgr.newSession("chat").id }.getOrNull()
             if (sid == null) {
                 AppLog.w(TAG, "could not obtain a session; re-bootstrapping")
+                abandonRun(handle)
                 bootstrap()
                 return@launch
             }
@@ -1054,13 +1089,18 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             wsId = ws
             sessionId = sid
             existingSessionWorkspace = ws
-            // The Job has to be captured or Stop cancels nothing. It was declared
-            // and read by stopStreaming() but never assigned, so the reply kept
-            // streaming after the user pressed Stop.
-            streamJob = viewModelScope.launch {
-                streamSend(text, ws, sid, mgr, p)
+            // Freeze the target on the handle BEFORE the stream can start, so a
+            // Stop from this instant on cancels exactly this ws/session - not
+            // whatever the view model points at when the tap arrives.
+            handle.freezeTarget(ws = ws, sid = sid, port = p)
+            val stream = viewModelScope.launch(start = CoroutineStart.LAZY) {
+                streamSend(text, ws, sid, mgr, p, handle)
             }
+            handle.streamJob = stream
+            stream.start()
         }
+        handle.preflightJob = preflight
+        preflight.start()
     }
 
     private suspend fun streamSend(
@@ -1068,10 +1108,16 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         ws: String,
         sid: String,
         mgr: WorkspaceManager,
-        p: Int
+        p: Int,
+        handle: RunHandle
     ) {
+        // Fresh id per turn, owned by the handle. ChatScreen keys its
+        // LazyColumn by message id, and a constant sentinel produced
+        // `IllegalArgumentException: Key "streaming" was already used` once
+        // sessions were reused; the handle additionally guarantees that only
+        // THIS turn can update this bubble.
         val bubbleId = "streaming-${UUID.randomUUID()}"
-        streamingId = bubbleId
+        handle.bubbleId = bubbleId
         _state.value = _state.value.copy(
             input = "",
             isStreaming = true,
@@ -1106,7 +1152,11 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // One retry, because a reaped workspace is routine rather than a
             // fault and the user's message must survive it. Two attempts max:
             // retrying more could duplicate a run that actually landed.
-            while (attempt < 2 && !accepted) {
+            //
+            // mayPost() is re-checked per attempt: a turn stopped during
+            // preflight must never reach the engine, and a stop that lands
+            // between attempts must not retry (audit P1-05).
+            while (attempt < 2 && !accepted && handle.mayPost()) {
                 val runId = UUID.randomUUID().toString()
                 // Subscribe BEFORE prompting, on the long-lived connection when
                 // it is healthy.
@@ -1164,11 +1214,22 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                     else -> null
                 }
 
+                if (!handle.mayPost()) {
+                    // Stop claimed this turn while the POST was in flight. The
+                    // result no longer matters: the engine is being asked to
+                    // cancel this run and this coroutine is cancelled.
+                    // Interpreting the resulting cancellation exception (the
+                    // runCatching around api.send() catches it like any other
+                    // failure) as a send error would rename the user's own
+                    // action into a model failure.
+                    break
+                }
+
                 if (msg == null) {
                     accepted = true
                     failure = null
                     try {
-                        awaitStream(events, runId)
+                        awaitStream(events, runId, handle)
                     } finally {
                         // Release the subscription either way. Completing the run
                         // closes the channel; an abandoned one must be
@@ -1227,8 +1288,8 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             }
 
             val err = failure
-            if (err != null) {
-                updateStreaming {
+            if (err != null && !handle.isStopped) {
+                updateStreaming(handle) {
                     it.copy(
                         isStreaming = false,
                         error = WorkspaceLease.explainReattach(err).take(200)
@@ -1246,12 +1307,25 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             }
         } catch (_: StopStream) {
             // expected: normal end of turn
+        } catch (e: CancellationException) {
+            // Stop, or the view model going away - not a failure. The finally
+            // below finalises this turn's bubble; without this catch the
+            // generic handler would paint the cancellation as a red error
+            // ("JobCancellationException...") the moment the user pressed Stop.
+            throw e
         } catch (e: Exception) {
-            updateStreaming {
+            updateStreaming(handle) {
                 it.copy(isStreaming = false, error = "${e.javaClass.simpleName}: ${e.message}")
             }
         } finally {
-            container.engineSupervisor.setWorkActive(false)
+            // Release the hang detector only when this turn was NOT stopped. A
+            // stopped turn keeps workActive true until stopStreaming's server
+            // cancel has actually completed (audit CANCEL-01); releasing it
+            // here - the moment the local job unwinds - would let hang
+            // detection judge the engine idle while it is still working on the
+            // run we just asked it to stop.
+            if (!handle.isStopped) container.engineSupervisor.setWorkActive(false)
+            abandonRun(handle)
             _state.value = _state.value.copy(isStreaming = false)
             // Finalise the live bubble no matter how the turn ended.
             //
@@ -1266,13 +1340,19 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // is exactly what a slow free model reproduces. Finalising here means
             // the bubble is honest about having ended, and empty is shown as the
             // timeout it is rather than as a reply that never arrived.
-            updateStreaming { m ->
+            updateStreaming(handle) { m ->
                 m.copy(
                     isStreaming = false,
                     // Keep whatever text arrived. An empty bubble is finalised as
                     // empty and marked, so the user is told the turn ended rather
                     // than left watching "thinking..." forever.
-                    error = m.error ?: if (m.text.isBlank()) "no reply received" else null
+                    //
+                    // A stopped turn is not a failed turn: "no reply received"
+                    // would tell the user their model broke when they pressed
+                    // Stop, so the marker is reserved for turns that ended on
+                    // their own.
+                    error = m.error
+                        ?: if (m.text.isBlank() && !handle.isStopped) "no reply received" else null
                 )
             }
             // Collect the file changes AFTER the turn, however it ended - success,
@@ -1336,7 +1416,8 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      */
     private suspend fun awaitStream(
         events: kotlinx.coroutines.flow.Flow<CrushEvent>,
-        runId: String
+        runId: String,
+        handle: RunHandle
     ) {
         withTimeoutOrNull(STREAM_TIMEOUT_MS) {
             events.collect { ev ->
@@ -1349,7 +1430,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                             // frame carries the full set, and appending would
                             // stack a duplicate row every time a tool advanced.
                             val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
-                            updateStreaming {
+                            updateStreaming(handle) {
                                 it.copy(
                                     text = m.text.ifBlank { it.text },
                                     thinking = m.thinking.ifBlank { it.thinking },
@@ -1374,7 +1455,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                     CrushEvent.PayloadType.RUN_COMPLETE -> {
                         val rc = gson.fromJson(ev.body, RunComplete::class.java)
                         if (rc.runId == runId || rc.runId.isEmpty()) {
-                            updateStreaming {
+                            updateStreaming(handle) {
                                 it.copy(
                                     isStreaming = false,
                                     text = rc.text.ifBlank { it.text }
@@ -1391,29 +1472,18 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     }
 
     /**
-     * The id of the single in-flight assistant bubble.
+     * Updates the live assistant bubble owned by [handle]'s turn.
      *
-     * Must be UNIQUE across all messages, because ChatScreen keys its LazyColumn
-     * by `id`. A previous version appended a bubble with the literal id
-     * "streaming" on every send, so the second send produced two rows with the
-     * same key and the app died with:
-     *
-     *   IllegalArgumentException: Key "streaming" was already used.
-     *
-     * That crash only appeared once sessions were reused, because before that a
-     * failed send left no second bubble to collide with. Fixed by generating a
-     * fresh id per turn and tracking it explicitly, rather than using a constant
-     * sentinel that every new turn reuses.
+     * The bubble id lives on the handle, so a turn can only ever touch its own
+     * row. The previous single mutable `streamingId` meant the sole way to
+     * identify "the" in-flight bubble was global mutable state, which is how a
+     * stop finishing late could finalise a bubble it never owned (audit P1-05).
      */
-    @Volatile
-    private var streamingId: String = ""
-
-    /** Updates the live assistant bubble for the current turn. */
-    private fun updateStreaming(transform: (ChatMessage) -> ChatMessage) {
-        val target = streamingId
+    private fun updateStreaming(handle: RunHandle, transform: (ChatMessage) -> ChatMessage) {
+        val target = handle.bubbleId
         _state.value = _state.value.copy(
             messages = _state.value.messages.map { m ->
-                if (target.isNotEmpty() && m.id == target) transform(m) else m
+                if (target != null && m.id == target) transform(m) else m
             }
         )
     }
@@ -1434,39 +1504,61 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      * request has actually completed. If the cancel cannot be confirmed we
      * still stop the UI, but say "stop requested" rather than claiming the
      * agent has stopped.
+     *
+     * The cancel addresses this turn's frozen target from its RunHandle, and a
+     * stop during preflight suppresses the POST instead of firing a cancel at
+     * a run that does not exist yet (audit P1-05).
      */
     fun stopStreaming() {
-        val job = streamJob
-        val ws = wsId
-        val sid = sessionId
-        val p = port
+        // Everything Stop needs comes from the handle for THIS turn (audit
+        // P1-05): the jobs to cancel, and the exact ws/session/port to tell the
+        // engine about. Reading the view model's fields here is what made Stop
+        // cancel the wrong run during preflight.
+        val handle = activeRun ?: return
 
-        streamJob = null
-        job?.cancel()
+        when (val action = handle.stop()) {
+            StopAction.AlreadyStopped -> return
 
-        if (ws == null || sid == null || p == null) {
-            container.engineSupervisor.setWorkActive(false)
-            finalizeStoppedRun(requestConfirmed = true)
-            return
-        }
-
-        // Keep workActive true until the server acknowledges. A transient
-        // failure here must not be reported to the user as "stopped".
-        viewModelScope.launch {
-            val confirmed = runCatching { CrushApi(p).cancel(ws, sid) }.isSuccess
-            if (!confirmed) {
-                AppLog.w(TAG, "stop: server cancel not confirmed for $sid")
+            StopAction.NothingPosted -> {
+                // Preflight window: nothing was posted, no bubble exists, and
+                // mayPost() keeps it that way. Local cancellation is complete.
+                abandonRun(handle)
+                container.engineSupervisor.setWorkActive(false)
+                finalizeStoppedRun(handle, requestConfirmed = true)
             }
-            container.engineSupervisor.setWorkActive(false)
-            finalizeStoppedRun(requestConfirmed = confirmed)
+
+            is StopAction.CancelOnServer -> {
+                abandonRun(handle)
+                // Keep workActive true until the server acknowledges. A
+                // transient failure here must not be reported to the user as
+                // "stopped".
+                viewModelScope.launch {
+                    val confirmed = runCatching {
+                        CrushApi(action.port).cancel(action.ws, action.sid)
+                    }.isSuccess
+                    if (!confirmed) {
+                        AppLog.w(TAG, "stop: server cancel not confirmed for ${action.sid}")
+                    }
+                    container.engineSupervisor.setWorkActive(false)
+                    finalizeStoppedRun(handle, requestConfirmed = confirmed)
+                }
+            }
         }
     }
 
-    private fun finalizeStoppedRun(requestConfirmed: Boolean) {
+    private fun finalizeStoppedRun(handle: RunHandle, requestConfirmed: Boolean) {
+        val bubble = handle.bubbleId
         _state.value = _state.value.copy(
             isStreaming = false,
+            // Only the bubble THIS run owned. The old finaliser cleared the
+            // streaming flag on every streaming row, so a stop finishing late
+            // could flip a newer turn's bubble to "done" mid-stream.
             messages = _state.value.messages.map {
-                if (it.isStreaming) it.copy(isStreaming = false) else it
+                if (bubble != null && it.id == bubble && it.isStreaming) {
+                    it.copy(isStreaming = false)
+                } else {
+                    it
+                }
             },
             // Do not assert the agent has stopped when we could not tell the
             // server to. The user is told the truth either way.

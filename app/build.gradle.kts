@@ -1,4 +1,4 @@
-﻿import java.util.Properties
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -34,13 +34,13 @@ val releaseSigning: Properties? = rootProject.file("keystore/credentials.propert
     ?.let { f -> Properties().also { props -> f.inputStream().use { props.load(it) } } }
 
 android {
-    namespace = "com.opencode.chat"
+    namespace = "com.crush.mobile"
     // Current AndroidX (Compose BOM 2026.09, core-ktx 1.19, lifecycle 2.11,
     // navigation 2.10.2, okhttp 5.5) all require compileSdk 37.
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.opencode.chat"
+        applicationId = "com.crush.mobile"
         // API 29, not 26.
         //
         // 26/27/28 forced a second and third Keystore auth tier and a second

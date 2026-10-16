@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OpenCodeChat"
+rootProject.name = "CrushMobile"
 include(":app")

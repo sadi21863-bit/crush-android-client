@@ -20,7 +20,7 @@ Write-Output "port=$port"
 
 # Valid UUID required for client_id / workspace id
 $ws = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
-$app = "/data/user/0/com.opencode.chat/files"
+$app = "/data/user/0/com.crush.mobile/files"
 
 Write-Output ""
 Write-Output "### does workspace dir exist? ###"

@@ -75,7 +75,7 @@ if ($Port -le 0) { throw 'Pass -Port (the engine port from /proc/net/tcp).' }
 $base = "http://127.0.0.1:$Port/v1"
 
 # Unique path so we never collide with the app's own workspace.
-$wsPath = "/data/data/com.opencode.chat/files/probe_send"
+$wsPath = "/data/data/com.crush.mobile/files/probe_send"
 $wsId = [guid]::NewGuid().ToString()
 $clientId = [guid]::NewGuid().ToString()
 
@@ -83,7 +83,7 @@ Write-Host "== create workspace (data_dir shared with app so the existing key is
 $create = @{
     id         = $wsId
     path       = $wsPath
-    data_dir   = "/data/data/com.opencode.chat/files/crush/state"
+    data_dir   = "/data/data/com.crush.mobile/files/crush/state"
     yolo       = $true
     client_id  = $clientId
 } | ConvertTo-Json -Compress

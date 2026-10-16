@@ -24,8 +24,8 @@ function Redact([string]$s) {
 $wsId = [guid]::NewGuid().ToString()
 $clientId = [guid]::NewGuid().ToString()
 $create = @{
-    id = $wsId; path = "/data/data/com.opencode.chat/files/probe_dump"
-    data_dir = "/data/data/com.opencode.chat/files/crush/state"
+    id = $wsId; path = "/data/data/com.crush.mobile/files/probe_dump"
+    data_dir = "/data/data/com.crush.mobile/files/crush/state"
     yolo = $true; client_id = $clientId
 } | ConvertTo-Json -Compress
 $ws = Invoke-RestMethod -Method Post -Uri "$base/workspaces" -Body $create -ContentType 'application/json' -TimeoutSec 60

@@ -1,4 +1,4 @@
-﻿<#
+<#
   Layer 2 chaos: UI / Keystore / navigation flows.
 
   Layer 1 (chaos.ps1) drives the ENGINE via adb. That cannot reach the bugs that
@@ -24,7 +24,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$PKG    = "com.opencode.chat"
+$PKG    = "com.crush.mobile"
 $MAIN   = "$PKG/.MainActivity"
 $SPIKE  = "$PKG/.ui.screens.spike.SpikeActivity"
 $DUMMY  = "dummykeyCHAOS9876543210ab"
@@ -213,7 +213,7 @@ function S19_EngineDeathWhileChat {
     Start-App
     Start-Sleep -Seconds 11
     # Navigate via the fault hook so no key is needed.
-    & $adb -s $serial shell "am start -n $SPIKE -a com.opencode.chat.FAULT --es fault kill_engine" 2>&1 | Out-Null
+    & $adb -s $serial shell "am start -n $SPIKE -a com.crush.mobile.FAULT --es fault kill_engine" 2>&1 | Out-Null
     Start-Sleep -Seconds 18
 
     $before = Get-EnginePid
@@ -231,7 +231,7 @@ function S20_OnboardingSpam {
     for ($i = 0; $i -lt 25; $i++) { Tap $C.OnboardStart[0] $C.OnboardStart[1] }
     $r = Assert-Healthy "S20_OnboardingSpam" 10
     $acts = (& $adb -s $serial shell dumpsys activity activities 2>$null |
-        Select-String "com.opencode.chat" | Measure-Object).Count
+        Select-String "com.crush.mobile" | Measure-Object).Count
     $r | Add-Member -Force Note "activity_records=$acts"
     $r
 }

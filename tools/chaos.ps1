@@ -1,4 +1,4 @@
-﻿<#
+<#
   Chaos / fault-injection harness for the Crush Android app.
 
   Netflix-style: we do not test that it works, we test that it BREAKS and that
@@ -18,7 +18,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$PKG = "com.opencode.chat"
+$PKG = "com.crush.mobile"
 $ACT = "$PKG/.ui.screens.spike.SpikeActivity"
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 $serial = "bbf8ca69"
@@ -73,9 +73,9 @@ function Start-App  { & $adb -s $serial shell am start -n $ACT 2>$null | Out-Nul
 
 # Crash the engine via the in-app fault hook. adb CANNOT SIGKILL an app-owned
 # process on this ROM (SELinux denies it even through run-as), so the owning
-# process signals its own child. See SpikeActivity's com.opencode.chat.FAULT.
+# process signals its own child. See SpikeActivity's com.crush.mobile.FAULT.
 function Crash-Engine {
-    & $adb -s $serial shell "am start -n $ACT -a com.opencode.chat.FAULT --es fault kill_engine" 2>$null | Out-Null
+    & $adb -s $serial shell "am start -n $ACT -a com.crush.mobile.FAULT --es fault kill_engine" 2>$null | Out-Null
 }
 
 # ---------------------------------------------------------------- scenarios

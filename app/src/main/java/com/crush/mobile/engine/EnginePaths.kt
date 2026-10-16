@@ -89,7 +89,10 @@ class EnginePaths(
     fun logFile(): File? = newestEngineLog(cache)
 
     companion object {
-        /** Newest crush.log under cache's server-*/ directories, or null. */
+        /**
+         * Newest crush.log under the cache directory's server-listener
+         * folders (server-tcp___host_port), or null when none exists yet.
+         */
         fun newestEngineLog(cacheDir: File): File? =
             cacheDir.listFiles { f -> f.isDirectory && f.name.startsWith("server-") }
                 ?.mapNotNull { dir -> File(dir, "crush.log").takeIf { log -> log.isFile } }

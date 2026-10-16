@@ -147,7 +147,7 @@ Ordered by how much each matters for a coding agent. Detail in
 1. **File diffs** — the agent writes files invisibly.
 2. **Tool-call timeline** — summary per message, not a live view.
 3. **Per-turn cost display**.
-4. **Verify a second provider** - 12 Catwalk ids are offered and the plumbing works, but only `opencode-zen` has completed a handshake. `openrouter` with a `:free` model is the obvious candidate, since Zen's own free tier is withdrawn. See [providers.md](providers.md).
+4. **Verify a second provider** — 13 provider ids are offered and the plumbing works, but only `opencode-zen` has completed a handshake. `hyper` (Charm Hyper, 100 credits/month free, no 402/403 plan gate) or `openrouter` with a `:free` model is the obvious candidate, since Zen's own free tier is withdrawn. See [providers.md](providers.md).
 5. **Multi-project** — one app-private workspace.
 6. **Instrumentation tests**.
 7. **Remote crash reporting** — in-app export only.

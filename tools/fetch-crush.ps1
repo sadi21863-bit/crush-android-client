@@ -13,7 +13,30 @@
 # extract it and exec() will fail.
 
 param(
-    [string]$Version = "0.97.1"
+    [string]$Version = "0.97.1",
+    # Expected SHA-256 of the release TARBALL, not the extracted binary.
+    #
+    # WHY THIS EXISTS
+    #
+    # The script verified only that the download was a 64-bit AArch64 PIE. That
+    # says nothing about WHERE it came from: anyone able to serve the download -
+    # a compromised mirror, a hijacked release asset, a poisoned proxy - could
+    # ship a perfectly well-formed backdoor and the check would pass. The app then
+    # exec()s it, so this is arbitrary code execution on the device, not a
+    # cosmetic supply-chain concern.
+    #
+    # Upstream publishes checksums.txt and a Sigstore bundle with each release.
+    # Sigstore/cosign verification is the stronger check; this pin is the floor.
+    # The value is read from the SIGNED release's checksums.txt for the exact
+    # asset, not from a local download of that same download - pinning against a
+    # hash derived from the thing you are verifying verifies nothing.
+    #
+    # Recorded 2026-10-16 from
+    #   https://github.com/charmbracelet/crush/releases/download/v0.97.1/checksums.txt
+    #   5b76ea03...709f70711  crush_0.97.1_Android_arm64.tar.gz
+    [string]$ExpectedSha256 = $(if ($Version -eq "0.97.1") {
+        "5b76ea03ee1382c6bcb91c3e56ee683a59abf19b678ab8c3d2dcfeb969f70711"
+    } else { "" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,6 +48,25 @@ $url = "$repo/releases/download/v$Version/$asset"
 $root = Split-Path -Parent $PSScriptRoot
 $destDir = Join-Path $root "app/src/main/jniLibs/arm64-v8a"
 $destFile = Join-Path $destDir "libcrush.so"
+
+# FAIL CLOSED on an unpinned version.
+#
+# A version with no recorded hash would otherwise be fetched and trusted on
+# structure alone, which is the exact gap this parameter exists to close. The
+# alternative - warn and continue - means the one time somebody adds a version
+# casually is the one time the guarantee silently disappears.
+if ($ExpectedSha256 -notmatch '^[0-9a-fA-F]{64}$') {
+    throw @"
+No SHA-256 pin for Crush $Version.
+
+Refusing to fetch. Structure alone cannot establish provenance: a hijacked
+release asset or a poisoned mirror would produce a well-formed AArch64 PIE that
+passes every other check here, and the app then exec()s it.
+
+To pin a new version, read the hash from the SIGNED release and pass it in:
+  ./tools/fetch-crush.ps1 -Version <v> -ExpectedSha256 <sha>
+"@
+}
 
 if (Test-Path $destFile) {
     $existing = (Get-Item $destFile).Length
@@ -43,6 +85,25 @@ try {
     $ProgressPreference = "SilentlyContinue"
     Invoke-WebRequest -Uri $url -OutFile $tarball -UseBasicParsing
     Write-Host ("Downloaded {0:N1} MB" -f ((Get-Item $tarball).Length / 1MB))
+
+    # PROVENANCE, before anything is extracted or executed.
+    #
+    # Deliberately before extraction: a tarball is not inspected for its contents
+    # before the checksum, so verifying afterwards would mean a malicious archive
+    # had already been unpacked into the temp directory.
+    $actual = (Get-FileHash $tarball -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -ne $ExpectedSha256.ToLowerInvariant()) {
+        throw @"
+SHA-256 MISMATCH for $asset
+
+  expected $ExpectedSha256
+  actual   $actual
+
+The download is not the artifact Charm signed. Delete the temp copy and do NOT
+retry until the cause is understood.
+"@
+    }
+    Write-Host "SHA-256 verified against the pinned release hash."
 
     Write-Host "Extracting ..."
     tar -xzf $tarball -C $tmp

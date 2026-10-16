@@ -50,9 +50,12 @@ but hides the useful distinction: the key is not revoked, the *models* are. The
 next diagnostic step should say which of the two it found, and the model picker
 should never offer a model that has already been observed to fail.
 
-`FALLBACK_PROBE_MODEL = "space-bunny-free"` is now doubly wrong: that id is no
-longer in the catalogue at all, so even as a placeholder-for-discovery it cannot
-claim a workspace.
+`FALLBACK_PROBE_MODEL = "space-bunny-free"` was singly and doubly wrong: the id
+is no longer in any catalogue, and a hardcoded guess is exactly what Crush
+rejects a handshake over (the "large model not found in provider" a friend hit
+on a fresh install). **Removed** on 2026-10-16: the early agent init now runs
+only when a model is actually chosen, and with none selected the workspace is
+claimed by `openWorkspace` alone and the model comes from the live probe.
 
 The pattern worth naming: **almost every serious defect lived in the seam between
 the Android lifecycle and the engine process lifecycle**, not in pure logic. That

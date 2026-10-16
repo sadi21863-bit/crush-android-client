@@ -185,6 +185,33 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     }
 
     /**
+     * A provider switch that was chosen in Settings while a run was in flight.
+     *
+     * Applied at run exit instead of under a streaming turn (audit P1-07):
+     * applying it mid-run dropped the workspace id and cached key underneath
+     * the stream and stopped the SSE connection feeding it, so the in-flight
+     * reply died silently. The persisted setting already says "new", so a
+     * relaunch lands on the new provider regardless of this field.
+     */
+    @Volatile
+    private var pendingProviderId: String? = null
+
+    /**
+     * Applies a deferred provider switch when nothing is running.
+     *
+     * Returns true when it applied, so callers that would otherwise bootstrap
+     * themselves can ask for it INSTEAD of bootstrapping and forking two
+     * workspaces in a row.
+     */
+    private fun applyPendingProviderIfIdle(): Boolean {
+        val pending = pendingProviderId ?: return false
+        if (activeRun != null) return false
+        pendingProviderId = null
+        setProvider(pending)
+        return true
+    }
+
+    /**
      * The workspace as it looked before the prompt in flight.
      *
      * Reused across turns rather than rebuilt: reading every file on every prompt
@@ -286,11 +313,14 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 .distinctUntilChanged()
                 .collect { persisted ->
                     observedProvider = persisted
-                    val resolved = Providers.resolve(persisted).id
-                    if (resolved == _state.value.providerId) return@collect
+                    // Not ready: applying here would tear down a bootstrap
+                    // already in flight (the guard below predates the switch
+                    // policy and exists for this emission noise alone).
                     if (wsId == null && !engineReadyNow()) return@collect
-                    AppLog.i(TAG, "provider changed to $resolved; re-bootstrapping")
-                    setProvider(resolved)
+                    // setProvider is the single reducer (audit P1-07): it
+                    // decides no-op, revert-clears-pending, apply-now and
+                    // defer-while-a-turn-runs in one place.
+                    setProvider(Providers.resolve(persisted).id)
                 }
         }
     }
@@ -454,13 +484,24 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         // So: handshake and discovery both need the workspace, so do the cheap
         // one first and re-verify after the slow one.
         val preferred = _state.value.selectedModel.ifBlank { null }
-        var ready = session.ensureAgentReady(
-            key,
-            providerId = providerId,
-            modelId = preferred ?: FALLBACK_PROBE_MODEL
-        )
-        if (!ready.isReady) {
-            AppLog.w(TAG, "early init: ${ready.notes.firstOrNull()}")
+        // The workspace claim itself happened above, in openWorkspace. Early
+        // agent init happens ONLY when the user already has a model chosen:
+        // with none selected, the old code fed a HARDCODED RETIRED id
+        // ("space-bunny-free") into the provider's model slots, and Crush
+        // treats a hardcoded guess as fatal - the exact "large model not found
+        // in provider" a friend hit on a fresh install (CrushSession refused
+        // to carry a default for this reason). STEP 2/3 below run the live
+        // catalogue, probe, and init with the probed id, and the key reaches
+        // the engine there too.
+        if (preferred != null) {
+            val ready = session.ensureAgentReady(
+                key,
+                providerId = providerId,
+                modelId = preferred
+            )
+            if (!ready.isReady) {
+                AppLog.w(TAG, "early init: ${ready.notes.firstOrNull()}")
+            }
         }
 
         // STEP 2 - discover a model that is actually callable.
@@ -564,7 +605,6 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             )
             return
         }
-        ready = init
         wsId = wsNow
         workspaces = mgr
 
@@ -700,7 +740,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     private fun currentProviderId(): String = Providers.resolve(currentPersistedProvider()).id
 
     /**
-     * Switches provider and re-bootstraps.
+     * Switches provider and re-bootstraps - the single switch reducer.
      *
      * The whole handshake is redone rather than patched: the key, BOTH model
      * slots, and the agent init are all provider-scoped, so changing only the
@@ -710,10 +750,39 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      * A provider change invalidates the model choice - a model id from one
      * provider's catalogue means nothing to another, and passing it through would
      * reproduce "large model not found in provider" on a different route.
+     *
+     * When to apply comes from [ProviderSwitchPolicy] (audit P1-07): a switch
+     * during a run is DEFERRED, because applying it the old way dropped the
+     * workspace id, the cached key and the shared SSE connection underneath a
+     * streaming turn, and the reply died while the UI kept its bubble. The
+     * deferred id is applied at run exit via [applyPendingProviderIfIdle], and
+     * reverting to the already-active provider cancels the deferral instead of
+     * honouring it.
      */
     fun setProvider(id: String) {
         val provider = Providers.resolve(id)
-        if (provider.id == _state.value.providerId) return
+        when (ProviderSwitchPolicy.resolve(
+            current = _state.value.providerId,
+            requested = provider.id,
+            runInFlight = activeRun != null,
+            pending = pendingProviderId
+        )) {
+            ProviderSwitchPolicy.Decision.NoOp -> return
+            ProviderSwitchPolicy.Decision.ClearPending -> {
+                AppLog.i(TAG, "provider reverted to ${provider.id}; deferred switch cancelled")
+                pendingProviderId = null
+                return
+            }
+            ProviderSwitchPolicy.Decision.Defer -> {
+                if (pendingProviderId != provider.id) {
+                    AppLog.i(TAG, "provider switch to ${provider.id} deferred; a turn is in flight")
+                }
+                pendingProviderId = provider.id
+                return
+            }
+            ProviderSwitchPolicy.Decision.ApplyNow -> pendingProviderId = null
+        }
+        AppLog.i(TAG, "provider switched to ${provider.id}; re-bootstrapping")
         _state.value = _state.value.copy(
             providerId = provider.id,
             selectedModel = "",
@@ -1051,12 +1120,15 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 wsId = null
                 abandonRun(handle)
                 _state.value = _state.value.copy(isStreaming = false)
-                bootstrap()
+                // A deferred provider switch (P1-07) applies here instead of
+                // the old-provider bootstrap - not in addition to it.
+                if (!applyPendingProviderIfIdle()) bootstrap()
                 return@launch
             }
             val ws = mgr.currentWorkspaceId ?: run {
                 abandonRun(handle)
                 _state.value = _state.value.copy(isStreaming = false)
+                applyPendingProviderIfIdle()
                 return@launch
             }
 
@@ -1082,7 +1154,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             if (sid == null) {
                 AppLog.w(TAG, "could not obtain a session; re-bootstrapping")
                 abandonRun(handle)
-                bootstrap()
+                if (!applyPendingProviderIfIdle()) bootstrap()
                 return@launch
             }
 
@@ -1363,6 +1435,13 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // Runtime, not persisted: this is what the agent did on THIS turn, so a
             // new session starts empty rather than inheriting a stale diff.
             collectFileChanges()
+
+            // A provider switch that waited for this turn (P1-07) applies now:
+            // the turn's events are done being consumed, so rebuilding the
+            // workspace underneath it can no longer kill the stream mid-reply or
+            // lose the measurement above. The run has already been abandoned,
+            // so setProvider's own "is a turn in flight" check passes.
+            applyPendingProviderIfIdle()
         }
     }
 
@@ -1591,18 +1670,6 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         const val TAG = "ChatViewModel"
         const val STREAM_TIMEOUT_MS = 180_000L
         const val SEND_TIMEOUT_MS = 30_000L
-
-        /**
-         * Best-effort model id used ONLY to claim a workspace before discovery
-         * has run, and always replaced by a probed id before the app reports
-         * ready. Crush reaps an unattached workspace in ~30s, so the bootstrap
-         * has to touch the workspace before the slow probe or every later call
-         * 404s.
-         *
-         * Deliberately NOT promoted to the configured model: if discovery fails,
-         * the app reports failure rather than silently chatting on a guess.
-         */
-        const val FALLBACK_PROBE_MODEL = "space-bunny-free"
     }
 }
 

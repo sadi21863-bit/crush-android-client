@@ -224,11 +224,11 @@ App-side mitigations:
   without a lock prompt, because there is no stored key at that moment. Later
   cold starts do prompt.
 - **Permission prompts and diagnostics are unverified on device.**
-- **`FALLBACK_PROBE_MODEL` is a hardcoded model id.** It exists only to claim a
-  workspace before discovery runs, and is always replaced by a probed id before
-  the app reports ready — but it is still a literal in
-  `ChatViewModel.Companion`, and a user reading the code has to take that on
-  trust. It should be removed in favour of a discovery-first bootstrap.
+- **The `FALLBACK_PROBE_MODEL` literal was removed.** The early agent init now
+  runs only when a model is actually chosen; with none selected, no retired
+  hardcoded id is fed to the provider any more (that guess was the "large model
+  not found in provider" a friend hit on a fresh install). Discovery-first
+  bootstrap probes a live id before the app reports ready.
 - **Multi-provider plumbing is in; only one provider is verified.** See [docs/providers.md](docs/providers.md). Twelve Catwalk ids are offered and the provider is chosen in Settings, but opencode-zen is the only one that has completed a handshake on a device - everything else is labelled unverified rather than claimed working.
 - **OAuth is not implemented.** Crush exposes /config/refresh-oauth and a Copilot import; the app calls neither. The endpoint that *initiates* an OAuth flow is not in the spec at all, so the redirect capture would have to be built from scratch.
 - **`WorkspaceLease` and the force-retry paths are now redundant.** They predate
@@ -269,7 +269,7 @@ terminal UI framework, compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 352 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 359 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -291,6 +291,7 @@ The suites worth naming, because each pins a defect a green build had hidden:
 | `AppLockPolicyTest` | cancel never becomes an unlock |
 | `SecureKeyStoreProviderScopeTest` | one credential slot per provider — a second key never destroys the first |
 | `RunHandleTest` | a stop during preflight suppresses the POST instead of cancelling the previous run |
+| `ProviderSwitchPolicyTest` | a provider switch during a run defers to run exit instead of killing the reply |
 
 **Robolectric cannot test the things that actually break.** The real Keystore
 cipher (Robolectric ships no AndroidKeyStore provider — the vault suite swaps in

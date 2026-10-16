@@ -15,6 +15,7 @@ turned out to be real, and two of those were bugs I had introduced.
 | **P1-03** | Workspace change keeps the stale SSE socket | **fixed** |
 | **P1-05** | Stop is not bound to the run it stops | **fixed** |
 | **P1-06** | `Channel.UNLIMITED` is not a bound | **fixed** |
+| **P1-07** | Provider switch needs serialisation | **fixed** |
 | **P2-09** | Comments still claim a 300s Keystore auth window | **fixed** |
 
 ### P0-01 — the lock was cosmetic
@@ -118,6 +119,38 @@ CANCEL-01's promise true in the `finally` path too, not just the explicit one.
 freeze-after-stop cannot resurrect the turn, the cancel names the frozen
 target, second stop is inert, jobs are cancelled exactly once.
 
+### P1-07 — provider switch tore the floor out of a running turn
+
+`setProvider` applied immediately, whatever was running. Applied mid-turn it
+dropped the workspace id and the cached key underneath a streaming run,
+cleared both model slots, stopped the shared SSE connection the run was
+consuming, and re-bootstrapped into a fresh workspace — the in-flight reply
+died silently while the UI kept showing its bubble. Because the key is
+resolved lazily by the same run, even the *reason* was wrong: the failure
+would have blamed the key.
+
+Now `setProvider` is the single reducer and its decision comes from
+`ProviderSwitchPolicy`, a pure function with four outcomes:
+
+| decision | when |
+|---|---|
+| `NoOp` | the requested provider is already active and nothing is deferred |
+| `ClearPending` | the requested provider is already active but a switch was deferred — the revert cancels the deferral |
+| `ApplyNow` | no run in flight; rebuild the handshake now |
+| `Defer` | a run is in flight; remember the request and apply at run exit |
+
+The deferred id rides in `pendingProviderId` and is applied by every run-exit
+path — `streamSend`'s finally, and the preflight failure paths, where it
+replaces the old-provider bootstrap rather than forking a second workspace in
+a row. Only the *final* choice is kept: a second switch during a run replaces
+the deferred one instead of queueing rebuilds the user no longer wants. The
+persisted setting says "new" the whole time, so even a process kill lands on
+the new provider after a relaunch.
+
+`ProviderSwitchPolicy` has 7 JVM tests, including the two behaviours a naive
+fix loses: reverting to the active provider mid-run clears the deferral, and
+a no-op must stay a no-op even while a run is in flight.
+
 ## Already addressed before this review
 
 The review lists these as changes, and they are genuinely in place — but it
@@ -136,7 +169,6 @@ the caller that was not checking.
 |---|---|---|
 | **P0-02** | Engine loopback is cross-app reachable | **Not fixable in the app layer.** Crush's HTTP server has no auth to enable and the spec declares no security scheme. Documented honestly in README § Security. |
 | **P1-04** | SSE may not be `CONNECTED` before POST | Partly mitigated: `streamSend` checks `conn.state == CONNECTED` and falls back to a per-turn stream otherwise. A bounded readiness await would be better. |
-| **P1-07** | Provider switch needs serialisation | `setProvider` was added this session and re-bootstraps, but it is not yet coordinated against an in-flight run by a single reducer. |
 | **P1-08** | Kotlin 2.4.10 vs Compose plugin 2.4.20 | Build risk, not a proven failure. Deliberate and documented in `docs/toolchain.md`. |
 | **P2-10** | Zen-specific model discovery remains | Real. `ZenApi`/`ZenRepository` are the legacy path; `ZenModelsApi` is now also used for provider-neutral probing but is still named for Zen. |
 | **P2-11/12** | arm64-only; no local inference | Product limitations, not defects. |

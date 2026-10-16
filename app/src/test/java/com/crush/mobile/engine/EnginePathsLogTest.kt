@@ -54,7 +54,7 @@ class EnginePathsLogTest {
     }
 
     @Test
-    fun `a server directory without crush.log is not a candidate`() {
+    fun `a server directory without a crush log is not a candidate`() {
         File(cache, "server-tcp___127.0.0.1_3003").mkdirs()
         assertNull(EnginePaths.newestEngineLog(cache))
     }

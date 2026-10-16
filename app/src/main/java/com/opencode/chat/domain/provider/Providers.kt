@@ -18,6 +18,14 @@ package com.opencode.chat.domain.provider
  * catalogue and returns HTTP 500 {"provider with ID ... not found"} for anything
  * it does not recognise.
  *
+ * `hyper` is the important case. It does NOT appear in Catwalk's
+ * internal/providers/configs/ directory, so reading that directory alone leads
+ * to concluding it does not exist - which is the wrong answer. Crush registers
+ * it in internal/config/load.go as
+ * `catwalk.InferenceProvider("hyper")`, reading HYPER_API_KEY from the
+ * environment. A published config list is not the same thing as the set of
+ * providers Crush will resolve.
+ *
  * This matters because the obvious guess is usually wrong. `openrouter` is plain;
  * `opencode` is not a provider at all; `opencode-zen` and `opencode-go` are two
  * separate ones. Deriving an id from a provider's public name produced the
@@ -76,16 +84,26 @@ object Providers {
             keyHint = "opencode.ai/zen"
         ),
         Provider(
-            // Catwalk id is plain "openrouter". Env var is OPENROUTER_API_KEY,
-            // which normalizeApiKey strips from a pasted assignment, so
-            // "OPENROUTER_API_KEY=sk-or-..." can be pasted verbatim.
+            id = "hyper",
+            displayName = "Charm Hyper",
+            isKnown = false,
+            keyHint = "hyper.charm.land (key starts sk-hyper-)",
+            // Verified live 2026-10-16, NOT from a marketing page:
+            //   GET https://hyper.charm.land/v1/models -> HTTP 200, 22 models,
+            //   and no auth is required to list them.
+            // The docs state "100 Hypercredits per month for free", and the
+            // documented error table is 401 and 5xx only - there is no 402/403
+            // plan gate the way OpenCode Zen has one. That is the whole reason it
+            // is listed first among the cloud options: Zen's free tier is
+            // advertised and no longer granted, this one is still granted.
+            hasFreeTier = true
+        ),
+        Provider(
             id = "openrouter",
             displayName = "OpenRouter",
             isKnown = false,
             keyHint = "openrouter.ai/keys",
-            // Free models are ids ending ":free". They are the cheapest way to
-            // exercise the agent end to end while Zen's own free tier is
-            // withdrawn.
+            // Free models are ids ending ":free".
             hasFreeTier = true
         ),
         Provider(

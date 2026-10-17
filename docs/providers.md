@@ -49,18 +49,22 @@ offer an id this engine's pinned Catwalk does not know.
 | id | Free tier? | Notes |
 |---|---|---|
 | `opencode-zen` | **no** (as of 2026-10-11) | the only one verified end to end |
-| `hyper` | **yes** | Charm Hyper — see below; 100 Hypercredits/month |
-| `openrouter` | **yes** — `:free` models | the current route to testing |
-| `opencode-go` | unknown | never completed a handshake here |
-| `groq` | **yes** | free tier exists |
-| `cerebras` | **yes** | free tier exists |
-| `deepseek` | **yes** | cheap rather than free |
+| `hyper` | **waitlisted** | Charm Hyper — see below; new signups land on a waitlist (2026-10-17) |
+| `openrouter` | **yes** — `:free` models | 50 req/day free below $10 of purchased credit, 1000/day at ≥$10; no card needed |
+| `opencode-go` | no | subscription, $10/mo |
+| `groq` | **yes** | free: `gpt-oss-120b`, `gpt-oss-20b`, `qwen/qwen3.8-27b` |
+| `cerebras` | **$5 once** | one-time credit after adding a payment card; 30-day expiry |
+| `deepseek` | **no** | cheap, not free; no free tier confirmed (2026-10-17) |
 | `openai` | no | |
 | `anthropic` | no | |
-| `gemini` | no | |
+| `gemini` | **yes** | free: 3.x flash models; free-tier content is reviewed/used for training |
 | `vertexai` | no | service-account credentials |
 | `xai` | no | |
 | `copilot` | n/a | **OAuth, not supported yet** — see below |
+
+Deep-dive research for every row: [`providers/`](providers/) — one .md per
+provider, sourced from official pages on 2026-10-17. The ranking and the
+Cross-provider summary live in [provider-research-2026-10-17.md](provider-research-2026-10-17.md).
 
 `isKnown` is true for exactly one entry: `opencode-zen`. Everything else is
 labelled unverified because no key has completed a handshake against it on a
@@ -78,8 +82,10 @@ on 2026-10-16 — not from inference:
   key field works — `normalizeApiKey` strips the `NAME=` prefix.
 - `GET /v1/models` returns HTTP 200 with 22 models **without auth**, so the model
   picker fills in before any key is stored.
-- `GET /v1/credits` returns `{"balance":100}`; the free allowance is **100
-  Hypercredits per month**.
+- `GET /v1/credits` returned `{"balance":100}` on the 2026-10-16 probe — but the
+  Hyper **FAQ (read 2026-10-17) says the monthly free Hypercredit allowance has
+  been retired**, and new signups land on a **waitlist** ("You're on the
+  waitlist" after email verification). Details in `providers/hyper.md`.
 - The documented error set is 401/5xx. There is **no 402/403 plan gate** the way
   OpenCode Zen has — worth stating because the Zen failure mode ("key works,
   every model refused") has already cost this project real debugging time.
@@ -97,13 +103,21 @@ OpenCode Zen's free tier is **withdrawn** — measured, see
 [project-analysis.md](project-analysis.md) §1a. The key authenticates and lists
 43 models but can call none: 33 × HTTP 402, and the ten `*-free` ids × HTTP 403.
 
-So for end-to-end testing, the two free routes are Hyper and OpenRouter:
+So for end-to-end testing, the realistic free routes (ranked by
+[provider-research-2026-10-17.md](provider-research-2026-10-17.md)):
 
-1. Settings → Provider → **Hyper** (or **OpenRouter**)
-2. Hyper: create a key at <https://hyper.charm.sh> (`sk-hyper-...`).
-   OpenRouter: <https://openrouter.ai/keys> (`sk-or-...`)
-3. Paste it, whole env assignment included if that is what you copied.
-4. Pick a model. On OpenRouter choose one whose id ends `:free`.
+1. Settings → Provider → **OpenRouter** — 16 `:free` models live today; 50
+   requests/day below $10 of purchased credit, 1000/day at $10+; no card
+   needed. Key: <https://openrouter.ai/keys> (`sk-or-...`).
+2. **Groq** — free tier with `gpt-oss-120b` / `gpt-oss-20b` /
+   `qwen/qwen3.8-27b`. Key: <https://console.groq.com/keys> (`gsk_...`).
+3. **Gemini API** — free tier for 3.x flash models, but free-tier content is
+   reviewed/used for training. Key via <https://aistudio.google.com>.
+4. Hyper is waitlisted, Cerebras needs a card for its $5 credit, and Zen's
+   free tier is intentionally restricted to OpenCode clients.
+
+Paste the key whole, env assignment included if that is what you copied, then
+pick a model. On OpenRouter choose one whose id ends `:free`.
 
 Crush's Catwalk snapshot for 0.97.1 decides which OpenRouter models are visible.
 If a `:free` model you expect is missing from the picker, the snapshot predates
@@ -147,3 +161,12 @@ hold a provider's raw API key.
 4. Never add it to a default path or a hardcoded model list. The app is
    dynamic-model-only by design; a hardcoded id is what produced
    `large model not found in provider`.
+
+## Deep-dive research files
+
+One file per provider in [`providers/`](providers/), researched from official
+sources on 2026-10-17: `gemini.md`, `hyper.md`, `groq.md`, `openrouter.md`,
+`opencode-zen.md`, `opencode-go.md`, `deepseek.md`, `openai.md`,
+`anthropic.md`, `cerebras.md`, `vertexai.md`, `xai.md`, `copilot.md`. The
+cross-provider ranking lives in
+[provider-research-2026-10-17.md](provider-research-2026-10-17.md).

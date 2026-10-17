@@ -269,7 +269,7 @@ terminal UI framework, compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 359 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 364 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,

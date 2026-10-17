@@ -497,7 +497,8 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             val ready = session.ensureAgentReady(
                 key,
                 providerId = providerId,
-                modelId = preferred
+                modelId = preferred,
+                mainAgent = Providers.byId(providerId)?.mainAgent?.takeIf { it.isNotBlank() }
             )
             if (!ready.isReady) {
                 AppLog.w(TAG, "early init: ${ready.notes.firstOrNull()}")
@@ -559,8 +560,9 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         // enough: Zen's /models is public and still advertises retired ids, so a
         // listed-but-dead model produced "Model is unavailable" on every turn
         // while the app reported a healthy catalogue. Probe with a 1-token
-        // request and take the first id that actually answers.
-        val shortlist = ModelChoice.shortlist(models)
+        // request and take the first id that actually answers. The provider's
+        // verified ids (if any) are probed first - see Provider.preferredModelIds.
+        val shortlist = ModelChoice.shortlist(models, Providers.byId(providerId)?.preferredModelIds.orEmpty())
         val result = zen.firstWorking(shortlist)
         val chosen = result.model
         if (chosen == null) {
@@ -584,11 +586,15 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         // STEP 3 - the workspace may have expired during the probe, so apply the
         // probed model and treat a 404 as "re-open", not as a fatal error.
         var wsNow = opened.workspaceId
+        // The provider's main-agent choice rides on every init, because a
+        // restarted engine recreates the coordinator with its own default
+        // (the build agent), which would silently undo the seating.
+        val mainAgent = Providers.byId(providerId)?.mainAgent?.takeIf { it.isNotBlank() }
         var init = runCatching {
-            session.ensureAgentReady(key, providerId = providerId, modelId = chosen)
+            session.ensureAgentReady(key, providerId = providerId, modelId = chosen, mainAgent = mainAgent)
         }.getOrElse {
             AppLog.w(TAG, "init with probed model threw: ${it.message}")
-            session.ensureAgentReady(key, providerId = providerId, modelId = chosen)
+            session.ensureAgentReady(key, providerId = providerId, modelId = chosen, mainAgent = mainAgent)
         }
 
         if (!init.isReady && init.notes.any { it.contains("workspace not found", true) }) {
@@ -605,7 +611,8 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 init = session.ensureAgentReady(
                     key,
                     providerId = providerId,
-                    modelId = chosen
+                    modelId = chosen,
+                    mainAgent = mainAgent
                 )
                 if (init.isReady) AppLog.i(TAG, "recovered on workspace $freshWs")
             }

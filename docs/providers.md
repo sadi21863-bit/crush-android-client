@@ -49,7 +49,7 @@ offer an id this engine's pinned Catwalk does not know.
 | id | Free tier? | Notes |
 |---|---|---|
 | `opencode-zen` | **no** (as of 2026-10-11) | the only one verified end to end |
-| `hyper` | **waitlisted** | Charm Hyper — see below; new signups land on a waitlist (2026-10-17) |
+| `hyper` | **no** | approved accounts see no free tier or credits (first-hand 2026-10-17); prepaid from $5 |
 | `openrouter` | **yes** — `:free` models | 50 req/day free below $10 of purchased credit, 1000/day at ≥$10; no card needed |
 | `opencode-go` | no | subscription, $10/mo |
 | `groq` | **yes** | free: `gpt-oss-120b`, `gpt-oss-20b`, `qwen/qwen3.8-27b` |
@@ -85,7 +85,10 @@ on 2026-10-16 — not from inference:
 - `GET /v1/credits` returned `{"balance":100}` on the 2026-10-16 probe — but the
   Hyper **FAQ (read 2026-10-17) says the monthly free Hypercredit allowance has
   been retired**, and new signups land on a **waitlist** ("You're on the
-  waitlist" after email verification). Details in `providers/hyper.md`.
+  waitlist" after email verification). First-hand confirmation the same day:
+  this project's waitlisted account came back **approved**, and the approved
+  account shows **no free tier and no free credits** — prepaid from $5 is the
+  smallest entry. Details in `providers/hyper.md`.
 - The documented error set is 401/5xx. There is **no 402/403 plan gate** the way
   OpenCode Zen has — worth stating because the Zen failure mode ("key works,
   every model refused") has already cost this project real debugging time.
@@ -109,19 +112,26 @@ So for end-to-end testing, the realistic free routes (ranked by
 1. Settings → Provider → **OpenRouter** — 16 `:free` models live today; 50
    requests/day below $10 of purchased credit, 1000/day at $10+; no card
    needed. Key: <https://openrouter.ai/keys> (`sk-or-...`).
-2. **Groq** — free tier with `gpt-oss-120b` / `gpt-oss-20b` /
-   `qwen/qwen3.8-27b`. Key: <https://console.groq.com/keys> (`gsk_...`).
+2. **Groq — chosen for project testing.** Free tier, no card, immediate key:
+   `openai/gpt-oss-120b` / `openai/gpt-oss-20b` / `qwen/qwen3.8-27b` at
+   30 RPM / 1,000 requests-day / 8K TPM / 200K tokens-day per model. Key:
+   <https://console.groq.com/keys> (`gsk_...`).
 3. **Gemini API** — free tier for 3.x flash models, but free-tier content is
    reviewed/used for training. Key via <https://aistudio.google.com>.
-4. Hyper is waitlisted, Cerebras needs a card for its $5 credit, and Zen's
-   free tier is intentionally restricted to OpenCode clients.
+4. Hyper is out: approved accounts see no free tier or credits (first-hand
+   2026-10-17); prepaid starts at $5. Cerebras needs a card for its $5
+   credit, and Zen's free tier is intentionally restricted to OpenCode
+   clients.
 
 Paste the key whole, env assignment included if that is what you copied, then
 pick a model. On OpenRouter choose one whose id ends `:free`.
 
-Crush's Catwalk snapshot for 0.97.1 decides which OpenRouter models are visible.
+Crush's Catwalk snapshot for 0.97.1 decides which provider models are visible.
 If a `:free` model you expect is missing from the picker, the snapshot predates
-it.
+it. Groq-specific: the snapshot predates Groq's 2026-08-16 llama shutdown for
+free/developer tiers, so if the picker offers `llama-3.3-70b-versatile` under
+`groq` it will be refused — pick `openai/gpt-oss-120b`, `openai/gpt-oss-20b` or
+`qwen/qwen3.8-27b` instead.
 
 ## OAuth is not implemented
 

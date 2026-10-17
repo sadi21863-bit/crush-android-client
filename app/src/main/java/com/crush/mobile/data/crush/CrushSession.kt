@@ -63,7 +63,13 @@ class CrushSession(
     suspend fun ensureAgentReady(
         apiKey: String,
         providerId: String,
-        modelId: String
+        modelId: String,
+        /**
+         * Engine agent id to seat as MAIN after init, or null for the engine's
+         * own default (the build agent). groq's free tier cannot host the
+         * build agent's request size at all (Provider.mainAgent).
+         */
+        mainAgent: String? = null
     ): Ready {
         val wsId = workspaces.currentWorkspaceId
             ?: return Ready("", providerId, false, listOf("no workspace"))
@@ -88,6 +94,15 @@ class CrushSession(
         runCatching { api.initAgent(wsId, interactive = true) }
             .onSuccess { notes += "agent/init ok" }
             .onFailure { notes += "agent/init FAILED: ${it.message?.take(120)}" }
+
+        // 3.5 seat the main agent. AFTER init: /agent/main on a fresh or dead
+        //     coordinator 400s with "agent coordinator not initialized"
+        //     (measured), and init is what creates it.
+        if (!mainAgent.isNullOrBlank()) {
+            runCatching { api.setMainAgent(wsId, mainAgent) }
+                .onSuccess { notes += "main agent = $mainAgent" }
+                .onFailure { notes += "main agent FAILED: ${it.message?.take(120)}" }
+        }
 
         // 4. confirm
         val info = runCatching { api.agentInfo(wsId) }.getOrNull()

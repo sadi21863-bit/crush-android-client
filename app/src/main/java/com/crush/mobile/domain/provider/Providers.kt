@@ -79,7 +79,34 @@ data class Provider(
      * Zen base is the constructor default; a null entry is an honest
      * "not supported for the picker yet" until researched.
      */
-    val modelsBase: String? = null
+    val modelsBase: String? = null,
+    /**
+     * Ids to probe FIRST, best first, when shortlisting from the live
+     * catalogue. Measured, not preferred: for groq the natural order put
+     * `allam-2-7b` first (alphabetically) which answers probes but cannot run
+     * the agent ("tool calling is not supported with this model"), while the
+     * models that can are named explicitly here. Empty = no preference.
+     *
+     * NOTE: groq itself is parked (2026-10-17). Its free tier caps every
+     * model at 8,000 tokens per minute and no agent shape fits - the coder
+     * agent's minimal request measures ~11.4K and even the leanest agent
+     * measures ~8.6K on-device, both over the cap. This list stays because the
+     * probe order is measured knowledge, not because groq is a supported
+     * target.
+     */
+    val preferredModelIds: List<String> = emptyList(),
+    /**
+     * Engine agent id to seat as MAIN after init, or "" for the engine's own
+     * default (the full-coder build agent).
+     *
+     * Currently unused by any listed provider: seating `plan` as main dropped
+     * Groq's request to ~8.6K, but that is STILL over the free tier's 8,000
+     * TPM cap on-device (measured twice, 2026-10-17), so no agent shape
+     * survives there and the field is parked until a real use appears.
+     * The plumbing (CrushSession.ensureAgentReady + POST /agent/main after
+     * init) stays because it is provider-generic.
+     */
+    val mainAgent: String = ""
 )
 
 object Providers {
@@ -122,10 +149,25 @@ object Providers {
             displayName = "OpenRouter",
             isKnown = false,
             keyHint = "openrouter.ai/keys",
-            // Free models are ids ending ":free" (16 of them live 2026-10-17).
-            // GET /api/v1/models is public and filterable.
+            // Free models are ids ending ":free" and need NO credits: the cap
+            // is per-REQUEST (20/min, 50/day without a $10 credit purchase -
+            // docs/providers/openrouter.md), NOT per-token. That is what makes
+            // this the project's test target from 2026-10-17: the agent's
+            // ~11.4K-token request size, fatal under Groq's 8K-TPM cap, is
+            // irrelevant here because free models carry 256K-1M contexts.
             hasFreeTier = true,
-            modelsBase = "https://openrouter.ai/api/v1"
+            modelsBase = "https://openrouter.ai/api/v1",
+            // Tool-capable free ids, best first, measured live against
+            // supported_parameters containing "tools" plus the moderation
+            // flag (moderated free routes can refuse agent content, so
+            // north-mini-code goes last despite being a code model).
+            preferredModelIds = listOf(
+                "google/gemma-4-31b-it:free",
+                "nvidia/nemotron-3-super-120b-a12b:free",
+                "thinkingmachines/inkling-small:free",
+                "dots-studio/dots-3-note-preview:free",
+                "cohere/north-mini-code:free"
+            )
         ),
         Provider(
             id = "opencode-go",
@@ -136,13 +178,24 @@ object Providers {
         Provider(
             id = "groq",
             displayName = "Groq",
-            isKnown = false,
+            isKnown = true,
             keyHint = "console.groq.com/keys",
-            // Free tier, no card (2026-10-17): gpt-oss-120b, gpt-oss-20b,
-            // qwen3.8-27b at 30 RPM / 1K RPD / 8K TPM / 200K TPD. This is the
-            // provider chosen for project testing.
+            // Parked 2026-10-17 as a test target: free tier caps every model
+            // at 8K tokens per minute (per-TOKEN, not per-request) and no
+            // agent shape fits - see the parked-list note on
+            // preferredModelIds below and docs/providers/groq.md.
             hasFreeTier = true,
-            modelsBase = "https://api.groq.com/openai/v1"
+            modelsBase = "https://api.groq.com/openai/v1",
+            // A 200 probe is not agent capability: allam-2-7b answers chat
+            // probes but rejects the agent's tool schema outright, and the
+            // oss models are the ones the engine accepted end-to-end. Order
+            // taken from the live catalogue plus those measurements.
+            preferredModelIds = listOf(
+                "openai/gpt-oss-120b",
+                "openai/gpt-oss-20b",
+                "qwen/qwen3.8-27b",
+                "allam-2-7b"
+            )
         ),
         Provider(
             id = "cerebras",

@@ -383,8 +383,16 @@ today works at exactly $0 **only if** Charm periodically waves
 someone through the waitlist queue; otherwise the smallest spendable entry is
 $5 (PAYG) or $10/mo (Shred).
 
+**First-hand check (2026-10-17, this project's user):** a waitlisted account
+came back **approved** — and the approved account shows **no free tier and no
+free credits** of any kind. This confirms the FAQ's "retired the monthly free
+Hypercredit allowance" with an observed account rather than docs alone, and
+confirms that approval itself does not grant any spendable $0 balance.
+
 **UNVERIFIED**: (a) actual approval generosity/latency today — no public
-policy page covers it; (b) whether a paid plan selection bypasses the waitlist
+policy page covers it; the first-hand check shows approval does happen (one
+account moved from waitlist to active the same month), but the cadence
+remains undocumented; (b) whether a paid plan selection bypasses the waitlist
 at signup; (c) whether legacy pre-2026-10-15 waitlisted accounts got an
 automatic approval cadence based on day-of-signup.
 

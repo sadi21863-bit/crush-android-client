@@ -113,6 +113,31 @@ class ProvidersTest {
     }
 
     @Test
+    fun `openrouter carries the measured probe order and compat base`() {
+        // Live measurement 2026-10-17: /api/v1/models?max_price=0 returned 18
+        // free rows; exactly these listed "tools" in supported_parameters and
+        // the ORDER here mirrors capability plus moderation (a moderated free
+        // route can refuse agent content, so north-mini-code sorts last).
+        val or = Providers.byId("openrouter")!!
+        assertEquals("https://openrouter.ai/api/v1", or.modelsBase)
+        assertEquals(
+            listOf(
+                "google/gemma-4-31b-it:free",
+                "nvidia/nemotron-3-super-120b-a12b:free",
+                "thinkingmachines/inkling-small:free",
+                "dots-studio/dots-3-note-preview:free",
+                "cohere/north-mini-code:free"
+            ),
+            or.preferredModelIds
+        )
+        // Every preferred id must today be a :free variant - the whole point
+        // of the list is to keep the app off paid routes while testing.
+        assertTrue(
+            or.preferredModelIds.all { it.endsWith(":free") }
+        )
+    }
+
+    @Test
     fun `the free tier list is not empty and excludes paid providers`() {
         assertTrue("testing needs somewhere to point at", Providers.FREE_TIER.isNotEmpty())
         assertTrue(

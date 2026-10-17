@@ -42,18 +42,28 @@ import com.crush.mobile.data.api.LiveZenModel
 object ModelChoice {
 
     /**
-     * Builds the probe order from a live catalogue. Nothing is hardcoded.
+     * Builds the probe order from a live catalogue.
      *
-     * Models Zen prices at zero go first so a missing subscription cannot block
-     * the app, then everything else. Order within a tier is stable so repeated
-     * launches probe the same candidates and do not burn tokens rediscovering.
+     * [preferred] ids (e.g. provider-verified ones, see
+     * [com.crush.mobile.domain.provider.Provider.preferredModelIds]) go
+     * first. A listed-but-dead id can still sort ahead of everyone by being
+     * free, so probing measures rather than trusting the order; preferred
+     * only biases the ORDER, never adds an id the provider did not list.
      *
-     * @return ids to probe, best-first. Empty when Zen returned nothing usable.
+     * Models priced at zero then go next so a missing subscription cannot
+     * block the app, then everything else. Order within a tier is stable so
+     * repeated launches probe the same candidates and do not burn tokens
+     * rediscovering.
+     *
+     * @return ids to probe, best-first. Empty when the catalogue returned
+     *   nothing usable.
      */
-    fun shortlist(models: List<LiveZenModel>): List<String> {
-        val free = models.filter { it.isFree && it.id.isNotBlank() }.map { it.id }
-        val rest = models.filter { !it.isFree && it.id.isNotBlank() }.map { it.id }
-        return (free + rest).distinct()
+    fun shortlist(models: List<LiveZenModel>, preferred: List<String> = emptyList()): List<String> {
+        val listed = models.filter { it.id.isNotBlank() }
+        val first = preferred.filter { id -> listed.any { it.id == id } }
+        val free = listed.filter { it.isFree && !first.contains(it.id) }.map { it.id }
+        val rest = listed.filter { !it.isFree && !first.contains(it.id) }.map { it.id }
+        return (first + free + rest).distinct()
     }
 
 /**

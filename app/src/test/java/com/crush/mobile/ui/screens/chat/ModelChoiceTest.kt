@@ -170,6 +170,37 @@ class ModelChoiceTest {
         )
     }
 
+    // ---- preferred ids bias the order without inventing ids --------------
+
+    @Test
+    fun `preferred ids sort first when the catalogue lists them`() {
+        val s = ModelChoice.shortlist(
+            listOf(m("alpha", false), m("openai/gpt-oss-120b", false), m("beta", false)),
+            preferred = listOf("openai/gpt-oss-120b")
+        )
+        assertEquals(listOf("openai/gpt-oss-120b", "alpha", "beta"), s)
+    }
+
+    @Test
+    fun `preferred ids that the provider does not list are ignored`() {
+        // Membership always comes from the live catalogue. A stale preferred
+        // id (retired upstream) must not resurrect itself into the probe.
+        val s = ModelChoice.shortlist(
+            listOf(m("alpha", false)),
+            preferred = listOf("moonshotai/kimi-k2-instruct-0905")
+        )
+        assertEquals(listOf("alpha"), s)
+    }
+
+    @Test
+    fun `preferred beats free-first ordering without duplicating`() {
+        val s = ModelChoice.shortlist(
+            listOf(m("free-a", true), m("chosen", true), m("paid", false)),
+            preferred = listOf("chosen")
+        )
+        assertEquals(listOf("chosen", "free-a", "paid"), s)
+    }
+
     // ---- error wording: credential vs connectivity must stay distinct ---
 
     @Test

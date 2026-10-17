@@ -131,6 +131,26 @@ class CrushEngine(private val paths: EnginePaths) {
             val port = freePort()
             currentPort = port
 
+            // LAST-MINUTE CATALOG OVERRIDE.
+            //
+            // The engine parses its config ONCE per process, so any provider
+            // catalogue repair has to land in the file BEFORE this spawn. The
+            // engine's Catwalk cache is authoritative for most providers but
+            // measured stale for groq (see EngineConfigInjector for the
+            // numbers), so the override list is merged in here, idempotently.
+            // Nothing must be logged with the file around - it holds the raw
+            // provider key.
+            runCatching {
+                val injected = com.crush.mobile.data.crush.EngineConfigInjector.syncProviderModels(
+                    paths.globalData,
+                    "groq",
+                    com.crush.mobile.data.crush.EngineConfigInjector.providerCatalog("groq")
+                )
+                if (injected.changed) {
+                    Log.i(TAG, "provider catalogue override applied: ${injected.ids.size} models")
+                }
+            }.onFailure { Log.w(TAG, "catalog override skipped: ${it.message}") }
+
             val cmd = listOf(
                 paths.binary.absolutePath,
                 "server",

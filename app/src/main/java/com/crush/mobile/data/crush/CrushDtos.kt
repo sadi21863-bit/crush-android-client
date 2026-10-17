@@ -141,7 +141,17 @@ data class SelectedModel(
     val model: String,
     val provider: String,
     @SerializedName("reasoning_effort") val reasoningEffort: String = "medium",
-    @SerializedName("max_tokens") val maxTokens: Int = 8192
+    /**
+     * Intentionally null.
+     *
+     * The old hard default of 8192 was larger than several provider models'
+     * real limits - measured on Groq: `allam-2-7b` rejects any turn with
+     * HTTP 400 "max_tokens must be less than or equal to 4096". Omitting the
+     * field (Gson drops nulls) lets the engine use each model's own
+     * `default_max_tokens` from its config, which is always correct for the
+     * model actually being called.
+     */
+    @SerializedName("max_tokens") val maxTokens: Int? = null
 )
 
 // ---------------------------------------------------------- permissions

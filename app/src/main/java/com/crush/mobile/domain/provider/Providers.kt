@@ -57,11 +57,29 @@ data class Provider(
     /**
      * True when this provider has a genuinely free tier reachable by API key.
      *
-     * Distinct from [isKnown]: `groq` and `cerebras` are unverified here but are
-     * free, and `openrouter` is free for `:free` models. A user whose paid plan
-     * lapsed needs to know which of these can still be tested against.
+     * Distinct from [isKnown]: `groq` and `openrouter` are unverified here but
+     * are free. A user whose paid plan lapsed needs to know which of these can
+     * still be tested against.
+     *
+     * 2026-10-17 corrections from per-provider research under docs/providers:
+     * Hyper's free credits are retired and approved accounts get none;
+     * DeepSeek has no free tier; Cerebras's $5 credit needs a payment card,
+     * so none of the three count as testable-for-$0 any more.
      */
-    val hasFreeTier: Boolean = false
+    val hasFreeTier: Boolean = false,
+    /**
+     * Base of the provider's OpenAI-compatible HTTP API, used for the live
+     * model catalogue (`GET <modelsBase>/models`) and 1-token call probes.
+     *
+     * Null means the app has no verified compat base for this provider, and
+     * must NOT silently fall back to Zen's: probing opencode.ai/zen with a
+     * foreign key is exactly the bug this field exists to fix — the key
+     * authenticates against a different host, and the ids it returns describe
+     * a different provider. For [com.crush.mobile.data.api.ZenModelsApi] the
+     * Zen base is the constructor default; a null entry is an honest
+     * "not supported for the picker yet" until researched.
+     */
+    val modelsBase: String? = null
 )
 
 object Providers {
@@ -81,30 +99,33 @@ object Providers {
             id = "opencode-zen",
             displayName = "OpenCode Zen",
             isKnown = true,
-            keyHint = "opencode.ai/zen"
+            keyHint = "opencode.ai/zen",
+            modelsBase = "https://opencode.ai/zen/v1"
         ),
         Provider(
             id = "hyper",
             displayName = "Charm Hyper",
             isKnown = false,
             keyHint = "hyper.charm.land (key starts sk-hyper-)",
-            // Verified live 2026-10-16, NOT from a marketing page:
-            //   GET https://hyper.charm.land/v1/models -> HTTP 200, 22 models,
-            //   and no auth is required to list them.
-            // The docs state "100 Hypercredits per month for free", and the
-            // documented error table is 401 and 5xx only - there is no 402/403
-            // plan gate the way OpenCode Zen has one. That is the whole reason it
-            // is listed first among the cloud options: Zen's free tier is
-            // advertised and no longer granted, this one is still granted.
-            hasFreeTier = true
+            // 2026-10-17: the FAQ retires the monthly free Hypercredit allowance,
+            // and a real approved account (first-hand, this project) shows no free
+            // tier and no credits. Prepaid from $5 is the smallest entry. The old
+            // comment here ("100 Hypercredits, still granted") was the docs' own
+            // stale promise. See docs/providers/hyper.md.
+            hasFreeTier = false,
+            // Verified live 2026-10-16: GET /v1/models -> HTTP 200 with 22
+            // models, no auth required to list.
+            modelsBase = "https://hyper.charm.land/v1"
         ),
         Provider(
             id = "openrouter",
             displayName = "OpenRouter",
             isKnown = false,
             keyHint = "openrouter.ai/keys",
-            // Free models are ids ending ":free".
-            hasFreeTier = true
+            // Free models are ids ending ":free" (16 of them live 2026-10-17).
+            // GET /api/v1/models is public and filterable.
+            hasFreeTier = true,
+            modelsBase = "https://openrouter.ai/api/v1"
         ),
         Provider(
             id = "opencode-go",
@@ -117,51 +138,70 @@ object Providers {
             displayName = "Groq",
             isKnown = false,
             keyHint = "console.groq.com/keys",
-            hasFreeTier = true
+            // Free tier, no card (2026-10-17): gpt-oss-120b, gpt-oss-20b,
+            // qwen3.8-27b at 30 RPM / 1K RPD / 8K TPM / 200K TPD. This is the
+            // provider chosen for project testing.
+            hasFreeTier = true,
+            modelsBase = "https://api.groq.com/openai/v1"
         ),
         Provider(
             id = "cerebras",
             displayName = "Cerebras",
             isKnown = false,
             keyHint = "cloud.cerebras.ai",
-            hasFreeTier = true
+            // The "$5 credit" (2026-10-17) requires a payment card and expires
+            // in 30 days; it is a trial grant, not a free tier.
+            hasFreeTier = false,
+            modelsBase = "https://api.cerebras.ai/v1"
         ),
         Provider(
             id = "deepseek",
             displayName = "DeepSeek",
             isKnown = false,
             keyHint = "platform.deepseek.com",
-            hasFreeTier = true
+            // Cheap, not free: no free tier or trial credit exists on any
+            // current official page (2026-10-17; docs/providers/deepseek.md).
+            hasFreeTier = false,
+            modelsBase = "https://api.deepseek.com"
         ),
         Provider(
             id = "openai",
             displayName = "OpenAI",
             isKnown = false,
-            keyHint = "platform.openai.com/api-keys"
+            keyHint = "platform.openai.com/api-keys",
+            modelsBase = "https://api.openai.com/v1"
         ),
         Provider(
             id = "anthropic",
             displayName = "Anthropic",
             isKnown = false,
             keyHint = "console.anthropic.com/settings/keys"
+            // No modelsBase: Anthropic's /v1/models is not OpenAI-shaped and
+            // does not take a Bearer key header.
         ),
         Provider(
             id = "gemini",
             displayName = "Google Gemini",
             isKnown = false,
-            keyHint = "aistudio.google.com/apikey"
+            keyHint = "aistudio.google.com/apikey",
+            // Free tier exists for 3.x flash models, but free-tier content is
+            // reviewed/used for training (2026-10-17).
+            hasFreeTier = true,
+            modelsBase = "https://generativelanguage.googleapis.com/v1beta/openai"
         ),
         Provider(
             id = "vertexai",
             displayName = "Google Vertex AI",
             isKnown = false,
             keyHint = "GCP service-account credentials"
+            // Credentials are an OAuth access token, not a pasted key.
         ),
         Provider(
             id = "xai",
             displayName = "xAI",
             isKnown = false,
-            keyHint = "console.x.ai"
+            keyHint = "console.x.ai",
+            modelsBase = "https://api.x.ai/v1"
         ),
         Provider(
             id = "copilot",

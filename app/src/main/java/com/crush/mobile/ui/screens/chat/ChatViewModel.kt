@@ -505,7 +505,23 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         }
 
         // STEP 2 - discover a model that is actually callable.
-        val zen = ZenModelsApi({ key })
+        //
+        // The catalogue comes from the SELECTED provider's own /models, never
+        // from Zen by default: constructing the client with Zen's base for a
+        // non-Zen provider would probe opencode.ai with that provider's key and
+        // fail with an opaque 401 that described nothing.
+        val modelsBase = Providers.byId(providerId)?.modelsBase
+        if (modelsBase == null) {
+            AppLog.w(TAG, "no compat base for provider '$providerId'; cannot fetch a catalogue")
+            _state.value = _state.value.copy(
+                phase = "This provider has no live model list in this build yet.",
+                models = emptyList(),
+                modelsError = "provider \"$providerId\" has no OpenAI-compatible /models base configured",
+                engineReady = false
+            )
+            return
+        }
+        val zen = ZenModelsApi({ key }, modelsBase)
 
         // Load REAL prices before parsing the catalogue.
         //
@@ -710,10 +726,22 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         return target.id
     }
 
-/** Live Zen catalogue, so the picker cannot offer a retired model. */
+/** Live catalogue for the current provider, so the picker cannot offer a retired model. */
     fun loadModels() {
         viewModelScope.launch {
-            val r = ZenModelsApi({ container.keySession.require(secureKeys, currentProviderId()) }).fetch()
+            val base = currentModelsBase()
+            if (base == null) {
+                _state.value = _state.value.copy(
+                    models = emptyList(),
+                    modelsError =
+                        "provider \"${currentProviderId()}\" has no OpenAI-compatible /models base configured"
+                )
+                return@launch
+            }
+            val r = ZenModelsApi(
+                { container.keySession.require(secureKeys, currentProviderId()) },
+                base
+            ).fetch()
             _state.value = _state.value.copy(
                 models = r.models,
                 modelsError = r.error
@@ -738,6 +766,13 @@ class ChatViewModel(private val context: Context, private val container: AppCont
 
     /** Resolved provider id, for call sites that need the key scoped to it. */
     private fun currentProviderId(): String = Providers.resolve(currentPersistedProvider()).id
+
+    /**
+     * Base of the selected provider's OpenAI-compatible API, or null when the
+     * picker cannot talk to that provider directly (see Provider.modelsBase).
+     */
+    private fun currentModelsBase(): String? =
+        Providers.byId(currentProviderId())?.modelsBase
 
     /**
      * Switches provider and re-bootstraps - the single switch reducer.
@@ -825,10 +860,20 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 )
                 return@launch
             }
-            if (!ZenModelsApi({ key }).probeWorks(id)) {
+            val providerName = Providers.byId(providerId)?.displayName ?: providerId
+            val base = currentModelsBase()
+            val rejection = when {
+                base == null ->
+                    "Cannot verify \"$id\": provider \"$providerName\" has no live " +
+                        "model list in this build, so taps cannot be trusted."
+                !ZenModelsApi({ key }, base).probeWorks(id) ->
+                    "\"$id\" is listed by $providerName but cannot be called. Pick another."
+                else -> null
+            }
+            if (rejection != null) {
                 AppLog.w(TAG, "rejected model $id (did not answer a probe)")
                 _state.value = _state.value.copy(
-                    modelsError = "\"$id\" is listed by Zen but cannot be called. Pick another."
+                    modelsError = rejection
                 )
                 return@launch
             }

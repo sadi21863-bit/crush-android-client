@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * Live model catalogue from OpenCode Zen.
+ * Live model catalogue, fetched from the SELECTED provider's own API.
  *
  * WHY THIS EXISTS, AND WHY IT IS NOT READ FROM CRUSH:
  *
@@ -26,7 +26,16 @@ import java.util.concurrent.TimeUnit
  *
  * That is not theoretical - it is what broke the first end-to-end run on this
  * project. The only trustworthy source of "can I actually call this model" is
- * Zen's own /models endpoint, so the picker is built on that instead.
+ * the provider's own /models endpoint, so the picker is built on that instead.
+ *
+ * Providers are only OpenAI-compatible-flavoured different providers of the same
+ * shape: Zen, Groq, Hyper, OpenRouter, DeepSeek, OpenAI, Gemini's compat layer,
+ * Cerebras and xAI all expose `GET <base>/models` returning a `data[]` array and
+ * `POST <base>/chat/completions`. Each provider's base is carried in
+ * [com.crush.mobile.domain.provider.Provider.modelsBase] and passed here.
+ * There is deliberately NO default other than Zen's: requesting opencode.ai/zen
+ * /models with a Groq key would answer 401, which told nobody anything useful.
+ * Callers must supply the right base per provider (see ChatViewModel).
  *
  * The key is read from [com.crush.mobile.data.local.SecureKeyStore], never
  * from disk directly, and is never logged.
@@ -118,6 +127,12 @@ data class FirstWorking(
 
 class ZenModelsApi(
     private val keyProvider: () -> String,
+    /**
+     * Base URL of the provider to talk to. Defaults to Zen for source
+     * compatibility; callers MUST pass the selected provider's
+     * [com.crush.mobile.domain.provider.Provider.modelsBase] instead.
+     */
+    private val baseUrl: String = ZenModelsApi.BASE,
     private val client: OkHttpClient = defaultClient()
 ) {
 
@@ -142,6 +157,11 @@ data class Result(
 
     private var cachedPricing: Map<String, ModelPrice> = emptyMap()
 
+    /** Host part of [baseUrl], for error strings that name the host probed. */
+    private fun hostForError(): String =
+        runCatching { java.net.URI(baseUrl).host }.getOrNull().orEmpty()
+            .ifEmpty { "provider" }
+
 /**
      * Fetches the live catalogue. Sorted free-first, then alphabetically, so the
      * free models are reachable without scrolling on a phone.
@@ -161,7 +181,7 @@ data class Result(
         }
         runCatching {
             val req = Request.Builder()
-                .url("$BASE/models")
+                .url("$baseUrl/models")
                 .header("Authorization", "Bearer $key")
                 .get()
                 .build()
@@ -170,7 +190,10 @@ data class Result(
                     // Body intentionally omitted: it can echo request material.
                     // Labelled return: this is now inside withContext{}, so a bare
                     // `return` would be a compile error rather than an early exit.
-                    return@withContext Result(emptyList(), "HTTP ${resp.code} from Zen /models")
+                    return@withContext Result(
+                        emptyList(),
+                        "HTTP ${resp.code} from ${hostForError()}/models"
+                    )
                 }
                 val body = resp.body?.string().orEmpty()
                 val arr = JsonParser.parseString(body).asJsonObject
@@ -259,7 +282,8 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
     }
 
     /**
-     * Asks Zen whether a model can ACTUALLY be called right now, with this key.
+     * Asks the provider whether a model can ACTUALLY be called right now, with
+     * this key.
      *
      * /models is a public catalogue that still advertises retired models, so
      * membership proves nothing. Measured on device: `deepseek-v4-flash-free`
@@ -288,7 +312,7 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
             }
             client.newCall(
                 Request.Builder()
-                    .url("$BASE/chat/completions")
+                    .url("$baseUrl/chat/completions")
                     .addHeader("Authorization", "Bearer ${keyProvider()}")
                     .post(body.toString().toRequestBody(JSON_MEDIA))
                     .build()

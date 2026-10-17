@@ -22,7 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crush.mobile.CrushMobileApp
 import com.crush.mobile.data.local.SecureKeyStore
-import com.crush.mobile.util.AppLog
+import com.crush.mobile.domain.provider.Provider
+import com.crush.mobile.domain.provider.Providers
 import com.crush.mobile.ui.screens.settings.SettingsViewModel
 import kotlinx.coroutines.launch
 
@@ -41,11 +42,17 @@ fun OnboardingScreen(
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val secureKeys = remember { SecureKeyStore(ctx) }
-    // Onboarding is the FIRST place a key is stored, so the provider it is stored
-    // against is the default one. When the user later switches provider their
-    // existing key is still there - that is the whole point of the per-provider
-    // vault.
-    val providerId = remember { SecureKeyStore.LEGACY_PROVIDER }
+    // Onboarding is the FIRST place a key is stored, so the user picks the
+    // provider HERE too. The key must be saved under the provider it belongs
+    // to: the first build saved every onboarding key under the default
+    // provider's scope, so a Groq key pasted at onboarding left the app
+    // reading "no key for opencode-zen" in chat while Settings showed a
+    // perfectly saved Groq key that nothing would use.
+    var providerId by remember { mutableStateOf(SecureKeyStore.LEGACY_PROVIDER) }
+    val provider = remember(providerId) {
+        Providers.byId(providerId) ?: Providers.DEFAULT
+    }
+    var providerMenuOpen by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var apiKey by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
@@ -94,11 +101,45 @@ fun OnboardingScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Provider selector. Plain DropdownMenu, not ExposedDropdownMenuBox:
+            // the box's menuAnchor() API has churned across material3 versions,
+            // and the plain popup needs no anchor plumbing at all.
+            OutlinedButton(
+                onClick = { providerMenuOpen = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (provider.hasFreeTier) {
+                        "${provider.displayName} (free tier)"
+                    } else {
+                        provider.displayName
+                    }
+                )
+            }
+            DropdownMenu(
+                expanded = providerMenuOpen,
+                onDismissRequest = { providerMenuOpen = false }
+            ) {
+                Providers.ALL.forEach { p ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(if (p.hasFreeTier) "${p.displayName} (free tier)" else p.displayName)
+                        },
+                        onClick = {
+                            providerId = p.id
+                            providerMenuOpen = false
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it.trim() },
                 label = { Text("API Key") },
-                placeholder = { Text("sk-...") },
+                placeholder = { Text(keyPlaceholder(provider)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = if (showKey) {
@@ -119,7 +160,7 @@ fun OnboardingScreen(
                     }
                 },
                 supportingText = {
-                    Text("Get your key at opencode.ai")
+                    Text("Get your key at ${provider.keyHint}")
                 }
             )
 
@@ -148,9 +189,15 @@ fun OnboardingScreen(
                     // gate instead.
                     scope.launch {
                         val ok = viewModel.saveApiKeyAwait(apiKey, providerId)
-                        AppLog.i("Onboarding", "saveApiKey ok=$ok")
-                        if (ok) onCompleted()
-                        else errorText = "Could not save key - please try again"
+                        // Persist the choice only after the key landed: the chat
+                        // screen reads the persisted provider on its first
+                        // bootstrap to decide which key scope to read.
+                        if (ok) {
+                            viewModel.saveProviderId(providerId)
+                            onCompleted()
+                        } else {
+                            errorText = "Could not save key - please try again"
+                        }
                     }
                 },
                 modifier = Modifier
@@ -162,4 +209,18 @@ fun OnboardingScreen(
             }
         }
     }
+}
+
+/**
+ * What a key for this provider looks like, shown as the field's hint. Real key
+ * shapes differ (`gsk_...` for Groq, `sk-hyper-...` for Hyper), and a hardcoded
+ * "sk-..." made every provider look like OpenAI.
+ */
+private fun keyPlaceholder(provider: Provider): String = when {
+    provider.id.startsWith("opencode") -> "oc_sk_..."
+    provider.id == "groq" -> "gsk_..."
+    provider.id == "hyper" -> "sk-hyper-..."
+    provider.id == "openrouter" -> "sk-or-..."
+    provider.id == "copilot" -> "OAuth sign-in only"
+    else -> "sk-..."
 }

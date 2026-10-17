@@ -129,6 +129,55 @@ class ProvidersTest {
     }
 
     @Test
+    fun `hyper is no longer advertised as free after the allowance retirement`() {
+        // 2026-10-17: Hyper's FAQ retires the monthly free Hypercredit allowance,
+        // and a real waitlisted-then-approved account (first-hand, this project)
+        // shows no free tier and no credits. Advertising it as free sent testers
+        // into a waitlist for nothing. See docs/providers/hyper.md.
+        assertFalse(Providers.byId("hyper")!!.hasFreeTier)
+    }
+
+    @Test
+    fun `deepseek and cerebras are not free tiers either`() {
+        // DeepSeek has no free tier or trial credit on any current official page
+        // (docs/providers/deepseek.md, 2026-10-17). Cerebras grants $5 once,
+        // only after adding a payment card, and it expires in 30 days - a trial,
+        // not a free tier. None of the three flags may drift back to true
+        // without new evidence.
+        assertFalse(Providers.byId("deepseek")!!.hasFreeTier)
+        assertFalse(Providers.byId("cerebras")!!.hasFreeTier)
+    }
+
+    @Test
+    fun `groq stays free and carries its compat base`() {
+        // The provider chosen for project testing. The base is what the model
+        // catalogue will call instead of blithely probing Zen with a Groq key.
+        val groq = Providers.byId("groq")!!
+        assertTrue(groq.hasFreeTier)
+        assertEquals("https://api.groq.com/openai/v1", groq.modelsBase)
+    }
+
+    @Test
+    fun `zen's models base matches the catalogue client's default`() {
+        assertEquals(
+            "https://opencode.ai/zen/v1",
+            Providers.byId("opencode-zen")!!.modelsBase
+        )
+    }
+
+    @Test
+    fun `every models base, when present, is a well formed https base`() {
+        Providers.ALL.forEach { p ->
+            if (p.modelsBase != null) {
+                assertTrue(
+                    "${p.id} modelsBase is not a plain https base: ${p.modelsBase}",
+                    p.modelsBase!!.startsWith("https://") && !p.modelsBase!!.endsWith("/")
+                )
+            }
+        }
+    }
+
+    @Test
     fun `copilot is listed but labelled as needing OAuth`() {
         // So its absence is a known gap rather than an oversight, and the user is
         // not sent to paste a key that does not exist.

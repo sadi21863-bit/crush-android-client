@@ -219,7 +219,10 @@ App-side mitigations:
   it as untested until a turn that actually edits something has been checked.
 - **A slow turn still strands a bubble.** `streamSend`'s `finally` now finalises
   the live bubble, but a turn whose provider simply never replies leaves an
-  empty bubble marked "no reply received". That is honest, not fixed.
+  empty bubble marked "no reply received". That is honest. A FAILED turn
+  (finish `reason:"error"`) now shows the provider's own wording instead —
+  including nested-object `details`, which previously crashed the stream
+  update and masked the server's message.
 - **First-launch app lock bypass.** On a *fresh* install the first session opens
   without a lock prompt, because there is no stored key at that moment. Later
   cold starts do prompt.
@@ -269,7 +272,7 @@ terminal UI framework, compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 382 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 386 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,

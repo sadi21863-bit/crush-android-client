@@ -196,6 +196,59 @@ class StreamMessageTest {
     }
 
     @Test
+    fun `nested-object details is mined for its message, not thrown on`() {
+        // Real ChatCompletions error bodies forwarded by Crush nest the provider
+        // message inside an OBJECT details. The previous asString read threw,
+        // killed the stream-update lambda and replaced the turn's error with a
+        // generic exception string.
+        val m = msg(
+            """{"role":"assistant","parts":[
+               {"type":"finish","data":{"reason":"error",
+                 "message":"Chat request aborted",
+                 "details":{"message":"Requested 9000 exceeds the 8000 TPM limit",
+                            "error":{"code":413}}}}]}"""
+        )
+        assertEquals(
+            "Chat request aborted: Requested 9000 exceeds the 8000 TPM limit",
+            m.finishError
+        )
+    }
+
+    @Test
+    fun `object details without a string message contributes nothing`() {
+        // message present, details object carries only error metadata with
+        // no nested string: the metadata is dropped, the wording is kept.
+        val m = msg(
+            """{"role":"assistant","parts":[
+               {"type":"finish","data":{"reason":"error",
+                 "message":"Chat request aborted",
+                 "details":{"code":413}}}]}"""
+        )
+        assertEquals("Chat request aborted", m.finishError)
+    }
+
+    @Test
+    fun `an error finish with no extractable text still reads as failed`() {
+        // reason=error with neither message nor details used to yield a null
+        // finishError, so the bubble rendered the mistiming marker "no reply
+        // received" - which lies about a FAILED turn.
+        val m = msg(
+            """{"role":"assistant","parts":[
+               {"type":"finish","data":{"reason":"error"}}]}"""
+        )
+        assertEquals("provider error with no message", m.finishError)
+    }
+
+    @Test
+    fun `array-valued details does not throw`() {
+        val m = msg(
+            """{"role":"assistant","parts":[
+               {"type":"finish","data":{"reason":"error","details":["a","b"]}}]}"""
+        )
+        assertEquals("provider error with no message", m.finishError)
+    }
+
+    @Test
     fun `malformed parts do not throw`() {
         val samples = listOf(
             """{"role":"assistant","parts":[{"type":"text"}]}""",

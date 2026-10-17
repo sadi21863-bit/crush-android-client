@@ -87,17 +87,45 @@ data class StreamMessage(
      * A `finish` part with reason "error" means the turn produced no text because
      * the provider call failed (e.g. `Unauthorized / Invalid API key.`). A turn
      * can be `isFinished` and still have failed, so callers must check this too.
+     *
+     * Real provider errors arrive in at least two shapes: `message` plus a
+     * STRING `details`, and — on the ChatCompletions error bodies Crush forwards
+     * verbatim — `details` as a nested OBJECT (`{"message":"…","error":{…}}`).
+     * Reading an object with asString throws, which crashed the stream-update
+     * lambda and replaced the server's actual wording with a generic exception
+     * string mid-turn. Both shapes are handled; object `details` is mined one
+     * level deep, and a reason-error with no extractable text falls back to an
+     * explicit marker so the bubble cannot render as a mistimed "no reply
+     * received" when the turn actually FAILED.
      */
     val finishError: String?
         get() = parts.firstOrNull { it.optString("type") == "finish" }
             ?.data()
             ?.takeIf { it.optString("reason") == "error" }
             ?.let { d ->
-                listOfNotNull(d.optString("message"), d.optString("details"))
+                val message = d.optString("message")
+                val details = detailsText(d)
+                listOfNotNull(message, details)
                     .filter { it.isNotBlank() }
                     .joinToString(": ")
+                    .takeIf { it.isNotBlank() } ?: "provider error with no message"
             }
-            ?.ifBlank { null }
+
+    /**
+     * The `details` field of a finish-error, as text when it is one:
+     * a string is taken verbatim, an object is mined for a nested `message`
+     * or `error` STRING (one level; second-level nesting is dropped rather
+     * than guessed at), and anything else contributes nothing.
+     */
+    private fun detailsText(d: JsonObject): String? {
+        return when {
+            d.has("details") && d.get("details").isJsonObject ->
+                d.optObject("details")?.let { obj ->
+                    obj.optString("message") ?: obj.optString("error")
+                }
+            else -> d.optString("details")
+        }
+    }
 
     val toolCalls: List<JsonObject>
         get() = parts.filter { it.optString("type") == "tool_call" }
@@ -115,8 +143,25 @@ private fun JsonObject.data(): JsonObject? {
     return if (d != null && d.isJsonObject) d.asJsonObject else null
 }
 
+/**
+ * Reads the named member as a Json object, or null when absent/not an object.
+ * Pair of [data] for nested-size access, same safety rule.
+ */
+private fun JsonObject.optObject(key: String): JsonObject? {
+    val d = get(key)
+    return if (d != null && d.isJsonObject) d.asJsonObject else null
+}
+
+/**
+ * Reads the member as its string value ONLY when it is a JSON primitive.
+ *
+ * Must NOT use getAsJsonPrimitive().asString blindly: asString throws
+ * UnsupportedOperationException on objects/arrays, which turned a nested
+ * provider error (`"details":{...}`) into a mid-turn crash instead of a
+ * message. Non-primitive members and JsonNull both return null.
+ */
 internal fun JsonObject.optString(key: String): String? =
-    if (has(key) && !get(key).isJsonNull) get(key).asString else null
+    if (has(key) && get(key).isJsonPrimitive) get(key).asString else null
 
 internal fun JsonObject.optBoolean(key: String): Boolean? =
     if (has(key) && !get(key).isJsonNull) get(key).asBoolean else null

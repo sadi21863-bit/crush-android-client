@@ -13,7 +13,10 @@
 # extract it and exec() will fail.
 
 param(
-    [string]$Version = "0.97.1",
+    # Default tracks the bundled engine (libcrush.so in jniLibs). Running this
+    # script as-is on a missing binary MUST NOT silently downgrade the app to an
+    # older engine - the default advanced to 0.98.1 when the binary did.
+    [string]$Version = "0.98.1",
     # Expected SHA-256 of the release TARBALL, not the extracted binary.
     #
     # WHY THIS EXISTS
@@ -31,10 +34,15 @@ param(
     # asset, not from a local download of that same download - pinning against a
     # hash derived from the thing you are verifying verifies nothing.
     #
-    # Recorded 2026-10-16 from
-    #   https://github.com/charmbracelet/crush/releases/download/v0.97.1/checksums.txt
-    #   5b76ea03...709f70711  crush_0.97.1_Android_arm64.tar.gz
-    [string]$ExpectedSha256 = $(if ($Version -eq "0.97.1") {
+    # Recorded 2026-10-17 from
+    #   https://github.com/charmbracelet/crush/releases/download/v0.98.1/checksums.txt
+    #   88f42f93...879ab3  crush_0.98.1_Android_arm64.tar.gz
+    # (Zero-arg runs of THIS script are where the pin matters; the local
+    # tarball was byte-verified against the hash below on 2026-10-17 and the
+    # extracted libcrush.so hashes 7bbfb0fe... aa052.)
+    [string]$ExpectedSha256 = $(if ($Version -eq "0.98.1") {
+        "88f42f9302cbf72cd268d05b52395266acecd9b44afa4a1c4dec8c6cf0879ab3"
+    } elseif ($Version -eq "0.97.1") {
         "5b76ea03ee1382c6bcb91c3e56ee683a59abf19b678ab8c3d2dcfeb969f70711"
     } else { "" })
 )

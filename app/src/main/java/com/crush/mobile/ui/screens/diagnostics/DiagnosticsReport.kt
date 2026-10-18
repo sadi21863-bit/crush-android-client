@@ -3,13 +3,12 @@ package com.crush.mobile.ui.screens.diagnostics
 import android.content.Context
 import android.os.Build
 import com.crush.mobile.CrushMobileApp
+import com.crush.mobile.engine.EngineSockets
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.util.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * The single thing a friend can copy and send us when the app misbehaves.
@@ -141,9 +140,13 @@ suspend fun loadDiagnostics(context: Context): DiagnosticsReport =
         }.getOrNull()
 
         val port = (engineState as? EngineState.Running)?.port
-        val responding = if (port != null) probeEngine(port) else null
+        // Under the Unix-socket transport the engine no longer binds TCP, so
+        // `port` is only a sentinel on the Running state. The probe therefore
+        // rides the socket file (the sentinel port is displayed untouched; the
+        // gate is the state, not the number).
+        val responding = if (port != null) probeEngineViaSocket(appContext) else null
         if (port != null && responding == null) {
-            notes += "Engine probe did not complete (the port may be busy, not dead)"
+            notes += "Engine probe did not complete (the socket may be busy, not dead)"
         }
 
         DiagnosticsReport(
@@ -287,38 +290,41 @@ private fun describeEngineState(state: EngineState?): String = when (state) {
 }
 
 /**
- * One GET against loopback with a short timeout.
+ * One GET against the engine over its Unix socket, with a short timeout.
  *
- * Kept because it is genuinely cheap and the answer is worth having: a friend
- * reporting "it says starting forever" is a different bug from one reporting
- * "no response", and nothing else on this screen distinguishes them.
+ * Kept here (not in the supervisor) because it is genuinely cheap and the
+ * answer is worth having: a friend reporting "it says starting forever" is a
+ * different bug from one reporting "no response", and nothing else on this
+ * screen distinguishes them.
  *
- * /v1/health is useless here - it returns 200 with an EMPTY body (recorded in
- * CrushEngine), so /v1/version is used for the same reason the engine uses it.
- * Timeouts are 1.2s rather than the supervisor's 5s: this is a UI refresh, and
- * a user staring at a spinner for five seconds is a worse experience than an
+ * The connection negotiates over the socket FILE (see [EngineSockets]); the old
+ * HttpURLConnection-on-TCP probe is gone because the engine no longer binds
+ * TCP. /v1/health is useless here - it returns 200 with an EMPTY body (recorded
+ * in CrushEngine), so /v1/version is used for the same reason the engine uses
+ * it. Timeouts are 1.2s rather than the supervisor's 5s: this is a UI refresh,
+ * and a user staring at a spinner for five seconds is a worse experience than an
  * inconclusive answer.
+ *
+ * Returns true on 200, false when the socket answered with another status, and
+ * null when nothing answered within the timeout (which also covers the socket
+ * file not being on disk yet). Today EngineSockets.probe folds a non-2xx
+ * answer into null, so false is defensive shape kept for the Boolean? contract
+ * the report field promises. The trichotomy is presented via engineProbeNote
+ * rather than a second boolean, because "slow" and "dead" have different causes
+ * and the supervisor's KDoc explains why a busy engine looks dead here.
  */
-private fun probeEngine(port: Int): Boolean? = try {
-    val conn = URL("http://127.0.0.1:$port/v1/version").openConnection() as HttpURLConnection
-    try {
-        conn.connectTimeout = PROBE_TIMEOUT_MS
-        conn.readTimeout = PROBE_TIMEOUT_MS
-        conn.requestMethod = "GET"
-        conn.responseCode == 200
-    } finally {
-        conn.disconnect()
-    }
-} catch (_: Exception) {
-    // Includes the timeout. Distinguished from false via engineProbeNote rather
-    // than a second boolean, because "slow" and "dead" have different causes
-    // and the supervisor's KDoc explains why a busy engine looks dead here.
-    null
-}
+private suspend fun probeEngineViaSocket(appContext: Context): Boolean? =
+    EngineSockets.probe(
+        EngineSockets.socketPath(appContext),
+        "/v1/version",
+        PROBE_TIMEOUT_MS,
+        PROBE_TIMEOUT_MS
+    )?.let { it == 200 }
 
 /** Shown on screen and copied. 200 is the brief's cap and also a sane paste size. */
 private const val LOG_LINES_SHOWN = 200
-private const val PROBE_TIMEOUT_MS = 1_200
+/** Probe timeouts, deliberately below the supervisor's 5s: this is a UI refresh. */
+private const val PROBE_TIMEOUT_MS: Long = 1_200
 private const val UNCAUGHT_MARKER = "UNCAUGHT on '"
 private const val TIMESTAMP_LEN = 12
 

@@ -8,6 +8,7 @@ import com.crush.mobile.data.crush.CrushEventStream
 import com.crush.mobile.data.crush.WorkspaceManager
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 
 /**
  * Exercises the real Crush API against the running engine.
@@ -15,10 +16,14 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Kept in the app deliberately: `adb shell curl` cannot reach the engine's
  * listening socket because Android SELinux isolates per-app ports, so there is
  * no way to probe this from outside the process.
+ *
+ * [socketPath] is the engine's Unix-socket file (EngineSockets.socketPath); the
+ * engine no longer binds TCP, so the port argument is only carried through for
+ * URL-shape compat and is ignored by the transport once the socket exists.
  */
-class CrushSmokeTest(private val port: Int) {
+class CrushSmokeTest(private val port: Int, private val socketPath: File? = null) {
 
-    private val api = CrushApi(port)
+    private val api = CrushApi(port, socketPath = socketPath)
     private val stream = CrushEventStream(api, Gson())
     private val workspaces = WorkspaceManager(api)
 

@@ -222,6 +222,17 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.okhttp3:okhttp-sse:5.5.0")
+
+    // Unix-domain-socket client for the embedded engine (P1, F01): the engine
+    // binds `-H unix://<app-private path>` and everything talks through the
+    // socket FILE; kernel file permissions are the authorized path (no sibling
+    // UID can connect). junixsocket-common has AFUNIXSocketFactory.FactoryArg,
+    // which OkHttp plugs in via socketFactory(...); junixsocket-native-android
+    // ships the AF_UNIX JNI .so for Android ABIs. (There is NO junixsocket-android
+    // artifact on Maven Central - do not guess one back.)
+    implementation("com.kohlschutter.junixsocket:junixsocket-common:2.10.1")
+    implementation("com.kohlschutter.junixsocket:junixsocket-native-android:2.10.1")
+
     implementation("com.google.code.gson:gson:2.14.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")

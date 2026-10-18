@@ -45,6 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.crush.mobile.CrushMobileApp
 import com.crush.mobile.data.crush.CrushApi
+import com.crush.mobile.engine.EngineSockets
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.ui.theme.CrushMobileTheme
 
@@ -236,7 +237,7 @@ private fun SpikeScreen(
                             connState = "connecting..."
                             scope.launch {
                                 connState = try {
-                                    val api = CrushApi(port)
+                                    val api = CrushApi(port, socketPath = socketPathOf(ctx))
                                     val s = CrushSession(api, WorkspaceManager(api))
                                     session = s
                                     val d = ctx.filesDir.absolutePath
@@ -277,7 +278,7 @@ if (apiKey.isNotBlank()) {
                 smokeBusy = true
                 scope.launch {
                     smoke = try {
-                        CrushSmokeTest(port).run()
+                        CrushSmokeTest(port, socketPath = socketPathOf(ctx)).run()
                     } catch (e: Exception) {
                         "FATAL ${e.javaClass.simpleName}: ${e.message}"
                     }
@@ -316,7 +317,12 @@ if (apiKey.isNotBlank()) {
                     // prompt - which chaos testing observed happening.
                     supervisor.setWorkActive(true)
                     val result = try {
-                        FullE2ETest(ctx, { (state as? EngineState.Running)?.port }, { apiKey }).run()
+                        FullE2ETest(
+                            ctx,
+                            { (state as? EngineState.Running)?.port },
+                            { socketPathOf(ctx) },
+                            { apiKey }
+                        ).run()
                     } catch (e: Exception) {
                         "ERROR ${e.javaClass.simpleName}: ${e.message}"
                     }
@@ -359,6 +365,13 @@ if (apiKey.isNotBlank()) {
         }
     }
 }
+/**
+ * Resolves the engine's Unix-socket file at CALL time (button click, not
+ * composition), so a socket that appears after the composable is built is
+ * still picked up by the clients those buttons build.
+ */
+private fun socketPathOf(context: android.content.Context): File =
+    EngineSockets.socketPath(context)
 
 
 private fun render(state: EngineState): String = when (state) {

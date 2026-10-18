@@ -62,6 +62,16 @@ class EnginePathsLogTest {
     }
 
     @Test
+    fun `a unix-socket listener directory is a candidate too`() {
+        // UDS mode (see EngineSockets) names the listener directory after the
+        // unix:// host rather than a tcp host_port pair. Discovery must stay
+        // name-agnostic beyond the server- prefix.
+        val dir = File(cache, "server-unix___app-priv-crush-sock").apply { mkdirs() }
+        val log = File(dir, "crush.log").apply { writeText("uds log") }
+        assertEquals(log, EnginePaths.newestEngineLog(cache))
+    }
+
+    @Test
     fun `directories that do not look like server listeners are ignored`() {
         File(cache, "workspace").let { dir ->
             dir.mkdirs()

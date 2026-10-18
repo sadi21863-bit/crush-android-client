@@ -1,5 +1,6 @@
 package com.crush.mobile.data.crush
 
+import com.crush.mobile.engine.EngineSockets
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.google.gson.JsonObject
@@ -11,6 +12,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -61,19 +63,44 @@ class CrushApi(
      * grants shell execution, so binding it to a routable interface would expose
      * a remote-code-execution surface on the network.
      */
-    private val baseUrlOverride: String? = null
+    private val baseUrlOverride: String? = null,
+    /**
+     * Unix-socket transport: pass [EngineSockets.socketPath] here once the
+     * engine is spawned with `-H unix://<path>` instead of binding TCP. All
+     * URLs still read `http://127.0.0.1:<port>/...` - the FactoryArg socket
+     * factory matches the host and ignores the port, so nothing else changes.
+     * Non-null but the file not yet on disk means the factory client cannot be
+     * built: calls then fail with connect refused until callers recreate
+     * CrushApi (the receipts flow rebinds when the engine boundary informs),
+     * and readiness itself is EngineSockets.probe's job.
+     */
+    private val socketPath: File? = null
 ) {
 
     /**
      * A dedicated client for streaming: no read timeout, because Crush sends no
      * heartbeat and an idle workspace legitimately produces zero bytes.
      */
-    val streamClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
+    val streamClient: OkHttpClient = buildStreamClient()
+
+    private fun buildStreamClient(): OkHttpClient {
+        val plain = OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+        // socketPath == null keeps the plain TCP client verbatim (tests use
+        // baseUrlOverride against this shape). socketPath set but absent gives
+        // okClient() == null, which falls back to plain: it fails fast on
+        // connect rather than crashing on a missing factory, and once the
+        // socket exists callers recreate CrushApi to be bound. Reading it
+        // through EngineSockets also guarantees that object's init has run
+        // before any FactoryArg is constructed, so the 127.0.0.1 URL host is
+        // recognised.
+        return if (socketPath != null) EngineSockets.okClient(socketPath, plain) ?: plain
+        else plain
+    }
 
     private val client: OkHttpClient = streamClient.newBuilder()
         .readTimeout(30, TimeUnit.SECONDS)

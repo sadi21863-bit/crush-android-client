@@ -38,6 +38,7 @@ import com.crush.mobile.data.local.SecureKeyStore
 import com.crush.mobile.di.AppContainer
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.EnginePaths
+import com.crush.mobile.engine.EngineSockets
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.util.AppLog
 import kotlinx.coroutines.CancellationException
@@ -159,6 +160,18 @@ class ChatViewModel(private val context: Context, private val container: AppCont
 
     private val gson = Gson()
     private val secureKeys = SecureKeyStore(context)
+
+    /**
+     * Engine client bound to the UDS socket path **at call time** (P1 pivot).
+     *
+     * Every engine call goes through here so each client sees the socket file
+     * as it exists right now: building once at construction time would pin a
+     * plain-TCP client whenever the engine had not yet created the file.
+     * The URL host/port are shape-only - CrushApi routes them through
+     * junixsocket's factory onto the socket file.
+     */
+    private fun crushApi(port: Int): CrushApi =
+        CrushApi(port, socketPath = EngineSockets.socketPath(context))
 
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
@@ -421,7 +434,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     private suspend fun doBootstrap() {
         _state.value = _state.value.copy(phase = "connecting to agent", engineReady = false)
         val p = port ?: return
-        val api = CrushApi(p)
+        val api = crushApi(p)
         val mgr = WorkspaceManager(api)
         val session = CrushSession(api, mgr)
         val d = File(context.filesDir, "").absolutePath
@@ -686,7 +699,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         runCatching { conn?.stop() }
         runCatching { eventRouter.close() }
         val router = CrushEventRouter()
-        val fresh = CrushConnection(p, router, gson, CrushApi(p).streamClient)
+        val fresh = CrushConnection(p, router, gson, crushApi(p).streamClient)
         // Assign before attaching so a send racing bootstrap sees a consistent
         // (router, connection) pair.
         eventRouter = router
@@ -717,7 +730,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      */
     private suspend fun findSessionToResume(ws: String): String? {
         val p = port ?: return null
-        val list = runCatching { CrushApi(p).listSessions(ws) }
+        val list = runCatching { crushApi(p).listSessions(ws) }
             .onFailure { AppLog.w(TAG, "listSessions failed: ${it.message}") }
             .getOrDefault(emptyList())
         if (list.isEmpty()) return null
@@ -886,7 +899,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             }
             // Both slots: Crush uses the small one for session titles.
             runCatching {
-                val api = CrushApi(p)
+                val api = crushApi(p)
                 for (slot in listOf(SetModelRequest.LARGE, SetModelRequest.SMALL)) {
                     api.setModel(ws, slot, SelectedModel(model = id, provider = providerId))
                 }
@@ -913,7 +926,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             val list = if (ws == null) {
                 emptyList()
             } else {
-                runCatching { CrushApi(p).listSessions(ws) }
+                runCatching { crushApi(p).listSessions(ws) }
                     .onFailure { AppLog.w(TAG, "listSessions failed: ${it.message}") }
                     .getOrDefault(emptyList())
             }
@@ -937,7 +950,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         viewModelScope.launch {
             if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) return@launch
             val ws = mgr.currentWorkspaceId ?: return@launch
-            val history = runCatching { CrushApi(p).messages(ws, sessionId) }
+            val history = runCatching { crushApi(p).messages(ws, sessionId) }
                 .onFailure { AppLog.w(TAG, "history failed: ${it.message}") }
                 .getOrDefault(emptyList())
 
@@ -1053,7 +1066,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // Re-acquire with force=true on failure. A "fresh" lease can still
             // address a workspace the engine has already dropped, because the
             // lease is wall-clock based and the reap is attachment based.
-            var outcome = CrushApi(p).deleteSession(ws, sessionId)
+            var outcome = crushApi(p).deleteSession(ws, sessionId)
             if (outcome is DeleteOutcome.Failed) {
                 AppLog.w(TAG, "delete attempt 1 unknown: ${outcome.reason}")
                 val back = runCatching { mgr.reattachIfStale(force = true) }
@@ -1061,7 +1074,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                     .getOrDefault(false)
                 val ws2 = mgr.currentWorkspaceId
                 if (back && ws2 != null) {
-                    outcome = CrushApi(p).deleteSession(ws2, sessionId)
+                    outcome = crushApi(p).deleteSession(ws2, sessionId)
                     if (outcome !is DeleteOutcome.Failed) wsId = ws2
                 }
             }
@@ -1122,7 +1135,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 else -> PermissionGrant.ALLOW
             }
             runCatching {
-                CrushApi(p).grant(ws, PermissionGrant(permission = req, action = action))
+                crushApi(p).grant(ws, PermissionGrant(permission = req, action = action))
             }.onFailure { AppLog.w(TAG, "grant failed: ${it.message}") }
         }
     }
@@ -1263,7 +1276,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         container.engineSupervisor.setWorkActive(true)
 
         try {
-            val api = CrushApi(p)
+            val api = crushApi(p)
             var targetWs = ws
             var targetSid = sid
             var attempt = 0
@@ -1525,7 +1538,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         }
 
         val set = runCatching {
-            val api = CrushApi(port ?: return@runCatching null)
+            val api = crushApi(port ?: return@runCatching null)
             val tracked = api.trackedFiles(ws, sid)
             collector.collect(workspaceRoot(), tracked, snap).copy(sessionId = sid)
         }.getOrNull()
@@ -1665,7 +1678,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 // "stopped".
                 viewModelScope.launch {
                     val confirmed = runCatching {
-                        CrushApi(action.port).cancel(action.ws, action.sid)
+                        crushApi(action.port).cancel(action.ws, action.sid)
                     }.isSuccess
                     if (!confirmed) {
                         AppLog.w(TAG, "stop: server cancel not confirmed for ${action.sid}")

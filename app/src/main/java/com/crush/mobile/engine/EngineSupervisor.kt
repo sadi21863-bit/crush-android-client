@@ -2,7 +2,6 @@ package com.crush.mobile.engine
 
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,9 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
+import java.io.File
 
 /**
  * Keeps the engine alive for the lifetime of the UI.
@@ -98,7 +95,10 @@ class EngineSupervisor(
                     _state.value = result
 
                     // Poll inline. Returns true to restart, false to exit.
-                    val shouldRestart = monitorUntilUnhealthy(result.port)
+                    // Health runs over the same Unix domain socket the engine
+                    // binds (see EngineSockets); result.port is a sentinel in
+                    // UDS mode and is NOT used here.
+                    val shouldRestart = monitorUntilUnhealthy(healthSocketFile())
                     if (!shouldRestart) return
 
                     Log.i(TAG, "engine unhealthy; restarting")
@@ -138,7 +138,8 @@ class EngineSupervisor(
          process table is authoritative: restart immediately.
  *
  *  2. The process is alive but not answering HTTP - a real hang. Liveness cannot
- *     detect this, so HTTP is the only available signal. Restart, because nothing
+ *     detect this, so HTTP (here: over the Unix domain socket) is the only
+ *     available signal. Restart, because nothing
  *     short of killing it recovers a wedged Go server.
  *
  * HTTP is NOT authoritative on its own: Crush holds one HTTP connection open for
@@ -147,8 +148,12 @@ class EngineSupervisor(
  * down healthy engines mid-session and invalidated the held workspace id. So an
  * alive-but-failing engine must persist for [HANG_GRACE_MS], and [isWorkActive]
  * suspends that judgement entirely.
+ *
+ * [socketFile] may be null when the supervisor was built without an application
+ * context (see [probeVersion]); hang detection then degrades to process
+ * liveness only, and is treated as never failing rather than always failing.
  */
-private suspend fun monitorUntilUnhealthy(port: Int): Boolean {
+private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
         var httpFailures = 0
         var firstFailureAt = 0L
         var calmRun = 0
@@ -240,7 +245,7 @@ private suspend fun monitorUntilUnhealthy(port: Int): Boolean {
                 continue
             }
 
-            if (probeVersion(port)) {
+            if (probeVersion(socketFile)) {
                 httpFailures = 0
                 firstFailureAt = 0L
                 continue
@@ -286,26 +291,47 @@ private suspend fun monitorUntilUnhealthy(port: Int): Boolean {
     private fun isWanted(): Boolean = synchronized(sync) { wanted }
 
     /**
-     * MUST run off the main thread.
-     *
-     * The supervisor's scope is the composition scope (Main dispatcher), so a
-     * blocking HttpURLConnection here threw NetworkOnMainThreadException on
-     * every probe. That was swallowed as "engine unhealthy" and caused the
-     * supervisor to tear down a perfectly healthy engine roughly every 100s.
+     * The socket file the health probes run over, or null when the supervisor
+     * was built without an application context (see [probeVersion]). Derived
+     * from [EngineSockets.socketPath] - the engine binds the UDS at exactly
+     * this path, and the old TCP port is gone (EngineState.Running.port is a
+     * sentinel now and must never be probed).
      */
-    private suspend fun probeVersion(port: Int): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val conn = URL("http://127.0.0.1:$port/v1/version").openConnection() as HttpURLConnection
-            try {
-                conn.connectTimeout = 5_000
-                conn.readTimeout = 5_000
-                conn.responseCode == 200
-            } finally {
-                conn.disconnect()
-            }
-        } catch (_: Exception) {
-            false
-        }
+    private fun healthSocketFile(): File? =
+        appContext?.let { EngineSockets.socketPath(it) }
+
+    /**
+     * Health probe over the Unix domain socket (see [EngineSockets]).
+     *
+     * Returns true when the engine answers /v1/version with 2xx; false counts
+     * as a probe failure exactly as the previous TCP
+     * `HttpURLConnection` probe did. [EngineSockets.probe] dispatches to the
+     * IO dispatcher internally and never throws - connect and timeout
+     * failures surface as null - so this is safe to call from the
+     * Main-dispatched supervisor loop. The old blocking HttpURLConnection
+     * version had to wrap itself in withContext(IO), because on the main
+     * thread it threw NetworkOnMainThreadException, which was swallowed as
+     * "engine unhealthy" and tore down a perfectly healthy engine roughly
+     * every 100s.
+     *
+     * [socketFile] is null only for construction sites without an application
+     * context (none exist today; AppContainer always passes one). There is
+     * then NO transport to probe, so report healthy and rely on process
+     * liveness alone - treating "cannot probe" as failure would restart a
+     * healthy engine on every poll.
+     *
+     * The 5s connect/read timeouts are preserved from the previous probe
+     * rather than EngineSockets' 1.2s defaults: hang detection must stay
+     * patient, and its escalation is bounded by [HANG_GRACE_MS] anyway.
+     */
+    private suspend fun probeVersion(socketFile: File?): Boolean {
+        if (socketFile == null) return true
+        return EngineSockets.probe(
+            socketFile,
+            "/v1/version",
+            connectTimeoutMs = 5_000,
+            readTimeoutMs = 5_000
+        ) != null
     }
 
     private fun backoffMs(attempt: Int): Long =

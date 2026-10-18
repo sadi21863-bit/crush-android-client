@@ -7,11 +7,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.Request
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.ServerSocket
-import java.net.URL
 import java.util.concurrent.TimeUnit
 
 /**
@@ -24,6 +22,11 @@ import java.util.concurrent.TimeUnit
  *
  * Engine state (sessions, messages, config) lives in its own files under
  * [EnginePaths], so a process that dies with the UI costs nothing.
+ *
+ * Transport (P1, audit F01): the engine binds `-H unix://<socketPath>` - a
+ * Unix domain socket in the app-private files directory - instead of a TCP
+ * port. Kernel file permissions on that socket file are the whole
+ * authentication story; see [EngineSockets] for the client side.
  */
 /**
  * Converts a reflective `Process.pid()` result to a pid, or -1.
@@ -44,11 +47,32 @@ internal fun pidFromReflective(raw: Any?): Int {
     return if (l > 0 && l <= Int.MAX_VALUE) l.toInt() else -1
 }
 
-class CrushEngine(private val paths: EnginePaths) {
+/**
+ * Port value written into [EngineState.Running] since the UDS transport pivot.
+ *
+ * There is NO TCP port any more: the engine binds a Unix domain socket and
+ * the URL port is meaningless. But every consumer that builds engine URLs
+ * (`http://127.0.0.1:<port>/v1/...`) from [EngineState.Running.port] keeps
+ * compiling byte-for-byte, because 1 is a syntactically valid port and the
+ * OkHttp AF_UNIX socket factory (see [EngineSockets]) ignores host and port
+ * entirely and connects to the socket file. Never treat this value as a real
+ * port; never compute a TCP port again.
+ */
+internal const val UDS_PORT_SENTINEL: Int = 1
+
+class CrushEngine(
+    private val paths: EnginePaths,
+    /**
+     * Application context, needed to resolve the Unix-domain-socket path the
+     * engine binds ([EngineSockets.socketPath]). AppContainer passes the
+     * application context, so the engine never pins an Activity.
+     */
+    private val appContext: Context
+) {
 
     /** Engine idle linger, in seconds, from static auto-tuning. */
     constructor(context: Context, idleTimeoutSec: Int = 3600) :
-        this(EnginePaths(context, idleTimeoutSec))
+        this(EnginePaths(context, idleTimeoutSec), context)
 
     /**
      * Updates the idle linger. Takes effect on the NEXT engine start because
@@ -63,8 +87,7 @@ class CrushEngine(private val paths: EnginePaths) {
 
     /**
      * Serialises [start] against itself. Concurrent callers (a double tap, or
-     * the supervisor racing a UI action) must not each spawn an engine on a
-     * different port.
+     * the supervisor racing a UI action) must not each spawn an engine.
      */
     private val startLock = Mutex()
 
@@ -95,29 +118,38 @@ class CrushEngine(private val paths: EnginePaths) {
         }.getOrDefault(false)
     }
 
-    /** Crush takes the port in -H, not --port, so we pick a free one. */
-    private fun freePort(): Int = ServerSocket(0).use { it.localPort }
+    /**
+     * Log hygiene. The engine binds app-private paths (the socket file, the
+     * state dir); they are not secrets, but abbreviating the device-absolute
+     * prefix keeps the exec line short, portable between devices, and free of
+     * paths that change per install.
+     */
+    private fun redactAppPriv(arg: String): String =
+        if (arg.contains("/data/user/0/")) arg.replace("/data/user/0/", "<datadir>/") else arg
 
     /**
-     * Starts `crush server` and suspends until it serves HTTP.
-     * Returns [EngineState.Running] or [EngineState.Failed]. Never throws.
+     * Starts `crush server` and suspends until it serves HTTP over the Unix
+     * domain socket. Returns [EngineState.Running] or [EngineState.Failed].
+     * Never throws.
      *
      * Re-entrant: if an engine is already running, returns the current state
-     * instead of spawning a second one on a different port.
+     * instead of spawning a second engine.
+     *
+     * Transport: the spawn uses `-H unix://<socketPath>`; there is NO TCP port
+     * and none is ever computed. [EngineState.Running.port] carries
+     * [UDS_PORT_SENTINEL] so URL-building consumers keep compiling while the
+     * socket factory (see [EngineSockets]) ignores the URL port entirely.
      */
     suspend fun start(timeoutMs: Long = 60_000): EngineState = startLock.withLock {
         withContext(Dispatchers.IO) {
             val existing = process
             if (existing != null && existing.isAlive) {
-                val port = currentPort
-                if (port != null) {
-                    return@withContext EngineState.Running(
-                        pid = readPid(existing),
-                        port = port,
-                        version = cachedVersion,
-                        bootMs = 0
-                    )
-                }
+                return@withContext EngineState.Running(
+                    pid = readPid(existing),
+                    port = UDS_PORT_SENTINEL,
+                    version = cachedVersion,
+                    bootMs = 0
+                )
             }
 
         if (!paths.isBinaryUsable) {
@@ -128,8 +160,12 @@ class CrushEngine(private val paths: EnginePaths) {
                 )
             }
 
-            val port = freePort()
-            currentPort = port
+            // The bind is a Unix domain socket in the app-private files dir,
+            // not a TCP port. A stale socket file left over from a crashed
+            // previous run is removed by the engine itself (net_other.go)
+            // before it listens, and EngineSockets.probe reports "not up" for
+            // a file with no listener behind it.
+            val socketFile = EngineSockets.socketPath(appContext)
 
             // LAST-MINUTE CATALOG OVERRIDE.
             //
@@ -154,10 +190,10 @@ class CrushEngine(private val paths: EnginePaths) {
             val cmd = listOf(
                 paths.binary.absolutePath,
                 "server",
-                "-H", "tcp://127.0.0.1:$port",
+                "-H", "unix://${socketFile.absolutePath}",
                 "-D", paths.dataDir.absolutePath
             )
-            Log.i(TAG, "exec: ${cmd.joinToString(" ")}")
+            Log.i(TAG, "exec: ${cmd.joinToString(" ") { redactAppPriv(it) }}")
 
             val started = System.currentTimeMillis()
             val proc = try {
@@ -167,7 +203,6 @@ class CrushEngine(private val paths: EnginePaths) {
                 }.start()
             } catch (e: IOException) {
                 Log.e(TAG, "exec failed", e)
-                currentPort = null
                 return@withContext EngineState.Failed(
                     reason = "Could not launch engine",
                     detail = "${e.javaClass.simpleName}: ${e.message}",
@@ -184,31 +219,36 @@ class CrushEngine(private val paths: EnginePaths) {
                     val code = runCatching { proc.exitValue() }.getOrDefault(-1)
                     Log.e(TAG, "engine exited early code=$code")
                     process = null
-                    currentPort = null
                     return@withContext EngineState.Failed(
                         reason = "Engine exited during startup (exit $code)",
                         detail = tailLog(),
                         willRetry = false
                     )
                 }
-                val version = probeVersion(port)
-                if (version != null) {
-                    cachedVersion = version
-                    val pid = readPid(proc)
-                    Log.i(TAG, "engine ready pid=$pid port=$port version=$version")
-                    return@withContext EngineState.Running(
-                        pid = pid,
-                        port = port,
-                        version = version,
-                        bootMs = System.currentTimeMillis() - started
-                    )
+                // Readiness probe over the socket. EngineSockets.probe returns
+                // null while the socket file does not exist or nothing is
+                // listening behind it - the same "engine not up yet" signal
+                // the old TCP probe gave - and never throws, so the loop needs
+                // no try/catch. Same 250ms cadence and deadline as before.
+                if (EngineSockets.probe(socketFile, "/v1/version") != null) {
+                    val version = probeVersion(socketFile)
+                    if (version != null) {
+                        cachedVersion = version
+                        val pid = readPid(proc)
+                        Log.i(TAG, "engine ready pid=$pid version=$version")
+                        return@withContext EngineState.Running(
+                            pid = pid,
+                            port = UDS_PORT_SENTINEL,
+                            version = version,
+                            bootMs = System.currentTimeMillis() - started
+                        )
+                    }
                 }
                 delay(250)
             }
 
             proc.destroy()
             process = null
-            currentPort = null
             EngineState.Failed(
                 reason = "Engine did not become healthy within ${timeoutMs / 1000}s",
                 detail = tailLog(),
@@ -230,7 +270,6 @@ class CrushEngine(private val paths: EnginePaths) {
     fun stopBlocking() {
         val proc = process
         process = null
-        currentPort = null
         cachedVersion = ""
         if (proc == null) return
         runCatching {
@@ -240,9 +279,6 @@ class CrushEngine(private val paths: EnginePaths) {
             }
         }.onFailure { Log.w(TAG, "stop failed", it) }
     }
-
-    @Volatile
-    private var currentPort: Int? = null
 
     @Volatile
     private var cachedVersion: String = ""
@@ -285,30 +321,30 @@ private fun readPid(proc: Process): Int = runCatching {
 }.getOrDefault(-1)
 
     /**
-     * GET /v1/version. /v1/health returns 200 with an EMPTY body, so it cannot
-     * confirm readiness usefully; /v1/version returns real JSON.
+     * GET /v1/version over the UDS socket. /v1/health returns 200 with an
+     * EMPTY body, so it cannot confirm readiness usefully; /v1/version
+     * returns real JSON.
+     *
+     * [EngineSockets.probe] answers the status question for the readiness
+     * loop; this performs the equivalent request through
+     * [EngineSockets.okClient] so the version STRING - the raw body, as the
+     * previous HttpURLConnection probe produced it - can be cached. Returns
+     * null when the socket file is still missing, the request fails, or the
+     * body is blank, exactly like the old probe.
      */
-    private fun probeVersion(port: Int): String? {
-        return try {
-            val conn = URL("http://127.0.0.1:$port/v1/version").openConnection() as HttpURLConnection
-            try {
-                conn.connectTimeout = 1_500
-                conn.readTimeout = 1_500
-                conn.requestMethod = "GET"
-                if (conn.responseCode != 200) {
-                    null
-                } else {
-                    val body = conn.inputStream.bufferedReader().use { it.readText() }
-                    if (body.isBlank()) null else body.take(400)
-                }
-            } finally {
-                conn.disconnect()
+    private fun probeVersion(socketFile: File): String? {
+        val client = EngineSockets.okClient(socketFile) ?: return null
+        return runCatching {
+            client.newCall(
+                Request.Builder()
+                    .url("http://${EngineSockets.LOCAL_HOSTNAME}/v1/version")
+                    .build()
+            ).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val body = resp.body?.string().orEmpty()
+                if (body.isBlank()) null else body.take(400)
             }
-        } catch (_: IOException) {
-            null
-        } catch (_: Exception) {
-            null
-        }
+        }.getOrNull()
     }
 
     private companion object {

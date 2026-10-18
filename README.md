@@ -206,6 +206,11 @@ App-side mitigations:
   degrades to `null` rather than guessing, and logs the keys it observes.
 - **Engine API is unauthenticated.** See [Security](#security). Not fixable in
   the app layer: the engine offers no auth to enable.
+- **Engine loopback has NO authentication across app UIDs.** The P1 EngineGate
+  (per-launch bearer token on loopback TCP) is **being wired** — module landed,
+  on-device verification pending. Until it ships and passes verification, do not
+  distribute builds. See [docs/p1-gate-design.md](docs/p1-gate-design.md) and
+  [docs/p1-attack-surface.md](docs/p1-attack-surface.md).
 - **Delete's 404 is ambiguous.** A 404 on a workspace the ~30s reap has already
   taken cannot be told apart from a 404 on the session itself. The flow
   re-attaches first and force-retries once, but "session gone" is still inferred

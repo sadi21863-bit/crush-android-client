@@ -18,12 +18,15 @@ import java.io.File
  * next step holding a stale workspace id, and it made results depend on which
  * button happened to be under a guessed coordinate.
  *
- * The port is passed in as a provider rather than a value, so a restart between
- * steps is picked up instead of silently failing.
+ * The liveness source is passed in as a provider rather than a value, so a
+ * restart between steps is picked up instead of silently failing. Under the
+ * Unix-socket transport the port is a sentinel; the socket file provider is
+ * what actually wires the transport into the clients built here.
  */
 class FullE2ETest(
     private val context: Context,
     private val portProvider: () -> Int?,
+    private val socketProvider: () -> File?,
     private val apiKeyProvider: () -> String
 ) {
 
@@ -49,7 +52,10 @@ class FullE2ETest(
         out.appendLine("key source: ${if (key.isNotBlank()) "${key.length} chars (keystore)" else "MISSING"}")
         out.appendLine()
 
-        val api = CrushApi(portProvider() ?: return "NO ENGINE RUNNING")
+        val api = CrushApi(
+            portProvider() ?: return "NO ENGINE RUNNING",
+            socketPath = socketProvider()
+        )
         val mgr = WorkspaceManager(api)
         val session = CrushSession(api, mgr)
         val d = context.filesDir.absolutePath

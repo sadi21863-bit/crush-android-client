@@ -45,8 +45,12 @@ object AppLockPolicy {
      *        [AppLockGate] - because "in memory" alone is not enough.
      * @param isColdStart true for the first onResume of the process.
      * @param secondsSinceBackground elapsed time between onPause and onResume,
-     *        or null when onPause was never observed. Retained for diagnostics
-     *        and to fail closed on an unobserved pause.
+     *        or null when onPause was never observed (fail closed).
+     *        A caller that just completed a successful authentication passes 0
+     *        regardless of how long the app was away: the trusted key it reports
+     *        in [alreadyUnlocked] was re-established THIS resume, so its trust
+     *        age restarts fresh. This is the double-prompt contract - see the
+     *        `freshUnlock` logic in MainActivity.onResume.
      * @param graceSeconds how long an unlocked key stays trusted after
      *        backgrounding. 0 means strict app lock: prompt on every resume.
      */

@@ -137,6 +137,28 @@ class AppLockPolicyTest {
     }
 
     @Test
+    fun `fresh unlock after a long absence opens exactly once`() {
+        // The double-prompt contract (MainActivity freshUnlock): the overlay's
+        // successful auth re-establishes trust THIS resume, so the caller passes
+        // a trust age of 0 no matter how long the real absence was. Callers must
+        // NOT pass null here: null means "unobserved pause" and fails closed.
+        assertEquals(
+            AppLockPolicy.Gate.OPEN,
+            decide(alreadyUnlocked = true, secondsSinceBackground = 0)
+        )
+    }
+
+    @Test
+    fun `strict mode still prompts after a fresh unlock`() {
+        // LOCK_GRACE_SEC = 0 means prompt on every resume, and a fresh unlock is
+        // still just a resume - the strict contract must survive the fix.
+        assertEquals(
+            AppLockPolicy.Gate.PROMPT,
+            decide(alreadyUnlocked = true, secondsSinceBackground = 0, graceSeconds = 0)
+        )
+    }
+
+    @Test
     fun `backwards clock fails closed`() {
         // Monotonic time cannot really go negative; if it reports that it did,
         // the safe answer is a prompt, not an open door.

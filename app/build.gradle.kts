@@ -227,11 +227,21 @@ dependencies {
     // binds `-H unix://<app-private path>` and everything talks through the
     // socket FILE; kernel file permissions are the authorized path (no sibling
     // UID can connect). junixsocket-common has AFUNIXSocketFactory.FactoryArg,
-    // which OkHttp plugs in via socketFactory(...); junixsocket-native-android
-    // ships the AF_UNIX JNI .so for Android ABIs. (There is NO junixsocket-android
-    // artifact on Maven Central - do not guess one back.)
+    // which OkHttp plugs in via socketFactory(...).
+    //
+    // The JNI bridge (libjunixsocket-native.so) CANNOT come from
+    // junixsocket-native-android on Maven Central: that coordinate is
+            // POM-packaging, so Gradle downloads only the marker pom and the
+            // package ships no natives (symptom: UnsatisfiedLinkError
+    // "No implementation found for NativeUnixSocket.createSocket" and the 60s
+    // readiness gate failing). The .so is vendored instead, extracted from the
+    // AAR published alongside the same version on Central:
+    //   https://repo1.maven.org/maven2/com/kohlschutter/junixsocket/
+    //     junixsocket-native-android/2.10.1/junixsocket-native-android-2.10.1.aar
+    //   sha1 eed2f4d90ebdc0de4964fd9ffe752cb9b57aa57d (verified 2026-10-18)
+    // jni/arm64-v8a/libjunixsocket-native.so -> app/src/main/jniLibs/arm64-v8a/
+    // (loader: NativeLibraryLoader -> System.loadLibrary("junixsocket-native")).
     implementation("com.kohlschutter.junixsocket:junixsocket-common:2.10.1")
-    implementation("com.kohlschutter.junixsocket:junixsocket-native-android:2.10.1")
 
     implementation("com.google.code.gson:gson:2.14.0")
 

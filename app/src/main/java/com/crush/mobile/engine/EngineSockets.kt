@@ -74,6 +74,9 @@ object EngineSockets {
         connectTimeoutMs: Long = 1200,
         readTimeoutMs: Long = 1200
     ): Int? = withContext(Dispatchers.IO) {
+        // Guard twice: no socket file means the engine has not bound yet -
+        // skip any socket construction (and its JNI work) entirely.
+        if (!socketFile.exists()) return@withContext null
         runCatching {
             val client = OkHttpClient.Builder().socketFactory(
                 AFUNIXSocketFactory.FactoryArg(socketFile)

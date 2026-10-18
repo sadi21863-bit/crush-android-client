@@ -28,7 +28,12 @@ setup-emu.bat
 .kotlin/
 
 # 92MB arm64 engine binary - fetched by tools/fetch-crush.ps1, not committed
-app/src/main/jniLibs/
+app/src/main/jniLibs/*
+# EXCEPTION: the 60KB junixsocket UDS JNI shim is vendored source-of-truth
+# (upstream ships it only as an unattached .aar sibling; see docs/p1-attack-surface.md)
+!app/src/main/jniLibs/arm64-v8a/
+app/src/main/jniLibs/arm64-v8a/*
+!app/src/main/jniLibs/arm64-v8a/libjunixsocket-native.so
 
 # Vendored toolchains (438MB total). Machine-local; see README for the
 # JDK 17 / Gradle requirements.

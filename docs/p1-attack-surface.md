@@ -236,4 +236,72 @@ Redaction alone is therefore explicitly **not** being claimed as a sufficient co
 `app/src/main/java/com/crush/mobile/data/api/ZenModelsApi.kt`;
 `BASELINE.md` §7 (F01 wording).
 
-**Status matrix:** `CONFIRMED MAPPED (static analysis); exfiltration chain NOT demonstrated on device`.
+**Status matrix (as mapped, 2026-10-17):** `CONFIRMED MAPPED (static analysis); exfiltration chain NOT demonstrated on device`.
+
+---
+
+## 8. P1 outcome (2026-10-18): mitigation (i) landed and device-verified
+
+Direction (i) was implemented — the engine pivot is no longer an experiment.
+The HTTP/TCP surface described in §3 is **closed at the transport layer** for
+every UID except the app's own.
+
+### What shipped (commits `a5c53b6`, `f235639`)
+
+- Engine spawned with `-H unix:///data/user/0/com.crush.mobile/files/crush.sock`
+  (v0.98.1 `ParseHostURL` accepts `scheme://`; net listener is `net.Listen("unix", …)`).
+  No TCP port is opened at any stage; app URLs keep the
+  `http://127.0.0.1:1/…` shape with a sentinel port (`UDS_PORT_SENTINEL`) and
+  Path remapping happens inside the OkHttp socket factory.
+- Clients attach via `junixsocket-common` `AFUNIXSocketFactory.FactoryArg`
+  (`EngineSockets.kt`), with the JNI shim **vendored**
+  (`app/src/main/jniLibs/arm64-v8a/libjunixsocket-native.so`, 60 KB, extracted
+  from the upstream AAR, sha1 `eed2f4d90ebdc0de4964fd9ffe752cb9b57aa57d`).
+  Upstream trap worth remembering: `junixsocket-native-android` on Central is
+  POM-packaging — Gradle downloads no natives, and every call dies with
+  `UnsatisfiedLinkError: NativeUnixSocket.createSocket`, which `runCatching`
+  converts into silent probe failures.
+- Readiness/heartbeat probes (`EngineSockets.probe`, supervisor, diagnostics)
+  all traverse the socket; `/proc/net/tcp*` is monitored as a regression canary.
+
+### On-device verification (Redmi Note 7 Pro, `bbf8ca69`, 2026-10-18)
+
+| Check | Result |
+|---|---|
+| Socket inode | `srwx------ u0_a316 u0_a316 … files/crush.sock` (owner-only rwx) |
+| TCP listeners owned by the app | **0** rows in `/proc/net/tcp` and `/proc/net/tcp6` whose UID is the app's (only DNS resolver, uid 1052) |
+| adb shell (uid 2000) `ls` on the socket path | **Permission denied** (traversal: dir is 0700) |
+| adb shell `cat` on the socket | **Permission denied** (open would also require MAY_WRITE for AF_UNIX connect) |
+| `run-as com.crush.mobile` from shell | sees the socket — proving only the owner UID passes |
+| End-to-end turn | user prompt → engine executed reasoning + tool rows → SSE text streamed back over the socket and rendered (`probe 'Reply_with_exactly:_UDS-OK' → 'UDS-OK'`) |
+| Stale-socket recovery | engine log `WARN Removed stale socket before binding` on rebind after app death |
+
+### Why this closes the sibling-app threat (kernel-enforced)
+
+For filesystem AF_UNIX sockets, `connect()` performs an
+`inode_permission(MAY_WRITE)` on the socket inode, and reaching the inode at all
+requires traversal permission through every parent directory. The app-private
+dir chain is 0700 and the socket inode is 0600, both owned by the app UID — so
+any **different Android UID** (the sibling-app threat from §1, plus the
+shell/2000-uid case actually exercised above) is denied by the kernel before
+our code or the engine's runs. No app-side allowlist to bypass; nothing is sent
+over the network.
+
+Note the honest limits of the live proof: the negative case was exercised with
+the shell UID (2000), not a literal sibling app UID (installing an attacker
+app on this device was not done). The kernel rule invoked is the same one for
+any non-owner UID, and the 0600/0700 bits are the observable protection. The
+`run-as` positive control confirms the ownership boundary is where access ends.
+
+### Residual (unchanged by the pivot)
+
+- Root/adbd or any process with `CAP_DAC_OVERRIDE` can still access the socket —
+  out of model (§1 excludes rooted devices).
+- Same-UID code (plugins inside our process) is inside the boundary by
+  definition.
+- §4 (raw `api_key` in `/config` responses) and §5 endpoint-class risks are now
+  reachable **only by the app itself**; they remain real for USB debugging
+  (`adb backup` is blocked, but `run-as` is available on debug builds).
+- Upstream `charmbracelet/crush` does not accept a UDS listen address via
+  documented config — our support is via the `-H` flag; track upstream
+  acceptance (P1.6) as the durable path.

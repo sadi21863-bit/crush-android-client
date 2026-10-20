@@ -101,6 +101,17 @@ fun LockOverlay(
                 // the user: the gate prompts when ANY provider has a credential,
                 // so a user whose selected provider has none could authenticate
                 // and still be unable to get past the overlay.
+                if (key.isBlank()) {
+                    // Diagnostic for the double-prompt investigation: opening
+                    // without a cached key is legitimate, but it made the gate
+                    // read wasUnlocked=false on the next resume. Log the provider
+                    // actually used (ids are not secret) so a mismatch with the
+                    // stored credential is visible on device.
+                    AppLog.i(
+                        TAG,
+                        "no stored key for provider=$providerId; opening without a cached key"
+                    )
+                }
                 keySession.put(key, providerId)
                 AppLog.i(TAG, "unlocked")
                 onUnlocked()

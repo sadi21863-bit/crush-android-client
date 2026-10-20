@@ -2,7 +2,6 @@ package com.crush.mobile
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.SystemClock
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -99,24 +98,21 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
     private lateinit var credentialLauncher: ActivityResultLauncher<Intent>
 
-    private var pausedAtElapsedMs: Long? = null
     private var coldStart = true
 
     /**
-     * When the lock overlay last completed a successful authentication,
-     * on the same monotonic clock [pausedAtElapsedMs] uses.
-     *
-     * The double-prompt bug this anchors: the overlay unlocks (`keySession.put`
-     * + gate OPEN), then [onResume] fires with a large `secondsSinceBackground`
-     * (the pause predates the fingerprint interaction by definition - the overlay
-     * was shown BECAUSE of the long absence). The old code aged the key per that
-     * timer, so it cleared the key the auth had JUST established and re-prompted.
-     * A successful auth is user presence INDEPENDENT of how long the app was
-     * away, so an unlock timestamped after the last pause must suppress the
-     * absence timer for that resume. Compared against [pausedAtElapsedMs], not
-     * wall-clock, for the reason in the class doc.
+     * The DI container, resolved once. The lock's temporal state lives in the
+     * container ([LockState]), NOT in instance fields: Android recreated this
+     * activity around a credential-screen closure THREE SECONDS after a
+     * successful unlock, and every instance field reset - the recreated
+     * instance re-prompted a user it had just verified (the double-prompt bug,
+     * device logs 14:23:26.846 OPEN -> 14:23:29.307 PROMPT with a fresh
+     * coldStart). Pause/unlock stamps must outlive the recreating activity the
+     * same way [com.crush.mobile.di.AppContainer.keySession] does.
      */
-    private var lastUnlockElapsedMs: Long? = null
+    private val container: com.crush.mobile.di.AppContainer by lazy {
+        (application as com.crush.mobile.CrushMobileApp).container
+    }
 
     /**
      * One store for the whole Activity. `needsUnlock` is instance state, so a
@@ -255,10 +251,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     // stayed true after the first unlock, so the
                                     // app never locked again.
                                     gateState.value = AppLockPolicy.Gate.OPEN
-                                    // Stamp presence so the imminent onResume
-                                    // (which fires after this) honours the fresh
-                                    // auth instead of ageing the key away.
-                                    lastUnlockElapsedMs = SystemClock.elapsedRealtime()
+                                    // Stamp presence in the PROCESS-scoped lock
+                                    // state so the imminent onResume honours the
+                                    // fresh auth, and so an activity recreation
+                                    // (which resets all instance fields but not
+                                    // the process) cannot forget it.
+                                    container.lockState.noteUnlock()
                                     // Let the chat layer retry now that a key is
                                     // actually in hand.
                                     container.notifyKeyAvailable()
@@ -273,12 +271,13 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
     override fun onPause() {
         super.onPause()
-        pausedAtElapsedMs = SystemClock.elapsedRealtime()
+        container.lockState.notePause()
     }
 
     override fun onResume() {
         super.onResume()
-        val container = (application as CrushMobileApp).container
+        val lock = container.lockState
+        val keySession = container.keySession
         // ANY stored credential, not just the selected provider's. A key for a
         // provider the user is not currently using is still a secret at rest, so
         // it must still sit behind the gate. Scoping this to one provider would
@@ -291,48 +290,43 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         // "coldStart=false", so the log could not distinguish a cold launch from
         // a resume - which is precisely the distinction being debugged.
         val wasColdStart = coldStart
-        val awaySec = pausedAtElapsedMs?.let {
-            (SystemClock.elapsedRealtime() - it) / 1000L
+        // Everything the gate decides on comes from the PROCESS-scoped lock
+        // state: the real absence, suppressed to 0 when the unlock happened
+        // within the current absence window (a fresh unlock restarts the trust
+        // age; see LockState.trustAgeSeconds), and the verification flag. The
+        // gate deliberately does NOT read keySession.isUnlocked here: the
+        // overlay's auth success can legitimately complete WITHOUT a cached key
+        // (blank read for a provider with no ciphertext; keySession also has
+        // independent writers/clearers), and deciding on the cache is what made
+        // a successful auth evaporate into a second prompt.
+        val freshUnlock = lock.isFreshUnlock()
+        val agedOut = lock.ageIfAbsent(LOCK_GRACE_SEC)
+        val trustAge = lock.trustAgeSeconds()
+        if (agedOut) {
+            keySession.clear()
         }
-        // An auth that completed at-or-after the last pause is fresh user
-        // presence: the overlay's fingerprint/PIN interaction IS the "user is
-        // here" fact the absence timer exists to approximate. Restart the trust
-        // age at 0 for this resume so the key established by that auth is
-        // neither cleared nor re-prompted. It must be 0 rather than null:
-        // null means "unobserved pause" in [AppLockPolicy.decide] and fails
-        // CLOSED, which would re-prompt anyway. With a 0 age the trust restarts
-        // exactly as [AppLockPolicy] documents for the key it is told is in
-        // hand; a LOCK_GRACE_SEC of 0 (strict mode) still prompts every time.
-        // Paused-at versus unlock are compared on the elapsed clock; a null
-        // pause cannot have preceded an unlock, so treat it as fresh too.
-        val freshUnlock = lastUnlockElapsedMs != null &&
-            (pausedAtElapsedMs == null || lastUnlockElapsedMs!! >= pausedAtElapsedMs!!)
+        // isColdStart stays false UNCONDITIONALLY: a fresh process has no
+        // ownerVerified, which decide() answers PROMPT through the
+        // existing alreadyUnlocked branch - there is no scenario where the
+        // first resume of an activity instance needs a rule of its own beyond
+        // that (a recreated instance belongs to a process where the user may
+        // have JUST authenticated, and prompting then is the bug).
         val gate = AppLockPolicy.decide(
             hasCiphertext = hasCiphertext,
-            alreadyUnlocked = container.keySession.isUnlocked,
-            isColdStart = wasColdStart,
-            secondsSinceBackground = if (freshUnlock) 0L else awaySec,
+            alreadyUnlocked = lock.ownerVerified,
+            isColdStart = false,
+            secondsSinceBackground = trustAge,
             graceSeconds = LOCK_GRACE_SEC
         )
-        // Age the in-memory key on PAUSE, not on resume.
-        //
-        // Clearing it in onResume when the gate came back PROMPT was subtly
-        // wrong: AppLockPolicy can also return PROMPT while a key IS held (long
-        // absence, unobserved pause), and clearing then discarded a perfectly
-        // good key and forced a pointless prompt. Ageing it at pause time means
-        // "isUnlocked" is already honest by the time onResume asks.
-        if (!freshUnlock && awaySec != null && awaySec >= LOCK_GRACE_SEC) {
-            container.keySession.clear()
-        }
         coldStart = false
         // Dropping the in-memory key on lock is the whole point of the gate.
-        if (gate == AppLockPolicy.Gate.PROMPT) container.keySession.clear()
+        if (gate == AppLockPolicy.Gate.PROMPT) keySession.clear()
         gateState.value = gate
         AppLog.i(
             "Main",
-            "resume gate=$gate coldStart=$wasColdStart away=${awaySec ?: -1}s " +
-                "ciphertext=$hasCiphertext wasUnlocked=${container.keySession.isUnlocked} " +
-                "freshUnlock=$freshUnlock"
+            "resume gate=$gate coldStart=$wasColdStart away=${trustAge ?: -1}s " +
+                "ciphertext=$hasCiphertext wasUnlocked=${keySession.isUnlocked} " +
+                "verified=${lock.ownerVerified} freshUnlock=$freshUnlock"
         )
     }
 

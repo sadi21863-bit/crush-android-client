@@ -2,6 +2,7 @@ package com.crush.mobile.di
 
 import android.content.Context
 import com.crush.mobile.data.local.KeySession
+import com.crush.mobile.data.local.LockState
 import com.crush.mobile.data.local.SettingsDataStore
 import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.DeviceProfile
@@ -42,6 +43,14 @@ class AppContainer(context: Context) {
      * the failure mode KeySession exists to remove.
      */
     val keySession: KeySession = KeySession()
+
+    /**
+     * Process-scoped temporal state of the app-lock gate. Activity-scoped lock
+     * state did not survive activity recreation (Android recreates the activity
+     * around credential-screen closure), which is how a fresh authentication
+     * could be forgotten within seconds - see [LockState].
+     */
+    val lockState: LockState = LockState()
 
     private val settingsDataStore = SettingsDataStore(appContext, keySession)
 

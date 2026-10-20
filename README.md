@@ -5,7 +5,7 @@ A native Android chat client that runs a **hidden local [Crush](https://github.c
 The Crush engine (a Go binary) ships inside the APK and is `exec()`d at app start. It talks to **OpenCode Zen** for inference. Everything — Compose UI, engine lifecycle, SSE client — lives in this repo.
 
 ```
-Compose UI  →  http://127.0.0.1:<ephemeral>/v1  →  libcrush.so (bundled Go binary)  →  OpenCode Zen
+Compose UI  →  app-private Unix-domain socket  →  libcrush.so (bundled Go binary)  →  OpenCode Zen / other provider
 ```
 
 Crush ships for macOS, Linux, Windows and BSD. **Android is not one of those platforms** — this repository is an independent client for the bundled engine, not an official Charm project.
@@ -23,8 +23,8 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 | Markdown rendering | ✅ verified — code blocks, inline code, emphasis, lists |
 | Live model discovery with probing | ✅ verified — never hardcoded |
 | Long-lived workspace SSE | ✅ verified — no ~30s reap between turns |
-| Tool-call visibility | ✅ built — field names are spec-confirmed, the part envelope is not |
-| File diffs | ✅ built and tested — the wire path is verified on device |
+| Tool-call visibility | ✅ built — fields parsed through candidate name lists; the logged observed shapes await a real tool-using turn to pin the wire format |
+| File diffs | ✅ built and JVM-tested — on device, verified only for a turn that tracked zero files; untested on a real edit |
 | Permission prompts (ask / always / never) | ⚠️ implemented, not device-tested |
 | In-app diagnostics + crash reports | ⚠️ implemented, not device-tested |
 
@@ -86,10 +86,13 @@ packaging { jniLibs { useLegacyPackaging = true } }
 With it `false`, the binary stays inside the APK and is never extracted, so
 `exec()` fails. Do not "clean this up".
 
-**3. Bind the engine to `127.0.0.1` only.**
-Crush has **no authentication** and the agent can execute shell commands.
-Binding `0.0.0.0` would expose that to the whole LAN. See
-[Security](#security) for why loopback is not the end of the story.
+**3. Bind the engine to a Unix-domain socket only — never TCP.**
+The engine has **no authentication** and the agent can execute shell commands.
+It is launched with `-H unix://<app-private path>/crush.sock`; Android keeps a
+filesystem socket owned 0700/0600 in a 0700 directory reachable only by the
+app's UID. `tcp://127.0.0.1:$port` (the pre-2026-10 arrangement) was *not*
+isolation: loopback is shared by every app on the device. See
+[Security](#security) and [docs/p1-attack-surface.md](docs/p1-attack-surface.md).
 
 **4. `/v1/health` returns an empty body.** Use `/v1/version` as the readiness probe.
 
@@ -150,37 +153,36 @@ model can never reach `agent/init`.
 
 ## Security
 
-**The engine's API is unauthenticated.** Crush grants shell execution, its
-`crush.json` stores the provider key in **plaintext** (Crush's own design), and
+**The engine's HTTP API has no authentication** (no token, origin, or credential
+check of any kind). Crush grants shell execution, its `crush.json` stores the
+provider key in **plaintext** (Crush's own design), and
 `spec/crush-openapi.json` declares **no security scheme of any kind**.
 
-The bind address does not save you. The engine is launched with
-`server -H tcp://127.0.0.1:$port`, which looks like isolation but is not: on
-Android, loopback is shared by **every app on the device**. Any app holding
-`android.permission.INTERNET` can reach 127.0.0.1 on that port, so the only
-defence the port itself offers is that it must be guessed rather than looked up.
+What makes that survivable is the transport. Since 2026-10-18 the engine is
+launched with `-H unix://<filesDir>/crush.sock` — a filesystem socket inside the
+app-private directory, `srwx------`, in a 0700 directory, both owned by the app
+UID. Linux `connect()` on an AF_UNIX inode requires MAY_WRITE on that inode plus
+traversal through the directory chain, which the kernel denies to every other
+UID: sibling apps, `adb shell` (uid 2000), and adbd included. The previous
+`tcp://127.0.0.1:$port` bind offered no such boundary — on-device,
+`GET /v1/version` and `GET /v1/workspaces` returned `HTTP 200` to **a different
+app UID** with no credentials, and `GET /v1/workspaces/{id}/config`
+**returned the plaintext provider key** (both recorded in
+[docs/p1-attack-surface.md](docs/p1-attack-surface.md) §4/§8).
 
-Confirmed on-device: `GET /v1/version` and `GET /v1/workspaces` both return
-`HTTP 200` to a **different app UID** (`adb shell`, uid 2000) with no credentials.
+The root-kit caveat is honest: root/adbd with `CAP_DAC_OVERRIDE` can still read
+the socket. That is a root-equivalent threat, outside the sibling-app model.
 
-**Not confirmed:** command execution and key exfiltration. Creating a workspace
-requires a registered `client_id`, and an unregistered one is refused, so no
-shell command could be attached during testing. But `GET
-/v1/workspaces/{id}/config` returns the resolved workspace configuration, and
-the key is in it — so the step from "I can reach the server" to "I hold the
-user's Zen key" is a websocket-client registration away. It has not been
-demonstrated; it should be assumed.
-
-`client_id` is **not** a secret: registering a client requires no credential, so
-it cannot be used as a bearer token. Treat it as a claim handle.
+Upstream has been asked for a documented `unix://` scheme plus optional token
+auth for TCP: [charmbracelet/crush#4092](https://github.com/charmbracelet/crush/issues/4092).
 
 App-side mitigations:
 
 - API key encrypted with **AES-256/GCM**; master key in the **Android Keystore**.
   Each provider's key is encrypted into **its own slot** (`ct.<providerId>`), so
   holding a key for several providers is supported and one never overwrites
-  another. This protects keys at rest in the app; it does nothing about the
-  running engine's plaintext copy.
+  another. This protects keys at rest in the app; the running engine still holds
+  a plaintext copy by its own design.
 - The key is **not** auth-gated at the Keystore layer, so `KeySession.require()`
   must never mark the session unlocked — doing so is a full authentication
   bypass, since `isUnlocked` is what the lock gate trusts. Only the
@@ -199,18 +201,23 @@ App-side mitigations:
 
 ## Known issues
 
-- **Tool-call wire format is half-confirmed.** The field names are confirmed from
-  `spec/crush-openapi.json` (`tool_name`, `tool_call_id`, `params`), but the
-  message-part envelope that carries them has never been captured from a real
-  tool-using turn. The parser reads each field through candidate lists and
-  degrades to `null` rather than guessing, and logs the keys it observes.
-- **Engine API is unauthenticated.** See [Security](#security). Not fixable in
-  the app layer: the engine offers no auth to enable.
-- **Engine loopback has NO authentication across app UIDs.** The P1 EngineGate
-  (per-launch bearer token on loopback TCP) is **being wired** — module landed,
-  on-device verification pending. Until it ships and passes verification, do not
-  distribute builds. See [docs/p1-gate-design.md](docs/p1-gate-design.md) and
-  [docs/p1-attack-surface.md](docs/p1-attack-surface.md).
+- **Tool-call wire format is unconfirmed on the chat stream.** The spec DOES
+  define the fields (`tool_name`, `tool_call_id`, `params`, `path`,
+  `description`, `action`) — but in the **permission-grant** payload schema,
+  not in the SSE part envelope the client actually parses. The parser reads
+  each field through candidate name lists and degrades to `null` rather than
+  guessing, and logs the keys it observes on every distinct shape, so the list
+  can be tightened the first time a real tool-using turn is captured (D3).
+- **Engine API has no HTTP-level authentication.** See [Security](#security).
+  Not fixable in the app layer: the engine offers no auth to enable. The
+  transport, however, is now a kernel-enforced app-private Unix-domain socket,
+  so cross-app reach — the actual exploit path — is closed.
+- **The sibling-app attack surface is closed by architecture (2026-10-18).**
+  The old loopback-TCP arrangement (any UID, any port) where the per-launch
+  EngineGate was planned no longer exists; the engine binds only
+  `unix://<app-private path>`. The gate itself was never built — superseded.
+  Evidence: [docs/p1-attack-surface.md](docs/p1-attack-surface.md) §4/§8,
+  decision record [docs/p1-gate-design.md](docs/p1-gate-design.md).
 - **Delete's 404 is ambiguous.** A 404 on a workspace the ~30s reap has already
   taken cannot be told apart from a 404 on the session itself. The flow
   re-attaches first and force-retries once, but "session gone" is still inferred
@@ -239,8 +246,11 @@ App-side mitigations:
   bootstrap probes a live id before the app reports ready.
 - **Multi-provider plumbing is in; only one provider is verified.** See [docs/providers.md](docs/providers.md). Twelve Catwalk ids are offered and the provider is chosen in Settings, but opencode-zen is the only one that has completed a handshake on a device - everything else is labelled unverified rather than claimed working.
 - **OAuth is not implemented.** Crush exposes /config/refresh-oauth and a Copilot import; the app calls neither. The endpoint that *initiates* an OAuth flow is not in the spec at all, so the redirect capture would have to be built from scratch.
-- **`WorkspaceLease` and the force-retry paths are now redundant.** They predate
-  the long-lived connection and remain as dead scaffolding.
+- **`WorkspaceLease` and the force-retry paths are NOT dead scaffolding.** An
+  earlier revision of this README called them redundant relics of the
+  per-turn-connection era. Re-checked 2026-10: they are the path the send loop
+  takes whenever the shared connection is **not** `CONNECTED`. Live at
+  `WorkspaceManager.kt:132` and in the ChatViewModel send loop.
 - **No `androidTest` instrumentation suite.** The app-lock flow is covered by a
   JVM policy suite; the real credential + Keystore path can only run on device.
 
@@ -270,14 +280,16 @@ See [`docs/toolchain.md`](docs/toolchain.md) for the contingency plan.
 AGP 9 migration notes that silently broke the `exec()` architecture are in
 [`app/build.gradle.kts`](app/build.gradle.kts).
 
-Upstream pins: **Crush v0.97.1** (latest stable as of this writing; a `nightly`
-tag also exists and is not used), **Bubble Tea is not used** — it is Crush's
-terminal UI framework, compiled into the binary but unreachable from Compose.
+Upstream pins: **Crush v0.98.1** (upgraded 2026-10-18 for the `unix://` listen
+scheme; the previous 0.97.1 binary is backed up under `engine-backups/`. A
+`nightly` tag also exists and is not used). **Bubble Tea is not used** — it is
+Crush's terminal UI framework, compiled into the binary but unreachable from
+Compose.
 
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 386 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 401 JVM unit tests
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -300,6 +312,7 @@ The suites worth naming, because each pins a defect a green build had hidden:
 | `SecureKeyStoreProviderScopeTest` | one credential slot per provider — a second key never destroys the first |
 | `RunHandleTest` | a stop during preflight suppresses the POST instead of cancelling the previous run |
 | `ProviderSwitchPolicyTest` | a provider switch during a run defers to run exit instead of killing the reply |
+| `LockStateTest` | the lock gate's timestamps survive the OS recreating the activity mid-unlock |
 
 **Robolectric cannot test the things that actually break.** The real Keystore
 cipher (Robolectric ships no AndroidKeyStore provider — the vault suite swaps in
@@ -324,6 +337,8 @@ Device scripts:
 | [`docs/capabilities.md`](docs/capabilities.md) | What works vs. what does not, per feature |
 | [`docs/toolchain.md`](docs/toolchain.md) | Versions, AGP 10 contingency, backup plan |
 | [`docs/project-analysis.md`](docs/project-analysis.md) | Architecture, known defects, capability plan |
+| [`docs/p1-attack-surface.md`](docs/p1-attack-surface.md) | The mapped sibling-app surface and the UDS mitigation evidence |
+| [`docs/external-review-triage.md`](docs/external-review-triage.md) | Every external finding, verified/fixed/open, with evidence |
 | [`docs/providers.md`](docs/providers.md) | Provider ids, adding one, and why OAuth is absent |
 | [`docs/dynamic-autotuning.md`](docs/dynamic-autotuning.md) | Thermal/memory tuning design and results |
 | [`docs/baseline-2026-10-16.md`](docs/baseline-2026-10-16.md) | What the pre-release checklist verified, measured, and did **not** |
@@ -339,9 +354,10 @@ This app redistributes the Crush binary, so its terms apply directly.
 
 FSL-1.1-MIT grants use and redistribution for permitted purposes, requires that
 redistributions retain and link the licence and copyright notices, restricts
-competing commercial use, and **converts each version to MIT on the second
-anniversary of its availability**. The bundled build is **v0.97.1**; confirm its
-future-MIT date before relying on MIT terms for that version.
+competing commercial use, and **≥ converts each version to MIT on the second
+anniversary of its availability**. The bundled build is **v0.98.1**; confirm its
+future-MIT date before relying on MIT terms for that version. The backup of the
+retired v0.97.1 binary under `engine-backups/` has its own future-MIT date.
 
 > An earlier revision of this README stated "Crush is MIT-licensed". That was
 > wrong. Verify licence claims against upstream before repeating them.

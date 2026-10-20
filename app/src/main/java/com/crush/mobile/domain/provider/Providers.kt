@@ -57,8 +57,10 @@ data class Provider(
     /**
      * True when this provider has a genuinely free tier reachable by API key.
      *
-     * Distinct from [isKnown]: `groq` and `openrouter` are unverified here but
-     * are free. A user whose paid plan lapsed needs to know which of these can
+     * Distinct from [isKnown]: these describe different facts. A provider can
+     * be free yet not handshake-verified (none currently), or verified but a
+     * bad TEST target ([groq]: 8K TPM caps every agent shape out of the free
+     * tier). A user whose paid plan lapsed needs to know which of these can
      * still be tested against.
      *
      * 2026-10-17 corrections from per-provider research under docs/providers:
@@ -147,7 +149,12 @@ object Providers {
         Provider(
             id = "openrouter",
             displayName = "OpenRouter",
-            isKnown = false,
+            // E2E-verified on device 2026-10-17: probe →
+            // nvidia/nemotron-3-super-120b-a12b:free responded, the turn
+            // streamed reasoning + text, finish end_turn, UI rendered it.
+            // The first preferred id (gemma-4-31b) failed its probe; fallback
+            // order is load-bearing.
+            isKnown = true,
             keyHint = "openrouter.ai/keys",
             // Free models are ids ending ":free" and need NO credits: the cap
             // is per-REQUEST (20/min, 50/day without a $10 credit purchase -

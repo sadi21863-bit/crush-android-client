@@ -43,10 +43,10 @@ These are the real gaps, ordered by how much they matter for a coding agent.
 
 | Gap | Impact |
 |---|---|
-| **File diffs** | The agent writes files; the user sees prose describing the change, not the change. Largest gap against Claude Code / Codex |
+| **File diffs** | Built and JVM-tested (snapshot → tracked files → diff → render), and the collector endpoint is verified running on device — but the only real turn measured so far tracked **zero files**, so the render has never been seen fed by an actual edit |
 | **Tool-call timeline** | Tool activity is a per-message summary, not a live view of what the agent is doing turn by turn |
 | **Per-turn cost display** | Cost is parsed and shown in the drawer only |
-| **Multi-provider** | Plumbing in, 12 Catwalk ids offered, only `opencode-zen` verified. See [providers.md](providers.md) |
+| **Multi-provider** | Plumbing in, 13 ids offered, two verified end to end (`opencode-zen`, `openrouter`) plus `groq` probe-verified but parked as a test target. See [providers.md](providers.md) |
 | **Multi-project / workspaces** | One app-private workspace, path-derived id |
 | **Attachments / image input** | Text only |
 | **Instrumentation tests** | No `androidTest` suite at all |
@@ -60,7 +60,10 @@ Open issues that are implemented-but-wrong, distinct from the gaps above.
 
 The engine emits `tool_call` parts and the client parses them, but the exact
 field names were never read off a real tool-using turn. The only fixture
-available was `{"name":"read"}`.
+available was `{"name":"read"}`. Note the spec **does** declare similar fields
+(`tool_name`, `tool_call_id`, `params`, `path`, `description`, `action`) — but
+inside the permission-grant payload schema, not the SSE part envelope, so it
+describes a different message than the one the parser sees.
 
 `ToolActivityParser` therefore reads each field through a list of candidate wire
 names (`WIRE_NAME = ["name", "tool", "tool_name", "toolName"]`, and similarly
@@ -72,32 +75,35 @@ An unrecognised state maps to `UNKNOWN`, never `COMPLETED`. Claiming a tool
 finished when it may not have is the same class of lie as reporting a Stop that
 never happened.
 
-### Delete treats transport failure as success
+### Delete treating transport failure as success — FIXED
 
-`CrushApi.deleteSession` converts a dropped connection, `InterruptedIOException`,
-`EOFException`, and anything containing "workspace not found" into success, on
-the reasoning that "a session cannot outlive its workspace".
+`CrushApi.deleteSession` used to convert a dropped connection,
+`InterruptedIOException`, `EOFException`, and anything containing "workspace not
+found" into success, on the reasoning that "a session cannot outlive its
+workspace". That reasoning was wrong: sessions are persistent engine state, so a
+timeout or a reaped workspace does **not** prove the session was deleted.
 
-That reasoning is wrong. Sessions are persistent engine state keyed by the
-workspace's cwd; the workspace is only an attachment handle. So a timeout or a
-reaped workspace does **not** prove the session was deleted, and the conversation
-can reappear in the drawer later.
+**Resolved (2026-10):** the dropped-connection swallow is gone. `DeleteOutcome` —
+pinned by `DeleteOutcomeTest` — distinguishes *confirmed*, *already-gone*, and
+*failed*, and the client re-attaches and force-retries before trusting `AlreadyGone`.
 
-Correct behaviour: re-acquire the workspace, retry, and only mutate local state
-once the server confirms. The workspace re-acquisition is now in place; the
-"swallow as success" part is not yet fixed.
+### The engine API is unauthenticated — RESOLVED for cross-app reach, still no HTTP auth
 
-### The engine API is unauthenticated and cross-app reachable
+Transport (2026-10): the engine is launched with a **Unix-domain socket inside
+the app-private directory**; the app is the only UID that can address it, and
+the sibling-app TCP surface documented in
+[p1-attack-surface.md](p1-attack-surface.md) is closed at the kernel level.
+On-device: `GET /v1/version` returning `HTTP 200` to a different app UID (uid
+2000, `adb shell`) is no longer possible — there is no reachable TCP port.
 
-Confirmed: `GET /v1/version` and `GET /v1/workspaces` return `HTTP 200` to a
-different app UID (`adb shell`, uid 2000) with no credentials. Android's
-loopback is shared by all apps on the device, so binding to `127.0.0.1` excludes
-the network but not local apps.
+Details of the device experiment and what it does and does not prove:
+[p1-attack-surface.md](p1-attack-surface.md) §8. Upstream has been offered the same fix:
+[charmbracelet/crush#4092](https://github.com/charmbracelet/crush/issues/4092).
 
-Not confirmed: command execution or key exfiltration. Workspace creation
-requires a registered `client_id` and an unregistered one is refused, so no
-shell command could be attached during testing. Treat as a known architectural
-limitation, not a proven RCE.
+The HTTP layer itself still has **no token, origin, or credential check** — over
+a filesystem socket from the same UID that is defence-in-depth buffer, not a
+boundary. Rows of the attack-surface map still apply to *this* app's own UID,
+which is trusted.
 
 ### First-launch lock bypass
 
@@ -106,17 +112,19 @@ On a fresh install the first session opens without a lock prompt, because
 starts do prompt. Whether onboarding itself warrants a gate is a product
 decision, not settled.
 
-### Redundant workspace-lease scaffolding
+### Workspace-lease scaffolding — NOT redundant
 
-`WorkspaceLease`, `reattachIfStale`, and the force-retry paths in the send loop
-all predate the long-lived SSE connection, which removes the condition they
-existed to handle. They are now redundant and remain as dead scaffolding. Left
-in place deliberately until the connection has proven stable, to avoid removing
-a fallback that is still the active path when the connection is not `CONNECTED`.
+An earlier revision of this page called `WorkspaceLease`, `reattachIfStale`, and
+the force-retry paths dead scaffolding from the per-turn-connection era.
+**Re-checked 2026-10: they are still live code** — the send path falls back to
+`reattachIfStale` + lease + force-retry whenever the shared connection is not
+`CONNECTED`. `WorkspaceLease` is used at `WorkspaceManager.kt:132`; the
+force-retry path is live in the ChatViewModel send loop. The audit that gloated
+here was wrong that time.
 
 ## Engine facts this project depends on
 
-All verified on-device against Crush v0.97.1, not read from docs.
+All verified on-device against Crush v0.97.1→v0.98.1, not read from docs.
 
 | Fact | Detail |
 |---|---|
@@ -127,15 +135,16 @@ All verified on-device against Crush v0.97.1, not read from docs.
 | SSE resume | Impossible (no `id:`). Reconnect and resync from `/messages` |
 | Message updates | Whole message republished, not deltas |
 | Event envelope | `{"type":…,"payload":{"type":…,"payload":{…}}}` |
-| Auth | None |
-| Provider id | `opencode-zen` |
+| Auth | None at the HTTP layer; transport is an app-private UDS since 2026-10 |
+| Listener | Unix-domain socket inside the app-private dir (was `tcp://127.0.0.1:<ephemeral>` before the 2026-10 pivot) |
+| Provider id | `opencode-zen` (a plain `openrouter` also works) |
 | `api_key` | Must be sent **bare**; a `NAME=` prefix yields 401 |
 | `scope` | An integer (0 = global), not a string |
 | `/v1/health` | 200 with an **empty body**; use `/v1/version` |
 
 ## Testing posture
 
-- **331 JVM unit tests**, all passing.
+- **401 JVM unit tests**, all passing (as of 2026-10-20).
 - Two `MockWebServer`-backed suites assert on real HTTP order and on requests
   actually reaching the server — the latter exists because a method that throws
   before the call produces a *passing-looking* no-op, which is exactly how

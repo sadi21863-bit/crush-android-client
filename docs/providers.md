@@ -48,11 +48,11 @@ offer an id this engine's pinned Catwalk does not know.
 
 | id | Free tier? | Notes |
 |---|---|---|
-| `opencode-zen` | **no** (as of 2026-10-11) | the only one verified end to end |
+| `opencode-zen` | **no** (as of 2026-10-11) | verified end to end; free tier withdrawn |
 | `hyper` | **no** | approved accounts see no free tier or credits (first-hand 2026-10-17); prepaid from $5 |
-| `openrouter` | **yes** — `:free` models | 50 req/day free below $10 of purchased credit, 1000/day at ≥$10; no card needed |
+| `openrouter` | **yes** — `:free` models | **verified end to end (2026-10-17)** — probe → turn streamed, finish `end_turn`. 50 req/day free below $10 of purchased credit, 1000/day at ≥$10; no card needed |
 | `opencode-go` | no | subscription, $10/mo |
-| `groq` | **yes** | free: `gpt-oss-120b`, `gpt-oss-20b`, `qwen/qwen3.8-27b` |
+| `groq` | **yes** | probe-verified but **parked as a test target**: free tier caps every model at 8,000 tokens/min (per-TOKEN) and no agent shape fits — coder ~11.4K, plan ~8.6K on-device. See `providers/groq.md` |
 | `cerebras` | **$5 once** | one-time credit after adding a payment card; 30-day expiry |
 | `deepseek` | **no** | cheap, not free; no free tier confirmed (2026-10-17) |
 | `openai` | no | |
@@ -66,10 +66,14 @@ Deep-dive research for every row: [`providers/`](providers/) — one .md per
 provider, sourced from official pages on 2026-10-17. The ranking and the
 Cross-provider summary live in [provider-research-2026-10-17.md](provider-research-2026-10-17.md).
 
-`isKnown` is true for exactly one entry: `opencode-zen`. Everything else is
-labelled unverified because no key has completed a handshake against it on a
-device. A row labelled available that 500s on first use is worse than one
-labelled unverified, because the user pays the key-setup cost first.
+`isKnown` is true for exactly three entries: `opencode-zen` (the original), and
+`openrouter` (full agent turn streamed on device 2026-10-17 — note its first
+probe id, `google/gemma-4-31b-it:free`, failed and the fallback order is
+load-bearing), plus `groq` (probes answered, but no agent shape fits its 8K-TPM
+free cap, so it is parked as a test target rather than offered as one).
+Everything else is labelled unverified because no key has completed a handshake
+against it on a device. A row labelled available that 500s on first use is worse
+than one labelled unverified, because the user pays the key-setup cost first.
 
 ### Charm Hyper, specifically
 
@@ -109,15 +113,19 @@ OpenCode Zen's free tier is **withdrawn** — measured, see
 So for end-to-end testing, the realistic free routes (ranked by
 [provider-research-2026-10-17.md](provider-research-2026-10-17.md)):
 
-1. Settings → Provider → **OpenRouter** — 16 `:free` models live today; 50
-   requests/day below $10 of purchased credit, 1000/day at $10+; no card
-   needed. Key: <https://openrouter.ai/keys> (`sk-or-...`).
-2. **Groq — chosen for project testing.** Free tier, no card, immediate key:
-   `openai/gpt-oss-120b` / `openai/gpt-oss-20b` / `qwen/qwen3.8-27b` at
-   30 RPM / 1,000 requests-day / 8K TPM / 200K tokens-day per model. Key:
-   <https://console.groq.com/keys> (`gsk_...`).
-3. **Gemini API** — free tier for 3.x flash models, but free-tier content is
+1. Settings → Provider → **OpenRouter — the project's test provider.** 16
+   `:free` models live today; the caps are per-REQUEST (20/min, 50/day below
+   $10 of purchased credit), NO per-token cap, and free models carry 256K–1M
+   contexts, so the agent's ~11.4K-token request fits where Groq's cannot.
+   Key: <https://openrouter.ai/keys> (`sk-or-...`).
+2. **Gemini API** — free tier for 3.x flash models, but free-tier content is
    reviewed/used for training. Key via <https://aistudio.google.com>.
+3. **Groq is parked.** Its free tier caps EVERY model at 8,000 tokens per
+   minute — per-TOKEN, not per-request — and no agent shape fits: the coder
+   agent's minimal request measures ~11.4K tokens, the leanest agent shape
+   ~8.6K, both over the cap (measured on-device 2026-10-17). Key is valid and
+   probes answer 200; agent turns do not. Deep dive: [`providers/groq.md`](providers/groq.md).
+   Upstream's stale Groq catalogue is filed as charmbracelet/crush#4087.
 4. Hyper is out: approved accounts see no free tier or credits (first-hand
    2026-10-17); prepaid starts at $5. Cerebras needs a card for its $5
    credit, and Zen's free tier is intentionally restricted to OpenCode
@@ -126,11 +134,12 @@ So for end-to-end testing, the realistic free routes (ranked by
 Paste the key whole, env assignment included if that is what you copied, then
 pick a model. On OpenRouter choose one whose id ends `:free`.
 
-Crush's Catwalk snapshot for 0.97.1 decides which provider models are visible.
-If a `:free` model you expect is missing from the picker, the snapshot predates
-it. Groq-specific: the snapshot predates Groq's 2026-08-16 llama shutdown for
-free/developer tiers, so if the picker offers `llama-3.3-70b-versatile` under
-`groq` it will be refused — pick `openai/gpt-oss-120b`, `openai/gpt-oss-20b` or
+Crush's bundled Catwalk snapshot decides which provider models are visible.
+Since engine v0.98.1 the OpenRouter snapshot is fresh (15 `:free` models with
+shapes — `dots-studio/dots-3-note-preview:free` among them). Groq-specific:
+the snapshot predates Groq's 2026-08-16 llama shutdown for free/developer
+tiers, so if the picker offers `llama-3.3-70b-versatile` under `groq` it will
+be refused — pick `openai/gpt-oss-120b`, `openai/gpt-oss-20b` or
 `qwen/qwen3.8-27b` instead.
 
 ## OAuth is not implemented

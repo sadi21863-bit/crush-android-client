@@ -66,17 +66,23 @@ user/auto-resolved policy and is only written when settings change;
 writes the result back. `lastEffective` distinguishes "settings changed" from
 "we adjusted it ourselves".
 
-## Known integration defect
+## Integration defect — RESOLVED
 
-`DynamicPolicy.next()` checks `calmRun + 1 >= 3`, but the caller increments
-`calmRun` **before** calling it, so the already-incremented count is passed in.
-The caller therefore relaxes after **two** observed calm samples rather than
-three.
+The off-by-one below was real and is **fixed** (2026-10). `next()` now receives
+`priorCalm` — the calm-run length *before* the current sample — and decides on
+that; the caller's own increment never leaks into the policy input twice. Pinned
+by `SupervisorHysteresisTest` (real signal sequences, not pre-incremented
+counts).
 
-The pure function's 20 unit tests all pass — they test `next()` directly with a
-pre-incremented count, so they encode the same off-by-one the caller has. Fixing
-it needs the contract defined once ("calmRun before or including this sample?")
-plus an integration test over a signal sequence. Not yet done.
+Historical note for context: `DynamicPolicy.next()` used to check
+`calmRun + 1 >= 3` while the caller incremented `calmRun` **before** calling it,
+so the already-incremented count was passed in and relaxation landed after two
+observed calm samples instead of three. The pure function's 20 unit tests passed
+throughout — they tested `next()` directly with a pre-incremented count, and so
+encoded the same off-by-one the caller had.
+
+Lesson retained: pin the *caller's contract* ("calmRun counts what the caller has
+NOT yet counted?") in the test, not just the pure function.
 
 ## Device verification
 

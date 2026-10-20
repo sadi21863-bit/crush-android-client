@@ -37,9 +37,11 @@ binary, and the emulator refuses ARM guests on an x86_64 host.
   `nativeLibraryDir`.
 - **Never** change `useLegacyPackaging` to `false`. The engine is then never
   extracted from the APK and `exec()` fails with `ENOENT`.
-- **Never** bind the engine to `0.0.0.0`. Crush has no authentication and the
-  agent can execute shell commands. Loopback excludes the LAN but *not* other
-  apps on the device — see the Known issues section of the README.
+- **Never** bind the engine to TCP — not `0.0.0.0`, and not `127.0.0.1` either.
+  The engine is launched with an app-private Unix-domain socket (`-H unix://…`);
+  any TCP listener re-opens the sibling-app surface documented in
+  [docs/p1-attack-surface.md](docs/p1-attack-surface.md), because on Android
+  loopback is shared by every app on the device.
 - **Never** hardcode a model id. Zen's `/models` is a public endpoint that still
   lists retired models; ids must come from the live probe in `ModelChoice` /
   `ZenModelsApi`.
@@ -49,6 +51,8 @@ binary, and the emulator refuses ARM guests on an x86_64 host.
 
 ## Reporting security issues
 
-Please do not open a public issue for a vulnerability. The engine's loopback API
-is unauthenticated and reachable cross-app; see the README for what is confirmed
-and what is not.
+Please do not open a public issue for a vulnerability. The engine's HTTP API
+still has no authentication; the transport is a kernel-enforced app-private
+Unix-domain socket, so cross-app reach is closed but same-UID (and
+root-equivalent) access remains — see the README Security section for what is
+proven and what the limits are.

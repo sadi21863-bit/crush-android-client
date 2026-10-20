@@ -1,5 +1,14 @@
 # AI Provider Research — Signup, Keys, Free Tiers (2026-10-17)
 
+> **Post-research correction (2026-10-18, do not trust the ranking below).**
+> The on-device measurements the same week of research superseded both #1 and #3:
+> **Groq is parked** — its 8K TPM cap is per-TOKEN, and no agent shape fits (coder
+> ~11.4K / plan ~8.6K measured); probes answer 200, agent turns do not.
+> **OpenRouter is the test provider and is verified end to end** — per-REQUEST
+> caps (20/min, 50/day) with no per-token limit; the agent's ~11.4K request fits
+> inside 262K context. Live ranking lives in [`providers.md`](providers.md) and
+> the per-provider deep dives under [`providers/`](providers/).
+
 Scope: verified October 2026 signup/keys/free-tier state of 13 providers, for a zero-budget tester running **charmbracelet/crush 0.97.1** (OpenAI-compatible chat completions via Catwalk provider ids). Ground rules: primary sources only (the provider's own docs/pricing/console pages), each claim cites its source. Everything then-current in this file is quoted or paraphrased from those pages; where a number or policy could not be confirmed from a primary source, it is listed under **Cannot verify**.
 
 ---

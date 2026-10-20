@@ -167,10 +167,10 @@ the caller that was not checking.
 
 | ID | Finding | Why it is not fixed |
 |---|---|---|
-| **P0-02** | Engine loopback is cross-app reachable | **Not fixable in the app layer.** Crush's HTTP server has no auth to enable and the spec declares no security scheme. Documented honestly in README § Security. |
+| ~~**P0-02**~~ | Engine loopback is cross-app reachable | **Resolved 2026-10-18 by architecture, not un-fixable after all.** The engine now binds a Unix domain socket under app-private storage (`files/crush.sock`, `srwx------`); `AF_UNIX connect()` requires **MAY_WRITE on the inode plus traversal through the 0700 directory**, which the kernel denies to any other UID — sibling apps, shell (uid 2000) and adbd included. No TCP listener remains owned by the app. Device-proven; see [`p1-attack-surface.md`](p1-attack-surface.md) §8. Upstream asks (documented `unix://` scheme, optional token auth for TCP, `api_key` masking) are filed as charmbracelet/crush#4092. |
 | **P1-04** | SSE may not be `CONNECTED` before POST | Partly mitigated: `streamSend` checks `conn.state == CONNECTED` and falls back to a per-turn stream otherwise. A bounded readiness await would be better. |
 | **P1-08** | Kotlin 2.4.10 vs Compose plugin 2.4.20 | Build risk, not a proven failure. Deliberate and documented in `docs/toolchain.md`. |
-| **P2-10** | Zen-specific model discovery remains | Real. `ZenApi`/`ZenRepository` are the legacy path; `ZenModelsApi` is now also used for provider-neutral probing but is still named for Zen. |
+| **P2-10** | Zen-specific model discovery remains | Narrowed: `ZenApi`/`ZenRepository` were deleted (2026-10-16). What remains is the *name* — `ZenModelsApi` is provider-neutral in function (it probes non-Zen providers too) but still named for Zen. |
 | **P2-11/12** | arm64-only; no local inference | Product limitations, not defects. |
 
 ## Proposed local-inference design
@@ -191,6 +191,5 @@ code rather than intention:
 
 - ☐ **Locked app cannot bootstrap the agent** — now enforced in `bootstrap()`
 - ☐ **SSE switch A→B delivers only B events** — now enforced and tested
-
-The rest remain open, in particular "another app cannot invoke privileged Crush
-API", which is P0-02 and is not solvable here.
+- ☑ **Another app cannot invoke privileged Crush API** — was P0-02; resolved by the
+  UDS transport pivot (Unix domain socket, kernel-enforced same-UID-only).

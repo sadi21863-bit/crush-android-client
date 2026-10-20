@@ -129,18 +129,21 @@ defects are mismatches between those lifetimes.
 
 ## 5. Open defects
 
-| ID | Defect | Severity |
+Reassessed 2026-10-20 against live code; every row below was re-verified, not
+carried forward.
+
+| ID | Defect | State |
 |---|---|---|
-| D1 | `deleteSession` treats transport failure as success, so a failed delete reappears | High |
-| D2 | Engine API is unauthenticated and reachable from another app's UID | High (architectural) |
-| D3 | Tool-call field names unconfirmed against a real engine turn | Medium |
-| D4 | `DynamicPolicy` hysteresis off by one — relaxes after 2 calm samples, not 3 | Medium |
-| D5 | `AppLog` rewrites the whole file on a 2s heartbeat and clears rather than rotating | Medium |
-| D6 | `AppLog` writes are unsynchronised across threads | Low |
-| D7 | `CrushEngine.readPid` casts `Process.pid()` (a `Long`) to `Int`; the cast fails and diagnostics see `-1` | Low |
-| D8 | `EnginePaths.logFile()` points at a path Crush may no longer write | Low |
-| D9 | First-launch lock bypass (no ciphertext yet, so no gate) | Low, by design |
-| D10 | `WorkspaceLease` and force-retry paths are now redundant dead scaffolding | Low |
+| D1 | `deleteSession` treats transport failure as success, so a failed delete reappears | **Fixed** — `DeleteOutcome` (Failed → banner, local state untouched; Deleted/AlreadyGone → confirmed) + force-retry; pinned by `DeleteOutcomeTest` |
+| D2 | Engine API unauthenticated and reachable from another app's UID | **Closed by architecture** — UDS-only transport (2026-10-18): the engine binds `files/crush.sock` `srwx------`, so `connect()` requires the app UID. Evidence and limits in [`p1-attack-surface.md`](p1-attack-surface.md) §8 |
+| D3 | Tool-call field names unconfirmed against a real engine turn | **Open** — next on the §9 order |
+| D4 | `DynamicPolicy` hysteresis off by one — relaxes after 2 calm samples, not 3 | **Fixed** — caller passes `priorCalm` so `calmRun + 1` is not applied twice; pinned by `SupervisorHysteresisTest` |
+| D5 | `AppLog` rewrites the whole file on a 2s heartbeat and clears rather than rotating | **Fixed** — `rotateKeepingTail` keeps the newest half, archive gets the evicted head |
+| D6 | `AppLog` writes are unsynchronised across threads | **Fixed** — `writeLock`; size cached instead of stat'd per line |
+| D7 | `CrushEngine.readPid` casts `Process.pid()` (a `Long`) to `Int`; the cast fails and diagnostics see `-1` | **Fixed** — `pidFromReflective` (`as? Number`, range-guarded), top-level for direct testing |
+| D8 | `EnginePaths.logFile()` points at a path Crush may no longer write | **Fixed** — `newestEngineLog` picks the newest `crush.log` by mtime (5 JVM tests) |
+| D9 | First-launch lock bypass (no ciphertext yet, so no gate) | By design and documented — nothing at rest to protect |
+| D10 | `WorkspaceLease` and force-retry paths are now redundant dead scaffolding | **Closed as incorrect** — both live: `WorkspaceLease.isFresh` is the reattach heuristic (`WorkspaceManager`), force-retry runs on failed deletes (`ChatViewModel`) |
 
 ## 6. Capability gaps
 
@@ -164,7 +167,7 @@ Ordered by how much each matters for a coding agent. Detail in
 | App lock | Platform credential screen, mandatory once a key exists |
 | Backups | `allowBackup=false` + `data_extraction_rules.xml` |
 | `crush.json` | **Plaintext key**, app-private, backup-excluded (Crush's design) |
-| Engine API | **Unauthenticated**, bound to loopback only |
+| Engine API | Bound to a **Unix domain socket** (`srwx------`), reachable only by the app UID — see [`p1-attack-surface.md`](p1-attack-surface.md) §8 |
 | Cleartext | Permitted to loopback only, via `network_security_config.xml` |
 | Release builds | Signed; debug builds are explicitly not shareable |
 

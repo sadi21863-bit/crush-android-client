@@ -439,11 +439,25 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         val session = CrushSession(api, mgr)
         val d = File(context.filesDir, "").absolutePath
 
-        // WHICH PROVIDER, resolved once for the whole handshake.
+        // WHICH PROVIDER, resolved ONCE, from the PERSISTED settings we await
+        // right below - not from any in-memory mirror.
         //
         // Read from PERSISTED settings, not from in-memory state, because Settings
         // is a different screen with its own ViewModel and the user can change the
         // provider there while this one still holds the old value.
+        //
+        // The bug this order kills (device 2026-10-20 15:40): the old code read
+        // `currentPersistedProvider()`, which is the OBSERVED MIRROR of the
+        // settings flow - `observedProvider` or the ChatUiState default. A
+        // freshly recreated ViewModel races DataStore's first emission: the
+        // mirror is still blank, so the handshake configured the DEFAULT
+        // provider (`opencode-zen`), found no ciphertext under that id, and the
+        // app showed "no API key - add one in Settings" to a user whose intact
+        // openrouter key was sitting in secure_api_keys.xml the whole time. The
+        // branch also logged nothing and never retried, so one loss latched the
+        // banner for the life of the process. Reading the provider from the SAME
+        // emission the permission mode comes from makes resolution deterministic:
+        // await persisted settings, then use them.
         //
         // Seven call sites used to pass the literal "opencode-zen". Resolving it
         // here means the key, the model slots, the price lookup and the agent init
@@ -451,15 +465,25 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         // the failure mode when a provider is changed in only some of them: Zen
         // prices read for one provider while the model is set on another, and
         // nothing complains.
-        val providerId = Providers.resolve(currentPersistedProvider()).id
-
-        // Read the persisted permission mode rather than assuming. Getting this
-        // wrong in the AUTO_APPROVE direction silently grants the agent
-        // unattended file edits, so it fails safe to ASK on any error.
-        val permissionMode = runCatching {
-            container.settingsRepository.settings.first().permissionMode
-        }.getOrDefault(com.crush.mobile.domain.model.PermissionMode.ASK)
-        AppLog.i(TAG, "permissionMode=$permissionMode")
+        //
+        // Fails safe to ASK/AUTO-approve defaults on read errors; the provider
+        // read failing is rarer but the same principle - resolve from the last
+        // KNOWN persisted value rather than a blank mirror. If the flow had not
+        // emitted at all we cannot configure safely: fall back to the mirror
+        // (pre-race behaviour, warmed by the ViewModel's own collector) and log
+        // loudly, because a wrong provider here undoes the whole handshake.
+        val persisted = runCatching {
+            container.settingsRepository.settings.first()
+        }
+        val permissionMode = persisted.getOrNull()?.permissionMode
+            ?: com.crush.mobile.domain.model.PermissionMode.ASK
+        val providerId = Providers.resolve(
+            persisted.getOrNull()?.providerId ?: currentPersistedProvider()
+        ).id
+        if (persisted.isFailure) {
+            AppLog.w(TAG, "settings read failed; configuring provider from mirror: $providerId")
+        }
+        AppLog.i(TAG, "permissionMode=$permissionMode providerId=$providerId")
 
         val opened = session.openWorkspace("$d/workspace", "$d/crush/state", permissionMode, providerId)
         // Read the key for the provider we are about to configure, not for whatever
@@ -471,9 +495,21 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // lapsed", so telling the user to add a key they had already added
             // sent them to Settings for nothing. Now that the app locks at
             // entry, a blank key here almost always means we are locked.
-            keyBlocked = secureKeys.hasStoredCiphertext(providerId)
+            //
+            // This branch MUST say what happened before giving up: device log
+            // 2026-10-20 15:40 spent this path SILENTLY - an app.log window with
+            // nothing in it - while the user saw "no API key" for a key that was
+            // provably intact on disk. providerId and the ciphertext state are
+            // ids, not secrets; the key itself is never logged anywhere.
+            val stored = secureKeys.hasStoredCiphertext(providerId)
+            AppLog.i(
+                TAG,
+                "bootstrap key empty: provider=$providerId storedCiphertext=$stored " +
+                    "providersWithKeys=${secureKeys.providersWithKeys().joinToString(",")}"
+            )
+            keyBlocked = stored
             _state.value = _state.value.copy(
-                phase = if (keyBlocked) {
+                phase = if (stored) {
                     "unlocking your saved key..."
                 } else {
                     "no API key - add one in Settings"
@@ -749,17 +785,22 @@ class ChatViewModel(private val context: Context, private val container: AppCont
 /** Live catalogue for the current provider, so the picker cannot offer a retired model. */
     fun loadModels() {
         viewModelScope.launch {
+            // Resolve the provider ONCE, here in the suspend context, per the
+            // same race that broke bootstrap (see currentPersistedProvider):
+            // the key factory lambda below is `() -> String`, so it cannot
+            // suspend, and a mirror read inside it can still be cold.
+            val providerId = currentProviderId()
             val base = currentModelsBase()
             if (base == null) {
                 _state.value = _state.value.copy(
                     models = emptyList(),
                     modelsError =
-                        "provider \"${currentProviderId()}\" has no OpenAI-compatible /models base configured"
+                        "provider \"$providerId\" has no OpenAI-compatible /models base configured"
                 )
                 return@launch
             }
             val r = ZenModelsApi(
-                { container.keySession.require(secureKeys, currentProviderId()) },
+                { container.keySession.require(secureKeys, providerId) },
                 base
             ).fetch()
             _state.value = _state.value.copy(
@@ -781,17 +822,33 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      * the default if there is nothing at all - never throws, because failing to
      * read a preference must not stop the app from starting.
      */
-    private fun currentPersistedProvider(): String =
-        observedProvider.takeIf { it.isNotBlank() } ?: _state.value.providerId
+    private suspend fun currentPersistedProvider(): String {
+        // THE persisted value, awaited. The in-memory mirror (observedProvider)
+        // is fed by a separate collector, so a freshly recreated ViewModel can
+        // reach a send or a bootstrap BEFORE the mirror has warmed; trusting the
+        // mirror there is what configured "opencode-zen" against an intact
+        // openrouter key and showed "no API key" for a key that was on disk the
+        // whole time (device log 2026-10-20 15:40). Await the real DataStore
+        // emission - first() answers immediately because DataStore serves the
+        // in-process cache after the first read - and keep the mirror only as
+        // the fallback if DataStore itself errors.
+        val persisted = runCatching {
+            container.settingsRepository.settings.first().providerId
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+        return persisted
+            ?: observedProvider.takeIf { it.isNotBlank() }
+            ?: _state.value.providerId
+    }
 
     /** Resolved provider id, for call sites that need the key scoped to it. */
-    private fun currentProviderId(): String = Providers.resolve(currentPersistedProvider()).id
+    private suspend fun currentProviderId(): String =
+        Providers.resolve(currentPersistedProvider()).id
 
     /**
      * Base of the selected provider's OpenAI-compatible API, or null when the
      * picker cannot talk to that provider directly (see Provider.modelsBase).
      */
-    private fun currentModelsBase(): String? =
+    private suspend fun currentModelsBase(): String? =
         Providers.byId(currentProviderId())?.modelsBase
 
     /**

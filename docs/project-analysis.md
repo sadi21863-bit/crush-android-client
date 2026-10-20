@@ -144,6 +144,7 @@ carried forward.
 | D8 | `EnginePaths.logFile()` points at a path Crush may no longer write | **Fixed** — `newestEngineLog` picks the newest `crush.log` by mtime (5 JVM tests) |
 | D9 | First-launch lock bypass (no ciphertext yet, so no gate) | By design and documented — nothing at rest to protect |
 | D10 | `WorkspaceLease` and force-retry paths are now redundant dead scaffolding | **Closed as incorrect** — both live: `WorkspaceLease.isFresh` is the reattach heuristic (`WorkspaceManager`), force-retry runs on failed deletes (`ChatViewModel`) |
+| D11 | Bootstrap resolved the provider from the **in-memory mirror** (`currentPersistedProvider`) instead of the persisted settings it already awaited; a freshly recreated ViewModel could lose that race and configure the default `opencode-zen`, latching "no API key - add one in Settings" **silently** against an intact key | **Fixed** (2026-10-20, device-proven) — commit `9498a67`: provider resolved from the awaited DataStore emission; the three resolution helpers are suspend and await `first()`; the blank-key branch logs `provider=<id> storedCiphertext=<bool> providersWithKeys=…` before giving up. The silent branch was the debugging cost — **any "giving up" branch must log what it decided on** |
 
 ## 6. Capability gaps
 

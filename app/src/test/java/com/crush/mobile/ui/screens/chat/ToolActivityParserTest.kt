@@ -2,6 +2,7 @@ package com.crush.mobile.ui.screens.chat
 
 import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -24,8 +25,15 @@ class ToolActivityParserTest {
 
     private fun parse(json: String): ToolActivity? {
         val o = JsonParser.parseString(json).asJsonObject
-        val data = o.getAsJsonObject("data")
-        return ToolActivityParser.from(data)
+        val data = o.get("data")
+        // Parse bare-block fixtures where data carries the fields directly
+        // ("reduced" payloads), and whole-envelope fixtures where data is the
+        // carrier. Both must end in the same ToolActivity.
+        return if (data != null && data.isJsonObject) {
+            ToolActivityParser.from(o)
+        } else {
+            ToolActivityParser.from(o.getAsJsonObject("data"))
+        }
     }
 
     // ---- the one shape we have actually seen -----------------------------
@@ -49,11 +57,13 @@ class ToolActivityParserTest {
         assertNull(o.get("data")?.takeIf { !it.isJsonNull }?.asJsonObject)
     }
 
-    // ---- field-name fallbacks --------------------------------------------
+    // ---- field names -------------------------------------------------------
 
     @Test
-    fun `name is found under any of the candidate keys`() {
-        for (key in listOf("name", "tool", "tool_name", "toolName")) {
+    fun `name is found under any confirmed key`() {
+        // CONFIRMED: `name` (the live data object) and `tool_name` (the
+        // permission object documented in the spec). Anything else was deleted.
+        for (key in listOf("name", "tool_name")) {
             val t = parse("""{"type":"tool_call","data":{"$key":"bash"}}""")
             assertEquals("wrong for $key", "bash", t?.name)
         }
@@ -61,7 +71,7 @@ class ToolActivityParserTest {
 
     @Test
     fun `arguments are pretty-printed when they are a JSON string`() {
-        val t = parse("""{"type":"tool_call","data":{"name":"read","arguments":"{\"path\":\"a.txt\"}"}}""")
+        val t = parse("""{"type":"tool_call","data":{"name":"read","input":"{\"path\":\"a.txt\"}"}}""")
         assertNotNull(t)
         // Pretty-printed, not the raw escaped one-liner.
         assertTrue(t!!.args.contains("\n"))
@@ -70,7 +80,7 @@ class ToolActivityParserTest {
 
     @Test
     fun `arguments are pretty-printed when they are already an object`() {
-        val t = parse("""{"type":"tool_call","data":{"name":"read","arguments":{"path":"a.txt"}}}""")
+        val t = parse("""{"type":"tool_call","data":{"name":"read","params":{"path":"a.txt"}}}""")
         assertNotNull(t)
         assertTrue(t!!.args.contains("a.txt"))
     }
@@ -133,8 +143,8 @@ class ToolActivityParserTest {
 
     @Test
     fun `a missing id still yields a stable synthesised one`() {
-        val a = parse("""{"type":"tool_call","data":{"name":"read","arguments":{"p":"x"}}}""")
-        val b = parse("""{"type":"tool_call","data":{"name":"read","arguments":{"p":"x"}}}""")
+        val a = parse("""{"type":"tool_call","data":{"name":"read","params":{"p":"x"}}}""")
+        val b = parse("""{"type":"tool_call","data":{"name":"read","params":{"p":"x"}}}""")
         assertEquals(a!!.id, b!!.id)
     }
 
@@ -156,7 +166,74 @@ class ToolActivityParserTest {
         assertTrue(failed.summary().contains("failed"))
     }
 
-    // ---- the spec-confirmed shape -----------------------------------------
+    // ---- the D3-captured live shape ----------------------------------------
+    //
+    // Evidence: bytes on the wire during a real tool turn (2026-10-25 probe,
+    // messages endpoint + SSE capture), engine v0.98.1. `input` is the tool
+    // arguments as a JSON STRING; `finished` is a boolean, and a streaming
+    // frame omits it. The parser must never claim COMPLETED without it.
+
+    private val Z2_STREAMING =
+        """{"type":"tool_call","data":{"id":"<id>","name":"write","input":""}}"""
+
+    private val Z2_COMPLETE =
+        """{"type":"tool_call","data":{"id":"<id>","name":"write",
+             "input":"{\"file_path\": \"/data/user/0/com.crush.mobile/files/workspace/z2_probe.txt\", \"content\": \"wire\"}",
+             "finished":true}}"""
+
+    @Test
+    fun `a streaming part without finished is RUNNING, never COMPLETED`() {
+        val t = parse(Z2_STREAMING)
+        assertNotNull(t)
+        assertEquals("write", t!!.name)
+        assertEquals(ToolState.RUNNING, t.state)
+        assertTrue(t.isRunning)
+        assertEquals("", t.args)
+    }
+
+    @Test
+    fun `finished true is COMPLETED with args pretty-printed`() {
+        val t = parse(Z2_COMPLETE)
+        assertNotNull(t)
+        assertEquals(ToolState.COMPLETED, t!!.state)
+        assertFalse(t.isRunning)
+        assertTrue(t.args.contains("\"file_path\""))
+    }
+
+    @Test
+    fun `the touched path is mined out of the arguments`() {
+        val t = parse(Z2_COMPLETE)
+        assertEquals("z2_probe.txt", parsePathSuffix(t!!.path!!))
+    }
+
+    private fun parsePathSuffix(p: String): String =
+        p.takeLastWhile { it != '/' }
+
+    @Test
+    fun `data null degrades to no tool rather than crashing`() {
+        assertNull(
+            ToolActivityParser.from(
+                JsonParser.parseString("""{"type":"tool_call","data":null}""").asJsonObject
+            )
+        )
+    }
+
+    @Test
+    fun `data scalar degrades to no tool rather than crashing`() {
+        assertNull(
+            ToolActivityParser.from(
+                JsonParser.parseString("""{"type":"tool_call","data":"x"}""").asJsonObject
+            )
+        )
+    }
+
+    @Test
+    fun `finished false with a reported state string still maps`() {
+        val t = parse("""{"type":"tool_call","data":{"name":"bash","state":"error","finished":false}}""")
+        assertEquals(ToolState.FAILED, t!!.state)
+    }
+
+    // ---- the spec-confirmed shape ----------------------------------------
     //
     // `tool_name` / `tool_call_id` / `params` are CONFIRMED, not guessed: they are
     // the REQUIRED properties of the `permission` object Crush sends when a tool

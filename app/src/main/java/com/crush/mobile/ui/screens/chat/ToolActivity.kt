@@ -18,20 +18,34 @@ import com.google.gson.JsonParser
  * arguments, and its output, because an agent you cannot watch is an agent you
  * cannot supervise.
  *
- * FIELD NAMES ARE A GUESS, AND THAT MATTERS
+ * FIELD NAMES ARE CONFIRMED ON THE WIRE (2026-10-20 / 2026-10-25 D3)
  *
- * The only fixture available while writing this was
- * `{"type":"tool_call","data":{"name":"read"}}`, which is not enough to build a
- * UI on. So [ToolActivity.from] reads each field through [pickString], which
- * tries several plausible wire names and returns null when none are present.
- * That is deliberate: guessing a single hard name and getting it wrong is how
- * this project shipped a build that failed every turn with "large model not
- * found in provider".
+ * The real `tool_call` part was captured two ways and both agree:
  *
- * Consequence: an unrecognised field yields null, not a crash and not a
- * fabricated value. The UI degrades to showing the tool name alone. When the
- * real wire format is confirmed, correct the names in WIRE_* below and delete
- * the fallbacks - nothing else in the UI needs to change.
+ *   part:  {"type":"tool_call","data":{...}}
+ *   data:  {"id":"call_...","name":"write",
+ *           "input":"{\"file_path\":\"...\",\"content\":\"...\"}",
+ *           "finished":true}
+ *
+ * Republished on every message update (whole-message replace), and the same
+ * shape in the persisted message history via GET .../sessions/{id}/messages.
+ * The fields land on the DATA object, not on the part itself - the first live
+ * capture logged `name=<none>` precisely because this parser was reading the
+ * part, not its `data`. [ToolActivity.from] now reads `data` with the part as
+ * the fallback, so both the whole envelope and legacy reduced payloads parse.
+ *
+ * State: the engine sends NO text state for tool calls - it sends a `finished`
+ * boolean. Streaming frames omit it (or carry `input:""`), history keeps it
+ * set. So: finished==true -> COMPLETED; a `state` string still maps through
+ * [parseState]; a part with an id but neither -> RUNNING; else UNKNOWN.
+ * NEVER optimistically claimed COMPLETED without `finished:true`.
+ *
+ * Permission requests (the OTHER shape carrying tool_name/tool_call_id/
+ * params/path/description) still parse through the same candidate lists -
+ * spec/crush-openapi.json documents those names, but engine v0.98.1 does not
+ * broadcast `permission_request` on the events stream at all (D3 finding),
+ * so today the app cannot receive that shape live. The lists are kept per
+ * the spec ahead of the engine fix.
  */
 data class ToolActivity(
     /** Engine call id when present; otherwise synthesised so the list is stable. */
@@ -87,60 +101,115 @@ object ToolActivityParser {
     // of showing a tool call is that a human can audit it.
     private val gson = GsonBuilder().setPrettyPrinting().create()
 
-    // ---- candidate wire names -------------------------------------------------
+    // ---- confirmed wire names -----------------------------------------------
     //
-    // `tool_name`, `tool_call_id` and `params` are CONFIRMED, not guessed. They
-    // are the required properties of the `permission` object that Crush sends
-    // when a tool needs approval - the same object that describes a tool call,
-    // reached by a different endpoint. See spec/crush-openapi.json.
+    // CONFIRMED ON THE LIVE WIRE (evidence: D3 captures 2026-10-20/25, engine
+    // v0.98.1, session messages endpoint - see the class doc): a tool_call part
+    // is `{"type":"tool_call","data":{"id","name","input","finished"}}` where
+    // `input` is the tool arguments as a JSON STRING. The permission object
+    // documented in spec/crush-openapi.json carries `tool_name`/`tool_call_id`/
+    // `params`/`description`/`path`, which is why those names stay in the lists
+    // (data-first, part-fallback covers both carriers).
     //
-    // `description` and `path` are also from the spec and are worth showing: a
-    // row reading "read - read src/main.kt" tells the user what was touched
-    // without opening anything, which is the whole point of the view.
-    //
-    // The remaining entries are still fallbacks, kept because the message-part
-    // envelope that carries these fields has never been observed end to end.
-    // They cost nothing: [pickString] tries each in order and takes the first
-    // match. Once a real tool_call part is captured, delete what is unused.
-    private val WIRE_ID = listOf("tool_call_id", "id", "call_id", "callId", "toolCallId")
-    private val WIRE_NAME = listOf("tool_name", "name", "tool", "toolName")
-    private val WIRE_ARGS = listOf("params", "arguments", "args", "input", "parameters")
-    private val WIRE_STATE = listOf("state", "status", "statuses")
-    private val WIRE_OUTPUT = listOf("output", "result", "content", "response")
-    private val WIRE_ERROR = listOf("error", "err", "error_message", "errorMessage")
-    private val WIRE_DESCRIPTION = listOf("description", "desc")
-    private val WIRE_PATH = listOf("path", "file", "file_path", "filePath")
+    // Every previously-guessed name with no wire evidence was deleted: `tool`,
+    // `toolName`, `arguments`, `args`, `parameters`, `status`, `statuses`,
+    // `result`, `response`, `err`, `errorMessage`, `file`, `filePath`,
+    // `call_id`, `callId`, `toolCallId`-as-part-name. If the engine grows a new
+    // shape, [recordShape] will surface it in one line per distinct shape.
+    private val WIRE_ID = listOf("id", "tool_call_id")
+    private val WIRE_NAME = listOf("tool_name", "name")
+    private val WIRE_ARGS = listOf("input", "params")
+    private val WIRE_STATE = listOf("state")
+    private val WIRE_OUTPUT = listOf("content", "output")
+    private val WIRE_ERROR = listOf("error")
+    private val WIRE_DESCRIPTION = listOf("description")
+    private val WIRE_PATH = listOf("path", "file_path")
 
     private const val MAX_OUTPUT_CHARS = 4000
 
     /**
-     * Builds a [ToolActivity] from a `tool_call` part's `data` object.
+     * Builds a [ToolActivity] from a `tool_call` part.
+     *
+     * Accepts BOTH carriers: the whole part `{"type":"tool_call","data":{...}}`
+     * (what the message stream delivers and ChatViewModel passes) and a bare
+     * `data` object (legacy reduced payloads and the unit tests). Fields are
+     * read from the `data` object when one exists, falling back to the block
+     * itself - that covers permission-style payloads, which put the fields on
+     * the object directly.
      *
      * Returns null only when there is no name to show, which would be useless
      * to the user. Every other field is optional by design.
      */
     fun from(part: JsonObject): ToolActivity? {
-        val name = pickString(part, WIRE_NAME)?.takeIf { it.isNotBlank() }
-        // Record which KEYS the engine actually sent, once per distinct shape.
-        // The candidate lists above are guesses; this is how they get corrected
-        // without guessing again on a device.
-        //
-        // Keys only, never values: argument values can contain file paths and
-        // command text, and a log is the wrong place for those. Once the real
-        // key names are known, WIRE_* can be trimmed to match and this removed.
-        recordShape(part, name)
+        val data = part.optBlock("data") ?: part
+        recordShape(part, data)
+        val name = pickString(data, WIRE_NAME).orBlankFix(pickString(part, WIRE_NAME))
+            ?.takeIf { it.isNotBlank() }
         if (name == null) return null
-        val rawArgs = pickElement(part, WIRE_ARGS)
+        val rawArgs = pickElement(data, WIRE_ARGS) ?: pickElement(part, WIRE_ARGS)
+        val textState = pickString(data, WIRE_STATE) ?: pickString(part, WIRE_STATE)
+        val state = stateFor(data, textState)
+        val path = pickString(data, WIRE_PATH).orBlankFix(pickString(part, WIRE_PATH))
+            ?: pathFromArgs(rawArgs)
         return ToolActivity(
-            id = pickString(part, WIRE_ID) ?: "tool-$name-${part.hashCode()}",
+            id = (pickString(data, WIRE_ID).orBlankFix(pickString(part, WIRE_ID)))
+                ?: "tool-$name-${data.hashCode()}",
             name = name,
             args = prettify(rawArgs),
-            state = parseState(pickString(part, WIRE_STATE)),
-            output = truncate(pickString(part, WIRE_OUTPUT).orEmpty()),
-            description = pickString(part, WIRE_DESCRIPTION),
-            path = pickString(part, WIRE_PATH),
-            error = pickString(part, WIRE_ERROR)
+            state = state,
+            output = truncate((pickString(data, WIRE_OUTPUT).orBlankFix(pickString(part, WIRE_OUTPUT))).orEmpty()),
+            description = pickString(data, WIRE_DESCRIPTION).orBlankFix(pickString(part, WIRE_DESCRIPTION)),
+            path = path,
+            error = pickString(data, WIRE_ERROR).orBlankFix(pickString(part, WIRE_ERROR))
         )
+    }
+
+    /**
+     * Reads the part's `data` member as an object, or null.
+     *
+     * Must NOT use getAsJsonObject(): a present-but-null or present-but-scalar
+     * member must degrade to "no data object" (and then to the part itself),
+     * never throw. Same rule as CrushEvent's data() helper, which was added
+     * after `"data":null` crashed the app on malformed engine output.
+     */
+    private fun JsonObject.optBlock(key: String): JsonObject? {
+        val el = get(key) ?: return null
+        return if (el.isJsonNull || !el.isJsonObject) null else el.asJsonObject
+    }
+
+    /** `a ?: b` for Strings that skips blank firsts. */
+    private fun String?.orBlankFix(fallback: String?): String? =
+        if (!this.isNullOrBlank()) this else fallback
+
+    /**
+     * State resolution, evidence-pinned: the engine sends a `finished` boolean
+     * - a present `true` means COMPLETED, absent or `false` with a call id
+     * means the call is streaming (RUNNING). A legacy `state` string still maps
+     * through [parseState]. Anything else is UNKNOWN - never guessed COMPLETED.
+     */
+    private fun stateFor(data: JsonObject, textState: String?): ToolState {
+        val finished = data.get("finished")
+        if (finished != null && finished.isJsonPrimitive && finished.asBoolean) {
+            return ToolState.COMPLETED
+        }
+        val mapped = parseState(textState)
+        if (mapped != ToolState.UNKNOWN) return mapped
+        return if (data.has("id")) ToolState.RUNNING else ToolState.UNKNOWN
+    }
+
+    /**
+     * Mines the call arguments for the touched path: the engine puts
+     * `file_path` (et al.) INSIDE the `input` JSON string, not on the part.
+     * Parsing a machine's own argument string must never crash parsing.
+     */
+    private fun pathFromArgs(rawArgs: String?): String? {
+        if (rawArgs.isNullOrBlank()) return null
+        val o = runCatching { JsonParser.parseString(rawArgs) }.getOrNull() ?: return null
+        val obj = o.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        val raw = pickString(obj, listOf("file_path", "path"))
+        if (!raw.isNullOrBlank()) return raw
+        val params = obj.optBlock("params") ?: return null
+        return pickString(params, listOf("file_path", "path"))?.takeIf { it.isNotBlank() }
     }
 
     private val seenShapes = java.util.Collections.synchronizedSet(mutableSetOf<String>())
@@ -148,9 +217,18 @@ object ToolActivityParser {
     /** Test seam: cleared between cases so the log-once behaviour is testable. */
     internal fun resetShapeLog() = seenShapes.clear()
 
-    private fun recordShape(part: JsonObject, name: String?) {
-        val keys = part.keySet().sorted().joinToString(",")
-        val shape = "keys=[$keys] name=${name ?: "<none>"}"
+    /**
+     * Logs the observed envelope ONCE per distinct shape - both the part keys
+     * and the `data` sub-keys. Keys only, never values: argument values can
+     * contain file paths and command text, and a log is the wrong place for
+     * those. This is the seam that caught the data-vs-part mismatch, so it
+     * stays regardless of the names now being confirmed.
+     */
+    private fun recordShape(part: JsonObject, data: JsonObject) {
+        val dataKeys = if (data === part) "<none>" else data.keySet().sorted().joinToString(",")
+        val name = pickString(data, WIRE_NAME) ?: pickString(part, WIRE_NAME)
+        val shape = "keys=[${part.keySet().sorted().joinToString(",")}]" +
+            " data=[$dataKeys] name=${name ?: "<none>"}"
         // Log once per distinct key-set. Verbose per-frame logging of a shape
         // that arrives on every message frame would drown the log for no gain.
         if (seenShapes.add(shape)) {

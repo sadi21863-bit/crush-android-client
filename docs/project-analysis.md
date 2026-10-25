@@ -14,15 +14,15 @@ Architecture, the defects that shaped it, and what is left.
 |---|---|
 | Engine lifecycle (boot, health, restart, shutdown) | Solid; supervised, with thermal tuning |
 | Crush protocol client | Solid; HTTP order pinned by `MockWebServer` tests |
-| Model selection | Built and honest; **no callable model exists on the current key** |
+| Model selection | Built, honest, live-probed; verified against OpenRouter `:free` (Zen free tier withdrawn — §1a) |
 | Conversation continuity | Fixed and verified — was splitting every 2–3 messages |
 | Session management | Delete fixed; resume fixed; reuse now correct |
 | App lock | Fixed and verified; bypass removed and now covered |
 | Markdown | Implemented, streaming-safe, hand-rolled |
-| Tool-call visibility | Built; inner field names spec-confirmed, envelope not |
+| Tool-call visibility | Built; wire shape confirmed on the wire 2026-10-25 (D3 closed) - parser pinned by tests |
 | File diffs | Built and JVM-tested; wire path verified, no edited-file turn yet |
-| Security | Key encrypted; **engine API unauthenticated and cross-app reachable** |
-| Test coverage | 331 JVM tests; **no instrumentation suite** |
+| Security | Key encrypted; engine transport app-private UDS (cross-app reach closed); HTTP layer still unauthenticated |
+| Test coverage | 401 JVM tests; **no instrumentation suite** |
 
 ## 1a. The Zen free tier is gone (measured 2026-10-11)
 
@@ -136,7 +136,7 @@ carried forward.
 |---|---|---|
 | D1 | `deleteSession` treats transport failure as success, so a failed delete reappears | **Fixed** — `DeleteOutcome` (Failed → banner, local state untouched; Deleted/AlreadyGone → confirmed) + force-retry; pinned by `DeleteOutcomeTest` |
 | D2 | Engine API unauthenticated and reachable from another app's UID | **Closed by architecture** — UDS-only transport (2026-10-18): the engine binds `files/crush.sock` `srwx------`, so `connect()` requires the app UID. Evidence and limits in [`p1-attack-surface.md`](p1-attack-surface.md) §8 |
-| D3 | Tool-call field names unconfirmed against a real engine turn | **Open** — next on the §9 order |
+| D3 | Tool-call field names unconfirmed against a real engine turn | **Closed 2026-10-25 - captured on the wire (SSE + persisted messages, engine v0.98.1): part = {"type":"tool_call","data":{"id","name","input":<args-JSON-string>,"finished":<bool>}}; ToolActivityParser reads data first with the part as fallback, resolves state from the finished boolean (COMPLETED only when true), mines file_path from input; pinning tests added. Spin-off finding: in ASK mode engine v0.98.1 never broadcasts permission_request on any route - mutating tool turns hang until cancelled; see D12 |
 | D4 | `DynamicPolicy` hysteresis off by one — relaxes after 2 calm samples, not 3 | **Fixed** — caller passes `priorCalm` so `calmRun + 1` is not applied twice; pinned by `SupervisorHysteresisTest` |
 | D5 | `AppLog` rewrites the whole file on a 2s heartbeat and clears rather than rotating | **Fixed** — `rotateKeepingTail` keeps the newest half, archive gets the evicted head |
 | D6 | `AppLog` writes are unsynchronised across threads | **Fixed** — `writeLock`; size cached instead of stat'd per line |
@@ -145,6 +145,7 @@ carried forward.
 | D9 | First-launch lock bypass (no ciphertext yet, so no gate) | By design and documented — nothing at rest to protect |
 | D10 | `WorkspaceLease` and force-retry paths are now redundant dead scaffolding | **Closed as incorrect** — both live: `WorkspaceLease.isFresh` is the reattach heuristic (`WorkspaceManager`), force-retry runs on failed deletes (`ChatViewModel`) |
 | D11 | Bootstrap resolved the provider from the **in-memory mirror** (`currentPersistedProvider`) instead of the persisted settings it already awaited; a freshly recreated ViewModel could lose that race and configure the default `opencode-zen`, latching "no API key - add one in Settings" **silently** against an intact key | **Fixed** (2026-10-20, device-proven) — commit `9498a67`: provider resolved from the awaited DataStore emission; the three resolution helpers are suspend and await `first()`; the blank-key branch logs `provider=<id> storedCiphertext=<bool> providersWithKeys=…` before giving up. The silent branch was the debugging cost — **any "giving up" branch must log what it decided on** |
+| D12 | Engine v0.98.1 (UDS build) never broadcasts `permission_request` on the workspace events stream - captured live: a tool turn blocked in the ask step published NOTHING (message frames stop after `tool_call finished:true`; session events route 404s). Consequence: in ASK mode a mutating tool turn hangs forever with no UI prompt; the app's 180s stream timeout then shows "no reply received" (D3 spin-off, 2026-10-25). App request-handling (PERMISSION_REQUEST branch + grant POST) stays correct and ready; upstream crush fix required. ANY tool-screen UX that claims a permission prompt works today must not be trusted until the engine publishes asks | **Open** - upstream; app-side watchdog candidate |
 
 ## 6. Capability gaps
 
@@ -154,7 +155,7 @@ Ordered by how much each matters for a coding agent. Detail in
 1. **File diffs** — the agent writes files invisibly.
 2. **Tool-call timeline** — summary per message, not a live view.
 3. **Per-turn cost display**.
-4. **Verify a second provider** — 13 provider ids are offered and the plumbing works, but only `opencode-zen` has completed a handshake. `hyper` (Charm Hyper, 100 credits/month free, no 402/403 plan gate) or `openrouter` with a `:free` model is the obvious candidate, since Zen's own free tier is withdrawn. See [providers.md](providers.md).
+4. **Verify a third provider** — `opencode-zen` and `openrouter` are verified end to end (OpenRouter since 2026-10-17, including the model-probe fallback order); `groq` is probe-verified but parked (8K TPM). Next candidates: `hyper` (device-code flow, no OAuth plumbing needed) or `gemini`. See [providers.md](providers.md).
 5. **Multi-project** — one app-private workspace.
 6. **Instrumentation tests**.
 7. **Remote crash reporting** — in-app export only.
@@ -192,11 +193,19 @@ confirmed; command execution is not.
 
 ## 9. Recommended order
 
-1. **Rotate the exposed key** and clear the stale value from engine state.
-2. **Settle D3** — one real tool-using turn confirms or corrects the field names.
-3. **Fix D1** — delete must not report success on transport failure.
-4. **File diffs** — the largest remaining user-visible gap.
-5. **Instrumentation tests** for the lock gate, so the auth bypass cannot return.
-6. **D10** — delete the lease scaffolding once the connection is trusted.
-7. **D2** — decide whether to ship with the unauthenticated engine API, and
-   document the decision either way.
+Re-baselined 2026-10-20 after the D-table audit: D1 was already fixed, D10 the
+"remove the scaffolding" instruction was closed as incorrect (the lease is the
+live fallback path), and D2 was resolved by the UDS pivot — so the original
+items 3, 6, 7 drop out. The exposed **Groq** key was rotated by the user
+(2026-10-25); groq stays parked as a test target.
+
+1. **Field-evidence follow-ups** - D12 permission events (upstream crush fix),
+   the file-diff "1 unreadable" miss seen on the auto-approve turn, and
+   finish-error bubbles rendering empty in history view.
+2. **File diffs** - the largest remaining user-visible gap.
+3. **Instrumentation tests** for the lock gate, so the auth bypass cannot
+   return.
+4. **Release gate**: signed release only, debug non-shareable; then a real
+   edited-file diff turn and a permission-mode walkthrough before distribution.
+
+

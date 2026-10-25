@@ -23,7 +23,7 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 | Markdown rendering | ✅ verified — code blocks, inline code, emphasis, lists |
 | Live model discovery with probing | ✅ verified — never hardcoded |
 | Long-lived workspace SSE | ✅ verified — no ~30s reap between turns |
-| Tool-call visibility | ✅ built — fields parsed through candidate name lists; the logged observed shapes await a real tool-using turn to pin the wire format |
+| Tool-call visibility | ✅ built — wire format CONFIRMED 2026-10-25 (D3): tool_call parts carry data {id, name, input (args as a JSON string), finished (bool)}; parser reads data first, pinned by unit tests |
 | File diffs | ✅ built and JVM-tested — on device, verified only for a turn that tracked zero files; untested on a real edit |
 | Permission prompts (ask / always / never) | ⚠️ implemented, not device-tested |
 | In-app diagnostics + crash reports | ⚠️ implemented, not device-tested |
@@ -201,13 +201,19 @@ App-side mitigations:
 
 ## Known issues
 
-- **Tool-call wire format is unconfirmed on the chat stream.** The spec DOES
-  define the fields (`tool_name`, `tool_call_id`, `params`, `path`,
-  `description`, `action`) — but in the **permission-grant** payload schema,
-  not in the SSE part envelope the client actually parses. The parser reads
-  each field through candidate name lists and degrades to `null` rather than
-  guessing, and logs the keys it observes on every distinct shape, so the list
-  can be tightened the first time a real tool-using turn is captured (D3).
+- **ASK-mode tool turns hang: the engine never publishes permission asks (D12).**
+  Captured live 2026-10-25 on engine v0.98.1: a tool turn waiting for approval
+  published nothing on the events stream, and the session events route is a
+  404. The app's ask handler is wired and correct, but no event ever reaches
+  it, so a mutating tool turn in ASK mode stalls until the 180s stream timeout
+  shows "no reply received". Workaround: AUTO mode runs mutating tools end to
+  end (proven). Upstream crush fix required; see docs/project-analysis.md D12.
+- **Tool-call wire format — CONFIRMED (D3, 2026-10-25).** `tool_call` parts
+  arrive as `{"type":"tool_call","data":{"id","name","input","finished"}}`,
+  where `input` is the tool arguments as a JSON string and `finished` is a
+  boolean (absent while streaming). The parser reads `data` first, claims
+  COMPLETED only on `finished:true`, and mines `file_path` from `input`; unit
+  tests pin the captured shapes. See docs/capabilities.md.
 - **Engine API has no HTTP-level authentication.** See [Security](#security).
   Not fixable in the app layer: the engine offers no auth to enable. The
   transport, however, is now a kernel-enforced app-private Unix-domain socket,

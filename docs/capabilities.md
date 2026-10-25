@@ -31,7 +31,7 @@ surfaced on a phone.
 
 | Capability | Notes |
 |---|---|
-| Tool-call visibility | Collapsed rows with name, state, arguments, output. **Wire format unconfirmed** — see below |
+| Tool-call visibility | Collapsed rows with name, state, arguments, output. **Wire format CONFIRMED 2026-10-25 (D3 closed)** — see below |
 | Markdown rendering | Hand-rolled, streaming-safe. Fenced code, inline code, headings, lists, quotes, rules, emphasis, links |
 | In-app diagnostics | Device/ABI/engine status, archived crash, log tail, copy/share report |
 | Settings | Key replace/delete, permission mode, diagnostics entry point |
@@ -56,24 +56,30 @@ These are the real gaps, ordered by how much they matter for a coding agent.
 
 Open issues that are implemented-but-wrong, distinct from the gaps above.
 
-### Tool-call wire format is unconfirmed
+### Tool-call wire format - CONFIRMED (D3, 2026-10-25)
 
-The engine emits `tool_call` parts and the client parses them, but the exact
-field names were never read off a real tool-using turn. The only fixture
-available was `{"name":"read"}`. Note the spec **does** declare similar fields
-(`tool_name`, `tool_call_id`, `params`, `path`, `description`, `action`) — but
-inside the permission-grant payload schema, not the SSE part envelope, so it
-describes a different message than the one the parser sees.
+A real tool-using turn was captured two ways: raw SSE frames and the persisted
+messages endpoint. Both agree:
 
-`ToolActivityParser` therefore reads each field through a list of candidate wire
-names (`WIRE_NAME = ["name", "tool", "tool_name", "toolName"]`, and similarly
-for arguments, state, output, error) and returns `null` when none match. A
-`runCatching`-guarded log records the **key names** the engine actually sends,
-once per distinct shape, so the list can be corrected without guessing again.
+- part envelope: `{"type":"tool_call","data":{...}}`
+- data keys: `id` (engine call id), `name` (write/bash/...), `input` (the tool
+  arguments as a JSON STRING), `finished` (boolean, absent on streaming frames)
+- tool results arrive as sibling `tool_result` parts carrying
+  `{tool_call_id, name, content, metadata (JSON string with diff/additions/removals), is_error}`
 
-An unrecognised state maps to `UNKNOWN`, never `COMPLETED`. Claiming a tool
-finished when it may not have is the same class of lie as reporting a Stop that
-never happened.
+ToolActivityParser reads data first (the part is the fallback), resolves
+state from the `finished` boolean - COMPLETED only on `finished:true`, RUNNING
+for a call id without it - and mines `file_path` out of the `input` JSON so the
+row names the touched file. Unknown field shapes still degrade to the row
+showing the tool name alone, and the runCatching-guarded key logging (now
+covering both the part and its data keys) stays in place to catch engine drift.
+
+**Related finding (live-captured):** in ASK mode the engine v0.98.1 never
+broadcasts `permission_request` on the events stream - a tool turn blocked in
+the ask step published nothing (session events route 404s too). Until the
+engine publishes asks upstream, ASK-mode mutating turns hang and the app
+times out to "no reply received"; see D12 in project-analysis.md. AUTO-approve
+turns run tools end to end and stream a complete turn (proven 2026-10-20).
 
 ### Delete treating transport failure as success — FIXED
 

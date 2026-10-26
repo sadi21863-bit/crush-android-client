@@ -52,6 +52,45 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.UUID
 
+/**
+ * Converts one persisted engine message into its history-replay row, or null.
+ *
+ * The standalone-day audit (2026-10-25) exposed the cost of dropping rows too
+ * eagerly: provider-failure turns persist as an assistant message whose only
+ * part is a `finish` with reason "error" (real example: `dial tcp: lookup
+ * openrouter.ai ... connection refused` after a DNS outage). The live bubble
+ * showed the failure, but the replay dropped the row, so every failed turn
+ * rendered as NOTHING after a reopen - the user's "the app sometimes doesn't
+ * work". Failed turns must stay visible: rows carrying a finish-error are kept
+ * with the error text even when they have no other content.
+ *
+ * Assistant messages with NO parts at all stay dropped. Wire truth: those are
+ * mid-stream snapshots that an abrupt stop/loss persisted (`"parts":[]`, from
+ * the same audit); they carry no error and no content to attribute. The live
+ * path already surfaces "no reply received" for such turns, and fabricating a
+ * row from an empty message would invent history. Tool activity is replayed
+ * too: a reopened chat that showed the answer but hid the fact the agent read
+ * six files would misrepresent what happened.
+ */
+internal fun replayRow(m: StreamMessage): ChatMessage? {
+    val text = m.text
+    val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
+    val error = m.finishError
+    return when {
+        m.role == "user" && text.isNotBlank() ->
+            ChatMessage(id = "h-u-${m.id}", role = "user", text = text)
+        m.role == "assistant" && (text.isNotBlank() || tools.isNotEmpty() || error != null) ->
+            ChatMessage(
+                id = "h-a-${m.id}",
+                role = "assistant",
+                text = text,
+                tools = tools,
+                error = error
+            )
+        else -> null
+    }
+}
+
 data class ChatMessage(
     val id: String,
     val role: String,
@@ -1011,29 +1050,11 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 .onFailure { AppLog.w(TAG, "history failed: ${it.message}") }
                 .getOrDefault(emptyList())
 
-            val replayed = history.mapNotNull { m ->
-                val text = m.text
-                // Tool activity is replayed too. A reopened chat that showed the
-                // answer but hid the fact that the agent read six files to
-                // produce it would misrepresent what happened.
-                val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
-                // Skip empty assistant placeholders; they are mid-stream rows,
-                // not something the user ever saw. An assistant turn that ONLY
-                // used tools is kept - dropping it would erase the trace of the
-                // work entirely.
-                when {
-                    m.role == "user" && text.isNotBlank() ->
-                        ChatMessage(id = "h-u-${m.id}", role = "user", text = text)
-                    m.role == "assistant" && (text.isNotBlank() || tools.isNotEmpty()) ->
-                        ChatMessage(
-                            id = "h-a-${m.id}",
-                            role = "assistant",
-                            text = text,
-                            tools = tools
-                        )
-                    else -> null
-                }
-            }
+            // Replay through the one seam that decides what a row is worth
+            // keeping: tool activity is replayed too, finish-error rows are
+            // preserved (the audit's invisible failed turns - see [replayRow]),
+            // and mid-stream empty snapshots stay dropped.
+            val replayed = history.mapNotNull { m -> replayRow(m) }
 
             wsId = ws
             // Fully qualified: inside launch{} a bare `this` is the

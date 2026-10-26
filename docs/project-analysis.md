@@ -138,14 +138,15 @@ carried forward.
 | D2 | Engine API unauthenticated and reachable from another app's UID | **Closed by architecture** — UDS-only transport (2026-10-18): the engine binds `files/crush.sock` `srwx------`, so `connect()` requires the app UID. Evidence and limits in [`p1-attack-surface.md`](p1-attack-surface.md) §8 |
 | D3 | Tool-call field names unconfirmed against a real engine turn | **Closed 2026-10-25 - captured on the wire (SSE + persisted messages, engine v0.98.1): part = {"type":"tool_call","data":{"id","name","input":<args-JSON-string>,"finished":<bool>}}; ToolActivityParser reads data first with the part as fallback, resolves state from the finished boolean (COMPLETED only when true), mines file_path from input; pinning tests added. Spin-off finding: in ASK mode engine v0.98.1 never broadcasts permission_request on any route - mutating tool turns hang until cancelled; see D12 |
 | D4 | `DynamicPolicy` hysteresis off by one — relaxes after 2 calm samples, not 3 | **Fixed** — caller passes `priorCalm` so `calmRun + 1` is not applied twice; pinned by `SupervisorHysteresisTest` |
-| D5 | `AppLog` rewrites the whole file on a 2s heartbeat and clears rather than rotating | **Fixed** — `rotateKeepingTail` keeps the newest half, archive gets the evicted head |
+| D5 | `AppLog` rewrites the whole file on a 2s heartbeat and clears rather than rotating | **Fixed** — `rotateKeepingTail` keeps the newest half, archive gets the evicted head. **Upgraded 2026-10-25:** the standalone-usage audit showed only 2 files ever survived (init roll deleted `app-prev.log`; mid-run rotation deleted it again to store an evicted head), erasing the Oct-23 standalone evidence. Evicted heads + each run's roll now append to dated `app-archive-<day>.log` files retained **30 days** (pruned past retention + at a 20MB total cap, oldest first); pinned by `RetentionPruneTest` |
 | D6 | `AppLog` writes are unsynchronised across threads | **Fixed** — `writeLock`; size cached instead of stat'd per line |
 | D7 | `CrushEngine.readPid` casts `Process.pid()` (a `Long`) to `Int`; the cast fails and diagnostics see `-1` | **Fixed** — `pidFromReflective` (`as? Number`, range-guarded), top-level for direct testing |
 | D8 | `EnginePaths.logFile()` points at a path Crush may no longer write | **Fixed** — `newestEngineLog` picks the newest `crush.log` by mtime (5 JVM tests) |
 | D9 | First-launch lock bypass (no ciphertext yet, so no gate) | By design and documented — nothing at rest to protect |
 | D10 | `WorkspaceLease` and force-retry paths are now redundant dead scaffolding | **Closed as incorrect** — both live: `WorkspaceLease.isFresh` is the reattach heuristic (`WorkspaceManager`), force-retry runs on failed deletes (`ChatViewModel`) |
 | D11 | Bootstrap resolved the provider from the **in-memory mirror** (`currentPersistedProvider`) instead of the persisted settings it already awaited; a freshly recreated ViewModel could lose that race and configure the default `opencode-zen`, latching "no API key - add one in Settings" **silently** against an intact key | **Fixed** (2026-10-20, device-proven) — commit `9498a67`: provider resolved from the awaited DataStore emission; the three resolution helpers are suspend and await `first()`; the blank-key branch logs `provider=<id> storedCiphertext=<bool> providersWithKeys=…` before giving up. The silent branch was the debugging cost — **any "giving up" branch must log what it decided on** |
-| D12 | Engine v0.98.1 (UDS build) never broadcasts `permission_request` on the workspace events stream - captured live: a tool turn blocked in the ask step published NOTHING (message frames stop after `tool_call finished:true`; session events route 404s). Consequence: in ASK mode a mutating tool turn hangs forever with no UI prompt; the app's 180s stream timeout then shows "no reply received" (D3 spin-off, 2026-10-25). App request-handling (PERMISSION_REQUEST branch + grant POST) stays correct and ready; upstream crush fix required. ANY tool-screen UX that claims a permission prompt works today must not be trusted until the engine publishes asks | **Open** - upstream; app-side watchdog candidate |
+| D12 | Engine v0.98.1 (UDS build) never broadcasts `permission_request` on the workspace events stream - captured live: a tool turn blocked in the ask step published NOTHING (message frames stop after `tool_call finished:true`; session events route 404s). Consequence: in ASK mode a mutating tool turn hangs forever with no UI prompt; the app's 180s stream timeout then shows "no reply received" (D3 spin-off, 2026-10-25). App request-handling (PERMISSION_REQUEST branch + grant POST) stays correct and ready; upstream crush fix required. ANY tool-screen UX that claims a permission prompt works today must not be trusted until the engine publishes asks | **Open** - **path closed upstream**: crush v0.98.2 (2026-10-23) adds session-scoped `permission_request` delivery + pending-prompt republish, zero DB migrations in range; app must additionally POST `current-session?client_id=<UUID>` on session open. Evidence: [`ecosystem-research-2026-10-25.md`](ecosystem-research-2026-10-25.md) §1 |
+| D13 | Failed turns rendered as NOTHING in history: the replay mapper dropped assistant rows without text or tools, but provider-failure turns persist as messages whose only part is a `finish` with reason "error" (standalone-usage wire evidence 2026-10-25: `dial tcp: lookup openrouter.ai ... connection refused` after a DNS outage). Every failed standalone turn vanished on reopen - the user-visible face of "the app sometimes doesn't work" | **Fixed** 2026-10-25 - replay keeps rows carrying a finish-error and the existing bubble renders the error text; degenerate `parts:[]` rows stay dropped deliberately (no invented history). Extracted as `replayRow`; pinned by `ChatHistoryReplayTest`. Follow-up from research: a typed error card with Retry (cline `ErrorRow` shape) remains open |
 
 ## 6. Capability gaps
 
@@ -199,13 +200,23 @@ live fallback path), and D2 was resolved by the UDS pivot — so the original
 items 3, 6, 7 drop out. The exposed **Groq** key was rotated by the user
 (2026-10-25); groq stays parked as a test target.
 
-1. **Field-evidence follow-ups** - D12 permission events (upstream crush fix),
-   the file-diff "1 unreadable" miss seen on the auto-approve turn, and
-   finish-error bubbles rendering empty in history view.
-2. **File diffs** - the largest remaining user-visible gap.
-3. **Instrumentation tests** for the lock gate, so the auth bypass cannot
+1. **Upgrade the engine to v0.98.2** - closes D12 outright (session-scoped
+   permission/question prompt delivery, fail-open for clients that never
+   report a session, republish of pending prompts, zero DB migrations);
+   app-side needs `POST /v1/workspaces/{id}/current-session?client_id=<UUID>`
+   on session open. Evidence and re-test matrix:
+   [`ecosystem-research-2026-10-25.md`](ecosystem-research-2026-10-25.md) §1.
+2. **Verify a real file-diff turn on device** - the diff feature is built and
+   JVM-tested but was only ever exercised on a turn that tracked zero files;
+   the engine already ships `metadata{diff,additions,removals}` per
+   `tool_result` (research §3/§8). Also chase the "1 unreadable" miss seen on
+   the auto-approve turn.
+3. **File diffs** - the largest remaining user-visible gap.
+4. **Instrumentation tests** for the lock gate, so the auth bypass cannot
    return.
-4. **Release gate**: signed release only, debug non-shareable; then a real
-   edited-file diff turn and a permission-mode walkthrough before distribution.
+5. **Release gate**: signed release only, debug non-shareable; then a real
+   edited-file diff turn and a permission-mode walkthrough before
+   distribution. Review the FSL-1.1-MIT license posture for any public
+   release (research §1 - crush is NOT plain MIT).
 
 

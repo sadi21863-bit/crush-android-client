@@ -1,6 +1,7 @@
 package com.crush.mobile.util
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -101,14 +102,24 @@ class RotateKeepingTailTest {
     }
 
     @Test
-    fun `an existing archive is replaced, not appended to`() {
-        val f = tmp.newFile()
-        val archive = tmp.newFile("archive.log")
-        archive.writeText("stale content that must not survive\n")
-        writeLines(f, 100)
-        rotateKeepingTail(f, archive, "entry", budget())
+    fun `a second rotation the same day appends and erases nothing`() {
+        // The archive sink is a DATED DAY FILE that several rotations and runs
+        // contribute to. The first cut of the retention design re-used the
+        // delete-then-write scratch-buffer semantics and would have erased
+        // every earlier entry of the day.
+        val f = File(tmp.root, "run.log")
+        val archive = File(tmp.root, "app-archive-2026-10-25.log")
 
-        assertTrue("archive must be replaced", !archive.readText().contains("stale content"))
+        f.writeText((1..100).joinToString("\n", postfix = "\n") { "A-%04d".format(it) })
+        rotateKeepingTail(f, archive, "A-NEWEST", budget())
+
+        f.writeText((1..100).joinToString("\n", postfix = "\n") { "B-%04d".format(it) })
+        rotateKeepingTail(f, archive, "B-NEWEST", budget())
+
+        val archived = archive.readText()
+        assertTrue("first rotation's head must survive", archived.contains("A-0001"))
+        assertTrue("second rotation's head must survive", archived.contains("B-0001"))
+        assertTrue("live log must not duplicate the archived head", !f.readText().contains("A-0001"))
     }
 
     @Test
@@ -154,5 +165,92 @@ class RotateKeepingTailTest {
         val huge = "E/EngineSession: " + "z".repeat(500)
         val text = rotateKeepingTail(f, null, huge, budget())
         assertTrue("an oversized entry must not be dropped", text.contains(huge))
+    }
+}
+
+/**
+ * Archive retention (2026-10-25).
+ *
+ * WHY: the user tests this app standalone, then asks what happened days later.
+ * Before this, only `app.log` + one overwriteable `app-prev.log` ever existed -
+ * the Oct-23 standalone evidence was erased from disk before it could be
+ * audited. Dated `app-archive-<day>.log` files must accumulate and be deleted
+ * only when they expire (30 days) or push the total past the storage cap.
+ */
+class RetentionPruneTest {
+
+    @get:Rule
+    val tmp = TemporaryFolder()
+
+    /** Fixed epoch: timestamps must never come from the wall clock in a test. */
+    private val now = 1_800_000_000_000L
+    private val day = 24L * 60 * 60 * 1000
+
+    private fun mk(name: String, ageMs: Long, bytes: Int = 100): File {
+        val f = File(tmp.root, name)
+        f.writeText("x".repeat(bytes))
+        f.setLastModified(now - ageMs)
+        return f
+    }
+
+    @Test
+    fun `archives past the retention window are deleted`() {
+        val old = mk("app-archive-2026-09-20.log", ageMs = 31 * day)
+        val fresh = mk("app-archive-2026-10-24.log", ageMs = 1 * day)
+
+        val deleted = pruneArchives(tmp.root, now, retentionMs = 30 * day, capBytes = 1 shl 30)
+
+        assertEquals(1, deleted)
+        assertFalse("expired archive must go", old.exists())
+        assertTrue("recent archive must stay", fresh.exists())
+    }
+
+    @Test
+    fun `an archive exactly at the boundary is kept`() {
+        // `age > retentionMs` is the rule: something stored 30 full days ago is
+        // not older than 30 days, so deleting it early would be off-by-one
+        // against the promise made to the user.
+        val boundary = mk("app-archive-2026-09-25.log", ageMs = 30 * day)
+        pruneArchives(tmp.root, now, retentionMs = 30 * day, capBytes = 1 shl 30)
+        assertTrue(boundary.exists())
+    }
+
+    @Test
+    fun `the size cap evicts the oldest first`() {
+        val oldest = mk("app-archive-2026-10-01.log", ageMs = 2 * day, bytes = 1000)
+        val middle = mk("app-archive-2026-10-02.log", ageMs = 1 * day, bytes = 1000)
+        val newest = mk("app-archive-2026-10-03.log", ageMs = 12 * 60 * 60 * 1000L, bytes = 1000)
+
+        pruneArchives(tmp.root, now, retentionMs = 30 * day, capBytes = 2500)
+
+        assertTrue("oldest must be evicted first", !oldest.exists())
+        assertTrue("middle must survive a cap of 2500 for 1000+1000 remaining", middle.exists())
+        assertTrue("newest must survive", newest.exists())
+    }
+
+    @Test
+    fun `files that are not dated archives are never touched`() {
+        // app.log itself may carry an old mtime (the file survives runs).
+        val decoy = mk("app.log", ageMs = 60 * day)
+        val engineState = mk("crush-state.bin", ageMs = 60 * day)
+
+        assertEquals(0, pruneArchives(tmp.root, now, 30 * day, 1 shl 30))
+
+        assertTrue(decoy.exists())
+        assertTrue(engineState.exists())
+    }
+
+    @Test
+    fun `a missing directory is not a crash`() {
+        val missing = File(tmp.root, "nope")
+        assertEquals(0, pruneArchives(missing, now, 30 * day, 1 shl 30))
+    }
+
+    @Test
+    fun `archive names sort chronologically because they are date-stamped`() {
+        val a = archiveFileName(1_799_000_000_000L)
+        val b = archiveFileName(1_800_000_000_000L)
+        assertTrue(a.matches(Regex("app-archive-\\d{4}-\\d{2}-\\d{2}\\.log")))
+        assertTrue("same-zone day strings must order with time", b >= a)
     }
 }

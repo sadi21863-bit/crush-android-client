@@ -175,8 +175,32 @@ class WorkspaceSnapshotter(
     private fun looksBinary(f: File): Boolean {
         if (f.length() == 0L) return false
         return runCatching {
-            val bytes = f.inputStream().use { it.readNBytes(512) }
-            bytes.any { it == 0.toByte() }
+            // NO readNBytes/readAllBytes here: both are Java 11 APIs that
+            // android.jar exposes at API 33+, so on an API 29 device every
+            // call throws NoSuchMethodError - which the runCatching below
+            // happily swallowed as getOrDefault(true), marking EVERY file
+            // binary. Device evidence (2026-10-29 z6 probe):
+            // snapKeys=[] snapTruncated=[everything] on a 3-file 11+5+4 byte
+            // workspace, and every pre-existing tracked file rendered
+            // "unreadable". Manual fill with the API-1 InputStream.read onto
+            // a buffer is the same 512-byte NUL probe, portable to minSdk.
+            val buf = ByteArray(512)
+            var n = 0
+            f.inputStream().use { s ->
+                while (n < buf.size) {
+                    val r = s.read(buf, n, buf.size - n)
+                    if (r < 0) break
+                    n += r
+                }
+            }
+            var sawNul = false
+            for (i in 0 until n) {
+                if (buf[i] == 0.toByte()) {
+                    sawNul = true
+                    break
+                }
+            }
+            sawNul
         }.getOrDefault(true)
     }
 

@@ -181,11 +181,24 @@ class FileChangeCollector(
             (rel.length >= 2 && rel[1] == ':')
         if (!isAbsolute) return rel
 
+        // The roots list carries BOTH spellings and BOTH app-data aliases,
+        // because canonicalFile does not always cross the /data/data <->
+        // /data/user/0 alias on-device, and the engine records absolute paths
+        // in whatever spelling the model chose to write in its tool call.
+        fun aliases(p: String): List<String> {
+            if (p.startsWith("/data/user/0/")) {
+                return listOf(p, "/data/data/" + p.removePrefix("/data/user/0/"))
+            }
+            if (p.startsWith("/data/data/")) {
+                return listOf(p, "/data/user/0/" + p.removePrefix("/data/data/"))
+            }
+            return listOf(p)
+        }
         val roots = buildList {
-            add(workspace.invariantSeparatorsPath)
+            aliases(workspace.invariantSeparatorsPath).forEach(::add)
             runCatching { workspace.canonicalFile.invariantSeparatorsPath }
                 .getOrNull()
-                ?.let { add(it) }
+                ?.let { aliases(it).forEach(::add) }
         }.distinct()
         for (root in roots) {
             // The workspace itself is not a diffable file: refusing keeps the

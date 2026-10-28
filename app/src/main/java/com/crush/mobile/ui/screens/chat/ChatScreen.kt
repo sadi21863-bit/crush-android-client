@@ -28,6 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -310,6 +314,42 @@ bottomBar = {
         )
     }
 
+    // Question gate (analysis §4 P0-3). In ask-flows the engine BLOCKS the run
+    // on a question batch until it is answered or cancelled; without a dialog
+    // the turn hangs invisibly until the idle timeout cancels it - the same
+    // failure class the permission dialog fixed. This build cannot answer with
+    // real option choices yet (see resolveQuestion), so both actions release
+    // the run by cancelling the batch; the dialog says so instead of implying
+    // an answer was sent.
+    s.pendingQuestion?.let { q ->
+        AlertDialog(
+            onDismissRequest = { vm.resolveQuestion() },
+            icon = { Icon(Icons.Default.Info, contentDescription = null) },
+            title = {
+                Text(q.displayTitle().ifBlank { "The agent has a question" })
+            },
+            text = {
+                Column {
+                    Text(
+                        "This build can show the question but not pick an answer yet. " +
+                            "Denying or dismissing cancels the question and lets the " +
+                            "run continue without one."
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.resolveQuestion() }) {
+                    Text("Deny")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.resolveQuestion() }) {
+                    Text("Dismiss")
+                }
+            }
+        )
+    }
+
     if (showSessions) {
         SessionSheet(
             sessions = s.sessions,
@@ -482,7 +522,13 @@ private fun FileDiffRow(diff: FileDiff) {
         Column {
             Row(
                 modifier = Modifier
-                    .clickable { expanded = !expanded }
+                    // Role.Button + a spoken state (analysis §4 P2): a tap-only
+                    // row otherwise reads as plain text to TalkBack, with no
+                    // affordance and no hint that tapping reveals the diff.
+                    .clickable(role = Role.Button) { expanded = !expanded }
+                    .semantics {
+                        stateDescription = if (expanded) "expanded" else "collapsed"
+                    }
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -589,7 +635,12 @@ private fun ToolRow(tool: ToolActivity) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded }
+                    // Role.Button + spoken state (analysis §4 P2): same rule as
+                    // the diff rows - tap targets must not read as flat text.
+                    .clickable(role = Role.Button) { expanded = !expanded }
+                    .semantics {
+                        stateDescription = if (expanded) "expanded" else "collapsed"
+                    }
                     .padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -600,7 +651,16 @@ private fun ToolRow(tool: ToolActivity) {
                         ToolState.RUNNING -> Icons.Default.Refresh
                         else -> Icons.Default.Info
                     },
-                    contentDescription = tool.state.name,
+                    // A human phrase, not implementation vocabulary (analysis
+                    // §4 P2): an enum name like "COMPLETED" is read aloud
+                    // letter-caps and describes the class, not the status.
+                    contentDescription = when (tool.state) {
+                        ToolState.FAILED -> "failed"
+                        ToolState.COMPLETED -> "completed"
+                        ToolState.RUNNING -> "running"
+                        ToolState.PENDING -> "pending"
+                        ToolState.UNKNOWN -> "status unknown"
+                    },
                     tint = tint,
                     modifier = Modifier.size(15.dp)
                 )
@@ -816,8 +876,13 @@ private fun SessionSheet(
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
                     items(sessions, key = { it.id }) { sess ->
                         val active = sess.id == activeId
+                        // Non-clickable Surface (analysis §4 P2): this used to
+                        // be Surface(onClick = {}) - a focusable row that did
+                        // NOTHING except present a second, dead tap target next
+                        // to the row's real clickable region and its delete
+                        // button. The color-carrying wrapper has no behaviour
+                        // of its own, so it must not pretend otherwise.
                         Surface(
-                            onClick = { },
                             color = if (active) MaterialTheme.colorScheme.secondaryContainer
                             else MaterialTheme.colorScheme.surface,
                             modifier = Modifier.fillMaxWidth()
@@ -915,7 +980,21 @@ private fun ModelSheet(
                         )
                     }
                     if (m.isFree) {
-                        AssistChip(onClick = { }, label = { Text("FREE") })
+                        // Non-interactive badge (analysis §4 P2): the AssistChip
+                        // was focusable and tappable while doing nothing, so a
+                        // screen reader announced a fake actionless row. A
+                        // labelled Text carries the same information without
+                        // inventing a behaviour, and it gets an explicit
+                        // contentDescription because "FREE" alone announces
+                        // poorly out of context.
+                        Text(
+                            "FREE",
+                            modifier = Modifier.semantics {
+                                contentDescription = "Free model"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }

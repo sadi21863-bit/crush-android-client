@@ -26,8 +26,17 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+/**
+ * Hard cap on how many lines one code block may lay out (analysis §4 P0-1).
+ * An unbounded fence from a runaway or adversarial reply is a layout storm:
+ * text measurement grows with the line count and a long fence can pin the
+ * streaming UI for seconds per frame. Far above anything a real reply needs.
+ */
+private const val CODE_MAX_LINES = 200
 
 /**
  * Renders assistant text as Markdown.
@@ -120,6 +129,13 @@ fun MarkdownText(
 @Composable
 private fun CodeBlock(block: MdBlock.Code) {
     val bg = MaterialTheme.colorScheme.surfaceVariant
+    // take(CODE_MAX_LINES) trims the CONTENT; the appended marker says so,
+    // because silently dropped code looks like the code simply ended.
+    val lines = if (block.lines.size > CODE_MAX_LINES) {
+        block.lines.take(CODE_MAX_LINES) + "… (truncated)"
+    } else {
+        block.lines
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -137,12 +153,18 @@ private fun CodeBlock(block: MdBlock.Code) {
         }
         // Horizontal scroll, not wrap: re-flowed code is not the code that was
         // written, and on a narrow phone wrap makes it unreadable.
+        //
+        // maxLines + ellipsis is the belt to take()'s braces (analysis §4
+        // P0-1): it bounds measurement even for a single code line of
+        // pathological length, instead of letting one Text inflate layout.
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             Text(
-                text = block.lines.joinToString("\n"),
+                text = lines.joinToString("\n"),
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = CODE_MAX_LINES,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

@@ -145,11 +145,67 @@ object MarkdownParser {
      * resolved with a single left-to-right pass because nested emphasis inside
      * streamed text is rare enough that a full parser would add failure modes
      * (and infinite loops on unbalanced markers) for little gain.
+     *
+     * SCAN BUDGET (recomposition-storm hardening, analysis §4 P0-1)
+     *
+     * Every marker handler runs indexOf scans whose cost is the distance from
+     * the marker to the next marker of the same kind - for an UNTERMINATED
+     * marker that distance is "the rest of the string". A reply flooded with
+     * such markers costs O(len²) character comparisons PER STREAMING FRAME,
+     * which showed up as a frozen bubble rather than an error.
+     *
+     * The budget below charges cumulative distance ONLY for scans that FAILED
+     * (found no closer): a successful scan's cost is bounded by the text it
+     * consumes, which is paid once and linearly over a block. Once one block's
+     * failed scans have walked more than ~64KB in total, inline markup is given
+     * up for the remainder of that block (a plain [MdInline.Text] run) - the
+     * same bail-out spirit as the app's other dose/response guards: degraded
+     * to plain text beats unbounded work. Healthy replies never trigger it,
+     * because prose has no unpaired markers walking millions of characters.
      */
-    fun parseInline(src: String): List<MdInline> {
+    fun parseInline(src: String): List<MdInline> = parseInline(src, ScanBudget())
+
+    /** Cumulative failed-scan charge for ONE block (see the doc on [parseInline]). */
+    private class ScanBudget {
+        var used: Int = 0
+            private set
+
+        fun charge(cost: Int) {
+            used += cost
+        }
+
+        val exhausted: Boolean get() = used > INLINE_SCAN_BUDGET_CHARS
+    }
+
+    /**
+     * ~64KB of walked text per block, in line with the app's response/dose
+     * caps. A real streaming frame is at most tens of KB, so only adversarial
+     * or engine-malfunctioning output gets close.
+     */
+    private const val INLINE_SCAN_BUDGET_CHARS = 64 * 1024
+
+    private fun parseInline(src: String, budget: ScanBudget): List<MdInline> {
         val out = mutableListOf<MdInline>()
         val buf = StringBuilder()
         var i = 0
+
+        /**
+         * indexOf(char) that reports the WALK to the budget when the scan
+         * fails and would otherwise cost the whole tail. Clamp for the
+         * from-beyond-the-end case, where indexOf scans nothing.
+         */
+        fun scanChar(from: Int, ch: Char): Int {
+            val idx = src.indexOf(ch, from)
+            if (idx < 0) budget.charge((src.length - from).coerceAtLeast(0))
+            return idx
+        }
+
+        /** Two-char needle variant of [scanChar] (used for `**`). */
+        fun scanSeq(from: Int, needle: String): Int {
+            val idx = src.indexOf(needle, from)
+            if (idx < 0) budget.charge((src.length - from).coerceAtLeast(0))
+            return idx
+        }
 
         fun flush() {
             if (buf.isNotEmpty()) {
@@ -159,6 +215,15 @@ object MarkdownParser {
         }
 
         while (i < src.length) {
+            if (budget.exhausted) {
+                // Give up on inline markup: flush what is in hand, emit the
+                // unread tail as ONE plain-text run and stop. Plain text is
+                // lossless, so the text on screen does not change - only the
+                // formatting budget does.
+                flush()
+                if (i < src.length) out += MdInline.Text(src.substring(i))
+                return out
+            }
             val c = src[i]
             when {
                 c == '\\' && i + 1 < src.length -> {
@@ -167,7 +232,7 @@ object MarkdownParser {
                     i += 2
                 }
                 c == '`' -> {
-                    val close = src.indexOf('`', i + 1)
+                    val close = scanChar(i + 1, '`')
                     // `close == i + 1` means the two backticks are adjacent, i.e.
                     // empty code. Treating that as a code span would emit an
                     // invisible zero-length run, so keep it literal.
@@ -186,18 +251,18 @@ object MarkdownParser {
                     // closer and swallows whatever follows - "**bold** and
                     // *italic*" turned the " and " into italic text.
                     if (src.startsWith("**", i)) {
-                        val close = src.indexOf("**", i + 2)
+                        val close = scanSeq(i + 2, "**")
                         val inner = if (close > i + 2) src.substring(i + 2, close) else ""
                         if (inner.isEmpty()) {
                             buf.append(c)
                             i++
                         } else {
                             flush()
-                            out += MdInline.Bold(parseInline(inner))
+                            out += MdInline.Bold(parseInline(inner, budget))
                             i = close + 2
                         }
                     } else {
-                        val close = src.indexOf('*', i + 1)
+                        val close = scanChar(i + 1, '*')
                         val inner = if (close > i + 1) src.substring(i + 1, close) else ""
                         // A single `*` with space next to it is arithmetic
                         // ("2 * 3"), not emphasis.
@@ -206,7 +271,7 @@ object MarkdownParser {
                             i++
                         } else {
                             flush()
-                            out += MdInline.Italic(parseInline(inner))
+                            out += MdInline.Italic(parseInline(inner, budget))
                             i = close + 1
                         }
                     }
@@ -216,7 +281,7 @@ object MarkdownParser {
                     // snake_case identifier loses its underscores: "my_var_name"
                     // became "myvarname".
                     val opensCleanly = i == 0 || !src[i - 1].isLetterOrDigit()
-                    val close = src.indexOf('_', i + 1)
+                    val close = scanChar(i + 1, '_')
                     val closesCleanly = close in 0 until src.length &&
                         (close + 1 >= src.length || !src[close + 1].isLetterOrDigit())
                     val inner = if (close > i + 1) src.substring(i + 1, close) else ""
@@ -227,22 +292,22 @@ object MarkdownParser {
                         i++
                     } else {
                         flush()
-                        out += MdInline.Italic(parseInline(inner))
+                        out += MdInline.Italic(parseInline(inner, budget))
                         i = close + 1
                     }
                 }
                 c == '[' -> {
-                    val labelEnd = src.indexOf(']', i)
+                    val labelEnd = scanChar(i, ']')
                     val urlStart = if (labelEnd >= 0 && labelEnd + 1 < src.length &&
                         src[labelEnd + 1] == '('
-                    ) src.indexOf(')', labelEnd + 1) else -1
+                    ) scanChar(labelEnd + 1, ')') else -1
                     if (labelEnd < 0 || urlStart < 0) {
                         buf.append(c)
                         i++
                     } else {
                         flush()
                         out += MdInline.Link(
-                            parseInline(src.substring(i + 1, labelEnd)),
+                            parseInline(src.substring(i + 1, labelEnd), budget),
                             src.substring(labelEnd + 2, urlStart)
                         )
                         i = urlStart + 1

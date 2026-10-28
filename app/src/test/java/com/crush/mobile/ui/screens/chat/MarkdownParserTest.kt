@@ -209,4 +209,58 @@ class MarkdownParserTest {
             .filterIsInstance<MdInline.Text>().joinToString("") { it.text }
         assertTrue("got: $text", text.contains("*not bold*"))
     }
+
+    // ---- inline scan budget (recomposition-storm hardening) ----------------
+    //
+    // The budget charges cumulative distance for FAILED scans (a marker with
+    // no closer makes every such scan walk to the end of the source). These
+    // cases pin BOTH the bail-out itself and the guarantee that healthy input
+    // is untouched. They assert behaviour, not wall clock alone - the
+    // structural checks are load-bearing, the timing bound is a loud tripwire,
+    // kept loose precisely so it never flakes on a slow CI worker.
+
+    @Test
+    fun `an unpaired bracket flood trips the scan budget and stays lossless`() {
+        val n = 150_000
+        // `]` before any `[`: no bracket ever finds a closer after itself, so
+        // before the budget this parsed in seconds-to-minutes of indexOf
+        // walking; with the budget it stops after ~64KB walked.
+        val src = "]".repeat(n) + "[".repeat(n)
+        val started = System.nanoTime()
+        val out = MarkdownParser.parseInline(src)
+        val elapsedMs = (System.nanoTime() - started) / 1_000_000
+        assertTrue("parse took ${elapsedMs}ms", elapsedMs < 10_000)
+        // Lossless: every character here is a literal, so the inline runs must
+        // reproduce the input exactly.
+        val text = out.filterIsInstance<MdInline.Text>().joinToString("") { it.text }
+        assertEquals(src, text)
+    }
+
+    @Test
+    fun `after the budget trips the remainder renders as one plain run`() {
+        val src = "]".repeat(20_000) + "[".repeat(40_000) + "TAIL-PLAIN-TAIL"
+        val out = MarkdownParser.parseInline(src)
+        // The bail-out gives up markup entirely: no Code/Bold/Italic/Link may
+        // leak out of a throttled block.
+        assertTrue("non-text inline escaped: $out", out.all { it is MdInline.Text })
+        // The unread tail is emitted verbatim as ONE run at the end.
+        val tail = out.filterIsInstance<MdInline.Text>().last().text
+        assertTrue("tail marker missing in: $out", tail.contains("TAIL-PLAIN-TAIL"))
+    }
+
+    @Test
+    fun `a long healthy line is not throttled by the scan budget`() {
+        // One ~150KB paragraph whose every marker is well-formed: successful
+        // scans consume only the text they span, so nothing is charged and the
+        // budget must NOT fire - real formatting still applies end to end.
+        val unit = "**bold** see [docs](https://x.dev) and `npm ci` ok "
+        val out = MarkdownParser.parseInline(unit.repeat(3_000))
+        assertTrue(out.any { it is MdInline.Bold })
+        assertTrue(out.any { it is MdInline.Link })
+        assertTrue(out.any { it is MdInline.Code })
+        // Each unit still contributed its literal " and " - i.e. the parser
+        // did not bail out partway and flush the rest as raw text.
+        val plain = out.filterIsInstance<MdInline.Text>().joinToString("") { it.text }
+        assertEquals(3_000, plain.split(" and ").size - 1)
+    }
 }

@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import androidx.compose.runtime.Immutable
 
 /**
  * One tool invocation made by the agent, as shown to the user.
@@ -47,6 +48,14 @@ import com.google.gson.JsonParser
  * so today the app cannot receive that shape live. The lists are kept per
  * the spec ahead of the engine fix.
  */
+/**
+ * [Immutable] is a composability ASSERTION (analysis §4 P0-1): the class holds a
+ * parsed-out `args` String and never mutates in place (rows are replaced
+ * wholesale every message frame), so claiming stability makes the collapsed
+ * row skippable instead of recomposing the whole tool list per streaming
+ * frame.
+ */
+@Immutable
 data class ToolActivity(
     /** Engine call id when present; otherwise synthesised so the list is stable. */
     val id: String,

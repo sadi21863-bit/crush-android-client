@@ -41,14 +41,21 @@ import com.crush.mobile.engine.EnginePaths
 import com.crush.mobile.engine.EngineSockets
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.util.AppLog
+import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import java.io.File
 import java.util.UUID
 
@@ -91,6 +98,15 @@ internal fun replayRow(m: StreamMessage): ChatMessage? {
     }
 }
 
+/**
+ * [Immutable] is an ASSERTION, not a derivation (analysis §4 P0-1): without it
+ * Compose sees a data class carrying a List and treats every row as
+ * possible-mutating, so a role/stability meta cannot mark bubble rows skippable
+ * and each streaming frame recomposes every visible cell. Text and tool lists
+ * are replaced wholesale here - never mutated in place - so the claim is
+ * sound.
+ */
+@Immutable
 data class ChatMessage(
     val id: String,
     val role: String,
@@ -112,6 +128,57 @@ data class ChatMessage(
      */
     val tools: List<ToolActivity> = emptyList()
 )
+
+/**
+ * One question batch raised by `question_batch_request` (analysis §4 P0-3).
+ *
+ * The wire shape per the engine is `{"id","session_id","tool_call_id",
+ * "questions":[...]}` (the ids that CrushApi.answerQuestions wants back are a
+ * top-level batch id and per-question request ids). Only the batch id is
+ * extracted; the RAW payload is kept verbatim so a real answer-choosing UI -
+ * which needs the option lists of every question - is built later without
+ * having ever thrown that information away mid-stream.
+ */
+@Immutable
+data class PendingQuestion(
+    /** Engine batch id (top-level `id`); empty when the engine sent none. */
+    val id: String,
+    /** The whole batch object as the engine published it. */
+    val raw: JsonElement
+)
+
+/** Where a human-readable ask MOST LIKELY lives, ordered by confidence. */
+private val QUESTION_TEXT_KEYS =
+    listOf("question", "title", "text", "message", "prompt", "label", "description")
+
+/** Candidate names for the question batch id, per the engine's known wire shape. */
+private val QUESTION_ID_KEYS = listOf("id", "request_id", "batch_id")
+
+/** First present, non-blank STRING member among [keys], else null. */
+private fun JsonObject.firstText(keys: List<String>): String? =
+    keys.firstNotNullOfOrNull { k ->
+        val e = get(k) ?: return@firstNotNullOfOrNull null
+        val v = (e as? com.google.gson.JsonPrimitive)?.takeIf { it.isString }?.asString
+        v?.takeIf { it.isNotBlank() }
+    }
+
+/**
+ * The question text the dialog gets as its title.
+ *
+ * Tries the top-level object first, then the first element of `questions[]`.
+ * The option field names are engine-versioned, so this reads defensively: any
+ * miss degrades to an empty string and the dialog falls back to a generic
+ * title rather than crashing on a shape it did not anticipate.
+ */
+internal fun PendingQuestion.displayTitle(): String {
+    val obj = raw as? JsonObject ?: return ""
+    val top = obj.firstText(QUESTION_TEXT_KEYS)
+    if (!top.isNullOrBlank()) return top.take(240)
+    val questions = obj.get("questions") as? JsonArray ?: return ""
+    val first = questions.firstOrNull() as? JsonObject ?: return ""
+    val text = first.firstText(QUESTION_TEXT_KEYS)?.take(240) ?: ""
+    return if (questions.size() > 1) "$text (+${questions.size() - 1} more)" else text
+}
 
 data class ChatUiState(
     val phase: String = "starting engine",
@@ -154,6 +221,16 @@ val selectedModel: String = "",
     val input: String = "",
     /** A tool call awaiting the user's decision. See PermissionMode.ASK. */
     val pendingPermission: PermissionRequest? = null,
+    /**
+     * A question batch the agent is blocked on (analysis §4 P0-3).
+     *
+     * `question_batch_request` is the permission-ask's sibling for multiple
+     * questions. This build can SHOW the batch but cannot answer it with real
+     * option choices, so the state carries the raw payload for the dialog and
+     * [ChatViewModel.resolveQuestion] releases the run by cancelling the
+     * batch. Whole-object replace, never mutated in place.
+     */
+    val pendingQuestion: PendingQuestion? = null,
     /** Sessions in the current workspace, newest first. See SessionList. */
     val sessions: List<Session> = emptyList(),
     val sessionsLoading: Boolean = false,
@@ -383,14 +460,20 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     fun bindEngine(engineState: EngineState) {
         val p = (engineState as? EngineState.Running)?.port
         if (p == null) {
-            _state.value = _state.value.copy(
-                phase = when (engineState) {
-                    is EngineState.Failed -> "engine failed: ${engineState.reason}"
-                    is EngineState.Starting -> "starting engine (attempt ${engineState.attempt})"
-                    else -> "engine stopped"
-                },
-                engineReady = false
-            )
+            // Flow.update, not read-modify-write (analysis §4 P2 on races):
+            // every `_state.value = _state.value.copy(...)` re-reads the state
+            // in between and two writers can interleave, silently dropping one
+            // side's fields. _state.update is a single atomic CAS loop.
+            _state.update {
+                it.copy(
+                    phase = when (engineState) {
+                        is EngineState.Failed -> "engine failed: ${engineState.reason}"
+                        is EngineState.Starting -> "starting engine (attempt ${engineState.attempt})"
+                        else -> "engine stopped"
+                    },
+                    engineReady = false
+                )
+            }
             return
         }
         // A port change means the engine was replaced: workspace id is dead and
@@ -460,10 +543,12 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 // routine, not exceptional.
                 AppLog.e(TAG, "bootstrap failed: ${t.javaClass.simpleName}: ${t.message}")
                 keyBlocked = false
-                _state.value = _state.value.copy(
-                    phase = "Could not start the agent. Retrying...",
-                    engineReady = false
-                )
+                _state.update {
+                    it.copy(
+                        phase = "Could not start the agent. Retrying...",
+                        engineReady = false
+                    )
+                }
             } finally {
                 bootstrapping = false
             }
@@ -471,7 +556,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     }
 
     private suspend fun doBootstrap() {
-        _state.value = _state.value.copy(phase = "connecting to agent", engineReady = false)
+        _state.update { it.copy(phase = "connecting to agent", engineReady = false) }
         val p = port ?: return
         val api = crushApi(p)
         val mgr = WorkspaceManager(api)
@@ -547,14 +632,16 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                     "providersWithKeys=${secureKeys.providersWithKeys().joinToString(",")}"
             )
             keyBlocked = stored
-            _state.value = _state.value.copy(
-                phase = if (stored) {
-                    "unlocking your saved key..."
-                } else {
-                    "no API key - add one in Settings"
-                },
-                engineReady = false
-            )
+            _state.update {
+                it.copy(
+                    phase = if (stored) {
+                        "unlocking your saved key..."
+                    } else {
+                        "no API key - add one in Settings"
+                    },
+                    engineReady = false
+                )
+            }
             return
         }
         keyBlocked = false
@@ -602,12 +689,14 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         val modelsBase = Providers.byId(providerId)?.modelsBase
         if (modelsBase == null) {
             AppLog.w(TAG, "no compat base for provider '$providerId'; cannot fetch a catalogue")
-            _state.value = _state.value.copy(
-                phase = "This provider has no live model list in this build yet.",
-                models = emptyList(),
-                modelsError = "provider \"$providerId\" has no OpenAI-compatible /models base configured",
-                engineReady = false
-            )
+            _state.update {
+                it.copy(
+                    phase = "This provider has no live model list in this build yet.",
+                    models = emptyList(),
+                    modelsError = "provider \"$providerId\" has no OpenAI-compatible /models base configured",
+                    engineReady = false
+                )
+            }
             return
         }
         val zen = ZenModelsApi({ key }, modelsBase)
@@ -635,12 +724,14 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         val models = catalogue?.models.orEmpty()
         if (models.isEmpty()) {
             AppLog.w(TAG, "no usable model: ${catalogue?.error}")
-            _state.value = _state.value.copy(
-                phase = ModelChoice.explainFetchFailure(catalogue?.error),
-                models = models,
-                modelsError = catalogue?.error,
-                engineReady = false
-            )
+            _state.update {
+                it.copy(
+                    phase = ModelChoice.explainFetchFailure(catalogue?.error),
+                    models = models,
+                    modelsError = catalogue?.error,
+                    engineReady = false
+                )
+            }
             return
         }
 
@@ -659,11 +750,13 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 "no usable model: probed=${result.probed} retired=${result.retired} " +
                     "denied=${result.denied} badKey=${result.badKey}"
             )
-            _state.value = _state.value.copy(
-                phase = ModelChoice.explainNoUsableModel(models.size, result),
-                models = models,
-                engineReady = false
-            )
+            _state.update {
+                it.copy(
+                    phase = ModelChoice.explainNoUsableModel(models.size, result),
+                    models = models,
+                    engineReady = false
+                )
+            }
             return
         }
         AppLog.i(
@@ -710,10 +803,12 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // Trim the note list: it holds one string per failed call and the
             // same cause repeats, burying the single useful fact.
             val summary = init.notes.distinct().take(2).joinToString("; ")
-            _state.value = _state.value.copy(
-                phase = "agent not ready: $summary",
-                engineReady = false
-            )
+            _state.update {
+                it.copy(
+                    phase = "agent not ready: $summary",
+                    engineReady = false
+                )
+            }
             return
         }
         wsId = wsNow
@@ -736,21 +831,33 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             runCatching { mgr.newSession("chat").id }.getOrNull()
         }
 
-        _state.value = _state.value.copy(
-            phase = "ready",
-            engineReady = true,
-            selectedModel = chosen,
-            models = models
-        )
+        // Bootstrap also retires any prompt from the session it left behind:
+        // a permission or question addressed to a pre-restart run can never be
+        // validly answered after the workspace was rebuilt (analysis §4 P1-7).
+        _state.update {
+            it.copy(
+                phase = "ready",
+                engineReady = true,
+                selectedModel = chosen,
+                models = models,
+                pendingPermission = null,
+                pendingQuestion = null
+            )
+        }
         loadModels()
         // A newly opened session has no measured diff. Null rather than an empty
         // list, so the UI reports "not collected" instead of "no files changed".
         workspaceSnapshot = null
-        _state.value = _state.value.copy(fileChanges = null)
+        _state.update { it.copy(fileChanges = null) }
         // Attach the long-lived stream LAST, once the agent is configured and
         // the session is settled. Attaching earlier means a workspace that dies
         // during the slow model probe leaves a socket pointed at nothing.
         attachEventStream(freshWsOrCurrent(), mgr.clientId)
+        // The stream speaks the client id the prompt scoping is keyed on from
+        // this moment, so the session report belongs right after it. The
+        // resumable path re-reports inside openSession; this covers the
+        // freshly minted session (no resume), where nothing else would.
+        reportCurrentSession(sessionId)
         resumable?.let { openSession(it) }
     }
 
@@ -787,6 +894,32 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     /** The workspace we should be attached to right now, preferring the newest. */
     private fun freshWsOrCurrent(): String? = wsId
 
+    /**
+     * Tells the engine which session this client is viewing (POST
+     * current-session, engine v0.98.2).
+     *
+     * This is half of the v0.98.2 prompt-scoping contract; the other half lives
+     * in [attachEventStream] and [CrushApi.currentSession]: the SSE stream must
+     * be attached with the client id sent here, because the engine keys prompt
+     * delivery on that identity pair. On v0.98.1 the route does not exist, the
+     * POST logs a failure, and everything degrades to the old open-broadcast.
+     *
+     * Fire-and-forget by design: a failed report must never block opening a
+     * conversation or starting a run. [null] clears (landing state).
+     */
+    private fun reportCurrentSession(sid: String?) {
+        val mgr = workspaces ?: return
+        val p = port ?: return
+        val ws = wsId ?: mgr.currentWorkspaceId ?: return
+        viewModelScope.launch {
+            runCatching { crushApi(p).currentSession(ws, mgr.clientId, sid.orEmpty()) }
+                .onFailure { AppLog.w(TAG, "current-session report failed: ${it.message}") }
+                .onSuccess {
+                    AppLog.i(TAG, "current-session reported: ${sid?.take(8) ?: "(cleared)"}")
+                }
+        }
+    }
+
     override fun onCleared() {
         runCatching { eventConnection?.stop() }
         runCatching { eventRouter.close() }
@@ -811,7 +944,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         if (list.isEmpty()) return null
 
         // Publish the list so the drawer is populated before we pick.
-        _state.value = _state.value.copy(sessions = list, sessionsLoading = false)
+        _state.update { it.copy(sessions = list, sessionsLoading = false) }
 
         val withMessages = list.filter { it.messageCount > 0 }
         val target = withMessages.maxByOrNull { it.updatedAt }
@@ -831,21 +964,25 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             val providerId = currentProviderId()
             val base = currentModelsBase()
             if (base == null) {
-                _state.value = _state.value.copy(
-                    models = emptyList(),
-                    modelsError =
-                        "provider \"$providerId\" has no OpenAI-compatible /models base configured"
-                )
+                _state.update {
+                    it.copy(
+                        models = emptyList(),
+                        modelsError =
+                            "provider \"$providerId\" has no OpenAI-compatible /models base configured"
+                    )
+                }
                 return@launch
             }
             val r = ZenModelsApi(
                 { container.keySession.require(secureKeys, providerId) },
                 base
             ).fetch()
-            _state.value = _state.value.copy(
-                models = r.models,
-                modelsError = r.error
-            )
+            _state.update {
+                it.copy(
+                    models = r.models,
+                    modelsError = r.error
+                )
+            }
         }
     }
 
@@ -934,13 +1071,15 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             ProviderSwitchPolicy.Decision.ApplyNow -> pendingProviderId = null
         }
         AppLog.i(TAG, "provider switched to ${provider.id}; re-bootstrapping")
-        _state.value = _state.value.copy(
-            providerId = provider.id,
-            selectedModel = "",
-            models = emptyList(),
-            modelsError = null,
-            fileChanges = null
-        )
+        _state.update {
+            it.copy(
+                providerId = provider.id,
+                selectedModel = "",
+                models = emptyList(),
+                modelsError = null,
+                fileChanges = null
+            )
+        }
         // Drop the cached decrypted key with the workspace. It belongs to the
         // provider being left, and a stale key in memory is a usable credential
         // for a provider the user is no longer looking at: switching back would
@@ -958,7 +1097,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     }
 
     fun setModel(id: String) {
-        _state.value = _state.value.copy(selectedModel = id)
+        _state.update { it.copy(selectedModel = id) }
         val ws = wsId ?: return
         val p = port ?: return
         val providerId = Providers.resolve(_state.value.providerId).id
@@ -971,9 +1110,11 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             val key = runCatching { container.keySession.require(secureKeys, currentProviderId()) }
                 .getOrNull()
             if (key == null) {
-                _state.value = _state.value.copy(
-                    modelsError = "No API key is stored yet. Add one in Settings."
-                )
+                _state.update {
+                    it.copy(
+                        modelsError = "No API key is stored yet. Add one in Settings."
+                    )
+                }
                 return@launch
             }
             val providerName = Providers.byId(providerId)?.displayName ?: providerId
@@ -988,9 +1129,9 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             }
             if (rejection != null) {
                 AppLog.w(TAG, "rejected model $id (did not answer a probe)")
-                _state.value = _state.value.copy(
-                    modelsError = rejection
-                )
+                _state.update {
+                    it.copy(modelsError = rejection)
+                }
                 return@launch
             }
             // Both slots: Crush uses the small one for session titles.
@@ -1015,7 +1156,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     fun loadSessions() {
         val mgr = workspaces ?: return
         val p = port ?: return
-        _state.value = _state.value.copy(sessionsLoading = true)
+        _state.update { it.copy(sessionsLoading = true) }
         viewModelScope.launch {
             val ok = runCatching { mgr.reattachIfStale() }.getOrDefault(false)
             val ws = if (ok) mgr.currentWorkspaceId else null
@@ -1026,10 +1167,12 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                     .onFailure { AppLog.w(TAG, "listSessions failed: ${it.message}") }
                     .getOrDefault(emptyList())
             }
-            _state.value = _state.value.copy(
-                sessions = SessionList.sort(list),
-                sessionsLoading = false
-            )
+            _state.update {
+                it.copy(
+                    sessions = SessionList.sort(list),
+                    sessionsLoading = false
+                )
+            }
         }
     }
 
@@ -1062,6 +1205,12 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // so `sessionId = sessionId` cannot resolve either way.
             this@ChatViewModel.sessionId = sessionId
             existingSessionWorkspace = ws
+            // First act after the session becomes the viewed one: report it,
+            // so a permission prompt raised by THIS session can reach us. The
+            // prompt can only arrive while the stream is attached and the
+            // report is in - ordering this before any replayed UI settles
+            // costs nothing and cannot race a turn the user sends later.
+            reportCurrentSession(sessionId)
             // No streaming-id reset needed: a turn's bubble is identified by
             // its own RunHandle, and the replayed message list contains none
             // of the previous turn's rows, so a still-running old turn cannot
@@ -1072,12 +1221,20 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // displayed under another - which reads as this session having made
             // edits it never made.
             workspaceSnapshot = null
-            _state.value = _state.value.copy(
-                messages = replayed,
-                isStreaming = false,
-                activeSessionId = sessionId,
-                fileChanges = null
-            )
+            // Switching chats also retires a prompt the OLD session raised:
+            // an unanswered permission or question belongs to the run stream
+            // that was being watched, and answering it from a different chat
+            // forwards the wrong session's context (analysis §4 P1-7).
+            _state.update {
+                it.copy(
+                    messages = replayed,
+                    isStreaming = false,
+                    activeSessionId = sessionId,
+                    fileChanges = null,
+                    pendingPermission = null,
+                    pendingQuestion = null
+                )
+            }
         }
     }
 
@@ -1094,6 +1251,10 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             wsId = ws
             sessionId = sid
             existingSessionWorkspace = ws
+            // An empty-but-live session is a real viewing target: the first
+            // turn can raise a permission prompt before there is any history
+            // to replay, so report immediately.
+            reportCurrentSession(sid)
             // A fresh chat must not inherit the previous session's file changes.
             // They describe what the agent did on the OTHER session, and showing
             // them here would claim edits this session never made.
@@ -1101,12 +1262,18 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // The snapshot is dropped too, not just the rendered diff: keeping it
             // would diff the new turn against files captured for the old one.
             workspaceSnapshot = null
-            _state.value = _state.value.copy(
-                messages = emptyList(),
-                isStreaming = false,
-                activeSessionId = sid,
-                fileChanges = null
-            )
+            // Same lifecycle rule as openSession: a fresh thread must not
+            // inherit a prompt addressed to the previous session's run.
+            _state.update {
+                it.copy(
+                    messages = emptyList(),
+                    isStreaming = false,
+                    activeSessionId = sid,
+                    fileChanges = null,
+                    pendingPermission = null,
+                    pendingQuestion = null
+                )
+            }
             loadSessions()
         }
     }
@@ -1124,20 +1291,20 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         val p = port ?: return
         viewModelScope.launch {
             // Clear any previous failure banner at the start of a new attempt.
-            _state.value = _state.value.copy(deleteError = null)
+            _state.update { it.copy(deleteError = null) }
 
             if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
                 AppLog.w(TAG, "deleteSession: could not re-attach")
-                _state.value = _state.value.copy(
-                    deleteError = "Could not reach the engine. Try again."
-                )
+                _state.update {
+                    it.copy(deleteError = "Could not reach the engine. Try again.")
+                }
                 return@launch
             }
             val ws = mgr.currentWorkspaceId
             if (ws == null) {
-                _state.value = _state.value.copy(
-                    deleteError = "Could not reach the engine. Try again."
-                )
+                _state.update {
+                    it.copy(deleteError = "Could not reach the engine. Try again.")
+                }
                 return@launch
             }
 
@@ -1164,9 +1331,9 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                     // produced a conversation that reappeared after the app had
                     // already told the user it was deleted.
                     AppLog.w(TAG, "deleteSession unknown outcome: ${outcome.reason}")
-                    _state.value = _state.value.copy(
-                        deleteError = "Could not delete that chat. It may still exist."
-                    )
+                    _state.update {
+                        it.copy(deleteError = "Could not delete that chat. It may still exist.")
+                    }
                     loadSessions()
                 }
                 DeleteOutcome.Deleted, DeleteOutcome.AlreadyGone -> {
@@ -1178,10 +1345,15 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                     ) {
                         this@ChatViewModel.sessionId = null
                         existingSessionWorkspace = null
-                        _state.value = _state.value.copy(
-                            messages = emptyList(),
-                            activeSessionId = null
-                        )
+                        // The deleted session's prompt dies with it (P1-7).
+                        _state.update {
+                            it.copy(
+                                messages = emptyList(),
+                                activeSessionId = null,
+                                pendingPermission = null,
+                                pendingQuestion = null
+                            )
+                        }
                         newThread()
                     }
                     loadSessions()
@@ -1198,30 +1370,102 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      *
      * The whole request object is echoed back, not just its id - Crush matches on
      * tool_call_id, so sending only the id silently leaves the agent blocked.
+     *
+     * LIFECYCLE (analysis §4 P1-7): the dialog previously closed BEFORE the
+     * grant POST, on failure paths re-attach/window included - so a grant that
+     * never landed closed the dialog AND left the run blocked, invisible. It
+     * now stays open until the grant POST itself resolves; only a successful
+     * (2xx) grant clears [ChatUiState.pendingPermission]. grant()'s
+     * PermissionGrantResponse.resolved flag is logged when false - some engine
+     * versions return it false on grants they did accept - but a 2xx is the
+     * confirmation available, so the dialog clears on it.
      */
     fun resolvePermission(allow: Boolean, allowForSession: Boolean = false) {
         val req = _state.value.pendingPermission ?: return
         val mgr = workspaces ?: return
         val p = port ?: return
-        _state.value = _state.value.copy(pendingPermission = null)
         viewModelScope.launch {
-            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) return@launch
-            val ws = mgr.currentWorkspaceId ?: return@launch
+            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+                AppLog.w(TAG, "grant aborted: could not re-attach; dialog kept open")
+                return@launch
+            }
+            val ws = mgr.currentWorkspaceId ?: run {
+                AppLog.w(TAG, "grant aborted: no workspace attached; dialog kept open")
+                return@launch
+            }
             val action = when {
                 !allow -> PermissionGrant.DENY
                 allowForSession -> PermissionGrant.ALLOW_SESSION
                 else -> PermissionGrant.ALLOW
             }
-            runCatching {
+            val granted = runCatching {
                 crushApi(p).grant(ws, PermissionGrant(permission = req, action = action))
-            }.onFailure { AppLog.w(TAG, "grant failed: ${it.message}") }
+            }
+            granted.onFailure {
+                AppLog.w(TAG, "grant failed: ${it.message}; dialog kept open")
+            }
+            granted.getOrNull()?.let { resp ->
+                if (!resp.resolved) {
+                    AppLog.w(TAG, "grant 200 but engine reported resolved=false; " +
+                        "request id ${req.id.take(12)}")
+                }
+            }
+            // Cleared ONLY after the POST resolved: a failed grant keeps the
+            // dialog open so the user can retry instead of a silently blocked
+            // turn (P1-7).
+            if (granted.isSuccess) {
+                _state.update { it.copy(pendingPermission = null) }
+            }
         }
     }
 
     /** True when the agent is waiting on the user, so the UI can show a badge. */
     val awaitingPermission: Boolean get() = _state.value.pendingPermission != null
+
+    /**
+     * Releases an agent blocked on a question batch (analysis §4 P0-3).
+     *
+     * HONEST SCOPE: this build cannot answer with real option choices yet.
+     * [CrushApi.answerQuestions] exists on the wire and is the intended
+     * endpoint, but building QuestionAnswer.selected_ids requires an
+     * option-choice UI this screen does not have - shipping guessed answer
+     * bodies would tell the engine a user chose something they never saw.
+     * What IS verified on the wire (and used by CrushStreamProbe to stop a
+     * probe turn from hanging) is POST .../questions/cancel, which releases
+     * the blocked run without an answer. Both dialog actions land here so the
+     * turn visibly resumes instead of hanging on an invisible ask.
+     */
+    fun resolveQuestion() {
+        val q = _state.value.pendingQuestion ?: return
+        val mgr = workspaces ?: return
+        val p = port ?: return
+        viewModelScope.launch {
+            // Mirror resolvePermission: the dialog stays open until the POST
+            // resolves, so a failed release cannot silently strand the run.
+            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+                AppLog.w(TAG, "question release aborted: could not re-attach; dialog kept open")
+                return@launch
+            }
+            val ws = mgr.currentWorkspaceId ?: run {
+                AppLog.w(TAG, "question release aborted: no workspace attached; dialog kept open")
+                return@launch
+            }
+            val confirmed = runCatching { crushApi(p).cancelQuestions(ws) }
+                .onFailure {
+                    AppLog.w(TAG, "question cancel failed: ${it.message}; dialog kept open")
+                }
+                .isSuccess
+            if (!confirmed) return@launch
+            AppLog.i(
+                TAG,
+                "question batch ${q.id.take(12)} cancelled; agent released without an answer"
+            )
+            _state.update { it.copy(pendingQuestion = null) }
+        }
+    }
+
     fun setInput(v: String) {
-        _state.value = _state.value.copy(input = v)
+        _state.update { it.copy(input = v) }
     }
 
     fun send() {
@@ -1233,10 +1477,10 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         // whole window, so a double-tap started two runs; both wrote to the same
         // streamingId and the replies interleaved into one bubble.
         // Clear any stale stop notice from a previous run.
-        _state.value = _state.value.copy(isStreaming = true, stopNotice = null)
-        val p = port ?: run { _state.value = _state.value.copy(isStreaming = false); return }
+        _state.update { it.copy(isStreaming = true, stopNotice = null) }
+        val p = port ?: run { _state.update { it.copy(isStreaming = false) }; return }
         val mgr = workspaces ?: run {
-            _state.value = _state.value.copy(isStreaming = false)
+            _state.update { it.copy(isStreaming = false) }
             bootstrap()
             return
         }
@@ -1262,7 +1506,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 workspaces = null
                 wsId = null
                 abandonRun(handle)
-                _state.value = _state.value.copy(isStreaming = false)
+                _state.update { it.copy(isStreaming = false) }
                 // A deferred provider switch (P1-07) applies here instead of
                 // the old-provider bootstrap - not in addition to it.
                 if (!applyPendingProviderIfIdle()) bootstrap()
@@ -1270,9 +1514,48 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             }
             val ws = mgr.currentWorkspaceId ?: run {
                 abandonRun(handle)
-                _state.value = _state.value.copy(isStreaming = false)
+                _state.update { it.copy(isStreaming = false) }
                 applyPendingProviderIfIdle()
                 return@launch
+            }
+
+            // RECOVERY BEFORE SEND - the re-attach above may have reported
+            // success while its agent/init FAILED: the engine rejects init
+            // with "large model provider not configured" whenever the model
+            // slots still name a provider the CURRENT config does not know
+            // (device 2026-10-27: yesterday's opencode-zen slots outlived the
+            // provider in crush.json, and every send died at init with no
+            // visible trace). Instead of letting the prompt fail, re-seat the
+            // key + both model slots + coordinator right here, using the same
+            // probe-verified model bootstrap chose.
+            if (_state.value.selectedModel.isNotBlank()) {
+                val precheck = runCatching { crushApi(p).agentInfo(ws) }.getOrNull()
+                if (precheck?.isReady != true) {
+                    AppLog.w(TAG, "send preflight: agent not ready, re-configuring")
+                    val key = runCatching {
+                        container.keySession.require(secureKeys, currentProviderId())
+                    }.getOrNull()
+                    val providerId = Providers.resolve(_state.value.providerId).id
+                    if (key != null) {
+                        val healed = runCatching {
+                            CrushSession(crushApi(p), mgr).ensureAgentReady(
+                                key,
+                                providerId = providerId,
+                                modelId = _state.value.selectedModel,
+                                mainAgent = Providers.byId(providerId)?.mainAgent?.takeIf { it.isNotBlank() }
+                            )
+                        }.getOrNull()
+                        if (healed?.isReady != true) {
+                            AppLog.w(
+                                TAG,
+                                "send preflight: re-configure did not produce a ready " +
+                                    "agent: ${healed?.notes?.distinct()?.take(2)?.joinToString("; ")}"
+                            )
+                        }
+                    } else {
+                        AppLog.w(TAG, "send preflight: no key in session; cannot re-configure")
+                    }
+                }
             }
 
             // REUSE the session so the conversation is a thread. Creating a
@@ -1304,6 +1587,10 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             wsId = ws
             sessionId = sid
             existingSessionWorkspace = ws
+            // Same scoping contract as openSession: the run about to start in
+            // [sid] may hit a permission ask before the stream shows anything,
+            // and the ask only finds this client if the report landed first.
+            reportCurrentSession(sid)
             // Freeze the target on the handle BEFORE the stream can start, so a
             // Stop from this instant on cancels exactly this ws/session - not
             // whatever the view model points at when the tap arrives.
@@ -1333,21 +1620,23 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         // THIS turn can update this bubble.
         val bubbleId = "streaming-${UUID.randomUUID()}"
         handle.bubbleId = bubbleId
-        _state.value = _state.value.copy(
-            input = "",
-            isStreaming = true,
-            activeSessionId = sid,
-            messages = _state.value.messages + ChatMessage(
-                id = UUID.randomUUID().toString(),
-                role = "user",
-                text = text
-            ) + ChatMessage(
-                id = bubbleId,
-                role = "assistant",
-                text = "",
-                isStreaming = true
+        _state.update {
+            it.copy(
+                input = "",
+                isStreaming = true,
+                activeSessionId = sid,
+                messages = it.messages + ChatMessage(
+                    id = UUID.randomUUID().toString(),
+                    role = "user",
+                    text = text
+                ) + ChatMessage(
+                    id = bubbleId,
+                    role = "assistant",
+                    text = "",
+                    isStreaming = true
+                )
             )
-        )
+        }
 
         // Tell the supervisor a long request is live so hang detection cannot
         // restart the engine underneath the stream.
@@ -1420,7 +1709,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                         workspaceRoot(),
                         workspaceSnapshot
                     )
-                    _state.value = _state.value.copy(fileChanges = null)
+                    _state.update { it.copy(fileChanges = null) }
                     runCatching { api.send(targetWs, AgentMessageRequest(targetSid, text, runId)) }
                 }
                 val msg = when {
@@ -1480,6 +1769,25 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                                 targetWs = ws2
                                 wsId = ws2
                                 existingSessionWorkspace = ws2
+                                // Re-point the long-lived event connection at the
+                                // fresh workspace (analysis §4 P1-6). This turn's
+                                // retry subscribes with its own per-turn stream on
+                                // the next loop pass (routerUsedHere is already
+                                // true), so the re-point matters for every LATER
+                                // turn: without it the shared socket stays attached
+                                // to the workspace the engine just reaped and
+                                // publishes nothing we are addressed by.
+                                // eventConnection == null means no shared attach
+                                // exists at all, in which case silently skipping
+                                // is right - the per-turn fallback already governs
+                                // this and later turns.
+                                runCatching { eventConnection?.ensureAttached(ws2, mgr.clientId) }
+                                    .onFailure {
+                                        AppLog.w(
+                                            TAG,
+                                            "event re-attach after reap failed: ${it.message}"
+                                        )
+                                    }
                                 attempt++
                                 continue
                             }
@@ -1541,7 +1849,18 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // run we just asked it to stop.
             if (!handle.isStopped) container.engineSupervisor.setWorkActive(false)
             abandonRun(handle)
-            _state.value = _state.value.copy(isStreaming = false)
+            // The turn is over in every sense: any permission or question this
+            // run raised is addressed to a run that no longer exists, and once
+            // the turn ends there is no one left to answer it. Clearing here
+            // (P1-7) completes the prompt lifecycle; live prompts raised by a
+            // STILL-RUNNING turn are re-raised by its own frames.
+            _state.update {
+                it.copy(
+                    isStreaming = false,
+                    pendingPermission = null,
+                    pendingQuestion = null
+                )
+            }
             // Finalise the live bubble no matter how the turn ended.
             //
             // Only state.isStreaming used to be cleared here. The bubble's own
@@ -1603,15 +1922,15 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     private suspend fun collectFileChanges() {
         val snap = workspaceSnapshot ?: run {
             AppLog.w(TAG, "no pre-turn snapshot; file changes not measured")
-            _state.value = _state.value.copy(fileChanges = null)
+            _state.update { it.copy(fileChanges = null) }
             return
         }
         val ws = wsId ?: run {
-            _state.value = _state.value.copy(fileChanges = null)
+            _state.update { it.copy(fileChanges = null) }
             return
         }
         val sid = sessionId ?: run {
-            _state.value = _state.value.copy(fileChanges = null)
+            _state.update { it.copy(fileChanges = null) }
             return
         }
 
@@ -1621,7 +1940,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             collector.collect(workspaceRoot(), tracked, snap).copy(sessionId = sid)
         }.getOrNull()
 
-        _state.value = _state.value.copy(fileChanges = set)
+        _state.update { it.copy(fileChanges = set) }
         if (set == null) {
             AppLog.w(TAG, "file-change collection failed; not reporting changes")
         } else {
@@ -1635,62 +1954,228 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      * `run_complete` also carries the final text, which is used as a fallback:
      * replayed message frames can arrive before the text part lands, and an
      * empty assistant bubble reads as "no reply" rather than "still loading".
+     *
+     * TIMEOUTS (analysis §4 P0-2) - two layered deadlines, both ending in a
+     * SERVER-SIDE cancel:
+     *
+     *  - STREAM_IDLE_MS per-frame idle: the previously single
+     *    withTimeoutOrNull(collect) treated the whole turn as one winner-takes-
+     *    all gap, so a tool call that thought for 20 minutes (or a model that
+     *    streams one token every slow minute) died at exactly 180s even though
+     *    the agent was demonstrably alive. Frames now reset the idle clock via
+     *    a per-receive race, so only a genuinely SILENT agent expires early.
+     *  - STREAM_TIMEOUT_MS total: unchanged in value, kept as the absolute
+     *    ceiling so a wedged-but-chattering run still cannot hold the turn
+     *    open forever.
+     *
+     * Expiry is not the old silent give-up: ask the engine to cancel the run
+     * first and AWAIT that POST (via the handle's frozen target, exactly like
+     * StopAction.CancelOnServer in stopStreaming), and only then return.
+     * streamSend's finally releases workActive, so awaiting the cancel here is
+     * what keeps the hang detector honest until the engine acknowledged it
+     * (CANCEL-01). On StopStream and CancellationException nothing changed.
      */
     private suspend fun awaitStream(
         events: kotlinx.coroutines.flow.Flow<CrushEvent>,
         runId: String,
         handle: RunHandle
     ) {
-        withTimeoutOrNull(STREAM_TIMEOUT_MS) {
-            events.collect { ev ->
-                when (ev.type) {
-                    CrushEvent.PayloadType.MESSAGE -> {
-                        val m = gson.fromJson(ev.body, StreamMessage::class.java)
-                        if (m.role == "assistant") {
-                            // Crush republishes the WHOLE message, so replace.
-                            // Tools are replaced with it, never appended: each
-                            // frame carries the full set, and appending would
-                            // stack a duplicate row every time a tool advanced.
-                            val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
-                            updateStreaming(handle) {
-                                it.copy(
-                                    text = m.text.ifBlank { it.text },
-                                    thinking = m.thinking.ifBlank { it.thinking },
-                                    tools = tools.ifEmpty { it.tools },
-                                    error = m.finishError ?: it.error
-                                )
-                            }
-                        }
+        val timedOut = withTimeoutOrNull(STREAM_TIMEOUT_MS) {
+            coroutineScope {
+                // The two event sources have different shapes: the shared
+                // router hands over a Channel, the per-turn fallback is a
+                // callbackFlow. Funneling both into ONE local channel gives the
+                // frame loop a plain receiveCatching() that CAN be raced
+                // against the idle deadline - receiveAsFlow() itself has no
+                // "wait N seconds for the next frame" primitive, and
+                // transformWhile-style tricks drop the frame raced on.
+                val frames = Channel<CrushEvent>(Channel.BUFFERED)
+                // Catch-all, not rethrow: when the consumer exits (stop, idled
+                // out, thrown), the still-collecting feeder sees a closed or
+                // cancelled channel and that is NORMAL teardown, not an error
+                // to paint. The finally closes the channel so the feeder can
+                // never block forever.
+                val feeder = launch {
+                    try {
+                        events.collect { frames.send(it) }
+                    } catch (e: Exception) {
+                        // Teardown vs failure are distinguished: a cancelled or
+                        // already-closed channel is normal shutdown (stop,
+                        // consumer exit), but the flow itself failing (e.g. the
+                        // SSE socket dropped mid-turn) must stay an HONEST
+                        // error. Closing the channel with the cause delivers it
+                        // to the consumer, which rethrows it so it is painted
+                        // on the bubble exactly as the old events.collect
+                        // propagated it.
+                        if (!frames.isClosedForSend) frames.close(e)
+                    } finally {
+                        frames.close()
                     }
-
-                    // In ASK mode the agent BLOCKS here until answered, so the
-                    // request must reach the UI or the turn hangs silently. In
-                    // AUTO_APPROVE the engine never emits this.
-                    CrushEvent.PayloadType.PERMISSION_REQUEST -> {
-                        val req = gson.fromJson(ev.body, PermissionRequest::class.java)
-                        if (req.id.isNotBlank()) {
-                            AppLog.i(TAG, "permission requested: ${req.toolName}")
-                            _state.value = _state.value.copy(pendingPermission = req)
-                        }
-                    }
-
-                    CrushEvent.PayloadType.RUN_COMPLETE -> {
-                        val rc = gson.fromJson(ev.body, RunComplete::class.java)
-                        if (rc.runId == runId || rc.runId.isEmpty()) {
-                            updateStreaming(handle) {
-                                it.copy(
-                                    isStreaming = false,
-                                    text = rc.text.ifBlank { it.text }
+                }
+                try {
+                    var foreignRunCompletes = 0
+                    while (true) {
+                        val got = withTimeoutOrNull(STREAM_IDLE_MS) { frames.receiveCatching() }
+                        if (got == null) {
+                            // Idle deadline expired: the engine went silent on
+                            // this run. A stopped turn already handles its own
+                            // cancel; anything else gets the same
+                            // cancel-then-end treatment as the total deadline.
+                            if (!handle.isStopped) {
+                                AppLog.w(
+                                    TAG,
+                                    "stream idle > ${STREAM_IDLE_MS / 1000}s for run " +
+                                        "${handle.turnId}; requesting engine cancel"
                                 )
+                                awaitServerCancel(handle)
                             }
                             throw StopStream()
                         }
-                    }
+                        // Source flow ENDED without a run_complete (per-turn
+                        // stream closed): a quiet end of turn exactly like the
+                        // old events.collect returning, UNLESS the flow FAILED
+                        // - in which case the close carried the failure and it
+                        // is rethrown so the bubble still tells the truth.
+                        val failure = got.exceptionOrNull()
+                        val ev = got.getOrNull()
+                        if (ev == null) {
+                            if (failure != null) throw failure
+                            break
+                        }
+                        when (ev.type) {
+                            CrushEvent.PayloadType.MESSAGE -> {
+                                val m = gson.fromJson(ev.body, StreamMessage::class.java)
+                                if (m.role == "assistant") {
+                                    // Crush republishes the WHOLE message, so replace.
+                                    // Tools are replaced with it, never appended: each
+                                    // frame carries the full set, and appending would
+                                    // stack a duplicate row every time a tool advanced.
+                                    val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
+                                    updateStreaming(handle) {
+                                        it.copy(
+                                            text = m.text.ifBlank { it.text },
+                                            thinking = m.thinking.ifBlank { it.thinking },
+                                            tools = tools.ifEmpty { it.tools },
+                                            error = m.finishError ?: it.error
+                                        )
+                                    }
+                                }
+                            }
 
-                    else -> Unit
+                            // In ASK mode the agent BLOCKS here until answered, so the
+                            // request must reach the UI or the turn hangs silently. In
+                            // AUTO_APPROVE the engine never emits this.
+                            CrushEvent.PayloadType.PERMISSION_REQUEST -> {
+                                val req = gson.fromJson(ev.body, PermissionRequest::class.java)
+                                if (req.id.isNotBlank()) {
+                                    AppLog.i(TAG, "permission requested: ${req.toolName}")
+                                    _state.update { it.copy(pendingPermission = req) }
+                                }
+                            }
+
+                            CrushEvent.PayloadType.QUESTION_REQUEST -> {
+                                // The agent is blocked on an ask-the-user question
+                                // batch (analysis §4 P0-3). The option vocabulary is
+                                // engine-versioned, so the batch is kept RAW: the
+                                // dialog renders its title and one release path -
+                                // see [resolveQuestion] - until a real option-choice
+                                // UI exists. Never swapped out: like permissions, a
+                                // question must reach this client or the run blocks
+                                // invisibly until the idle timeout cancels it.
+                                val q = PendingQuestion(
+                                    id = ev.body.firstText(QUESTION_ID_KEYS).orEmpty(),
+                                    raw = ev.body
+                                )
+                                AppLog.i(TAG, "question batch requested (raw ${ev.body})")
+                                _state.update { it.copy(pendingQuestion = q) }
+                            }
+
+                            CrushEvent.PayloadType.RUN_COMPLETE -> {
+                                val rc = gson.fromJson(ev.body, RunComplete::class.java)
+                                if (rc.runId == runId) {
+                                    // STRICT MATCH (analysis §4 P2): the old
+                                    // `|| rc.runId.isEmpty()` condition let an
+                                    // empty/foreign run_complete finalise THIS
+                                    // turn, but bubble ids are always minted as
+                                    // UUIDs, so an empty id can only belong to a
+                                    // run this client never posted. Count them
+                                    // (bounded, not spammed) and keep waiting.
+                                    // A finished run also implies its tools
+                                    // finished (§4 P2 live rows): flip only
+                                    // THIS bubble's RUNNING rows to COMPLETED,
+                                    // never on timeout/stop, where the run did
+                                    // not complete.
+                                    updateStreaming(handle) {
+                                        it.copy(
+                                            isStreaming = false,
+                                            text = rc.text.ifBlank { it.text },
+                                            tools = it.tools.map { t ->
+                                                if (t.isRunning) {
+                                                    t.copy(state = ToolState.COMPLETED)
+                                                } else {
+                                                    t
+                                                }
+                                            }
+                                        )
+                                    }
+                                    throw StopStream()
+                                } else {
+                                    foreignRunCompletes++
+                                    if (foreignRunCompletes <= 3) {
+                                        AppLog.w(
+                                            TAG,
+                                            "run_complete ignored: runId='${rc.runId}' " +
+                                                "while waiting for '$runId' (turn ${handle.turnId}, " +
+                                                "foreign #$foreignRunCompletes)"
+                                        )
+                                    }
+                                }
+                            }
+
+                            else -> Unit
+                        }
+                    }
+                } finally {
+                    frames.close()
+                    feeder.cancel()
                 }
             }
+        } == null
+        if (timedOut) {
+            // Total deadline tripped while the engine kept dribbling frames
+            // (or wedged without any): same treatment as idle - a server-side
+            // cancel awaited THEN end of turn, so the job that waits on the
+            // cancel holds workActive to the last moment (P0-2).
+            if (!handle.isStopped) {
+                AppLog.w(
+                    TAG,
+                    "stream total timeout after ${STREAM_TIMEOUT_MS / 1000}s for run " +
+                        "${handle.turnId}; requesting engine cancel"
+                )
+                awaitServerCancel(handle)
+            }
+            throw StopStream()
         }
+    }
+
+    /**
+     * Asks the engine to cancel this turn's run and waits for the POST.
+     *
+     * Target comes from the handle's frozen snapshot (same rule as
+     * stopStreaming), or does nothing at all when no target was frozen. The
+     * isStopped re-check narrows (eliminates on the happy path) the race where
+     * an expiry-driven cancel would fire at a NEWER run on the same session -
+     * the documented reason StopAction exists at all. Cancel POSTs are
+     * idempotent enough per RunHandle's contract, so an unlucky interleave is
+     * an accepted cost rather than a redesign.
+     */
+    private suspend fun awaitServerCancel(handle: RunHandle) {
+        val p = handle.port ?: return
+        val w = handle.ws ?: return
+        val s = handle.sid ?: return
+        if (handle.isStopped) return
+        runCatching { crushApi(p).cancel(w, s) }
+            .onFailure { AppLog.w(TAG, "expiry cancel not confirmed for $s: ${it.message}") }
     }
 
     /**
@@ -1703,11 +2188,13 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      */
     private fun updateStreaming(handle: RunHandle, transform: (ChatMessage) -> ChatMessage) {
         val target = handle.bubbleId
-        _state.value = _state.value.copy(
-            messages = _state.value.messages.map { m ->
-                if (target != null && m.id == target) transform(m) else m
-            }
-        )
+        _state.update { st ->
+            st.copy(
+                messages = st.messages.map { m ->
+                    if (target != null && m.id == target) transform(m) else m
+                }
+            )
+        }
     }
 
     /** Stop button: cancels the stream without tearing the engine down. */
@@ -1746,11 +2233,24 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 // mayPost() keeps it that way. Local cancellation is complete.
                 abandonRun(handle)
                 container.engineSupervisor.setWorkActive(false)
+                // A prompt raised during preflight belongs to a run that was
+                // never posted and can never be answered; retire it (P1-7).
+                _state.update {
+                    it.copy(pendingPermission = null, pendingQuestion = null)
+                }
                 finalizeStoppedRun(handle, requestConfirmed = true)
             }
 
             is StopAction.CancelOnServer -> {
                 abandonRun(handle)
+                // The answer to this prompt can no longer be consumed by the
+                // stream being stopped here; retire it now (P1-7) rather than
+                // leaving a dialog pointed at a run about to die. The cancel
+                // MAY fail, which is a stop-confirmation problem - it does not
+                // make the prompt answerable again.
+                _state.update {
+                    it.copy(pendingPermission = null, pendingQuestion = null)
+                }
                 // Keep workActive true until the server acknowledges. A
                 // transient failure here must not be reported to the user as
                 // "stopped".
@@ -1770,32 +2270,34 @@ class ChatViewModel(private val context: Context, private val container: AppCont
 
     private fun finalizeStoppedRun(handle: RunHandle, requestConfirmed: Boolean) {
         val bubble = handle.bubbleId
-        _state.value = _state.value.copy(
-            isStreaming = false,
-            // Only the bubble THIS run owned. The old finaliser cleared the
-            // streaming flag on every streaming row, so a stop finishing late
-            // could flip a newer turn's bubble to "done" mid-stream.
-            messages = _state.value.messages.map {
-                if (bubble != null && it.id == bubble && it.isStreaming) {
-                    it.copy(isStreaming = false)
+        _state.update { st ->
+            st.copy(
+                isStreaming = false,
+                // Only the bubble THIS run owned. The old finaliser cleared the
+                // streaming flag on every streaming row, so a stop finishing late
+                // could flip a newer turn's bubble to "done" mid-stream.
+                messages = st.messages.map { m ->
+                    if (bubble != null && m.id == bubble && m.isStreaming) {
+                        m.copy(isStreaming = false)
+                    } else {
+                        m
+                    }
+                },
+                // Do not assert the agent has stopped when we could not tell the
+                // server to. The user is told the truth either way.
+                stopNotice = if (requestConfirmed) {
+                    null
                 } else {
-                    it
+                    "Stop requested. The agent may still be finishing."
                 }
-            },
-            // Do not assert the agent has stopped when we could not tell the
-            // server to. The user is told the truth either way.
-            stopNotice = if (requestConfirmed) {
-                null
-            } else {
-                "Stop requested. The agent may still be finishing."
-            }
-        )
+            )
+        }
     }
 
     private fun updateAssistant(id: String, transform: (ChatMessage) -> ChatMessage) {
-        _state.value = _state.value.copy(
-            messages = _state.value.messages.map { m -> if (m.id == id) transform(m) else m }
-        )
+        _state.update { st ->
+            st.copy(messages = st.messages.map { m -> if (m.id == id) transform(m) else m })
+        }
     }
 
     private class StopStream : RuntimeException(null, null, false, false)
@@ -1813,6 +2315,19 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         const val TAG = "ChatViewModel"
         const val STREAM_TIMEOUT_MS = 180_000L
         const val SEND_TIMEOUT_MS = 30_000L
+
+        /**
+         * Per-frame idle deadline (analysis §4 P0-2), separate from
+         * [STREAM_TIMEOUT_MS] which keeps its original value and meaning: a
+         * single withTimeoutOrNull around the whole collect treated ANY hung
+         * moment as the whole budget, so a turn that streamed steadily for
+         * 3 minutes died at exactly 180s while a silent-but-alive agent
+         * waited out the full window doing nothing. Idle resets on every
+         * received frame, so a slow tool call is tolerated as long as the
+         * engine is talking at all. 20s is under the workspace's ~30s reap window
+         * and comfortably above a normal frame gap.
+         */
+        const val STREAM_IDLE_MS = 20_000L
     }
 }
 

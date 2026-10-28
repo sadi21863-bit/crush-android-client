@@ -245,3 +245,67 @@ design, no-lockscreen fail-open stance, key-at-rest guard note, plus the
 deferred verified-model persistence item) live in
 [`docs/decisions-open.md`](decisions-open.md). They are intentionally not
 tracked as engineering backlog items here.
+
+## 9. Addendum — 2026-10-29 D12 live-device verification (ask card E2E)
+
+D12's fix was verified end-to-end on device `bbf8ca69` with real turns
+(z3…z6, evidence `build/d12-evidence/`, logs `app-current*.log`). Two new
+defects surfaced during that verification; both root-caused and fixed in
+tree the same day. Anatomy of each, condensed for reuse:
+
+### Defect A — an open ask card killed its own turn (fixed, proven live)
+
+`awaitStream`'s per-frame idle deadline (`STREAM_IDLE_MS`, 20 s) could not
+distinguish "engine silent" from "engine parked waiting for the user's
+grant" — in ASK mode a pending permission IS silence to the frame loop.
+App log proof: `permission requested: write` 00:34:19 → *same run*
+`stream idle > 20s …; requesting engine cancel` 00:34:39, while z4's ask
+card stood open. Fix: while `pendingPermission`/`pendingQuestion` is
+non-null the frame receive runs without the idle race; the outer total
+ceiling remains the only cap. Live proof (z6): ask opened 01:42:55, the
+dialog still stood ~50 s later, grant → write → `file changes` at
+01:44:10, zero idle-cancel lines. The §4 P0-2 row ("no per-frame reset")
+is partially superseded: the idle race + awaited engine cancel exist; what
+remains of P0-2 is the *outer* 3-min ceiling question for long agentic
+turns.
+
+### Defect B — every snapshot read failed on API < 33 ("1 unreadable" phantom)
+
+Symptom chain (z4/z5/z6): after any turn, the UI's file-changes card added
+`N file(s) not shown (unreadable…)` for files the engine tracked but that
+pre-dated the turn — including a 5-byte text file that had diffed cleanly
+a turn earlier. `FileChangeCollector`'s route instrumentation (added
+2026-10-29) decided it: `routes: … ROUTE=truncated-before …;
+snapKeys=[] snapTruncated=[all files]` on a 3-file, 20-byte workspace.
+
+Root cause: `WorkspaceSnapshotter.looksBinary()` used
+`InputStream.readNBytes(int)` — a Java 11 API android.jar exposes only at
+API 33+. On this API 29 device every call throws `NoSuchMethodError`,
+which `runCatching { … }.getOrDefault(true)` converts into "binary" for
+EVERY non-empty file → the capture stored no content and marked all files
+truncated → the collector's `truncated-before` branch honestly reported
+them unreadable. JVM unit tests never saw it because desktop JDKs have the
+method. z3 looked clean only because its tracked file did not exist yet at
+its own capture. Fix: manual 512-byte `InputStream.read` fill (API-1
+portable), semantics unchanged. Verification turn planned: `routes:`
+should print `snapKeys=[files]` + diff-edit routes, `0 unreadable`.
+
+Also in this pass (defensive, keep): `FileChangeCollector.normalise()` now
+accepts `/data/data` ↔ `/data/user/0` alias spellings of the workspace
+root, because the engine records whatever absolute spelling the model put
+in its tool call. Verification turn z7 (02:08–02:09, fixed build) closed
+the loop: ask card → automated Allow-once → resume →
+`routes: z7ask.txt ROUTE=diff-created(+1/-0) | z6/z5/z3ask.txt
+ROUTE=diff-edit(+0/-0); snapKeys=[4 files] snapTruncated=[]` and
+`file changes: +1 -0 across 1 file(s), 0 unreadable` — the phantom is
+gone. The TEMP diagnostics (`tracked(N)…`, `routes: …`) served their
+purpose and were removed after z7; their output is preserved in
+`build/d12-evidence/app-current4.log` (z6) and `app-current5.log` (z7).
+
+Process notes worth keeping: `uiautomator dump` cannot settle on this app
+(biometric prompt + caret blink), so all UI automation ran on
+screencap→System.Drawing pixel measurement; FLAG_SECURE renders the lock
+gate as a 0-byte screencap, which doubles as the unlock detector; the
+permission mode only re-binds at `doBootstrap` (the settings screen even
+labels it "next time the agent starts a session"), so a mode flip needs
+force-stop+relaunch+one fingerprint.

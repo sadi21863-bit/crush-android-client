@@ -2015,7 +2015,23 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                 try {
                     var foreignRunCompletes = 0
                     while (true) {
-                        val got = withTimeoutOrNull(STREAM_IDLE_MS) { frames.receiveCatching() }
+                        // A pending permission/question is NOT engine silence:
+                        // in ASK mode the run parks ON the user's decision, so
+                        // racing the idle deadline cancels a healthy turn
+                        // exactly 20s after the dialog opens - the z4 probe
+                        // died this way on 2026-10-29 ("stream idle > 20s" 20s
+                        // after "permission requested") while its own dialog
+                        // stood open. While a prompt is pending, receive
+                        // unbounded; the OUTER total deadline remains the only
+                        // ceiling, so a never-answered dialog still ends the
+                        // turn, and answering either prompt immediately
+                        // restores framed activity.
+                        val waitingOnPrompt =
+                            _state.value.pendingPermission != null ||
+                                _state.value.pendingQuestion != null
+                        val got =
+                            if (waitingOnPrompt) frames.receiveCatching()
+                            else withTimeoutOrNull(STREAM_IDLE_MS) { frames.receiveCatching() }
                         if (got == null) {
                             // Idle deadline expired: the engine went silent on
                             // this run. A stopped turn already handles its own

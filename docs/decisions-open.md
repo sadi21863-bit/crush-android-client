@@ -98,3 +98,21 @@ catalogue fetch (`ChatViewModel.kt:634/654/745`). Persisting which model ids
 each provider has already verified would kill that cost, but the item was
 parked pending an API design that outlives this session. Kept here so it
 stays visible next to the decisions it must not be confused with.
+
+## 8. How long may the agent wait on ONE ask or question dialog?
+
+**Status: OPEN — default applied, awaiting your call (or your "stand" note).**
+
+The 2026-10-29 device-verification pass removed the old 180 s whole-turn
+timeout (it could only ever kill healthy turns: a user still reading an ask,
+or a long but steadily-streaming agentic turn). Real engine silence is now
+caught by the 20 s per-frame idle deadline, and a PARKED prompt (the dialog
+is standing, the engine is waiting on the decision) is bounded by
+`PROMPT_WAIT_MS` = **10 minutes** after which the turn ends with an awaited
+server-side cancel (`ChatViewModel.kt` companion).
+
+**The decision:** confirm 10 minutes as the parked-prompt ceiling, or pick a
+different bound (longer / shorter / never-ending interrupted by manual Stop).
+The trade: a shorter bound cleans abandoned dialogs sooner but can cancel a
+genuinely reading user mid-thought; "never" relies on the Stop button and
+app teardown only. Unless you choose otherwise, 10 minutes stands.

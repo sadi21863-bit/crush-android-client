@@ -50,17 +50,19 @@ untestable and the source of most P0/P1 behavioral bugs.
    string per token (`MarkdownText.kt:56-57`) — O(n²) per turn; this is why
    uiautomator cannot snapshot the app. Fix: `@Immutable` models, mutate only
    the streaming bubble, incremental markdown parse (append-only last block).
-2. **Stream timeout semantics** (new): `withTimeoutOrNull(STREAM_TIMEOUT_MS)`
-   wraps the *whole* collect — no per-frame reset, no server-side cancel on
-   expiry (`ChatViewModel.kt:1728/1729-1776`). After the D12 fix restores
-   streaming, legit >3 min agentic turns die client-side; the engine keeps
-   running, `workActive` drops and hang-restart can fire under the live run.
-   Fix: per-event idle timeout + `cancel()` before finalizing.
-3. **`question_batch_request` has no handler** (`else -> Unit`,
-   `ChatViewModel.kt:1774`): once fan-out delivers it, an unanswered question
-   hangs the turn to the same 180 s timeout — D12 relived through the sibling
-   event. Needs a `pendingQuestion` branch + answer POST before the fan-out
-   fix ships for question flows.
+2. **Stream timeout semantics** — **RESOLVED 2026-10-28→29** (`3235f7e`
+   built the per-event idle deadline + awaited server cancel; `a870939`-era
+   device work then proved the ask-parked case wrong both ways: an open ask
+   was cancelled by the 20s idle race (Finding 1, fixed by suspending the
+   idle race while a prompt is pending), and the REMAINING 180s total cap
+   could only ever kill the healthy cases (long steady-stream turns,
+   think-past-it ask reading). Final shape: idle race for real silence,
+   `PROMPT_WAIT_MS` (10 min, decisions-open item 8) for parked prompts, no
+   total cap. Residual gap: the total cap's absence is reasoned from
+   evidence, not device-tested against a wedged-but-chattering run.
+3. **`question_batch_request` has no handler** — **RESOLVED** (handler
+   shipped in `3235f7e`: raw-batch `PendingQuestion` + `resolveQuestion`
+   release path; questions also suspend the idle race since 2026-10-29).
 
 ### P1 — degrades or misleads
 

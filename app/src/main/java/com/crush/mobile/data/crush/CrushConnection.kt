@@ -57,6 +57,20 @@ class CrushConnection(
     private var clientId: String = ""
 
     /**
+     * Unknown outer event `type` names -> frames dropped for each. Keyed lookup
+     * doubles as the "already logged" set: a null value is the first occurrence
+     * and logs; non-null only counts.
+     *
+     * TOLERANCE, stated on purpose (P1-15): decode is called from one reader
+     * thread today, but the map is @Volatile-read and check-then-write is not
+     * atomic - a hypothetical second writer could at worst log a name twice or
+     * lose one count. That is acceptable for diagnostics: routing never reads
+     * this map, so no race can change what happens to a frame.
+     */
+    @Volatile
+    private var unknownOuterTypes = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    /**
      * Ensures a connection exists for [ws].
      *
      * Idempotent, and safe to call repeatedly: if the workspace id is unchanged
@@ -178,7 +192,31 @@ class CrushConnection(
                         // blip. Retrying the same dead id forever would hide a
                         // real lifecycle event, so surface it via state and stop.
                         if (response.code == 404) {
+                            // THE 404-ZOMBIE BUG (P1-4).
+                            //
+                            // This branch used to return with `running` and
+                            // `thread` still set, so a later ensureAttached with
+                            // the SAME identity hit the "same workspace, live
+                            // reader" guard and returned early: no reconnect ever
+                            // happened. Workspace ids are path-derived, so the id
+                            // the app holds does not change when the engine-side
+                            // workspace does - re-attach with the same id IS the
+                            // recovery path the comment below promised and never
+                            // delivered. Meanwhile every turn silently used a dead
+                            // socket and fell back to the per-turn stream, which
+                            // reaps again after ~30s.
+                            //
+                            // A 404 means "this workspace id no longer exists on
+                            // the engine", not "the client asked to stop" - so
+                            // unwind the same state stop() unwinds (running, the
+                            // thread reference, the in-flight call, state) while
+                            // KEEPING the workspace id: the next ensureAttached,
+                            // same id, starts a fresh reader against whatever the
+                            // engine now serves under it.
                             AppLog.w(TAG, "events: workspace $ws is gone")
+                            runCatching { inFlight.getAndSet(null)?.cancel() }
+                            running.set(false)
+                            thread.set(null)
                             _state.value = State.IDLE
                             return
                         }
@@ -219,7 +257,15 @@ class CrushConnection(
 
             if (!running.get()) break
             if (_state.value != State.IDLE) _state.value = State.CONNECTING
-            val backoff = (INITIAL_BACKOFF_MS shl attempt.coerceAtMost(4)).toLong()
+            // P2-16: the shift bound was 4, i.e. 250ms shl 4 = 4s, so the
+            // `.coerceAtMost(MAX_BACKOFF_MS)` clamp (10s) could never engage and
+            // MAX_BACKOFF_MS was dead. The bound is now 6: 250ms shl 5 = 8s,
+            // shl 6 = 16s -> clamped to the documented 10s ceiling at the 6th
+            // retry. Same ladder shape Crush's own client uses, just with a
+            // reachable top. The reset-to-0 on any successful connect is kept
+            // DELIBERATELY (a genuinely fresh connect restarts the ladder) - the
+            // fix here is the cap, not a redesign of the reset policy.
+            val backoff = (INITIAL_BACKOFF_MS shl attempt.coerceAtMost(6)).toLong()
                 .coerceAtMost(MAX_BACKOFF_MS)
             attempt++
             sleep(backoff)
@@ -242,6 +288,11 @@ class CrushConnection(
      * type must be dropped, not fatal, because the engine adds event types
      * between releases and a client that throws on an unknown type stops seeing
      * every event after it.
+     *
+     * NOTE: consolidating this decoder with [CrushEventStream]'s into a shared
+     * helper on [CrushEvent] is DEFERRED (backlog 2026-10-27, deliberate) - the
+     * connection path below is the live one; mirroring exact behaviour across
+     * both paths stays pinned by their respective tests until then.
      */
     private fun decode(json: String): CrushEvent? {
         val root = com.google.gson.JsonParser.parseString(json)
@@ -256,7 +307,28 @@ class CrushConnection(
         val payload = payloadEl.asJsonObject
         val inner = payload.optString("type")
 
-        val pType = CrushEvent.PayloadType.entries.firstOrNull { it.wire == outer } ?: return null
+        val pType = CrushEvent.PayloadType.entries.firstOrNull { it.wire == outer }
+        if (pType == null) {
+            // P1-15: the drop itself is correct (expecting unknown types is part
+            // of the contract with the engine), but it USED to be invisible:
+            // an engine release that added an event type left zero trace behind,
+            // so "why is my app silently missing data" was undiagnosable from the
+            // log. Log ONCE per unknown type name; later frames of the same type
+            // drop quietly and only bump the count. Nothing in routing reads
+            // this map - it is diagnostics, never behaviour.
+            if (!outer.isNullOrEmpty()) {
+                val seen = unknownOuterTypes[outer]
+                if (seen == null) {
+                    AppLog.w(
+                        TAG,
+                        "events: unknown engine event type \"$outer\"; frame skipped, " +
+                            "further frames of this type drop silently"
+                    )
+                }
+                unknownOuterTypes[outer] = (seen ?: 0) + 1
+            }
+            return null
+        }
         val cType = CrushEvent.ChangeType.entries.firstOrNull { it.wire == inner }
             ?: CrushEvent.ChangeType.UPDATED
 

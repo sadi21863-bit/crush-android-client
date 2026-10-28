@@ -129,6 +129,63 @@ class CrushEventRouterTest {
         assertEquals(null, e.runIdOrNull())
     }
 
+    // ---- P1-5: the search is BOUNDED and must not over-match ---------------
+
+    @Test
+    fun `a foreign run id in tool params or two plain levels deep does not bind`() {
+        // A run id inside a tool call's params is tool ARGUMENTS, not event
+        // routing. `params` is a plain child of the body - not an envelope
+        // `payload` hop - so the search must stop before it. The recursive
+        // version bound such frames to a run whose id merely appeared in the
+        // arguments, delivering e.g. a permission ask to the WRONG run
+        // mid-turn.
+        val params = ev(
+            """{"id":"p1","session_id":"s1","tool_name":"write","params":{"run_id":"foreign"}}"""
+        )
+        assertEquals(null, params.runIdOrNull())
+
+        // Same for a run id reached via two PLAIN object levels. Only the
+        // wire's `payload` hops are followed, so `outer.inner.run_id` is out
+        // of reach on purpose - see the doc comment on findRunId.
+        val twoLevels = ev("""{"outer":{"inner":{"run_id":"foreign"}}}""")
+        assertEquals(null, twoLevels.runIdOrNull())
+    }
+
+    @Test
+    fun `a run id inside an array element does not bind`() {
+        // Parts/spans hold per-entry structures with ids of their own; the
+        // recursive version descended arrays and re-introduced the foreign
+        // bind through them. The reachable places are body top level and the
+        // `payload` chain - arrays are never on that path.
+        val e = ev("""{"role":"assistant","parts":[{"type":"text","run_id":"foreign"}]}""")
+        assertEquals(null, e.runIdOrNull())
+
+        // An array inside the envelope is equally out of reach.
+        val nested = ev(
+            """{"payload":{"type":"updated","payload":{"parts":[{"run_id":"foreign"}]}}}"""
+        )
+        assertEquals(null, nested.runIdOrNull())
+    }
+
+    @Test
+    fun `a frame whose only run id hides in tool params fans out anonymously`() = runBlocking {
+        // The routing consequence of the bounded search: an event whose ONLY
+        // run_id sits inside tool params cannot be bound to that run, so it
+        // routes as anonymous - every live turn sees it and each collector
+        // filters by its own turn downstream (same rules as D12 fan-out). If
+        // the run id WERE bound, run-1 would receive nothing at all.
+        val r = CrushEventRouter()
+        val one = r.register("run-1")
+        val decoy = r.register("run-foreign")
+        r.dispatch(ev("""{"session_id":"s1","tool_name":"write","params":{"run_id":"run-foreign"}}"""))
+        // The discriminator is run-1: fan-out delivers to every live run, so
+        // it gets the frame ONLY if routing treated the event as anonymous.
+        // An over-match would deliver to run-foreign alone and starve run-1.
+        assertTrue("run-1 lost an anonymous frame", one.tryReceive().getOrNull() != null)
+        assertTrue("fan-out must have reached run-foreign too", decoy.tryReceive().getOrNull() != null)
+        r.close()
+    }
+
     @Test
     fun `malformed json yields null rather than throwing`() {
         val e = CrushEvent(
@@ -137,6 +194,55 @@ class CrushEventRouterTest {
             JsonParser.parseString("{}").asJsonObject
         )
         assertEquals(null, e.runIdOrNull())
+    }
+
+    // ---- D12: anonymous (run-id-less) events must reach live runs ---------
+
+    @Test
+    fun `a run-id-less permission request reaches the in-flight turn`() = runBlocking {
+        val r = CrushEventRouter()
+        val ch = r.register("run-1")
+        // Real permission frame shape: no run_id anywhere in the body, and the
+        // engine sends it DURING the registered run (nothing else registered).
+        val e = CrushEvent(
+            CrushEvent.PayloadType.PERMISSION_REQUEST,
+            CrushEvent.ChangeType.CREATED,
+            JsonParser.parseString(
+                """{"id":"perm-1","session_id":"s1","tool_call_id":"tc1","tool_name":"write","action":"write","params":{}}"""
+            ).asJsonObject
+        )
+        r.dispatch(e)
+        assertTrue("ask card could never render (D12)", ch.tryReceive().getOrNull() != null)
+        r.close()
+    }
+
+    @Test
+    fun `a run-id-less message frame reaches the in-flight turn`() = runBlocking {
+        val r = CrushEventRouter()
+        val ch = r.register("run-1")
+        // proto.Message carries only a session id - every streaming frame is
+        // anonymous, which is why streaming text stayed "thinking" until the
+        // final run_complete.
+        r.dispatch(ev("""{"id":"m1","role":"assistant","session_id":"s1","parts":[]}"""))
+        assertTrue("streaming text was dropped (D12)", ch.tryReceive().getOrNull() != null)
+        r.close()
+    }
+
+    @Test
+    fun `anonymous events reach every live run, scoped ones stay scoped`() = runBlocking {
+        val r = CrushEventRouter()
+        val one = r.register("run-1")
+        val two = r.register("run-2")
+        // Anonymous frame: both live turns see it (a collector that is not the
+        // event's turn ignores it downstream).
+        r.dispatch(ev("""{"id":"m1","role":"assistant","session_id":"s1","parts":[]}"""))
+        assertTrue(one.tryReceive().getOrNull() != null)
+        assertTrue(two.tryReceive().getOrNull() != null)
+        // Scoped frame (run_complete echoes the caller's run id): unchanged.
+        r.dispatch(ev("""{"run_id":"run-2","text":"done"}"""))
+        assertTrue(two.tryReceive().getOrNull()?.body?.optString("text") == "done")
+        assertTrue("run-scoped event crossed runs", one.tryReceive().getOrNull() == null)
+        r.close()
     }
 
     // ---- lifecycle --------------------------------------------------------

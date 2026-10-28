@@ -152,4 +152,55 @@ class CrushConnectionWorkspaceSwitchTest {
         )
         conn.stop()
     }
+
+    @Test
+    fun `a 404 shutdown clears the reader so the SAME identity can reconnect`() {
+        // THE 404-ZOMBIE PIN (P1-4).
+        //
+        // The workspace-gone branch used to exit the reader loop with
+        // `running` and `thread` still set, so a later ensureAttached with the
+        // SAME identity short-circuited on the "same workspace, live reader"
+        // guard - no reconnect ever happened. The workspace id is path-derived
+        // and does NOT change when the engine-side workspace does, so
+        // re-attach with the same id is the one real recovery path, and it was
+        // a silent no-op: every turn fell back to the per-turn stream, which
+        // reaps the workspace again after ~30s.
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(hangingStream())
+
+        val conn = connection()
+        conn.ensureAttached("ws-A", "client-1")
+        val zombie = conn.readerThreadForTest()
+        assertTrue("the reader before the 404 should be live", zombie != null)
+        val gone = server.takeRequest(5, TimeUnit.SECONDS)
+        assertTrue("the stream request should have reached the engine", gone != null)
+
+        // 404 semantics: unwind the reader thread itself - it must NOT retry a
+        // dead id forever - clearing running/thread and returning the
+        // connection to IDLE.
+        zombie!!.join(5_000)
+        assertTrue("reader thread did not exit after the workspace-gone 404", !zombie.isAlive)
+        assertEquals(
+            "state after a 404 should be IDLE, not a zombie CONNECTED",
+            CrushConnection.State.IDLE,
+            conn.state.value
+        )
+        assertEquals(
+            "the thread reference must be cleared so ensureAttached can restart",
+            null,
+            conn.readerThreadForTest()
+        )
+
+        // Recovery: the SAME identity must start a FRESH reader - exactly the
+        // call the old code used to swallow.
+        conn.ensureAttached("ws-A", "client-1")
+        val revived = conn.readerThreadForTest()
+        assertNotEquals("ensureAttached after a 404 must start a fresh reader", zombie, revived)
+
+        // ...and that reader must have actually opened a new socket (the 404
+        // socket is the first recorded request; this one is the second).
+        val second = server.takeRequest(10, TimeUnit.SECONDS)
+        assertTrue("no fresh socket was opened after the 404", second != null)
+        conn.stop()
+    }
 }

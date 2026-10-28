@@ -162,8 +162,29 @@ suspend fun agentInfo(workspaceId: String): AgentInfo =
         postEmpty("/v1/workspaces/$workspaceId/agent/main", mapOf("agent_id" to agentId))
     }
 
-    suspend fun currentSession(workspaceId: String, sessionId: String) {
-        postEmpty("/v1/workspaces/$workspaceId/current-session", mapOf("session_id" to sessionId))
+    /**
+     * Reports which session this client is viewing (engine v0.98.2).
+     *
+     * Permission/question prompts are scoped: they are delivered only to
+     * clients whose reported current session matches the one that raised the
+     * prompt. An empty sessionId clears the entry (the landing-screen state),
+     * and a client that never reports at all fails OPEN instead - which is why
+     * reporting is optional-but-doing-it is correct: without a report we are
+     * still stuck with v0.98.1-style broadcast behaviour, receiving prompts
+     * raised in sessions we are not looking at.
+     *
+     * `client_id` is REQUIRED on this route (a UUID - without it the call is a
+     * 400) and MUST be the very same id the SSE stream attached with, because
+     * prompt scoping is keyed on that client identity. Callers therefore pass
+     * `WorkspaceManager.clientId`, the same value handed to
+     * [attachEventStream]. Engine v0.98.1 has no such route at all: the
+     * failure then logs a warning and everything behaves as before (D12).
+     */
+    suspend fun currentSession(workspaceId: String, clientId: String, sessionId: String = "") {
+        postEmpty(
+            "/v1/workspaces/$workspaceId/current-session?client_id=$clientId",
+            mapOf("session_id" to sessionId)
+        )
     }
 
     // ------------------------------------------------------------ session

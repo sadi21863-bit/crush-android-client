@@ -74,12 +74,23 @@ row names the touched file. Unknown field shapes still degrade to the row
 showing the tool name alone, and the runCatching-guarded key logging (now
 covering both the part and its data keys) stays in place to catch engine drift.
 
-**Related finding (live-captured):** in ASK mode the engine v0.98.1 never
-broadcasts `permission_request` on the events stream - a tool turn blocked in
-the ask step published nothing (session events route 404s too). Until the
-engine publishes asks upstream, ASK-mode mutating turns hang and the app
-times out to "no reply received"; see D12 in project-analysis.md. AUTO-approve
-turns run tools end to end and stream a complete turn (proven 2026-10-20).
+**Related finding (live-captured, two defects):** in ASK mode an ask turn
+never surfaced a prompt. Both halves were found and closed:
+(1) **v0.98.1 engine defect** — the old engine never published
+`permission_request` on the events stream at all; crush v0.98.2 adds
+session-scoped ask delivery (plus pending-prompt republish on
+`current-session`).
+(2) **App-side defect, found 2026-10-27** — against v0.98.2, an instrumented
+engine proved every breadcrumb fired (`permissionsvc publish` → workspace
+fan-in → session-filter pass → frame written to SSE), yet the app still got
+nothing: `CrushEventRouter` delivered run-id-less frames (`permission_request`,
+`question_batch_request`, and every `message` — only `run_complete` echoes the
+app-minted run id) to catch-all channels alone, and nothing in the app
+subscribes to catch-alls. Fixed by fanning anonymous frames to every registered
+run; pinned by tests. Consequence worth keeping visible: streaming text rode the
+same broken path — the bubble stayed "thinking" until `run_complete` painted the
+final text. See D12 in project-analysis.md. AUTO-approve turns run tools end to
+end and stream a complete turn (proven 2026-10-20).
 
 ### Delete treating transport failure as success — FIXED
 

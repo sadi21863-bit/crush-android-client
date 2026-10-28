@@ -1,6 +1,6 @@
 package com.crush.mobile.data.crush
 
-import android.util.Log
+import com.crush.mobile.util.AppLog
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlinx.coroutines.channels.awaitClose
@@ -62,15 +62,18 @@ class CrushEventStream(private val api: CrushApi, private val gson: com.google.g
 
                             runCatching { decode(json) }
                                 .onSuccess { trySend(it) }
-                                .onFailure { Log.d(TAG, "skip malformed frame: ${it.message}") }
+                                // AppLog, not android.util.Log: the fallback per-turn
+                                // stream path must also reach the persistent file log,
+                                // or fallback-path failures stay invisible after the fact.
+                                .onFailure { AppLog.d(TAG, "skip malformed frame: ${it.message}") }
                         }
                     }
                 } catch (e: IOException) {
                     if (cancelled) return@Thread
-                    Log.w(TAG, "events stream dropped (attempt $attempt): ${e.message}")
+                    AppLog.w(TAG, "events stream dropped (attempt $attempt): ${e.message}")
                 } catch (e: Exception) {
                     if (cancelled) return@Thread
-                    Log.w(TAG, "events stream error: ${e.message}")
+                    AppLog.w(TAG, "events stream error: ${e.message}")
                 } finally {
                     call = null
                 }
@@ -78,7 +81,10 @@ class CrushEventStream(private val api: CrushApi, private val gson: com.google.g
                 if (cancelled) return@Thread
 
                 // Crush's own client uses 250ms -> 10s exponential backoff.
-                val backoff = (INITIAL_BACKOFF_MS shl attempt.coerceAtMost(4))
+                // Same dead-cap fix as CrushConnection (P2-16): the shift bound
+                // was 4, capping the ladder at 4s so the 10s ceiling could never
+                // engage; a bound of 6 lets the clamp actually do its job.
+                val backoff = (INITIAL_BACKOFF_MS shl attempt.coerceAtMost(6))
                     .coerceAtMost(MAX_BACKOFF_MS)
                 attempt++
 
@@ -99,7 +105,7 @@ class CrushEventStream(private val api: CrushApi, private val gson: com.google.g
                     // Expected on cancel. Restore the flag so any higher-level
                     // blocking code can observe it, then leave quietly.
                     Thread.currentThread().interrupt()
-                    Log.d(TAG, "backoff interrupted; stopping reader")
+                    AppLog.d(TAG, "backoff interrupted; stopping reader")
                     return@Thread
                 }
             }

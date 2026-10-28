@@ -1,6 +1,6 @@
 package com.crush.mobile.data.crush
 
-import android.util.Log
+import com.crush.mobile.util.AppLog
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -102,7 +102,10 @@ class CrushStreamProbe(private val api: CrushApi, private val gson: Gson = Gson(
                             val rc = gson.fromJson(ev.body, RunComplete::class.java)
                             types += "run_complete"
                             if (rc.runId == runId || rc.runId.isEmpty()) {
-                                Log.i(TAG, "run_complete for our turn: ${rc.messageId}")
+                                // AppLog, not android.util.Log: this probe is the
+                                // manual sanity path and its findings must land in
+                                // the persistent log to be usable after the run.
+                                AppLog.i(TAG, "run_complete for our turn: ${rc.messageId}")
                                 throw StopIteration()
                             }
                         }

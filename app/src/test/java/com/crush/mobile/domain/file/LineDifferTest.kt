@@ -224,4 +224,16 @@ class LineDifferTest {
         assertEquals(2, r.removed)
         assertTrue(r.hasChanges)
     }
+
+    @Test
+    fun `duplicated lines still yield the minimal edit script`() {
+        // The linear-space reconstruction (Hirschberg) may land on a different
+        // minimal script than the old full-table backtrace when several exist -
+        // repeated lines are exactly that case. What is pinned here, and what
+        // every minimal script shares, is the common-line count: counts, stats
+        // and hunk merging never depend on WHICH minimal script was chosen.
+        val r = d("x\nx", "x")
+        assertEquals(1, r.removed)
+        assertEquals(0, r.added)
+    }
 }

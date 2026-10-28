@@ -25,8 +25,17 @@ import java.security.MessageDigest
  * snapshot" marker rather than silently stored or silently skipped.
  *
  * FILES ARE READ ONCE. Reading a 2MB file on every prompt would be a real cost,
- * so [WorkspaceSnapshotter] only re-reads files whose size or mtime changed
- * since the last snapshot.
+ * so [WorkspaceSnapshotter] stores each captured file's size and mtime and
+ * reuses the previous content only when BOTH still match the file on disk.
+ *
+ * The reuse guard is load-bearing, not an optimisation footnote: the first
+ * version keyed reuse on path PRESENCE alone, so turn N's before-image was
+ * silently turn N-1's state. An edit made between turns (by the agent's own
+ * earlier work, or by the user in another app) then rendered as an inflated
+ * diff, with outside edits attributed to the agent at this turn. Matching on
+ * size+mtime is the same guard any build system uses; its known miss - a
+ * same-size rewrite landing inside the filesystem's mtime resolution - is a
+ * cheap, rare false-negative set against re-reading every file on every prompt.
  */
 class WorkspaceSnapshotter(
     /**
@@ -40,13 +49,30 @@ class WorkspaceSnapshotter(
     val maxTotalBytes: Int = 4 * 1024 * 1024,
     val maxFiles: Int = 400
 ) {
-    /** path -> the file's content when the turn started. */
+    /**
+     * path -> the file's content when the turn started, plus the identity the
+     * content was read against (see [Stat]).
+     *
+     * [contents] and [before()] are the API [FileChangeCollector] consumes and
+     * are deliberately unchanged by the staleness fix; [stats] rides along so
+     * the NEXT capture can decide whether [contents] still describes the file
+     * on disk rather than a file that has since been edited.
+     */
     data class Snapshot(
         val contents: Map<String, String>,
         val truncatedPaths: Set<String>,
-        val capturedAtMs: Long
+        val capturedAtMs: Long,
+        /** path -> size+mtime at the moment [contents] was read. */
+        val stats: Map<String, Stat> = emptyMap()
     ) {
         fun before(path: String): String? = contents[path]
+
+        /**
+         * The file identity content was read against. Length is the on-disk
+         * byte size, not the character count - utf-8 multi-byte files have
+         * fewer chars than bytes, and it is the FILE that changes identity.
+         */
+        data class Stat(val lastModified: Long, val length: Long)
     }
 
     /**
@@ -62,6 +88,7 @@ class WorkspaceSnapshotter(
 
         val contents = LinkedHashMap<String, String>()
         val truncated = LinkedHashSet<String>()
+        val stats = LinkedHashMap<String, Snapshot.Stat>()
 
         fun walk(dir: File, depth: Int) {
             if (depth > MAX_DEPTH || contents.size + truncated.size >= maxFiles) return
@@ -87,11 +114,20 @@ class WorkspaceSnapshotter(
                     truncated.add(key)
                     continue
                 }
-                if (previous != null && previous.contents.containsKey(key)) {
-                    // Unchanged since the last snapshot: keep the same content
-                    // without paying for a re-read.
-                    contents[key] = previous.contents.getValue(key)
-                    continue
+                val stat = Snapshot.Stat(child.lastModified(), len)
+                if (previous != null) {
+                    val prevText = previous.contents[key]
+                    if (prevText != null && previous.stats[key] == stat) {
+                        // Size AND mtime both unchanged since the last snapshot:
+                        // the cached content still describes this file, so keep
+                        // it without paying for a re-read.
+                        contents[key] = prevText
+                        stats[key] = stat
+                        continue
+                    }
+                    // Stale or unseen: fall through and re-read. A presence-only
+                    // check used to keep the previous turn's content here, which
+                    // is what made second edits render as inflated diffs.
                 }
 
                 val text = runCatching {
@@ -103,6 +139,7 @@ class WorkspaceSnapshotter(
                     truncated.add(key)
                 } else {
                     contents[key] = text
+                    stats[key] = stat
                 }
 
                 if (totalBytesOf(contents) > maxTotalBytes) {
@@ -112,13 +149,16 @@ class WorkspaceSnapshotter(
                     if (over > 0) {
                         truncated.add(key)
                         contents.remove(key)
+                        // Keep the stat map consistent with contents: a reused
+                        // stat whose content is gone would be a landmine.
+                        stats.remove(key)
                     }
                 }
             }
         }
 
         walk(root, 0)
-        return Snapshot(contents, truncated, System.currentTimeMillis())
+        return Snapshot(contents, truncated, System.currentTimeMillis(), stats)
     }
 
     private fun totalBytesOf(m: Map<String, String>): Long =

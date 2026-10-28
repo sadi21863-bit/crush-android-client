@@ -123,6 +123,28 @@ class KeySessionLockTest {
     }
 
     @Test
+    fun `scoped clear drops only the named provider's cached key`() {
+        // clear(providerId) is the provider-scoped counterpart used by
+        // clearApiKey: deleting one provider's key must not also tear the
+        // OTHER provider's cached credential out of memory.
+        val session = KeySession()
+        session.put("zen-key", "opencode-zen")
+
+        session.clear("hyper")
+
+        assertTrue(
+            "another provider's cache must survive the scoped clear",
+            session.isUnlocked
+        )
+        assertEquals("zen-key", session.peekFor("opencode-zen"))
+        assertNull("the cleared provider's cache must be gone", session.peekFor("hyper"))
+
+        session.clear("opencode-zen")
+        assertFalse("clearing the cached provider re-locks", session.isUnlocked)
+        assertNull(session.peek())
+    }
+
+    @Test
     fun `require after clear re-reads but stays locked`() {
         val session = KeySession()
         val s = store()

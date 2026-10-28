@@ -24,7 +24,10 @@ class FileChangeCollector(
 
     /**
      * @param workspace the app-private workspace root.
-     * @param tracked    paths from the engine's filetracker, relative to [workspace].
+     * @param tracked    paths from the engine's filetracker, relative to
+     * [workspace]. Absolute paths that already sit under the workspace are
+     * reduced to their relative form; absolute paths from anywhere else are
+     * rejected as undiffable (see [normalise]) rather than rendered.
      */
     fun collect(
         workspace: File,
@@ -52,11 +55,28 @@ class FileChangeCollector(
         // "./a.kt" as two entries, and the same file rendered twice - once as its
         // real edit and once as an identical duplicate, which reads to a user as
         // the agent having made the same change twice.
-        val targets = tracked
-            .mapNotNull { raw -> normalise(raw)?.let { it to raw } }
-            .distinctBy { it.first }
+        // Normalise FIRST, then dedupe. Deduping the raw strings left "a.kt" and
+        // "./a.kt" as two entries, and the same file rendered twice - once as its
+        // real edit and once as an identical duplicate, which reads to a user as
+        // the agent having made the same change twice.
+        //
+        // A null from normalise is not "retry later" - it is "this path can
+        // never name a diffable file under the workspace" (a foreign absolute
+        // path). Dropping it via mapNotNull erased the agent's actual IO from
+        // the report entirely, which is its own species of lie; unreadable is
+        // the honest bucket, the same one collect() uses for every other path
+        // it refuses to diff. Blank raws stay silent drops: the engine gave no
+        // path, and rendering an empty entry would only confuse the UI.
+        val resolved = ArrayList<Pair<String, String>>()
+        val rejected = LinkedHashSet<String>()
+        tracked.forEach { raw ->
+            if (raw.isBlank()) return@forEach
+            val rel = normalise(raw, workspace)
+            if (rel == null) rejected.add(raw) else resolved.add(rel to raw)
+        }
+        unreadable.addAll(rejected)
 
-        for ((rel, rawPath) in targets) {
+        for ((rel, rawPath) in resolved.distinctBy { it.first }) {
             val file = File(workspace, rel)
 
             // Refuse to escape the workspace. A path with ".." in it is not a file
@@ -111,16 +131,72 @@ class FileChangeCollector(
         )
     }
 
-    /** Unreadable, binary, or over budget - in every case we cannot diff it. */
+    /**
+     * Reads the after-image, or null when it cannot be diffed honestly.
+     *
+     * TWO size guards, because file.length() and readText() are two separate
+     * worlds. The pre-read check is the cheap rejection; the post-read check
+     * covers the gap in between: a file the agent keeps appending to can pass
+     * the length() check and then hand back a string several times the cap
+     * (TOCTOU). The snapshotter applies the identical post-read rule and files
+     * such a read under its truncated marker; here the honest equivalent is to
+     * report the entry unreadable, because a "truncated" UX label cannot be
+     * formed from a snapshot that already shipped - collect() cannot mutate
+     * [WorkspaceSnapshotter.Snapshot], and fabricating a diff from a string we
+     * know to be oversized is the lie this class exists to prevent.
+     */
     private fun readOrNull(file: File, snapshotter: WorkspaceSnapshotter): String? =
         runCatching {
             if (file.length() > snapshotter.maxFileBytes) return null
-            file.readText()
+            val text = file.readText()
+            if (text.length > snapshotter.maxFileBytes) return null
+            text
         }.getOrNull()
 
-    private fun normalise(raw: String): String? {
+    /**
+     * Maps an engine-tracked path onto a workspace-relative one, or null when
+     * the path can never name a diffable file inside the workspace.
+     *
+     * ABSOLUTE PATHS used to slip through: this only stripped backslashes and a
+     * "./" prefix, so a fully-qualified tracker entry built
+     * `File(workspace, "/abs/path")` - which Java resolves by dropping the
+     * root's parent directories, landing INSIDE the workspace on the device.
+     * The after-image then read fine but the before-image lookup missed (the
+     * snapshot is keyed by relative path), and the entry rendered as a creation
+     * "+N -0" that never happened.
+     *
+     * Now an absolute path is reduced to its relative form when it sits under
+     * one of the workspace's own spellings - both the raw absolute path and the
+     * canonical one, because Android resolves /data/data through a symlink so
+     * the engine's spelling and File's can disagree - and null is returned
+     * otherwise, so collect() reports it in the unreadable list instead of
+     * pretending it was created.
+     */
+    private fun normalise(raw: String, workspace: File): String? {
         if (raw.isBlank()) return null
-        return raw.replace('\\', '/').removePrefix("./").ifBlank { null }
+        val rel = raw.replace('\\', '/').removePrefix("./").ifBlank { null } ?: return null
+        // Device paths are POSIX-absolute ("/..."); the drive-letter form exists
+        // only so the JVM tests run on a Windows dev box behave like the device.
+        val isAbsolute = rel.startsWith("/") ||
+            (rel.length >= 2 && rel[1] == ':')
+        if (!isAbsolute) return rel
+
+        val roots = buildList {
+            add(workspace.invariantSeparatorsPath)
+            runCatching { workspace.canonicalFile.invariantSeparatorsPath }
+                .getOrNull()
+                ?.let { add(it) }
+        }.distinct()
+        for (root in roots) {
+            // The workspace itself is not a diffable file: refusing keeps the
+            // blank-relative case out of the "created" bucket too.
+            if (rel == root) return null
+            val prefix = "$root/"
+            if (rel.startsWith(prefix)) {
+                return rel.removePrefix(prefix).ifBlank { null }
+            }
+        }
+        return null
     }
 
     /**

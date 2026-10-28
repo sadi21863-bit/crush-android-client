@@ -158,6 +158,91 @@ class FileChangeCollectorTest {
         assertTrue(collector.collect(root, emptyList(), before).isEmpty)
     }
 
+    // ---- before-image reuse honesty (mtime+size guard) -----------------------
+
+    @Test
+    fun `a file edited between snapshots is recaptured even when the size is unchanged`() {
+        // THE P1-8 PIN. Reuse used to be keyed on path presence, so turn N's
+        // snapshot held turn N-1's content and the diff between the real state
+        // and the snapshot reported phantom changes. Same size here on purpose:
+        // a content-only guard would not notice this edit at all.
+        val f = write("a.kt", "AAAA\n")
+        // Fixed, well-separated mtimes so the pin does not depend on the host
+        // filesystem's write-time resolution.
+        f.setLastModified(1_000_000L)
+        val s1 = collector.captureBefore(root)
+        assertEquals("AAAA\n", s1.contents["a.kt"])
+
+        f.writeText("BBBB\n")
+        f.setLastModified(2_000_000L)
+        val s2 = collector.captureBefore(root, s1)
+
+        assertEquals(
+            "the before-image must be THIS turn's state, not the previous turn's",
+            "BBBB\n", s2.contents["a.kt"]
+        )
+    }
+
+    @Test
+    fun `an untouched file still serves the previous content and stat`() {
+        val f = write("a.kt", "same\n")
+        f.setLastModified(1_000_000L)
+        val s1 = collector.captureBefore(root)
+        val s2 = collector.captureBefore(root, s1)
+
+        assertEquals("same\n", s2.contents["a.kt"])
+        assertEquals(s1.stats["a.kt"], s2.stats["a.kt"])
+    }
+
+    @Test
+    fun `a file the same size with the SAME mtime reuses the previous content`() {
+        // Documents the accepted trade: a same-size rewrite inside the
+        // filesystem's mtime resolution is invisible, exactly as for a build
+        // system. Forcing the mtime back makes that explicit rather than
+        // accidental.
+        val f = write("a.kt", "AAAA\n")
+        f.setLastModified(1_000_000L)
+        val s1 = collector.captureBefore(root)
+        f.writeText("BBBB\n")
+        f.setLastModified(1_000_000L)
+        val s2 = collector.captureBefore(root, s1)
+        assertEquals("AAAA\n", s2.contents["a.kt"])
+    }
+
+    // ---- absolute tracker paths ----------------------------------------------
+
+    @Test
+    fun `an absolute path under the workspace resolves, not renders as a creation`() {
+        // The P2 phantom: a fully-qualified tracker entry resolved INSIDE the
+        // workspace for the after-image, missed the keyed-by-relative-path
+        // before-image, and rendered "+N -0" for a file that was never created.
+        write("a.kt", "old\n")
+        val before = collector.captureBefore(root)
+        write("a.kt", "CHANGED\n")
+
+        val abs = root.invariantSeparatorsPath + "/a.kt"
+        val set = collector.collect(root, listOf(abs), before)
+
+        assertTrue("must not be unreadable: $set", set.unreadable.isEmpty())
+        assertEquals(1, set.diffs.size)
+        assertEquals("a.kt", set.diffs.single().path)
+        assertEquals(1, set.diffs.single().added)
+        assertEquals(1, set.diffs.single().removed)
+    }
+
+    @Test
+    fun `an absolute path outside the workspace is reported unreadable, not created`() {
+        write("a.kt", "x\n")
+        val before = collector.captureBefore(root)
+        val elsewhere = File(tmp.root, "elsewhere").apply { mkdirs() }
+        val abs = File(elsewhere, "leaked.txt").absolutePath
+
+        val set = collector.collect(root, listOf(abs), before)
+
+        assertEquals(listOf(abs), set.unreadable)
+        assertTrue(set.diffs.isEmpty())
+    }
+
     // ---- snapshotting -------------------------------------------------------
 
     @Test

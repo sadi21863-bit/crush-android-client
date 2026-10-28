@@ -239,13 +239,16 @@ fun buildReport(report: DiagnosticsReport, capturedAt: String): String = buildSt
 /**
  * Strips anything key-shaped from text bound for a third-party app.
  *
+ * The patterns live in [AppLog.Masking] and are shared with the log WRITE path
+ * (there is exactly one regex set): AppLog now masks every persisted line at
+ * the sink, so this pass is belt-and-braces for assembled report fields - the
+ * report still never trusts a log to have been written by a masking version.
+ *
  * Deliberately blunt. A diagnostics report that silently mangled a stack trace
  * would be worse than one that dropped a rare legitimate token, and the only
  * strings that must never leave the device are the ones matching this.
  */
-private fun redactSecrets(text: String): String = text
-    .replace(SECRET_OC_SK, "[redacted-key]")
-    .replace(SECRET_SK, "[redacted-key]")
+private fun redactSecrets(text: String): String = AppLog.Masking.mask(text)
 
 /**
  * Pulls the most recent uncaught exception out of the app log.
@@ -330,8 +333,3 @@ private const val TIMESTAMP_LEN = 12
 
 /** Matches AppLog's `HH:mm:ss.SSS L/TAG: ` prefix, used as a record terminator. */
 private val ENTRY_PREFIX = Regex("""^\d{2}:\d{2}:\d{2}\.\d{3} [DIWE]/\S+: """)
-
-// oc_sk_ is OpenCode Zen's own prefix and must be caught first; the sk- pattern
-// would otherwise match its tail.
-private val SECRET_OC_SK = Regex("""oc_sk_[A-Za-z0-9_\-]{6,}""")
-private val SECRET_SK = Regex("""(?<![A-Za-z0-9_])sk-[A-Za-z0-9_\-]{8,}""")

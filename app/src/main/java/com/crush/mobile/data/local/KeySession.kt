@@ -78,6 +78,23 @@ class KeySession {
     }
 
     /**
+     * Drops ONLY [providerId]'s cached plaintext; a key cached for another
+     * provider stays.
+     *
+     * The fully-scoped counterpart of [clear]: "delete the Groq key" while a
+     * Zen key is cached should not also tear the Zen credential out of memory -
+     * the store-side delete is already provider-scoped, and this used to clear
+     * everything, which locked the app when a settings action happened to name
+     * a different provider. Lock/unlock lifecycle callers keep using [clear].
+     */
+    fun clear(providerId: String) {
+        if (cachedProviderId == providerId) {
+            cached = null
+            cachedProviderId = ""
+        }
+    }
+
+    /**
      * The key, falling back to a decrypt when nothing is cached yet.
      *
      * SECURITY: the fallback decrypt does NOT unlock the app.

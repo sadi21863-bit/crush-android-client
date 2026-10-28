@@ -15,7 +15,15 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
-class SettingsDataStore(context: Context, private val keySession: KeySession = KeySession()) {
+/**
+ * @param keySession the process-scoped key cache. DELIBERATELY no default
+ * value: the default `KeySession()` here was a DI trap - a caller that
+ * constructed its own SettingsDataStore wired up a SECOND cache that the lock
+ * gate and the engine never cleared or filled, so "key saved" and "key
+ * unlocked" disagreed between instances. AppContainer is the single
+ * constructor site and passes its [KeySession] explicitly.
+ */
+class SettingsDataStore(context: Context, private val keySession: KeySession) {
 
     /** Exposed so SettingsRepository can build the static device profile. */
     val context: Context = context.applicationContext
@@ -124,10 +132,18 @@ class SettingsDataStore(context: Context, private val keySession: KeySession = K
     /** Synchronous read for call sites that cannot suspend (engine bootstrap). */
     fun readApiKey(providerId: String): String = keySession.require(secureKeys, providerId)
 
-    /** Removes ONE provider's credential, leaving the others intact. */
+    /**
+     * Removes ONE provider's credential, leaving the others intact.
+     *
+     * The cache drop is scoped the same way ([KeySession.clear] used to be
+     * called whole): wiping every provider's cached plaintext in response to
+     * deleting one provider's key would also drag the OTHER provider behind
+     * the lock gate, which is a state the settings screen never told the user
+     * about.
+     */
     suspend fun clearApiKey(providerId: String) {
         secureKeys.clear(providerId)
-        keySession.clear()
+        keySession.clear(providerId)
     }
 
     suspend fun saveSelectedModel(model: String) {

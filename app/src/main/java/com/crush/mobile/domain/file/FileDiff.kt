@@ -102,6 +102,10 @@ object LineDiffer {
      * trimming the common prefix and suffix, so a large file with a small edit
      * still diffs fine - the cap only bites when the changed region itself is
      * enormous.
+     *
+     * Since the LCS pass went linear-memory the cap no longer guards memory
+     * (that is O(n+m) now); it guards TIME, which is still O(n*m) for the
+     * middle region.
      */
     private const val MAX_DIFF_LINES = 10_000
 
@@ -230,45 +234,150 @@ object LineDiffer {
     // ---- LCS ----------------------------------------------------------------
 
     /**
-     * Dynamic-programming LCS over lines, returned as ops with line numbers.
+     * Minimal LCS edit script over lines, returned as ops with line numbers.
      *
-     * Memory is O(n*m), which is exactly why the prefix/suffix trim and
-     * [MAX_DIFF_LINES] exist: with the trim in place the middle region is small
-     * for essentially every real edit.
+     * WHY THERE IS NO FULL DP TABLE (2026-10-27)
+     *
+     * The first version allocated `Array(n+1) { IntArray(m+1) }` and held it for
+     * the whole reconstruction. At [MAX_DIFF_LINES] that is 100M ints - about
+     * 400MB on this app's ~1GB-heap device - so the cap bounded the CELL COUNT
+     * while the table itself stayed unbounded in the two dimensions it was
+     * meant to guard. The fix is the classic one: keep only two rows of lengths
+     * at a time (~80KB at the cap), and reconstruct the actual edit script with
+     * Hirschberg's divide-and-conquer - split the before side at its midpoint,
+     * pick the after-side split that maximises LCS(left, y-pref) +
+     * LCS(right, y-suff) by combining a forward lengths pass over the first
+     * half with a backward pass over the second, and recurse into both halves.
+     * Total time stays O(n*m), same as the old table; peak memory drops to
+     * O(n+m) per live recursion level and the levels are transient.
+     *
+     * WHAT CAN DIFFER FROM THE OLD BACKTRACE: when several minimal scripts
+     * exist (repeated lines, block moves), this one is not guaranteed to pick
+     * the tie the old forward walk picked. EVERY minimal script has the same
+     * LCS length, so added/removed counts, hunk merging and the tooLarge path
+     * are all unchanged; only which duplicated line a hunk lines up as its
+     * anchor can differ, and any of those scripts is a correct minimal diff.
      */
-    private fun lcsOps(a: Array<String>, b: Array<String>): List<Op> {
-        val n = a.size
-        val m = b.size
-        val dp = Array(n + 1) { IntArray(m + 1) }
-        for (i in n - 1 downTo 0) {
-            for (j in m - 1 downTo 0) {
-                dp[i][j] = if (a[i] == b[j]) dp[i + 1][j + 1] + 1
-                else maxOf(dp[i + 1][j], dp[i][j + 1])
-            }
-        }
-        val out = ArrayList<Op>(n + m)
-        var i = 0
-        var j = 0
-        while (i < n && j < m) {
-            when {
-                a[i] == b[j] -> {
-                    out.add(Op(DiffLine.Kind.CONTEXT, a[i], i, j)); i++; j++
-                }
-                dp[i + 1][j] >= dp[i][j + 1] -> {
-                    out.add(Op(DiffLine.Kind.REMOVED, a[i], i, null)); i++
-                }
-                else -> {
-                    out.add(Op(DiffLine.Kind.ADDED, b[j], null, j)); j++
-                }
-            }
-        }
-        while (i < n) {
-            out.add(Op(DiffLine.Kind.REMOVED, a[i], i, null)); i++
-        }
-        while (j < m) {
-            out.add(Op(DiffLine.Kind.ADDED, b[j], null, j)); j++
-        }
+    private fun lcsOps(before: Array<String>, after: Array<String>): List<Op> {
+        val out = ArrayList<Op>(before.size + after.size)
+        reconstruct(before, 0, before.size, after, 0, after.size, out)
         return out
+    }
+
+    /**
+     * Appends the ops for window x[x0 until x1) vs y[y0 until y1).
+     *
+     * Indices stay GLOBAL to the arrays on purpose: op line numbers are the
+     * original files', so per-window renumbering would have shifted every hunk
+     * after the first recursion level.
+     *
+     * Tie-break in the split below takes the FIRST maximum, which keeps block
+     * moves reading as "removed here, added there" rather than shuffling the
+     * y split point to the far end.
+     */
+    private fun reconstruct(
+        x: Array<String>, x0: Int, x1: Int,
+        y: Array<String>, y0: Int, y1: Int,
+        out: MutableList<Op>
+    ) {
+        val n = x1 - x0
+        val m = y1 - y0
+        when {
+            n == 0 ->
+                // Nothing left to keep on the before side: the rest is additions.
+                for (j in y0 until y1) out.add(Op(DiffLine.Kind.ADDED, y[j], null, j))
+            m == 0 ->
+                for (i in x0 until x1) out.add(Op(DiffLine.Kind.REMOVED, x[i], i, null))
+            n == 1 -> {
+                // Single before line: match it against its first counterpart in
+                // the after window, additions otherwise falling in file order.
+                val line = x[x0]
+                val firstMatch = (y0 until y1).firstOrNull { y[it] == line }
+                if (firstMatch == null) {
+                    out.add(Op(DiffLine.Kind.REMOVED, line, x0, null))
+                    for (j in y0 until y1) out.add(Op(DiffLine.Kind.ADDED, y[j], null, j))
+                } else {
+                    for (j in y0 until firstMatch) {
+                        out.add(Op(DiffLine.Kind.ADDED, y[j], null, j))
+                    }
+                    out.add(Op(DiffLine.Kind.CONTEXT, line, x0, firstMatch))
+                    for (j in firstMatch + 1 until y1) {
+                        out.add(Op(DiffLine.Kind.ADDED, y[j], null, j))
+                    }
+                }
+            }
+            else -> {
+                val xmid = x0 + n / 2
+                // forward[k] = LCS(x[x0..xmid), y[y0..y0+k))
+                val forward = lcsLengths(x, x0, xmid, y, y0, y1)
+                // backward[k] = LCS(x[xmid..x1), y[y0+k..y1))
+                val backward = lcsLengthsBackward(x, xmid, x1, y, y0, y1)
+                var best = -1
+                var bestK = 0
+                for (k in 0..(y1 - y0)) {
+                    val total = forward[k] + backward[k]
+                    if (total > best) {
+                        best = total
+                        bestK = k
+                    }
+                }
+                val ymid = y0 + bestK
+                reconstruct(x, x0, xmid, y, y0, ymid, out)
+                reconstruct(x, xmid, x1, y, ymid, y1, out)
+            }
+        }
+    }
+
+    /**
+     * LCS lengths of the x prefix [x0 until xEnd) against every prefix of the
+     * y window; result[k] = LCS(x[x0..xEnd), y[y0..y0+k)).
+     *
+     * Two rolling rows and no table. Buffer reuse works because row rendering
+     * is left-to-right: `cur[k-1]` is always either this row's fresh value or
+     * the 0 seed at index 0, never a stale value from two rows ago, so the
+     * swapped buffer needs no re-zeroing.
+     */
+    private fun lcsLengths(
+        x: Array<String>, x0: Int, xEnd: Int,
+        y: Array<String>, y0: Int, y1: Int
+    ): IntArray {
+        val w = y1 - y0
+        var prev = IntArray(w + 1)
+        var cur = IntArray(w + 1)
+        for (i in x0 until xEnd) {
+            for (k in 1..w) {
+                cur[k] = if (x[i] == y[y0 + k - 1]) prev[k - 1] + 1
+                else maxOf(prev[k], cur[k - 1])
+            }
+            val swap = prev
+            prev = cur
+            cur = swap
+        }
+        return prev
+    }
+
+    /**
+     * Mirror of [lcsLengths] over the x suffix [xStart until x1); result[k] =
+     * LCS(x[xStart..x1), y[y0+k..y1)). Rendered right-to-left for the same
+     * buffer-reuse reason, with index `w` at each row staying the 0 seed.
+     */
+    private fun lcsLengthsBackward(
+        x: Array<String>, xStart: Int, x1: Int,
+        y: Array<String>, y0: Int, y1: Int
+    ): IntArray {
+        val w = y1 - y0
+        var prev = IntArray(w + 1)
+        var cur = IntArray(w + 1)
+        for (i in x1 - 1 downTo xStart) {
+            for (k in w - 1 downTo 0) {
+                cur[k] = if (x[i] == y[y0 + k]) prev[k + 1] + 1
+                else maxOf(prev[k], cur[k + 1])
+            }
+            val swap = prev
+            prev = cur
+            cur = swap
+        }
+        return prev
     }
 
     // ---- hunking ------------------------------------------------------------

@@ -2,6 +2,7 @@ package com.crush.mobile.util
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -252,5 +253,90 @@ class RetentionPruneTest {
         val b = archiveFileName(1_800_000_000_000L)
         assertTrue(a.matches(Regex("app-archive-\\d{4}-\\d{2}-\\d{2}\\.log")))
         assertTrue("same-zone day strings must order with time", b >= a)
+    }
+}
+
+/**
+ * Credential masking at the sink (2026-10-27).
+ *
+ * The write path used to persist whatever a log call passed in, and the
+ * `gsk_` Groq prefix plus any long high-entropy token sailed straight into the
+ * file a friend is later told to `cat` and send. These pins exercise
+ * [AppLog.Masking] itself - the exact function [AppLog.write] runs every line
+ * through before either sink (logcat or the file) receives it - rather than a
+ * live AppLog instance, which would need a Robolectric Context without adding
+ * coverage the pure transform does not already carry.
+ *
+ * No real credential appears in this file; sample keys are throwaway shapes.
+ */
+class SecretMaskingTest {
+
+    @Test
+    fun `a groq key embedded in a log line is masked`() {
+        val line = "12:00:01.123 E/Engine: auth rejected for gsk_A1b2C3d4E5f6G7h8I9"
+        val masked = AppLog.Masking.mask(line)
+        assertTrue("masked: $masked", masked.contains("[redacted-key]"))
+        assertFalse("secret leaked: $masked", masked.contains("A1b2C3d4E5f6G7h8I9"))
+        // The line format survives masking: the diagnostics parser keys on it.
+        assertTrue(masked.startsWith("12:00:01.123 E/Engine: "))
+    }
+
+    @Test
+    fun `a generic high-entropy token is masked`() {
+        val line = "12:00:02.000 D/Engine: token Xy9kL2mNpQrStUvWx3yz0123456890123 rejected"
+        val masked = AppLog.Masking.mask(line)
+        assertFalse("secret leaked: $masked", masked.contains("Xy9kL2mNpQrStUvWx3yz0123456890123"))
+        assertTrue("masked: $masked", masked.contains("[redacted-key]"))
+    }
+
+    @Test
+    fun `an oc_zen key is still masked and caught before the generic rule`() {
+        val line = "12:00:03.000 I/Net: header oc_sk_TESTONLY_ab12cd34efgh5678"
+        val masked = AppLog.Masking.mask(line)
+        assertFalse(masked.contains("TESTONLY"))
+        assertTrue(masked.contains("[redacted-key]"))
+    }
+
+    @Test
+    fun `a brand-less sk- key is masked`() {
+        val line = "12:00:04.000 W/Net: 401 sk-TESTONLY_ab12cd34efgh5678"
+        val masked = AppLog.Masking.mask(line)
+        assertFalse(masked.contains("TESTONLY"))
+        assertTrue(masked.contains("[redacted-key]"))
+    }
+
+    @Test
+    fun `a pure hex uuid is not masked`() {
+        // Session and run ids are UUID-shaped everywhere in this app; masking
+        // each one would have shredded log timelines. The exclusion is the one
+        // written trade in the 25+ generic rule.
+        val id = "550e8400-e29b-41d4-a716-446655440000"
+        val line = "12:00:05.000 I/Chat: run $id completed in 900ms"
+        assertEquals(line, AppLog.Masking.mask(line))
+    }
+
+    @Test
+    fun `exception class names in a stack trace are not masked`() {
+        // No digits: real keys virtually always embed one, class names never
+        // do. A masked exception name would have gutted the crash evidence the
+        // whole log exists for.
+        val line =
+            "12:00:06.000 E/App: UNCAUGHT on 'x'\n" +
+            "java.lang.StringIndexOutOfBoundsException: length=3; index=9"
+        assertEquals(line, AppLog.Masking.mask(line))
+    }
+
+    @Test
+    fun `short lines pass through untouched`() {
+        assertEquals("12:00:00", AppLog.Masking.mask("12:00:00"))
+        assertEquals("", AppLog.Masking.mask(""))
+    }
+
+    @Test
+    fun `the secret hook defaults to the built-in mask`() {
+        assertNull(
+            "no custom hook by default - AppLog masks with its own Masking",
+            AppLog.secretMatcher
+        )
     }
 }

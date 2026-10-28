@@ -2,6 +2,7 @@ package com.crush.mobile
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -251,6 +252,15 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     // stayed true after the first unlock, so the
                                     // app never locked again.
                                     gateState.value = AppLockPolicy.Gate.OPEN
+                                    // The unlock path never goes through
+                                    // onPause/onResume (the activity stayed
+                                    // resumed under the overlay), so the flag
+                                    // backgrounding set must be dropped here -
+                                    // otherwise every user screenshot stays
+                                    // black for the rest of the session.
+                                    window.clearFlags(
+                                        WindowManager.LayoutParams.FLAG_SECURE
+                                    )
                                     // Stamp presence in the PROCESS-scoped lock
                                     // state so the imminent onResume honours the
                                     // fresh auth, and so an activity recreation
@@ -270,6 +280,17 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     }
 
     override fun onPause() {
+        // FLAG_SECURE BEFORE the platform picture is taken (2026-10-27). The
+        // task-switcher and screen-capture snapshot of this activity used to
+        // show whatever was on screen, so backgrounding the app put unlocked
+        // chat history into the OS screenshots bucket at
+        // /data/system_de/0/recent_images - outside app-private storage and
+        // readable with shell access. Setting the flag first means the
+        // system must render the task's update as black.
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
         super.onPause()
         container.lockState.notePause()
     }
@@ -322,6 +343,19 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         // Dropping the in-memory key on lock is the whole point of the gate.
         if (gate == AppLockPolicy.Gate.PROMPT) keySession.clear()
         gateState.value = gate
+        // Screenshots of unlocked chat are protected by the flag set in
+        // onPause; the gate decision decides whether they stay protected while
+        // the app is FOREGROUND too. Cleared only after the gate check has
+        // passed, so a locked resume never shows - or photographs - unlocked
+        // content behind the overlay.
+        if (gate == AppLockPolicy.Gate.OPEN) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE
+            )
+        }
         AppLog.i(
             "Main",
             "resume gate=$gate coldStart=$wasColdStart away=${trustAge ?: -1}s " +

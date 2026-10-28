@@ -168,8 +168,13 @@ open class SecureKeyStore(context: Context) {
                     Log.w(TAG, "ciphertext failed authentication for $providerId; clearing")
                     clear(providerId)
                 }
-                // The Keystore key is gone (device credentials changed, or the
-                // app was restored onto different hardware).
+                // The Keystore backend can no longer decrypt. NOT device
+                // credentials: the auth gate was removed (see the class KDoc),
+                // and without setUserAuthenticationRequired a changed PIN or a
+                // biometric re-enrollment does not invalidate a non-auth-bound
+                // key. What actually reaches this branch is the app's data
+                // being restored onto other hardware - the ciphertext travels
+                // with a backup but the hardware-backed key material does not.
                 is android.security.keystore.KeyPermanentlyInvalidatedException -> {
                     Log.w(TAG, "keystore key invalidated; clearing")
                     clearAll()

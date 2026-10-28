@@ -67,6 +67,22 @@ object AppLog {
     private val fmt = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
     private val writeLock = Any()
 
+    /**
+     * Replaces secret material in a log line before it is written anywhere.
+     *
+     * Deliberately a hook, not an injected dependency: AppLog is a plain object
+     * reachable from every layer, and a util->diagnostics import here would be
+     * an upside-down dependency. The default implementation is the built-in
+     * [Masking]; the diagnostics layer delegates to the SAME object, so there is
+     * exactly one regex set in the app and a caller may swap or extend it (a
+     * test stub, a stricter pattern set) without touching the write path.
+     *
+     * The hook must be a total function - it receives every persisted line and
+     * a throwing hook would take out the calling log call itself.
+     */
+    @Volatile
+    var secretMatcher: ((String) -> String)? = null
+
     fun init(context: Context) {
         synchronized(writeLock) {
             val dir = context.filesDir
@@ -111,21 +127,39 @@ object AppLog {
     fun e(tag: String, msg: String, t: Throwable? = null) = write("E", tag, msg, t)
 
     private fun write(level: String, tag: String, msg: String, t: Throwable?) {
+        // MASK AT THE SINK (2026-10-27). Redaction used to run only on the
+        // diagnostics copy-out, so the FILE this logger persists - the thing a
+        // friend is told to `cat` and send - held whatever a log call put in it,
+        // including `gsk_` Groq keys and any long high-entropy token that
+        // crashed through an engine log. Masking the message and the trace
+        // here covers BOTH sinks (logcat and the file) at one choke point, and
+        // the line format itself (`HH:mm:ss.SSS L/TAG: `) is left intact so the
+        // diagnostics' log parser keeps working on masked lines.
+        val match = secretMatcher ?: Masking::mask
+        val safeMsg = match(msg)
+        val safeTrace = t?.let { match(it.stackTraceToString()) }
+
         val body = buildString {
             append(fmt.format(Date()))
             append(' ').append(level).append('/').append(tag)
-            append(": ").append(msg)
-            t?.let { append('\n').append(it.stackTraceToString()) }
+            append(": ").append(safeMsg)
+            safeTrace?.let { append('\n').append(it) }
         }
 
         when (level) {
-            "E" -> Log.e(tag, msg, t)
-            "W" -> Log.w(tag, msg, t)
-            "I" -> Log.i(tag, msg, t)
-            else -> Log.d(tag, msg, t)
+            "E" -> Log.e(tag, safeMsg, t)
+            "W" -> Log.w(tag, safeMsg, t)
+            "I" -> Log.i(tag, safeMsg, t)
+            else -> Log.d(tag, safeMsg, t)
         }
 
         val f = file ?: return
+        // `file` is only ever constructed with an explicit parent, but that
+        // parent comes back typed-nullable. Resolving it once up front keeps
+        // both rotate and prune compile-time honest: a parentless File has no
+        // writable home anywhere below, so an early return beats a runtime
+        // error caught-and-swallowed at write time.
+        val dir = f.parentFile ?: return
         // Serialised so concurrent writers cannot interleave a line. The size is
         // cached rather than stat'd on every call, which is what a heartbeat
         // logging every second would otherwise pay each time.
@@ -137,10 +171,10 @@ object AppLog {
                     // and is replaced at init. A long-lived supervisor run that
                     // rolls several times must not erase what it archived an
                     // hour ago - and the day file survives the next launch.
-                    val sink = File(f.parentFile, archiveFileName(System.currentTimeMillis()))
+                    val sink = File(dir, archiveFileName(System.currentTimeMillis()))
                     rotateKeepingTail(f, sink, body, KEEP_ON_ROTATE)
                     sizeBytes = f.length()
-                    pruneArchives(f.parentFile, System.currentTimeMillis(), RETENTION_MS, MAX_ARCHIVE_BYTES)
+                    pruneArchives(dir, System.currentTimeMillis(), RETENTION_MS, MAX_ARCHIVE_BYTES)
                 } else {
                     f.appendText(body + "\n")
                     sizeBytes += body.length + 1
@@ -151,6 +185,72 @@ object AppLog {
 
     /** Path for the chaos harness / adb. */
     fun path(): String = file?.absolutePath ?: "(not initialised)"
+
+    /**
+     * The one regex set for credential-shaped text in this app.
+     *
+     * Used by [AppLog.write] for every persisted line, and delegated to by the
+     * diagnostics copy-out (`DiagnosticsReport.redactSecrets`), which used to
+     * own the patterns itself - two copies would eventually disagree about what
+     * counts as a secret, and the log file was the copy without a guard.
+     *
+     * Order matters and is a dependency between the patterns: the brand rules
+     * (oc_sk_, gsk_, sk-) run first because the generic high-entropy rule would
+     * otherwise swallow their tails indiscriminately.
+     *
+     * THE OVERREACH, ON RECORD: the 25+ rule trades precision for coverage.
+     * It can match a long non-secret token (a logged hash, a base64 chunk) that
+     * a brand rule would not. That is accepted on purpose - what must never
+     * reach the persisted log is unbounded; the cost of one over-masked line is
+     * a slightly less readable log. The written escape hatch: a token that is
+     * EXACTLY a hex UUID (8-4-4-4-12) is treated as an id, not a key, because
+     * session and run ids everywhere in this app are UUID-shaped and masking
+     * every one would have made log timelines unreadable. Exception names are
+     * the other mass false-positive risk, which is why the generic rule also
+     * requires at least one digit: real keys virtually always embed digits;
+     * class names like StringIndexOutOfBoundsException never do.
+     */
+    internal object Masking {
+
+        private const val MASKED = "[redacted-key]"
+
+        // OpenCode Zen key. Caught first: `oc_sk_foo` contains `sk_foo` and the
+        // brand-less rule must never clip its tail.
+        private val OC_SK = Regex("""oc_sk_[A-Za-z0-9_\-]{6,}""")
+        // Groq key, per the app's own Onboarding placeholder ("gsk_...").
+        private val GROQ = Regex("""gsk_[A-Za-z0-9_\-]{8,}""")
+        // Brand-less OpenAI-style keys, including Hyper's `sk-hyper-...`. The
+        // lookbehind keeps `mask_sk_...`-style identifiers from matching.
+        private val SK = Regex("""(?<![A-Za-z0-9_])sk-[A-Za-z0-9_\-]{8,}""")
+
+        /**
+         * Generic high-entropy token: a 25+ char run of key-ish characters
+         * containing at least one digit. Bounded by lookaround on both ends so
+         * the match is the whole maximal run, not a hinterland of a longer word.
+         */
+        private val GENERIC = Regex(
+            """(?<![A-Za-z0-9_\-])(?=[A-Za-z0-9_\-]*\d)[A-Za-z0-9_\-]{25,}(?![A-Za-z0-9_\-])"""
+        )
+
+        // Hex UUID, 8-4-4-4-12, accepted in either case: ids, not secrets.
+        private val UUID_SHAPE = Regex(
+            """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"""
+        )
+
+        fun mask(text: String): String {
+            // Shortest pattern floor is `sk-` + 8 = 11 chars: below that nothing
+            // can match, and the timestamp-only lines dominate log volume.
+            if (text.length < 11) return text
+            val first = OC_SK.replace(text, MASKED)
+            val second = GROQ.replace(first, MASKED)
+            val third = SK.replace(second, MASKED)
+            // Last, so it sees already-masked brand keys only through the
+            // bracketed placeholder, which is not itself key-shaped.
+            return GENERIC.replace(third) { m ->
+                if (m.value.matches(UUID_SHAPE)) m.value else MASKED
+            }
+        }
+    }
 }
 
 /**

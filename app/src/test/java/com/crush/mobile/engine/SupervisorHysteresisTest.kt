@@ -3,6 +3,7 @@ package com.crush.mobile.engine
 import com.crush.mobile.domain.model.DynamicPolicy
 import com.crush.mobile.domain.model.PressureLevel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -117,5 +118,52 @@ class SupervisorHysteresisTest {
     fun `the policy constant matches the documented intent`() {
         // If this ever changes, the loop test above documents the old behaviour.
         assertEquals(3, DynamicPolicy.CALM_SAMPLES_TO_RELAX)
+    }
+
+    // ---------------------------------------------------------------------
+    // Supervisor START-budget / wedge-budget rules (P1-10, P1-25SUP).
+    //
+    // These live here because the class's header documents the same principle:
+    // loop contract regressions are only catchable by replaying or pinning the
+    // CALLER's rule, not the helper it calls. Both rules are pure companion
+    // functions on EngineSupervisor (no process spawn) extracting the exact
+    // branch the supervise() loop uses.
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun `transient startup failures still retry within the budget`() {
+        // A slow first boot and a stale-socket early exit are both
+        // Failed(willRetry=true) now; attempts 1..MAX must keep retrying.
+        for (attempt in 1..EngineSupervisor.MAX_START_ATTEMPTS) {
+            assertFalse(
+                "attempt $attempt must still retry",
+                EngineSupervisor.startRetryGivesUp(attempt, failureWantsRetry = true)
+            )
+        }
+    }
+
+    @Test
+    fun `the start budget is finite - one past the cap gives up`() {
+        assertTrue(
+            "beyond the budget the supervisor must stop restarting",
+            EngineSupervisor.startRetryGivesUp(EngineSupervisor.MAX_START_ATTEMPTS + 1, true)
+        )
+    }
+
+    @Test
+    fun `hard startup failures give up immediately regardless of budget`() {
+        // Missing binary / exec denied never succeed on retry.
+        assertTrue(EngineSupervisor.startRetryGivesUp(1, failureWantsRetry = false))
+    }
+
+    @Test
+    fun `wedge budget tolerates cap-minus-one rapid restarts then refuses`() {
+        assertFalse(
+            EngineSupervisor.wedgeBudgetExhausted(EngineSupervisor.MAX_WEDGE_RESTARTS - 1)
+        )
+        assertTrue(
+            "at the cap the loop must surface a terminal failure instead of churning",
+            EngineSupervisor.wedgeBudgetExhausted(EngineSupervisor.MAX_WEDGE_RESTARTS)
+        )
     }
 }

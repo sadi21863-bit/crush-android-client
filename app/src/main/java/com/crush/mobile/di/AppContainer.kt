@@ -1,6 +1,7 @@
 package com.crush.mobile.di
 
 import android.content.Context
+import com.crush.mobile.data.crush.WorkspaceManager
 import com.crush.mobile.data.local.KeySession
 import com.crush.mobile.data.local.LockState
 import com.crush.mobile.data.local.SettingsDataStore
@@ -79,6 +80,20 @@ class AppContainer(context: Context) {
                     appContext = appContext
                 ).also { s ->
                 supervisorInstance = s
+                // P1-11: a workspace id is minted PER ENGINE PROCESS, so the
+                // moment a new engine run reaches Running, every id minted by
+                // the previous run is dead regardless of how fresh the lease
+                // claims it is - the 15s freshness rule alone cannot see an
+                // engine restart. This ONE registration on the ONE supervisor
+                // singleton (see the two-loop story above: registering
+                // anywhere else risks a second loop or a second registration)
+                // bumps WorkspaceManager's engine-generation counter; every
+                // manager instance then fails closed on any cached id minted
+                // by an older generation and re-POSTs the idempotent
+                // /workspaces attach.
+                s.onEngineStart {
+                    WorkspaceManager.onEngineRestarted()
+                }
                 applyTuning(
                     TuningPolicy.resolve(deviceProfile, TuningPolicy.Overrides())
                 )
@@ -121,5 +136,28 @@ class AppContainer(context: Context) {
     private fun applyTuning(t: TuningPolicy.Resolved) {
         supervisorInstance?.tuning = t
         crushEngine.setIdleTimeoutSec(t.engineIdleTimeoutSec)
+    }
+
+    /**
+     * Production teardown path (P1-10).
+     *
+     * Until today ONLY the spike harness (SpikeActivity) called
+     * EngineSupervisor.stop(), so a UI-launched engine process outlived the UI
+     * and kept binding the app-private socket for nothing. Android does not
+     * guarantee Application.onTerminate() will ever be called (the process is
+     * usually killed outright with no callback), so this hook ENABLES clean
+     * teardown for the termination paths that do call back - it cannot
+     * guarantee the OS honours it. That limitation is documented at the call
+     * site in CrushMobileApp.onTerminate(); the honest goal of this fix is
+     * "teardown exists and is wired", not "teardown is guaranteed".
+     *
+     * Only touches an ALREADY-MATERIALISED supervisor: constructing it here
+     * would lazily build the engine, spawn the settings collector - and for an
+     * app being torn down that is pure waste, plus the collector would race
+     * stop() on the new instance.
+     */
+    fun shutdown() {
+        val s = synchronized(this) { supervisorInstance }
+        s?.stop()
     }
 }

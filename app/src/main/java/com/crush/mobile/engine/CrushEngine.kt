@@ -222,7 +222,18 @@ class CrushEngine(
                     return@withContext EngineState.Failed(
                         reason = "Engine exited during startup (exit $code)",
                         detail = tailLog(),
-                        willRetry = false
+                        // P1-10: the most common non-config cause of an
+                        // early exit is a bind failure on the socket file -
+                        // usually a stale socket file left by a crashed
+                        // previous engine run. That is NOT a hard error: the
+                        // engine itself removes a stale socket before
+                        // listening (net_other.go, see the bind comment
+                        // above), so a retry has a real chance of clearing
+                        // it. The START budget in EngineSupervisor
+                        // (MAX_START_ATTEMPTS) bounds the retry loop; a
+                        // genuinely hard failure (missing binary, exec
+                        // denied) never reaches this branch.
+                        willRetry = true
                     )
                 }
                 // Readiness probe over the socket. EngineSockets.probe returns
@@ -252,7 +263,16 @@ class CrushEngine(
             EngineState.Failed(
                 reason = "Engine did not become healthy within ${timeoutMs / 1000}s",
                 detail = tailLog(),
-                willRetry = false
+                // P1-10: exactly ONE slow cold boot at 60s used to leave the
+                // user stranded in Failed(willRetry=false) forever - a slow
+                // first boot (cold disk, catalog population under writeMu
+                // measured ~5s alone, memory pressure) is transient, so it
+                // must retry rather than strand. The retry budget is bounded
+                // by EngineSupervisor's MAX_START_ATTEMPTS backoff ladder, so
+                // this cannot become an infinite loop; keep willRetry=false
+                // for the genuinely hard failures (missing binary, exec
+                // failure) above.
+                willRetry = true
             )
         }
     }

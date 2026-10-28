@@ -41,9 +41,8 @@ object EngineConfigInjector {
 
     /**
      * One model as the engine's config wants it (schema of Catwalk's Model,
-     * the subset the engine reads). `cost` fields are 0 not because these
-     * models are free but because the engine's own default (from its stale
-     * catalogue) is what the picker overrides anyway.
+     * the subset the engine reads). Deliberately carries NO cost fields - see
+     * [toJson] for why a zero cost was banned from these specs.
      */
     data class ModelSpec(
         val id: String,
@@ -183,8 +182,15 @@ object EngineConfigInjector {
             }
         }
         addProperty("supports_images", false)
-        addProperty("cost_per_1m_input_tokens", 0)
-        addProperty("cost_per_1m_output_tokens", 0)
-        addProperty("cost_per_1m_cached_input_tokens", 0)
+        // NO cost fields (P2-21). The old 2026-10-17 frozen table wrote
+        // cost_per_1m_* = 0 for every injected id, and ZenModelsApi treats an
+        // engine-reported 0 as "known free" - so a paid Groq model was
+        // labelled free on the strength of a spreadsheet snapshot. Zero is
+        // also unfixable later: absence can be filled in by discovery, an
+        // explicit 0 has to be actively overwritten. Cost truth comes from
+        // LIVE catalogue discovery (the engine's own Catwalk cache, patched
+        // through /providers pricing), never from this frozen table, so the
+        // injected specs omit the fields and let the engine/its catalogue
+        // carry real numbers - or no number, which is honest.
     }
 }

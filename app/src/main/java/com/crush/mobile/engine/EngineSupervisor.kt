@@ -29,11 +29,13 @@ class EngineSupervisor(
     private val engine: CrushEngine,
     private val scope: CoroutineScope,
     /**
-     * Runtime tuning, resolved from static auto-tuning plus any user override
-     * (see TuningPolicy). Mutable so a settings change takes effect without a
-     * process restart.
+     * Initial runtime tuning, resolved from static auto-tuning plus any user
+     * override (see TuningPolicy). This parameter only SEEDS the backing
+     * field; every later write must go through the public [tuning] setter,
+     * which is what makes a settings change visible to the pressure loop
+     * without a process restart.
      */
-    @Volatile var tuning: com.crush.mobile.domain.model.TuningPolicy.Resolved =
+    tuning: com.crush.mobile.domain.model.TuningPolicy.Resolved =
         com.crush.mobile.domain.model.TuningPolicy.resolve(
             com.crush.mobile.domain.model.DeviceProfile(
                 apiLevel = android.os.Build.VERSION.SDK_INT,
@@ -56,6 +58,79 @@ class EngineSupervisor(
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Stopped)
     val state: StateFlow<EngineState> = _state.asStateFlow()
+
+    /**
+     * The live policy value. The pressure loop writes this field DIRECTLY
+     * (never through the [tuning] setter): a derived, pressure-adjusted value
+     * must not masquerade as a user settings change - see [tuningRevision].
+     */
+    @Volatile
+    private var tuningValue: com.crush.mobile.domain.model.TuningPolicy.Resolved = tuning
+
+    /**
+     * Monotonic revision of USER-supplied settings (audit SUP-01, round two).
+     *
+     * The previous detection compared the current `tuning` against both the
+     * unadjusted base and the last derived value by EQUALITY. That cannot
+     * separate three cases: (a) the user changed a value, (b) this loop wrote
+     * its own pressure-adjusted derivative, (c) the user changed a value BACK
+     * to what it was before pressure modified it - case (c) is invisible to
+     * any equality check and was silently dropped.
+     *
+     * A revision counter has none of those blind spots: the ONLY writer is the
+     * [tuning] setter, so every bump means some external caller (AppContainer,
+     * from real settings) handed over a new base policy, whatever its value.
+     *
+     * Race note: the setter records the value first, then bumps the counter.
+     * A poll that reads the old counter with the new value simply re-derives
+     * from a base one poll older than it should be and corrects on the next
+     * iteration; the reverse order (bump first) could read a NEW revision with
+     * the OLD value and latch a stale base, so this order is deliberate.
+     */
+    private val tuningRevision = java.util.concurrent.atomic.AtomicLong()
+
+    /**
+     * Runtime tuning as seen by every reader (the poll loop reads the getter
+     * for interval/grace values). Assigning from OUTSIDE the supervisor (the
+     * user changed a setting) marks the new base as unabsorbed via
+     * [tuningRevision]; the pressure loop never assigns here - see
+     * [tuningValue].
+     */
+    var tuning: com.crush.mobile.domain.model.TuningPolicy.Resolved
+        get() = tuningValue
+        set(value) {
+            tuningValue = value
+            tuningRevision.incrementAndGet()
+        }
+
+    /**
+     * Listeners notified once per SUCCESSFUL start of a NEW engine run, right
+     * after the run reaches [EngineState.Running].
+     *
+     * Why this exists (P1-11): Crush mints a workspace id per engine process,
+     * so a restart voids every id minted by the previous run. The engine does
+     * not know about workspace ids and WorkspaceManager instances are created
+     * outside the DI graph, so the supervisor - which knows exactly when a new
+     * engine generation begins - exposes the moment and lets the DI wiring
+     * (AppContainer) push it into whichever layer owns the ids.
+     *
+     * CopyOnWriteArrayList: listeners are registered once at DI time and never
+     * removed; reads dominate writes. The re-entrant early-return path in
+     * [CrushEngine.start] ("process already alive") deliberately does NOT
+     * notify - that is the SAME run continuing, not a new engine generation.
+     */
+    private val startListeners =
+        java.util.concurrent.CopyOnWriteArrayList<(EngineState.Running) -> Unit>()
+
+    /** Registers a listener fired at every new engine run's [Running] moment. */
+    fun onEngineStart(fn: (EngineState.Running) -> Unit) {
+        startListeners.add(fn)
+    }
+
+    /** Listener exceptions must never kill the supervision loop. */
+    private fun notifyEngineStart(running: EngineState.Running) {
+        for (fn in startListeners) runCatching { fn(running) }
+    }
 
     private var supervisorJob: Job? = null
 
@@ -85,6 +160,13 @@ class EngineSupervisor(
 
     private suspend fun supervise() {
         var attempt = 0
+        // Wedge tracking (P1-25SUP): how many restarts in a row happened
+        // WITHOUT the engine ever staying Running for MIN_HEALTHY_RUN_MS.
+        // Dying instantly on every boot (bad socket file, hostile file state,
+        // native crash at boot) without this cap produces an unbounded
+        // restart loop at backoff pace forever.
+        var wedgeRestarts = 0
+        var runningSince = 0L
         while (currentCoroutineContext().isActive && isWanted()) {
             attempt++
             _state.value = EngineState.Starting(attempt)
@@ -92,7 +174,10 @@ class EngineSupervisor(
             when (val result = engine.start()) {
                 is EngineState.Running -> {
                     attempt = 0
+                    wedgeRestarts = 0
+                    runningSince = System.currentTimeMillis()
                     _state.value = result
+                    notifyEngineStart(result)
 
                     // Poll inline. Returns true to restart, false to exit.
                     // Health runs over the same Unix domain socket the engine
@@ -102,15 +187,61 @@ class EngineSupervisor(
                     if (!shouldRestart) return
 
                     Log.i(TAG, "engine unhealthy; restarting")
+                    // Wedge cap: a run that never lasted MIN_HEALTHY_RUN_MS is
+                    // a boot-phase failure, not a regression under load. After
+                    // MAX_WEDGE_RESTARTS of them in a row, give up - the user
+                    // gets an honest terminal state instead of a battery-drain
+                    // churn cycle. A run that DID last the stretch resets the
+                    // count, so one bad boot after weeks of healthy use
+                    // restarts with a full budget.
+                    val ranMs = System.currentTimeMillis() - runningSince
+                    if (ranMs < MIN_HEALTHY_RUN_MS) {
+                        wedgeRestarts++
+                        if (wedgeBudgetExhausted(wedgeRestarts)) {
+                            Log.e(
+                                TAG,
+                                "engine wedged $wedgeRestarts times in a row without ever " +
+                                    "staying Running ${MIN_HEALTHY_RUN_MS / 1000}s; giving up"
+                            )
+                            engine.stopBlocking()
+                            _state.value = EngineState.Failed(
+                                reason = "Engine repeatedly failed to stay running",
+                                detail = "$wedgeRestarts rapid restarts in a row, none lasting " +
+                                    "${MIN_HEALTHY_RUN_MS / 1000}s",
+                                willRetry = false
+                            )
+                            return
+                        }
+                    } else {
+                        wedgeRestarts = 0
+                    }
                     engine.stopBlocking()
                     delay(RESTART_DELAY_MS)
                 }
 
                 is EngineState.Failed -> {
+                    // P1-10: a cold boot on a slow device can legitimately
+                    // exceed the engine's 60s readiness window, and CrushEngine
+                    // now classifies both that timeout and an early exit as
+                    // RETRYABLE (stale socket files are the most common cause
+                    // of the latter, and the engine removes its own stale
+                    // socket before listening). The budget lives HERE so the
+                    // retirable classification can never become an infinite
+                    // loop: MAX_START_ATTEMPTS consecutive failures then a real
+                    // terminal Failed(willRetry=false).
+                    if (startRetryGivesUp(attempt, result.willRetry)) {
+                        Log.e(
+                            TAG,
+                            "startup failed permanently after $attempt attempts " +
+                                "(budget $MAX_START_ATTEMPTS): ${result.reason}"
+                        )
+                        // Report through the same state the caller would have
+                        // seen; only the retry promise flips, so the UI shows
+                        // a terminal error instead of an eternal spinner.
+                        _state.value = if (result.willRetry) result.copy(willRetry = false) else result
+                        return
+                    }
                     _state.value = result
-                    // A non-retryable failure (missing binary, exec denied) will
-                    // never succeed on retry, so surface it and stop.
-                    if (!result.willRetry) return
                     delay(backoffMs(attempt))
                 }
 
@@ -146,7 +277,8 @@ class EngineSupervisor(
  * the workspace SSE stream, so while a stream or agent run is active the server
  * can be slow to answer /v1/version. Treating a single slow probe as "dead" tore
  * down healthy engines mid-session and invalidated the held workspace id. So an
- * alive-but-failing engine must persist for [HANG_GRACE_MS], and [isWorkActive]
+ * alive-but-failing engine must persist for the configured hang grace
+ * (tuning.hangGraceSec), and [isWorkActive]
  * suspends that judgement entirely.
  *
  * [socketFile] may be null when the supervisor was built without an application
@@ -174,9 +306,17 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
         // `desiredBase` is now only ever written when the effective policy
         // changes, so it always holds the unadjusted user resolution.
         var desiredBase = tuning
-        // The last value actually derived from desiredBase under pressure. Used
-        // only to distinguish "settings changed" from "we adjusted it ourselves".
-        var lastEffective = tuning
+        // SUP-01, mechanism switched to a REVISION counter: the equality pair
+        // `tuning != desiredBase && tuning != lastEffective` could not tell a
+        // real user settings change from the loop's own derived write, and
+        // missed a user changing a value back to a previously-derived value
+        // entirely. Now the public [tuning] setter is the only writer that
+        // bumps [tuningRevision]; any counter value newer than the one we last
+        // absorbed IS an external settings change, whatever the values say.
+        // Seeded at loop entry so user changes that landed while the engine
+        // was already healthy and merely entered monitoring are absorbed, not
+        // treated as "something to re-derive" over and over.
+        var absorbedRevision = tuningRevision.get()
         while (currentCoroutineContext().isActive && isWanted()) {
             delay(tuning.healthIntervalSec * 1000L)
 
@@ -202,9 +342,12 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
                     )
                 }.getOrNull()
                 if (signals != null) {
-                    // A settings change must update the BASE, never be compared
-                    // against a previously pressure-shrunk value.
-                    if (tuning != desiredBase && tuning != lastEffective) {
+                    // A settings change is now detected by the REVISION bump on
+                    // [tuning], not by object equality (above). Absorb any
+                    // unabsorbed external change into the unadjusted base.
+                    val currentRevision = tuningRevision.get()
+                    if (currentRevision != absorbedRevision) {
+                        absorbedRevision = currentRevision
                         desiredBase = tuning
                     }
                     val observed = com.crush.mobile.domain.model.DynamicPolicy.pressureOf(signals)
@@ -228,10 +371,15 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
                     // repeated CRITICAL samples divided the idle timeout down to
                     // the floor where it stuck permanently.
                     val derived = effectiveTuningFor(desiredBase, signals, effective)
-                    if (effective != pressure || derived != tuning) {
+                    if (effective != pressure || derived != tuningValue) {
                         pressure = effective
-                        tuning = derived
-                        lastEffective = derived
+                        // Direct FIELD write, deliberately not `tuning =`:
+                        // routing a derived value through the public setter
+                        // would bump the revision counter, and the next poll
+                        // would read our own derivative as a "user settings
+                        // change" - re-deriving from an already pressure-shrunk
+                        // base, which is exactly the original SUP-01 defect.
+                        tuningValue = derived
                         Log.i(TAG, "dynamic tuning: pressure=$effective idle=${derived.engineIdleTimeoutSec}s")
                     }
                 }
@@ -322,7 +470,8 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
      *
      * The 5s connect/read timeouts are preserved from the previous probe
      * rather than EngineSockets' 1.2s defaults: hang detection must stay
-     * patient, and its escalation is bounded by [HANG_GRACE_MS] anyway.
+     * patient, and its escalation is bounded by the configured tuning hang
+     * grace (see monitorUntilUnhealthy) anyway.
      */
     private suspend fun probeVersion(socketFile: File?): Boolean {
         if (socketFile == null) return true
@@ -337,8 +486,15 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
     private fun backoffMs(attempt: Int): Long =
         (INITIAL_BACKOFF_MS shl (attempt - 1).coerceIn(0, 5)).coerceAtMost(MAX_BACKOFF_MS)
 
-    private companion object {
-        const val TAG = "EngineSupervisor"
+    /**
+     * Companion is deliberately NOT private: SupervisorHysteresisTest pins the
+     * pure give-up rules (startRetryGivesUp / wedgeBudgetExhausted) through
+     * the companion's internal members, and keeping the companion unlocked
+     * removes any ambiguity about whether a private companion gates external
+     * member access to them.
+     */
+    companion object {
+        private const val TAG = "EngineSupervisor"
 
         /**
          * Applies current pressure to the UNADJUSTED base policy.
@@ -348,23 +504,62 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
          * a previously pressure-adjusted value - that mistake (audit SUP-01)
          * compounded the reduction until it hit the floor and stuck there.
          */
-        fun effectiveTuningFor(
+        private fun effectiveTuningFor(
             base: com.crush.mobile.domain.model.TuningPolicy.Resolved,
             signals: com.crush.mobile.domain.model.RuntimeSignals,
             pressure: com.crush.mobile.domain.model.PressureLevel
         ): com.crush.mobile.domain.model.TuningPolicy.Resolved =
             com.crush.mobile.domain.model.DynamicPolicy.applySafely(base, signals, pressure)
         /**
-         * Legacy defaults, kept only as the pre-tuning fallback. Live values
-         * come from [tuning]. At 10s per probe a 60s grace is ~6 consecutive
-         * failures: long enough that a busy engine is never killed mid-turn,
-         * short enough that a real deadlock resolves within a minute.
+         * The dead legacy constants HANG_GRACE_MS / HEALTH_INTERVAL_MS are DELETED
+         * (P1-25SUP): since tuning moved to TuningPolicy, live values come from
+         * [tuning].healthIntervalSec / [tuning].hangGraceSec and these copies of the
+         * numbers were referenced by nothing - a second thing anyone editing the
+         * grace had to remember to update, and a lie waiting to be trusted.
          */
-        const val HANG_GRACE_MS = 60_000L
-        const val HEALTH_INTERVAL_MS = 10_000L
-
         const val RESTART_DELAY_MS = 1_000L
         const val INITIAL_BACKOFF_MS = 1_000L
         const val MAX_BACKOFF_MS = 30_000L
+
+        /**
+         * Bounded START-failure budget (P1-10): how many consecutive
+         * Failed(willRetry=true) results the loop still honours before it
+         * reports a terminal failure. attempt counts FAILURES: attempts 1..3
+         * retry with the existing backoff; a 4th consecutive failure gives
+         * up. Reset to 0 by every successful start.
+         */
+        const val MAX_START_ATTEMPTS = 3
+
+        /**
+         * Wedge-restart cap (P1-25SUP): how many consecutive restarts of a
+         * run that never survived [MIN_HEALTHY_RUN_MS] the loop performs
+         * before reporting a terminal failure.
+         */
+        const val MAX_WEDGE_RESTARTS = 5
+
+        /**
+         * The minimum Running stretch that counts as a non-wedged life.
+         * Aligned with the old 60s hang-grace unit: an engine that served
+         * traffic for a minute and THEN died is a separate diagnosis with a
+         * full wedge budget again; an engine that cannot boot into a minute
+         * of life five times in a row is not going to.
+         */
+        const val MIN_HEALTHY_RUN_MS = 60_000L
+
+        /**
+         * Pure give-up rule for the START budget, split out so SupervisorHysteresisTest
+         * can pin the boundary without spawning an engine process. `attempt` is the
+         * count of CONSECUTIVE failures (the supervisor zeroes it on every
+         * successful start).
+         */
+        internal fun startRetryGivesUp(attempt: Int, failureWantsRetry: Boolean): Boolean =
+            !failureWantsRetry || attempt > MAX_START_ATTEMPTS
+
+        /**
+         * Pure wedge rule, same reason: an engine that skipped a full healthy
+         * stretch on this many consecutive starts is not going to boot.
+         */
+        internal fun wedgeBudgetExhausted(consecutiveShortRuns: Int): Boolean =
+            consecutiveShortRuns >= MAX_WEDGE_RESTARTS
     }
 }

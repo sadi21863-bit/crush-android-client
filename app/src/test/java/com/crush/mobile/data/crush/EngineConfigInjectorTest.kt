@@ -109,6 +109,35 @@ class EngineConfigInjectorTest {
         assertEquals(listOf("low", "medium", "high"), oss.reasoningEfforts)
     }
 
+    /**
+     * P2-21: the frozen 2026-10-17 table used to write cost_per_1m_* = 0,
+     * which ZenModelsApi then read as "known free" - a paid model labelled
+     * free by a stale spreadsheet. The fix is ABSENCE, not a corrected
+     * number: absence can be filled by live catalogue discovery, an explicit
+     * 0 has to be actively overwritten. Pin that no cost key ever comes back.
+     */
+    @Test
+    fun `injected models claim NO cost - zero must never be written as a free claim`() {
+        val dir = tmp.newFolder("no-cost")
+        sync(dir)
+        val models = JsonParser.parseString(java.io.File(dir, "crush.json").readText())
+            .asJsonObject.getAsJsonObject("providers")
+            .getAsJsonObject("groq").getAsJsonArray("models")
+        for (m in models) {
+            val o = m.asJsonObject
+            for (key in listOf(
+                "cost_per_1m_input_tokens",
+                "cost_per_1m_output_tokens",
+                "cost_per_1m_cached_input_tokens"
+            )) {
+                assertFalse(
+                    "$key must be absent: a frozen-table 0 reads as a known-free claim",
+                    o.has(key)
+                )
+            }
+        }
+    }
+
     @Test
     fun `unknown provider gets no override`() {
         assertTrue(EngineConfigInjector.providerCatalog("does-not-exist").isEmpty())

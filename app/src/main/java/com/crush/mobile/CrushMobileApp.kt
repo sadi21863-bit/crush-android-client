@@ -83,6 +83,30 @@ class CrushMobileApp : Application() {
         })
     }
 
+    /**
+     * P1-10: production never TORE the engine down - only the spike harness
+     * called EngineSupervisor.stop(). This is the wiring that makes teardown
+     * exist for the real app: stop() cancels the supervision loop and destroys
+     * the child Crush process, so an explicitly terminated app leaves no
+     * orphaned engine holding the app-private unix socket.
+     *
+     * HONEST LIMITATION, deliberately not hidden: Android does not guarantee
+     * this callback at all. The normal death of an app process (swipe-away,
+     * OOM kill, crash) never reaches onTerminate(); it fires only for explicit
+     * termination requests. So this hook ENABLES the previously dead teardown
+     * path for the termination requests that do call back; it cannot guarantee
+     * the OS invokes it. See AppContainer.shutdown() - the honest fallback
+     * route, kept minimal on purpose rather than adding the
+     * androidx.lifecycle-process ProcessLifecycleOwner hook, whose dependency
+     * is not present in app/build.gradle.kts.
+     */
+    override fun onTerminate() {
+        AppLog.i(TAG, "app terminating; stopping embedded engine")
+        runCatching { container.shutdown() }
+            .onFailure { AppLog.e(TAG, "engine teardown failed", it) }
+        super.onTerminate()
+    }
+
     private companion object {
         const val TAG = "App"
     }

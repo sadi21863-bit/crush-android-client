@@ -201,13 +201,21 @@ App-side mitigations:
 
 ## Known issues
 
-- **ASK-mode tool turns hang: the engine never publishes permission asks (D12).**
-  Captured live 2026-10-25 on engine v0.98.1: a tool turn waiting for approval
-  published nothing on the events stream, and the session events route is a
-  404. The app's ask handler is wired and correct, but no event ever reaches
-  it, so a mutating tool turn in ASK mode stalls until the 180s stream timeout
-  shows "no reply received". Workaround: AUTO mode runs mutating tools end to
-  end (proven). Upstream crush fix required; see docs/project-analysis.md D12.
+- **ASK-mode ask cards: two defects, both fixed — live device re-test pending (D12).**
+  Captured live 2026-10-25 on engine v0.98.1: the engine never published
+  permission asks at all (that half needed the v0.98.2 engine). On
+  2026-10-27 an instrumented v0.98.2 engine proved the ask WAS published,
+  session-filtered, and written to the live SSE stream — yet the app showed
+  no card and no "permission requested" log. The second defect was the
+  app's `CrushEventRouter`: events with no run id (`permission_request`,
+  `question_batch_request`, and every `message` frame) went only to
+  catch-all channels, and nothing in the app subscribes to catch-alls, so
+  the frames were silently dropped. The fix fans anonymous events to every
+  registered run (i.e. the in-flight turn) and is pinned by unit tests.
+  Side effect of the same bug now fixed: streaming text should now render
+  live instead of appearing only when the turn ends. Workaround while the
+  fix is untested on device: AUTO mode runs mutating tools end to end
+  (proven). See docs/project-analysis.md D12.
 - **Tool-call wire format — CONFIRMED (D3, 2026-10-25).** `tool_call` parts
   arrive as `{"type":"tool_call","data":{"id","name","input","finished"}}`,
   where `input` is the tool arguments as a JSON string and `finished` is a
@@ -250,7 +258,7 @@ App-side mitigations:
   hardcoded id is fed to the provider any more (that guess was the "large model
   not found in provider" a friend hit on a fresh install). Discovery-first
   bootstrap probes a live id before the app reports ready.
-- **Multi-provider plumbing is in; only one provider is verified.** See [docs/providers.md](docs/providers.md). Twelve Catwalk ids are offered and the provider is chosen in Settings, but opencode-zen is the only one that has completed a handshake on a device - everything else is labelled unverified rather than claimed working.
+- **Multi-provider plumbing is in; three providers verified to varying degrees.** See [docs/providers.md](docs/providers.md). Thirteen Catwalk ids are offered and the provider is chosen in Settings; `opencode-zen` and `openrouter` have completed handshakes on a device, `groq` was probe-verified but is parked as a test target after a key rotation - everything else is labelled unverified rather than claimed working.
 - **OAuth is not implemented.** Crush exposes /config/refresh-oauth and a Copilot import; the app calls neither. The endpoint that *initiates* an OAuth flow is not in the spec at all, so the redirect capture would have to be built from scratch.
 - **`WorkspaceLease` and the force-retry paths are NOT dead scaffolding.** An
   earlier revision of this README called them redundant relics of the
@@ -259,6 +267,11 @@ App-side mitigations:
   `WorkspaceManager.kt:132` and in the ChatViewModel send loop.
 - **No `androidTest` instrumentation suite.** The app-lock flow is covered by a
   JVM policy suite; the real credential + Keystore path can only run on device.
+- **Store/R8/keystore decisions are parked, not lost.** Lint stays disabled
+  behind an untriaged AGP/lint crash, no signed release has ever shipped, a
+  plaintext test key still sits at the repo root, and a few other
+  human-gated trades are catalogued with their evidence in
+  [docs/decisions-open.md](docs/decisions-open.md).
 
 ## Toolchain
 

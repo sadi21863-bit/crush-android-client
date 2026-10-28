@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            The test harness (CrushSmokeTest, FullE2ETest, fault injection) is
+            NOT a launcher entry. It used to be, which put a second "Crush Spike"
+            icon in the app drawer and exposed a debug surface to anyone holding
+            the phone. It stays reachable for development via an explicit intent:
+
+                adb shell am start -n com.crush.mobile/.ui.screens.spike.SpikeActivity
+
+            exported="false" keeps it off other apps' reach entirely.
+
+            Moved here (2026-10-27) from the main manifest together with the
+            spike source files in src/debug/java/, so nothing in this file is
+            merged into release builds.
+        -->
+        <activity
+            android:name=".ui.screens.spike.SpikeActivity"
+            android:exported="false"
+            android:label="Crush Spike"
+            android:theme="@style/Theme.CrushMobile" />
+    </application>
+</manifest>

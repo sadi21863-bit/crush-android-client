@@ -1865,7 +1865,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             //
             // Only state.isStreaming used to be cleared here. The bubble's own
             // isStreaming flag was cleared by `run_complete` inside awaitStream, so
-            // any turn that ended WITHOUT one - the 180s timeout, an SSE that
+            // any turn that ended WITHOUT one - the prompt-wait ceiling, an SSE that
             // delivered nothing, an exception between the POST and the first frame -
             // left a permanent "thinking..." bubble.
             //
@@ -1955,8 +1955,8 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      * replayed message frames can arrive before the text part lands, and an
      * empty assistant bubble reads as "no reply" rather than "still loading".
      *
-     * TIMEOUTS (analysis §4 P0-2) - two layered deadlines, both ending in a
-     * SERVER-SIDE cancel:
+     * TIMEOUTS (analysis §4 P0-2) - layered, all ending in a SERVER-SIDE
+     * cancel:
      *
      *  - STREAM_IDLE_MS per-frame idle: the previously single
      *    withTimeoutOrNull(collect) treated the whole turn as one winner-takes-
@@ -1964,9 +1964,17 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      *    streams one token every slow minute) died at exactly 180s even though
      *    the agent was demonstrably alive. Frames now reset the idle clock via
      *    a per-receive race, so only a genuinely SILENT agent expires early.
-     *  - STREAM_TIMEOUT_MS total: unchanged in value, kept as the absolute
-     *    ceiling so a wedged-but-chattering run still cannot hold the turn
-     *    open forever.
+     *  - PROMPT_WAIT_MS per parked prompt: while an ask/question dialog
+     *    stands, the engine is legitimately silent - it parks ON the user's
+     *    decision - so the idle race is suspended there (device 2026-10-29:
+     *    the z4 ask was cancelled by its own 20s idle race exactly 20s after
+     *    the dialog opened, with the turn healthy). The STREAM_TIMEOUT_MS
+     *    TOTAL cap was then only able to kill the other healthy cases: a long
+     *    multi-tool turn streamed past 180s, and a user reading the ask
+     *    parked past it (both proven live, z6/z7); with real silence covered
+     *    by idle and parked silence covered by PROMPT_WAIT_MS, the total cap
+     *    had no job left and is removed. A never-answered dialog still ends
+     *    the turn via the prompt ceiling - awaited server cancel first.
      *
      * Expiry is not the old silent give-up: ask the engine to cancel the run
      * first and AWAIT that POST (via the handle's frozen target, exactly like
@@ -1980,8 +1988,7 @@ class ChatViewModel(private val context: Context, private val container: AppCont
         runId: String,
         handle: RunHandle
     ) {
-        val timedOut = withTimeoutOrNull(STREAM_TIMEOUT_MS) {
-            coroutineScope {
+        coroutineScope {
                 // The two event sources have different shapes: the shared
                 // router hands over a Channel, the per-turn fallback is a
                 // callbackFlow. Funneling both into ONE local channel gives the
@@ -2012,6 +2019,35 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                         frames.close()
                     }
                 }
+                // While an ask/question dialog stands open the engine is
+                // PARKED, not silent, so the 20s idle race must not fire
+                // (z4, 2026-10-29). Parked receives race the remaining
+                // PROMPT_WAIT ceiling instead, so a prompt nobody answers
+                // still ends the turn with the same awaited server cancel
+                // the other expiries use; answering the dialog (or any
+                // stray frame) hands control back to the frame loop's
+                // normal idle regime.
+                suspend fun receiveWhilePromptOpen(): kotlinx.coroutines.channels.ChannelResult<CrushEvent> {
+                    var promptStartMs = 0L
+                    while (true) {
+                        val nowMs = System.currentTimeMillis()
+                        if (promptStartMs == 0L) promptStartMs = nowMs
+                        val remaining = PROMPT_WAIT_MS - (nowMs - promptStartMs)
+                        if (remaining <= 0L) {
+                            if (!handle.isStopped) {
+                                AppLog.w(
+                                    TAG,
+                                    "prompt unanswered > ${PROMPT_WAIT_MS / 60000}min " +
+                                        "for run ${handle.turnId}; requesting engine cancel"
+                                )
+                                awaitServerCancel(handle)
+                            }
+                            throw StopStream()
+                        }
+                        val waiting = withTimeoutOrNull(remaining) { frames.receiveCatching() }
+                        if (waiting != null) return waiting
+                    }
+                }
                 try {
                     var foreignRunCompletes = 0
                     while (true) {
@@ -2021,16 +2057,15 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                         // exactly 20s after the dialog opens - the z4 probe
                         // died this way on 2026-10-29 ("stream idle > 20s" 20s
                         // after "permission requested") while its own dialog
-                        // stood open. While a prompt is pending, receive
-                        // unbounded; the OUTER total deadline remains the only
-                        // ceiling, so a never-answered dialog still ends the
-                        // turn, and answering either prompt immediately
-                        // restores framed activity.
+                        // stood open. Parked prompts wait in
+                        // [receiveWhilePromptOpen], which races the prompt
+                        // ceiling instead; the frame loop relies on the
+                        // per-frame idle race for everything else.
                         val waitingOnPrompt =
                             _state.value.pendingPermission != null ||
                                 _state.value.pendingQuestion != null
                         val got =
-                            if (waitingOnPrompt) frames.receiveCatching()
+                            if (waitingOnPrompt) receiveWhilePromptOpen()
                             else withTimeoutOrNull(STREAM_IDLE_MS) { frames.receiveCatching() }
                         if (got == null) {
                             // Idle deadline expired: the engine went silent on
@@ -2155,22 +2190,6 @@ class ChatViewModel(private val context: Context, private val container: AppCont
                     frames.close()
                     feeder.cancel()
                 }
-            }
-        } == null
-        if (timedOut) {
-            // Total deadline tripped while the engine kept dribbling frames
-            // (or wedged without any): same treatment as idle - a server-side
-            // cancel awaited THEN end of turn, so the job that waits on the
-            // cancel holds workActive to the last moment (P0-2).
-            if (!handle.isStopped) {
-                AppLog.w(
-                    TAG,
-                    "stream total timeout after ${STREAM_TIMEOUT_MS / 1000}s for run " +
-                        "${handle.turnId}; requesting engine cancel"
-                )
-                awaitServerCancel(handle)
-            }
-            throw StopStream()
         }
     }
 
@@ -2329,21 +2348,30 @@ class ChatViewModel(private val context: Context, private val container: AppCont
 
     private companion object {
         const val TAG = "ChatViewModel"
-        const val STREAM_TIMEOUT_MS = 180_000L
         const val SEND_TIMEOUT_MS = 30_000L
 
         /**
-         * Per-frame idle deadline (analysis §4 P0-2), separate from
-         * [STREAM_TIMEOUT_MS] which keeps its original value and meaning: a
-         * single withTimeoutOrNull around the whole collect treated ANY hung
-         * moment as the whole budget, so a turn that streamed steadily for
-         * 3 minutes died at exactly 180s while a silent-but-alive agent
-         * waited out the full window doing nothing. Idle resets on every
-         * received frame, so a slow tool call is tolerated as long as the
-         * engine is talking at all. 20s is under the workspace's ~30s reap window
-         * and comfortably above a normal frame gap.
+         * Per-frame idle deadline (analysis §4 P0-2). A single
+         * withTimeoutOrNull(collect) around the whole collect treated ANY hung
+         * moment as the whole budget: a turn that streamed steadily died at
+         * exactly 180s, and a silent-but-alive agent wasted the window. Idle
+         * resets on every received frame, so only a genuinely SILENT agent
+         * expires early. 20s is under the workspace's ~30s reap window and
+         * comfortably above a normal frame gap.
          */
         const val STREAM_IDLE_MS = 20_000L
+
+        /**
+         * Ceiling for ONE parked prompt - the ask/question dialog the user is
+         * still reading. Replaces the old STREAM_TIMEOUT_MS total (180s),
+         * which device evidence (z4/z6/z7, 2026-10-29) showed can only ever
+         * kill the healthy cases: parked-past-it ask reading, and a fast-
+         * but-long multi-tool turn. Real silence is the idle deadline's job;
+         * parked silence is this ceiling's job, so the total cap is gone. 10
+         * minutes is a product default, recorded as decision item 8 in
+         * docs/decisions-open.md.
+         */
+        const val PROMPT_WAIT_MS = 600_000L
     }
 }
 

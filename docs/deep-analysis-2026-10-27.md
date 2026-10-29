@@ -126,56 +126,61 @@ sessions shipped code, not rows. Commit citations below are verified by
 
 ### P2 — quality/hygiene (condensed)
 
-- Lost-update races on `MutableStateFlow` (read-modify-write everywhere; typed
-  input can be erased by a stream frame) — `ChatViewModel.kt:1264/1738-1746`.
-- DROP_OLDEST silent frame loss (no drop logging/counter) —
-  `CrushEventRouter.kt:58-64/124`; unknown-type frames dropped with zero
-  logging (`CrushConnection.kt:259`).
-- Close-vs-send race loses an event silently; `completeRun` double-closes
-  channels — `CrushEventRouter.kt:104/138-141`.
-- LCS in `FileDiff` allocates a full DP table — OOM-class at caps
-  (`FileDiff.kt:239-247`); two-row table + reconstruction is the fix.
-- Fallback/backoff ladder: cap is 4 s (dead `MAX_BACKOFF_MS`), attempt resets
-  on any success — `CrushConnection.kt:222-226/188`; repeated connect-fails
-  spam the persistent log during engine boot.
-- `run_complete` accepted with empty run id — cross-turn race
-  (`ChatViewModel.kt:1763`; `CrushStreamProbe.kt:104`).
-- Live tool rows never reach COMPLETED within a turn (history replay only) —
-  `ToolActivity.kt:37-40/190-198`.
-- Bootstrap cost per resume: ≤3 one-token probes + duplicate catalogue fetch
-  (`ChatViewModel.kt:634/654/745`); verified-model persistence would kill the
-  resume cost.
-- Engine groq catalogue frozen (2026-10-17) and hardcodes cost=0 → engine
-  reports "free" (`EngineConfigInjector.kt:171-188`,
-  `ZenModelsApi.kt:224-234`).
-- Sentinel port produces real `:1` URLs on fallback paths —
-  `CrushApi.kt:92-102/110`.
-- Mutating `yoloMode` before workspace creation succeeds —
-  `WorkspaceManager.kt:82-96`.
-- INJECTOR lost-update vs concurrent engine config write —
-  `EngineConfigInjector.kt:134-167`.
-- Equality-based base re-detection in SUP-01 —
-  `EngineSupervisor.kt:207-209`; plus unbounded wedge-restart loop, dead
-  tuning constants, probe-without-appContext reports healthy
-  (`EngineSupervisor.kt:86-119/357-364/317-321`).
-- `stopBlocking` may stall main ~3 s (`EngineSupervisor.kt:80-83`).
-- UI: markdown quadratic inline-scan hardening + code-block caps
-  (`MarkdownParser.kt:189-250`, `MarkdownText.kt:140-147`); Settings mojibake
-  (`SettingsScreen.kt:141-143`); provider-mislabeled key field copy
-  (`:365/374`); hardcoded diff colors vs unused theme tokens
-  (`ChatScreen.kt:544-547`); a11y gaps (raw enum `contentDescription`,
-  no `liveRegion`, focusable no-op chips); heartbeat floods the 200-line
-  diagnostics tail (`CrushMobileApp.kt:56-66`); enter-send setting has no UI.
-- Security: key plaintext at rest in `crush.json` (documented trade, deserves
-  an agent-prompt guard note) — `EngineConfigInjector.kt:36-38/129`;
-  no-lockscreen fail-open (`DeviceAuth.kt:54-62`); `KeySession` default-arg DI
-  trap (`SettingsDataStore.kt:18`); Keystore-invalidation comment wrong
-  (`SecureKeyStore.kt:171-172`).
-- Build/repo: R8 off + lint fully disabled (`app/build.gradle.kts:92-94/155-169`);
-  spike harness (`SpikeActivity/FullE2ETest/CrushSmokeTest`) ships in every
-  APK; no signed release has ever been produced; plaintext test key file at
-  repo root ("opencode api key for testing.txt") — rotate/remove;
-  `AGP 10` opt-outs must go before AGP 10 (`gradle.properties:42/47`).
+**RE-TRIAGED 2026-10-29.** Several rows were already fixed by the hardening
+commits named above the P1 class; those are now separated from the backlog.
+
+**Resolved since this analysis was written** (verified by code inspection and
+`git log -S`, not separately re-tested):
+
+- LCS diff allocates a full DP table → linear-space diff (`c22b394`).
+- `run_complete` accepted with empty run id → strict-match with counted
+  foreign-run completes (`3235f7e`); the same change makes live tool rows
+  reach COMPLETED inside the turn at `run_complete` (was replay-only).
+- DROP_OLDEST silent frame loss + close-vs-send race/`completeRun`
+  double-close → overflow-safe queue design with a `closed` guard for late
+  subscribers (`d50f26e`, `CrushEventRouter.kt:42-95`).
+- Backoff ladder: dead `MAX_BACKOFF_MS` (4 s cap because the shift bound was
+  250ms shl 4) → shift bound 6 so the 10 s clamp engages, and the fresh-
+  connect ladder reset is now deliberate (`P2-16`, `CrushConnection.kt:260`).
+- Engine groq catalogue frozen with cost=0 → the injector no longer writes
+  the old cost fields (`P2-21`, `EngineConfigInjector.kt:185`).
+- Mutating `yoloMode` before workspace creation succeeds → identity + yolo
+  mode commit only on success (`P2-22`, `WorkspaceManager.kt:170/186`).
+- SUP-01 equality-based re-detection + unbounded wedge-restart loop →
+  monotonic revision of user-supplied settings + bounded wedge budget
+  (`4cd9c19`, `EngineSupervisor.kt:71/168-241`).
+- Sentinel port producing live `:1` fallback URLs → UDS transport; the
+  sentinel survives only as a compile-compat URL shape
+  (`CrushApi.kt:93-110`), absent-socket fails fast instead of connecting.
+- Spike harness shipping in every APK → moved to the debug source set
+  (`a870939`).
+
+**Still open** (rows below are NOT re-verified today unless they carry a
+note; label sizes unchanged from the original analysis):
+
+- StateFlow logical races: read-modify-write facets where a stream frame can
+  erase typed input — `ChatViewModel`.
+- UI: markdown quadratic inline-scan hardening + code-block caps;
+  Settings mojibake; provider-mislabeled key field copy; hardcoded diff
+  colors vs unused theme tokens; a11y gaps (raw enum `contentDescription`,
+  no `liveRegion`, focusable no-op chips); heartbeat floods the diagnostics
+  tail; enter-send setting has no UI.
+- Security: key plaintext at rest in `crush.json` — decision item 6 (open,
+  user trade); no-lockscreen fail-open — decision item 5 (open, user
+  store stance); `KeySession` default-arg DI trap; Keystore-invalidation
+  comment wrong.
+- Build/repo: R8 off + lint fully disabled — decision item 1 (open; blocked
+  on triaging the AGP/lint crash); no signed release has ever been
+  produced; **plaintext test key file still at repo root** ("opencode api
+  key for testing.txt" — confirmed present 2026-10-29, rotate/remove is a
+  user action); `AGP 10` opt-outs must go before AGP 10
+  (`gradle.properties:42/47`).
+- INJECTOR lost-update vs concurrent engine config write — decision item 2
+  (open, single-writer design call).
+- `stopBlocking` main-stall latency: call sites now live on the supervisor's
+  own scope, but the ~3 s worst case is not re-measured.
+- Bootstrap cost per resume: ≤3 one-token probes + duplicate catalogue
+  fetch — parked as decision item 7 (deferred, cross-agent API design).
 
 ### Verification/coverage gaps (from the tests agent)
 
@@ -234,6 +239,13 @@ Distribution record, so re-assembly of who-owns-what stays possible:
 | Engine lifecycle | Supervisor/engine teardown, generation-bound lease, CancellationException swallowing, groq catalogue |
 | Files/security | Snapshot staleness, sink-side secret masking, `FLAG_SECURE`, diff/allocation hardening |
 | Build/docs | Spike-harness source-set move, decisions doc, ledger/doc bookkeeping (this agent) |
+
+**Completion record (2026-10-29)** — every distributed territory landed and was
+re-verified in-tree during the D14 closure pass: Chat/streaming core in
+`3235f7e` + `d779c17` + `a268aca`; SSE pipeline in `d50f26e`; Engine lifecycle
+in `4cd9c19`; Files/security in `c22b394` + `584bf3d`; Build/docs in
+`a870939`. Per-item status now lives in §4 P0/P1/P2 above, which was the
+section the distribution table pointed at while it was still unwritten.
 
 These notes record only what **this** agent completed; each other territory
 is owned by its own agent's report.

@@ -5,10 +5,30 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+
+/**
+ * Themed diff tokens (analysis §4 P2). Material3's scheme has no "added/
+ * removed line" slot, but the diff renderer cannot hardcode its palette
+ * either - the old hardcoded pair was light-mode-only and broke dark mode.
+ * Provided from [CrushMobileTheme] so it follows the COMPILED theme decision
+ * (the themeMode setting can force what isSystemInDarkTheme would deny),
+ * read nowhere else than where the pixels are painted.
+ */
+data class DiffColors(val added: Color, val removed: Color)
+
+val LocalDiffColors = staticCompositionLocalOf {
+    DiffColors(
+        added = LightDiffAdded,
+        removed = LightDiffRemoved
+    )
+}
 
 private val DarkColorScheme = darkColorScheme(
     primary = OpenCodePrimary,
@@ -62,9 +82,17 @@ fun CrushMobileTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalDiffColors provides if (darkTheme) {
+            DiffColors(DarkDiffAdded, DarkDiffRemoved)
+        } else {
+            DiffColors(LightDiffAdded, LightDiffRemoved)
+        }
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

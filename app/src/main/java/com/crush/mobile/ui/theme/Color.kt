@@ -35,3 +35,15 @@ val WarningColor = Color(0xFFFDCB6E)
 val ToolRunningColor = Color(0xFFFDCB6E)
 val ToolCompletedColor = Color(0xFF00B894)
 val ToolErrorColor = Color(0xFFE74C3C)
+
+// Diff line colors per ACTIVE theme (analysis §4 P2). The old pair was
+// hardcoded light-mode material greens/reds (0xFF1B5E20 / 0xFFB71C1C) baked
+// into the chat screen, so dark mode rendered the same deep greens on a
+// near-black surface - the text was unreadable, and the two "tokens" were
+// silently divergent from the scheme that styled everything around them.
+// Light values keep the original perceptual choice; dark values go to the
+// code-block-safe 300-level palette so they keep >=4.5:1 on DarkSurface.
+val LightDiffAdded = Color(0xFF1B5E20)
+val LightDiffRemoved = Color(0xFFB71C1C)
+val DarkDiffAdded = Color(0xFFA5D6A7)
+val DarkDiffRemoved = Color(0xFFEF9A9A)

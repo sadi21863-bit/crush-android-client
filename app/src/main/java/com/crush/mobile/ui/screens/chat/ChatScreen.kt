@@ -3,8 +3,8 @@ package com.crush.mobile.ui.screens.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.graphics.Color
 import com.crush.mobile.domain.file.DiffLine
+import com.crush.mobile.ui.theme.LocalDiffColors
 import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.file.FileDiff
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,7 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
@@ -271,7 +273,18 @@ bottomBar = {
             icon = { Icon(Icons.Default.Warning, contentDescription = null) },
             title = { Text("Allow this action?") },
             text = {
-                Column {
+                Column(
+                    // Live region (analysis §4 P2): a screen reader that is
+                    // mid-browsing elsewhere gets this dialog read out once,
+                    // WITHOUT moving focus or re-announcing on each internal
+                    // state change. The column is the atomic unit - tool,
+                    // description, path - so a bare title fragment is never
+                    // announced alone (skill rule: one meaningful contextual
+                    // status, not a competing bare label).
+                    modifier = Modifier.semantics {
+                        liveRegion = LiveRegionMode.Polite
+                    }
+                ) {
                     Text(
                         req.toolName.ifBlank { "The agent" },
                         style = MaterialTheme.typography.titleSmall
@@ -329,7 +342,14 @@ bottomBar = {
                 Text(q.displayTitle().ifBlank { "The agent has a question" })
             },
             text = {
-                Column {
+                // Live region, same rule as the permission dialog above: the
+                // question reaches a screen reader that is currently
+                // elsewhere, once, without disturbing focus.
+                Column(
+                    modifier = Modifier.semantics {
+                        liveRegion = LiveRegionMode.Polite
+                    }
+                ) {
                     Text(
                         "This build can show the question but not pick an answer yet. " +
                             "Denying or dismissing cancels the question and lets the " +
@@ -588,8 +608,8 @@ private fun FileDiffRow(diff: FileDiff) {
                                         modifier = Modifier.width(34.dp)
                                     )
                                     val lineTint = when (line.kind) {
-                                        DiffLine.Kind.ADDED -> Color(0xFF1B5E20)
-                                        DiffLine.Kind.REMOVED -> Color(0xFFB71C1C)
+                                        DiffLine.Kind.ADDED -> LocalDiffColors.current.added
+                                        DiffLine.Kind.REMOVED -> LocalDiffColors.current.removed
                                         DiffLine.Kind.CONTEXT -> MaterialTheme.colorScheme.onSurface
                                     }
                                     Text(

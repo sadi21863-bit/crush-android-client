@@ -138,9 +138,9 @@ private fun TuningSection(
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 buildString {
-                    append("${profile.perfClass.name} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· API ${profile.apiLevel} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ")
-                    append("${profile.totalRamMb}MB RAM ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${profile.cores} cores")
-                    if (profile.isLowRamDevice) append(" ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· low-RAM")
+                    append("${profile.perfClass.name} · API ${profile.apiLevel} · ")
+                    append("${profile.totalRamMb}MB RAM · ${profile.cores} cores")
+                    if (profile.isLowRamDevice) append(" · low-RAM")
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -248,7 +248,8 @@ fun SettingsScreen(
     // engine bootstrap can never disagree about which slot they are talking
     // about. A raw persisted id would only differ for a value this build no
     // longer knows, which is exactly when the wrong slot would be touched.
-    val providerId = Providers.resolve(settings.providerId).id
+    val provider = Providers.resolve(settings.providerId)
+    val providerId = provider.id
     var replacing by remember { mutableStateOf(false) }
     var newKey by remember { mutableStateOf("") }
 
@@ -362,7 +363,7 @@ Card(modifier = Modifier.fillMaxWidth()) {
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                "Add an OpenCode Zen key to start chatting.",
+                                "Add a ${provider.displayName} key to start chatting.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -371,7 +372,7 @@ Card(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
                             value = newKey,
                             onValueChange = { newKey = it },
-                            label = { Text("New OpenCode Zen API Key") },
+                            label = { Text("New ${provider.displayName} API Key") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),

@@ -66,43 +66,63 @@ untestable and the source of most P0/P1 behavioral bugs.
 
 ### P1 — degrades or misleads
 
-4. **404-zombie connection** (new): the workspace-gone branch exits the reader
-   loop without clearing `running`/`thread` (`CrushConnection.kt:178-183`), so
-   same-identity `ensureAttached` is a permanent no-op and every turn silently
-   falls back to the per-turn stream — which re-introduces the ~30 s workspace
-   reap. Fix: set `running=false` on 404 and observe connection state to
-   re-attach.
-5. **`runIdOrNull` over-matches** (new): recursive descent through tool
-   params/arrays (`CrushEventRouter.kt:170-189`) can bind events to a
-   *foreign* run; constrain to the two documented depths.
-6. **Mid-send retry never re-points the shared connection** (new): after
-   `workspace not found`, `targetWs` changes but `ensureAttached` is not
-   called (`ChatViewModel.kt:1543-1568`) — the turn can hang on a socket
-   attached to the dead workspace.
-7. **`pendingPermission` lifecycle** (new): never cleared on stop/timeout/new
-   thread except by `resolvePermission` (`ChatViewModel.kt:1247/1757`); grant
-   failure is silent (`1247-1258` — dialog gone, agent still blocked).
-8. **Stale before-image snapshots** (new): snapshot reuse is keyed only on
-   path presence (`WorkspaceSnapshotter.kt:90-94`) against claims of
-   mtime/size guarding; turn N's before image is turn N−1's state — second
-   edits render inflated/wrong diffs, user edits get attributed to the agent.
-9. **Secret masking at the log sink** (new): redaction runs only on
-   diagnostics copy-out (`DiagnosticsReport.kt:246-248`), not in
-   `AppLog.write` (`AppLog.kt:113-149`); `gsk_` (Groq) keys and generic
-   high-entropy tokens pass through.
-10. **Engine teardown + startup retry arm** (new): no production call to
-    `EngineSupervisor.stop()` (`SpikeActivity.kt:144` only); one slow cold
-    start (>60 s readiness) → `Failed(willRetry=false)` forever
-    (`CrushEngine.kt:250-256`, `EngineSupervisor.kt:109-114`).
-11. **Lease not bound to engine generation** (new): `WorkspaceManager` trusts
-    a ≤15 s-old workspace id that may predate an engine restart
-    (`WorkspaceManager.kt:35-46`); `forget()` has zero callers.
-12. **`runCatching` swallows CancellationException** (new) across the
-    handshake (`CrushSession.kt:125/137/145/153/159`,
-    `WorkspaceManager.kt:107/146`) — retry logic can run after abort.
-13. **Recents preview leaks unlocked chats** (new): no `FLAG_SECURE` anywhere;
-    the task-switcher screenshot previews plaintext chat
-    (`MainActivity.kt:272-275`).
+**CLASS CLOSED 2026-10-29**: every row below was re-checked against the
+current tree and all ten are already fixed by the 2026-10-27/28 engine and
+SSE hardening commits — this section was never updated because those
+sessions shipped code, not rows. Commit citations below are verified by
+`git log -S` and by the code markers (`P1-4`…`P1-11`) each fix carries.
+
+4. **404-zombie connection** — **RESOLVED** (`d50f26e`): the workspace-gone
+   branch now unwinds exactly like `stop()` (cancel in-flight call,
+   `running=false`, `thread=null`, state→IDLE) while KEEPING the workspace
+   id, so same-identity `ensureAttached` starts a fresh reader instead of
+   being a permanent no-op (`CrushConnection.kt`, the 404 branch's
+   "THE 404-ZOMBIE BUG (P1-4)" comment).
+5. **`runIdOrNull` over-matches** — **RESOLVED** (`d50f26e`): the recursive
+   descent became a bounded run-id search ("bounded run-id search (P1-5)",
+   `CrushEventRouter.kt`); deep tool-param ids no longer bind events to a
+   foreign run.
+6. **Mid-send retry never re-points the shared connection** — **RESOLVED**
+   (`3235f7e`): the fresh-workspace retry calls
+   `eventConnection?.ensureAttached(ws2, clientId)` ("analysis §4 P1-6"),
+   so the turn cannot hang on a socket still attached to the dead
+   workspace.
+7. **`pendingPermission` lifecycle** — **RESOLVED** (`3235f7e`): prompts
+   retire when their session dies in replay, on stop in preflight and on
+   the server ("retire it (P1-7)"), inside the answer-dialog lifecycle,
+   and when the engine generation boundary orphans them; the legacy
+   cross-workspace prompt keeps its dialog answerable instead of painting
+   an unanswerable one.
+8. **Stale before-image snapshots** — **RESOLVED** (`c22b394`, "honest
+   snapshot reuse"): reuse is no longer keyed on path presence alone;
+   the snapshotter re-validates the claimed state so turn N's before
+   image is genuinely turn N−1's committed state (the API-portable binary
+   probe followed in `584bf3d`).
+9. **Secret masking at the log sink** — **RESOLVED** (`c22b394`): the one
+   regex set (`AppLog.Masking`: `oc_sk_`, `gsk_`, `sk-`, then the generic
+   25+ digit-bearing token rule with a UUID-shape exception) now runs in
+   `AppLog.write` on every persisted line — message and throwable trace,
+   both sinks — and `SecretMaskingTest` pins it; the diagnostics copy-out
+   delegates to the same matcher instead of owning a divergent copy.
+10. **Engine teardown + startup retry arm** — **RESOLVED** (`4cd9c19`,
+    "Engine: teardown hook, retry budgets"): `EngineSupervisor.stop()` is a
+    production teardown path, and cold-start readiness failures run a
+    bounded START-failure budget (`startRetryGivesUp`, P1-10) instead of
+    latching `Failed(willRetry=false)` on one slow boot.
+11. **Lease not bound to engine generation** — **RESOLVED** (`4cd9c19`,
+    "generation-bound workspace lease"): every manager records its
+    allocation generation and fails closed if it would hand out a
+    workspace id minted by an older generation than the running engine
+    (P1-11); the lease state carries the generation that minted it.
+12. **`runCatching` swallows CancellationException** — **RESOLVED**
+    (`4cd9c19`): `runCatchingNonCancellation` (CrushSession.kt) rethrows
+    CancellationException, and every handshake `runCatching` site switched
+    to it — an abort no longer becomes "step failed, retry once".
+13. **Recents preview leaks unlocked chats** — **RESOLVED** (`c22b394`):
+    `FLAG_SECURE` is set BEFORE the platform takes the task-switcher
+    picture and cleared only after the gate decision (`MainActivity.kt`,
+    "FLAG_SECURE BEFORE…" comment), so a locked chat cannot appear as a
+    plaintext thumbnail.
 
 ### P2 — quality/hygiene (condensed)
 

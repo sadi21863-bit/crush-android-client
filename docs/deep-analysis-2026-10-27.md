@@ -160,11 +160,23 @@ note; label sizes unchanged from the original analysis):
 
 - StateFlow logical races: read-modify-write facets where a stream frame can
   erase typed input — `ChatViewModel`.
-- UI: markdown quadratic inline-scan hardening + code-block caps;
-  Settings mojibake; provider-mislabeled key field copy; hardcoded diff
-  colors vs unused theme tokens; a11y gaps (raw enum `contentDescription`,
-  no `liveRegion`, focusable no-op chips); heartbeat floods the diagnostics
-  tail; enter-send setting has no UI.
+- ~~UI rows~~ — **CLEARED 2026-10-31**, two waves: (1) verified already
+  in-tree, same hardening generation as the P1 class: the markdown inline
+  scan carries `INLINE_SCAN_BUDGET_CHARS = 64 * 1024` + `ScanBudget`
+  exhaustion fallback to lossless plain text, and code blocks are capped
+  (`CODE_MAX_LINES` + `maxLines` + ellipsis); the tool-row enum
+  `contentDescription` is human phrases + `Role.Button` and the model
+  "FREE" AssistChip was already replaced by a labelled non-interactive
+  Text. (2) Fixed this session: diff +/- colors were hardcoded light-mode
+  hex breaking dark mode → themed `DiffColors` tokens via `LocalDiffColors`
+  (`9a01b0f`); Settings mojibake (double-encoded `·` separators) restored;
+  provider-mislabeled key copy now names the SELECTED provider
+  (`9a01b0f`); both blocking dialogs got `LiveRegionMode.Polite` atoms
+  (`9a01b0f`); enter-send existed in model/DataStore/ViewModel with no
+  consumer → IME-action consumer + "Keyboard" toggle card shipped
+  (`a02d882`); the 2s heartbeat flooding the 200-line diagnostics tail
+  slowed to 30s with the kill-vs-crash attribution trade documented
+  (`a02d882`).
 - Security: key plaintext at rest in `crush.json` — decision item 6 (open,
   user trade); no-lockscreen fail-open — decision item 5 (open, user
   store stance); `KeySession` default-arg DI trap; Keystore-invalidation

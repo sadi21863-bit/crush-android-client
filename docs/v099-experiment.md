@@ -58,9 +58,37 @@ Findings that are NOT app bugs:
   catalogue), short chat path (404 plan-miss), and the UA filter (python
   urllib 403 vs browser 200 on the same URL).
 
+### Promotion VERIFIED on device — 2026-11-01
+
+Two-turn cycle executed on the promoted MAIN app (agent-driven via taps +
+screenshots; the user approved permission cards):
+
+- **Turn 1 (tool + ask card):** "list the files in your project directory"
+  fired a bash tool row, the permission card was raised and approved, and
+  the answer streamed: "There are 5 files in the project directory
+  (/data/user/0/com.crush.mobile/files/workspace)" — the list includes the
+  z-session artifacts (z3/z5/z6/z7ask.txt): the migration carried the
+  D-era evidence workspace into the main app intact.
+- **Turn 2 (write):** "create a file called go-promotion.txt …" → the
+  write card rendered (Always/Deny/Allow once), approved Allow-once, and
+  the chain closed: app log `file changes: +1 -0 across 1 file(s)` and
+  files/workspace/go-promotion.txt exists with `hello`, written by the
+  agent.
+- Multi-provider keys verified live the same hour: settings re-bootstrapped
+  on openrouter (290 models, dots-3-note-preview seated) then on
+  opencode-go (28 models, beam-free) — both keys stored and switchable.
+- Findings from the cycle, recorded not fixed: the migrated session cwd
+  still carries v099-absolute paths (which remain valid only while the
+  experiment app is installed); a one-shot `HTTP 409 "client not attached"`
+  during reconnect self-healed on the next read; two consecutive bash
+  permission asks fired 10 s apart during a declined-then-retried call.
+
+**Promotion therefore reads DONE-DONE.** Remaining follow-ups live in the
+standing backlog (stopBlocking soak, DeepSeek/GLM with the re-keyed
+subscription key, v099-app deletion decision).
+
 Verdict so far: **v0.99.0 + OpenCode Go WORKS end to end for entitled
-models** — with the entire app-side model layer now split correctly
-(list/chat/plan), and the last open question (status codes on rejected
+models** — with the entire app-side model layer now split correctly(list/chat/plan), and the last open question (status codes on rejected
 models) now ANSWERED: rejected taps name precise verdicts, the
 PAYMENT_REQUIRED class carries the workspace-key guidance inline (2026-11-01;
 the official mechanics: one key = one workspace, billing per that

@@ -312,20 +312,23 @@ See [`docs/toolchain.md`](docs/toolchain.md) for the contingency plan.
 AGP 9 migration notes that silently broke the `exec()` architecture are in
 [`app/build.gradle.kts`](app/build.gradle.kts).
 
-Upstream pins: the engine of record is **Crush v0.98.2** since the 2026-10-27
-instrumented upgrade (D12 ask delivery requires it; code comments and the
-D12 evidence all reference v0.98.2, and the working-tree `libcrush.so` does
-not hash to the v0.98.1 checksum recorded in BASELINE). **`tools/fetch-crush.ps1`
-now defaults to 0.98.2** —; the upstream v0.98.2 (published 2026-10-23)
-`crush_0.98.2_Android_arm64.tar.gz` SHA-256 pin was added 2026-10-31 from the
-signed release's checksums.txt (`9402531`), so a fresh-clone fetch no longer
-downgrades. Caveat that stays: the in-tree binary is the locally instrumented
-`v0.98.2+dirty` build, so a fresh-clone fetch yields the clean upstream engine
-of the same version, minus the instrumentation. (0.98.1 was the 2026-10-18 upgrade for the `unix://` listen
-scheme; the older 0.97.1 binary is backed up under `engine-backups/`. A
-`nightly` tag also exists and is not used.) **Bubble Tea is not used** — it is
-Crush's terminal UI framework, compiled into the binary but unreachable from
-Compose.
+Upstream pins: the engine of record is **Crush v0.99.0** since the
+2026-11-01 promotion (`0.98.2+dirty` instrumented build retired to the
+z-evidence archive; v0.99.0 is the upstream clean release, published
+2026-10-29). **`tools/fetch-crush.ps1` defaults to 0.99.0** with its SHA-256
+pin from the signed release's checksums.txt; the earlier 0.98.x pins remain
+for historical fetches. Two facts carried into the promotion from the
+v099-experiment lane (that branch, commits `55dae84` back to `d326e60`,
+holds the device evidence): OpenCode Go model access REQUIRES this engine
+(the `x-opencode-session` header exists only from 0.99.0), and the model
+layer gained plan-split bases for the OpenCode/Console family (see
+`domain/provider/Providers.kt`). Earlier pins for the record: 0.98.2 was the
+2026-10-27 instrumented upgrade whose D12 ask-delivery evidence (z6/z7
+sessions) was gathered on-device with it; 0.98.1 was the 2026-10-18 upgrade
+for the `unix://` listen scheme; the older 0.97.1 binary is backed up under
+`engine-backups/`. A `nightly` tag also exists and is not used. **Bubble Tea
+is not used** — it is Crush's terminal UI framework, compiled into the
+binary but unreachable from Compose.
 
 ## Testing
 

@@ -131,6 +131,17 @@ end and stream a complete turn (proven 2026-10-20).
 > in the experiment app; evidence log: `docs/v099-experiment.md` on the
 > branch. Main tree stays on 0.98.2+dirty.
 
+> **PROMOTED 2026-11-01.** The isolated experiment branch
+> (`v099-experiment`, evidence log `docs/v099-experiment.md` on that branch)
+> proved OpenCode Go dynamically — plan-correct listing, probes, turns — on
+> the upstream v0.99.0 engine, and the user called the promotion: `main`
+> now bundles upstream **v0.99.0** (checksum-pinned from the signed
+> release) plus the model-layer split. The instrumented 0.98.2+dirty binary
+> remains the evidence base for the 2026-10 z-sessions; new evidence
+> accretes against 0.99.0. Two-turn on-device verification on the promoted
+> build (ask-card approval + file-edit diff, plus the standing
+> stopBlocking/backgrounding re-measure) remains to call it done-done.
+
 ### Delete treating transport failure as success — FIXED
 
 `CrushApi.deleteSession` used to convert a dropped connection,

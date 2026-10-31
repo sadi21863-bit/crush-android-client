@@ -224,3 +224,55 @@ Re-audited against the tree today; the "fixed" table above holds:
   0.98.2 in the bundle (`v0.98.2+dirty`, locally built; upstream released
   2026-10-23). See [p1-attack-surface.md](p1-attack-surface.md) for the dated
   note.
+
+## Second external review — 2026-10-31 ("Progress Review", ChatGPT)
+
+A second external review landed today (checked against the GitHub README and
+upstream releases on 2026-10-31, "compared with the October 17 roadmap"). Its
+backend headers show it read the **pre-update** README (engine "v0.98.1",
+401 tests), so several of its blockers are already closed in-tree. Claim by
+claim, verified against the tree at `0d061cc`:
+
+| Review claim | Tree state today | Evidence |
+| --- | --- | --- |
+| "Engine v0.98.1" (header) | superseded | engine of record **v0.98.2** since 2026-10-27; `v0.98.2+dirty` binary in-tree at `d50f26e` (Go buildinfo) |
+| "401 JVM tests" (header) | superseded | **455** `@Test` methods in 38 files (grep-counted 2026-10-31; README updated today) |
+| "Secure engine transport: complete for the sibling-app threat" | agreed | UDS pivot (`unix://`, `AFUNIXSocketFactory.FactoryArg`), kernel-enforced UDB isolation; README + p1-attack-surface |
+| "Permission approval in ASK mode: broken — Critical" | **already closed** | the v0.98.2 fix it proposes was shipped 2026-10-29: D12 fan-out (`d50f26e`), ask cards + 10-min `PROMPT_WAIT_MS` (`3235f7e`) — full ASK → approve → execute → finish cycle verified on device z6, README updated today |
+| "session registration needed for permission events" | already landed | the client-side re-attach/fan-out work IS the registration; run-id-less frames fan to watched runs since `d50f26e` |
+| "Actual AI file edit + visible diff: not demonstrated" | mostly closed | z7 demonstrated a real create + a real diff-edit on device, diffs rendered 0-unreadable (README/project-analysis updated today); denial path shown live in z6 |
+| remaining edge of the same row | holds | cancel mid-edit + app-backgrounding during an edit round still unmeasured — the standing `stopBlocking` device re-measure item covers exactly this |
+| "Hyper: no successful device chat turn documented" | still true | `Providers.kt` keeps hyper `isKnown = false`; a real-key turn is still owed (needs a user Hyper account) |
+| "Multi-provider: Zen + OpenRouter tested" | agreed | matches the provider row evidence (ProviderSwitchPolicy tests, on-device OpenRouter/OAI-compatible turns) |
+| "No `androidTest` suite" | still true | A1's 2026-10-31 tree pass confirmed none exists |
+| "Licences/public release incomplete" | still true | no root LICENCE, no NOTICE, no CI; decision item list holds (user) |
+
+Upstream facts it cites, **verified first-hand today**:
+
+- **Upstream v0.99.0 exists** (GitHub release, published 2026-10-29
+  16:25 UTC, release id 428115031). Its Catwalk v3 / piped-permission claims
+  were not independently verified locally; evaluate it as a separate
+  upgrade AFTER re-measuring, as the review itself recommends — do not mix
+  it with the current evidence base.
+- **Discussion #4107 exists** — converted from issue #4092 on 2026-10-21
+  08:34 UTC, category Ideas, label `area: releasing`, and maintainer
+  `andrinoff` answered "Moving this to a discussion!" (refines the
+  addendum's "one comment" note above: that comment was the move).
+  A genuine maintainer interaction on our findings.
+
+Recommendation mapping to the ledger (their §4, our state):
+
+1. ASK-mode fix — **done 2026-10-29** (above); nothing further owed before
+   re-measure.
+2. Full coding-task proof — the open remainder is exactly the parked
+   "stopBlocking + backgrounding re-measure" item; plus one pass at
+   cancel-during-edit on device.
+3. Hyper completion — needs a real Hyper key from the user; then a verified
+   turn would let `Providers.kt` flip its `isKnown` honestly.
+4. Release readiness — still the user's decision stack (licence, notices,
+   GitHub About/topics, CI, demo). The fetch-pin divergence they cannot have
+   seen was additionally closed today (`9402531`).
+
+Its overall verdict ("postponed Termux + local-models until permission
+handling, file-edit proof and release readiness land") matches the standing
+decisions already open in decisions-open.md.

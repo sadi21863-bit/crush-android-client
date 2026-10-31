@@ -159,7 +159,46 @@ commits named above the P1 class; those are now separated from the backlog.
 note; label sizes unchanged from the original analysis):
 
 - StateFlow logical races: read-modify-write facets where a stream frame can
-  erase typed input — `ChatViewModel`.
+  erase typed input — `ChatViewModel`. **RESOLVED 2026-10-31** as a design
+  pass with two code fixes and two documented no-actions: **R1 attach-
+  clobber** — `openSession`'s final write replaced `messages = replayed` and
+  forced `isStreaming = false`, so on a slow network a turn the user sent
+  during the history fetch (send() claims `isStreaming` synchronously,
+  making the window real) was ERASED by the late transcript, along with its
+  Stop affordance; fixed in `ce43c7a` by merging
+  inside the CAS loop — replayed rows own the transcript order, any live
+  rows they do not contain survive after them (`mergeReplay`, pinned by
+  `ChatStateMergeTest`) — and `isStreaming` now only drops when
+  `activeRun == null`, so a live run keeps its Stop and sends stay blocked
+  while the engine is owned (intentional vs the old switch behavior: the
+  opposite risk was two concurrent streams, the exact interleave the
+  send-claim fix killed). **R3 selection lie** — `setModel` optimistically
+  wrote `selectedModel = id` while the network verify could reject it:
+  the TopBar then showed a model the engine slots had refused. Fixed with
+  a generation token (`modelSelection`): the latest tap is the only writer
+  that may settle, a superseded tap neither errors nor writes the slots,
+  and a rejection reverts to the pre-tap selection. **No-action
+  (documented)**: R2 — a stale `loadSessions` write is equal-shape
+  idempotent data, last-write-wins is harmless; R5 — a late permission
+  from a cancelled turn is closed by design in D12/P1-7 (prompts belong to
+  the watched session and are retired on switch). Bootstrap double-fire
+  was already guarded by the `bootstrapping` flag in-tree.
+- App-wide ui-ux-pro-max audit (2026-10-31, whole surface) — **shipped
+  (code commit)**: Onboarding — the save button now shows a spinner and
+  "Saving key..." while `saveApiKeyAwait` runs (skill Submit-Feedback,
+  high), a superseded re-tap is disabled; the provider picker got the
+  chevron affordance and a spoken "Provider: X" phrase; the save error is
+  a polite live region. LockOverlay — the biometric prompt still said
+  "Unlock OpenCode" (pre-rebrand copy); now "Unlock Crush Mobile", error
+  line announced. Diagnostics — "  Copy"/"  Share" whitespace-as-layout
+  replaced by Spacers; StatusRow label+value merge into one spoken unit.
+  Chat — sessions trigger reads "Open chats list" (action, not widget
+  name); ModelSheet renders the active check + `stateDescription`
+  "selected" for the current model (the `selected` param existed and was
+  never rendered). Verified-clean during the sweep: session-sheet empty
+  states, row tap-target sizes, diff/tool a11y (earlier batches), bubble
+  contrast (brand purple on white-on-purple = 4.9:1, passes AA), and the
+  DiagnosticsScreen honesty copy. Code in `a67aee5` + `ce43c7a`.
 - ~~UI rows~~ — **CLEARED 2026-10-31**, two waves: (1) verified already
   in-tree, same hardening generation as the P1 class: the markdown inline
   scan carries `INLINE_SCAN_BUDGET_CHARS = 64 * 1024` + `ScanBudget`

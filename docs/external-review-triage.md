@@ -193,3 +193,34 @@ code rather than intention:
 - ☐ **SSE switch A→B delivers only B events** — now enforced and tested
 - ☑ **Another app cannot invoke privileged Crush API** — was P0-02; resolved by the
   UDS transport pivot (Unix domain socket, kernel-enforced same-UID-only).
+
+---
+
+## Addendum 2026-10-31
+
+Re-audited against the tree today; the "fixed" table above holds:
+
+- **P1-03 / P1-06 / P1-07 / P1-05** — still fixed and still pinned:
+  `CrushConnectionWorkspaceSwitchTest`, the router channel is
+  `Channel(512, DROP_OLDEST)` (`CrushEventRouter.QUEUE_CAPACITY`),
+  `ProviderSwitchPolicy` keeps its 7 JVM tests, and `RunHandle` +
+  `RunHandleTest` its 6.
+- **P2-10** — still as narrowed here: `ZenApi`/`ZenRepository` were deleted
+  2026-10-16 (commit `84f4d7d`); the *name* `ZenModelsApi` survives and is
+  still provider-neutral in function.
+- **P1-04 (Still open)** — still accurate: `CrushConnection` exposes the
+  `CONNECTED` state and the send path falls back when it is not; no bounded
+  readiness await has landed since.
+- **P1-08** — still true and unchanged: AGP 9.4.1 / Kotlin 2.4.10 / Compose
+  compiler 2.4.20 in `build.gradle.kts` on 2026-10-31.
+- **New state to record:** the upstream asks filed as
+  [charmbracelet/crush#4092](https://github.com/charmbracelet/crush/issues/4092)
+  were **closed by upstream on 2026-10-21** (`state_reason: completed`, one
+  comment, discussion locked). No engine-side auth/token landed from it, so
+  the "recognize/test `unix://`" request remains un-adopted upstream — worth
+  a fresh upstream issue if the app ever depends on the scheme being
+  documented.
+- **Context shift:** the engine referenced throughout ("v0.98.1") is now
+  0.98.2 in the bundle (`v0.98.2+dirty`, locally built; upstream released
+  2026-10-23). See [p1-attack-surface.md](p1-attack-surface.md) for the dated
+  note.

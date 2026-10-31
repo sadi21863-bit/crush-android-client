@@ -4,6 +4,18 @@
 > Decision taken 2026-10-04: the Termux-based approach becomes its own project.
 > `OpenCode Chat` (bundled engine) continues independently and is not migrated.
 
+> **Addendum 2026-10-31 — two identity facts have drifted since this plan dated
+> 2026-10-04.** Still not started; still nothing in the app depends on it.
+>
+> 1. The app's identity is no longer `com.opencode.chat`: `applicationId` and
+>    namespace are **`com.crush.mobile`** (`app/build.gradle.kts:37,43`), and the
+>    README brands it "Crush Android". The §4 paths therefore read
+>    `/data/user/0/com.crush.mobile/files/` today, not the `com.opencode.chat`
+>    paths shown there.
+> 2. The bundled engine is now **0.98.2** (`v0.98.2+dirty`; upstream released
+>    2026-10-23). The §2 facts about Crush itself (Go/Bubble Tea lineage,
+>    upstream Android/arm64-only release policy) are unchanged.
+
 ---
 
 ## 1. Why this exists

@@ -2,6 +2,31 @@
 
 Research for the Kotlin/Compose Android client ("crush-mobile") embedding charmbracelet/crush v0.98.1 over `files/crush.sock` (SSE at `/v1/workspaces/{workspaceId}/events` + grant POST). Focus: does an engine upgrade fix D12 (no `permission_request` broadcast), what to borrow from similar projects, and which Kotlin libraries close our known gaps. All claims cite primary sources (GitHub source/compare APIs, release tags, official docs). Nothing was verified against a running engine here — only upstream source/releases.
 
+> **Addendum 2026-10-31 — the "upgrade required?" rows below have landed.**
+> Original text intact; read the remedies as done, not pending:
+>
+> - **Engine upgraded in-tree.** `app/src/main/jniLibs/arm64-v8a/libcrush.so` is
+>   locally built from upstream `v0.98.2` (Go buildinfo reads
+>   `v0.98.2+dirty` alongside `go1.27.1`; upstream released 0.98.2 on
+>   2026-10-23 as §1 describes). So the defect-map row "Yes — upgrade to
+>   v0.98.2" is satisfied.
+> - **App-side D12 half landed.** `CrushEventRouter.dispatch` fans run-id-less
+>   frames (`permission_request`, `question_batch_request`, every `message`)
+>   to every registered run (catch-all routing is unchanged and still unused
+>   by the app), pinned by `CrushEventRouterTest`. Open follow-up 1's "trace
+>   v0.98.1's fan-in gap" question was answered by this root-cause rather than
+>   by further source tracing; the ASK turn itself was then device-verified
+>   (see 2026-10-29 D12 commits, `d779c17`/`4403593`).
+> - **"Finish-error turns render as empty assistant bubbles" landed too:**
+>   the cline-ErrorRow-style typed error card with Retry shipped (commit
+>   `0dca731`, 2026-10-31).
+> - **"401 JVM tests" row:** now 455 `@Test` methods across 39 files
+>   (2026-10-31 count); still no instrumentation suite.
+> - **Caution for the fetch script:** `tools/fetch-crush.ps1` still defaults
+>   to `-Version 0.98.1` and pins only 0.97.1/0.98.1 — with `libcrush.so`
+>   present a run is a no-op ("already present"), but with the binary deleted
+>   it re-fetches and **downgrades** the bundle to 0.98.1.
+
 ## TL;DR — 5 highest-leverage adoptables
 
 1. **crush v0.98.2 (released 2026-10-23) rewires how `permission_request` reaches remote clients** — session-scoped delivery + fail-open for clients that never report a session + republish of pending prompts, with a cross-client e2e test. Upgrading and mirroring the TUI's `POST /v1/workspaces/{id}/current-session` is the concrete path to closing D12. ([compare v0.98.1...v0.98.2](https://github.com/charmbracelet/crush/compare/v0.98.1...v0.98.2), commits `305e072`, `f1425bd`, `80374e7`). **Update 2026-10-27:** the upgrade landed and breadcrumbs proved the v0.98.2 engine delivers the ask end-to-end (`permissionsvc publish` → fan-in → session filter → frame written to the SSE stream) — but the ask was still being dropped *in the app*: the CrushEventRouter sent run-id-less frames to catch-all channels and nothing subscribed to catch-alls. The engine half of D12 was necessary, not sufficient; the app-side fan-out fix (dispatch fanning anonymous frames to registered runs) closed the other half.

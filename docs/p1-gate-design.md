@@ -1,7 +1,7 @@
 # P1 — EngineGate Design Note: Per-Launch Bearer Token on Loopback TCP
 
 **Status: SUPERSEDED as the primary mitigation (2026-10-18). The codebase pivoted to
-Unix-domain-socket transport (see `EngineSockets.kt`, `p1-attack-surface.md` §4); the
+Unix-domain-socket transport (see `EngineSockets.kt`, `p1-attack-surface.md` §8); the
 engine now binds `unix://<app-private path>` and the gate module was never built —
 the "module landed" note in earlier revisions was a subagent's false claim.**
 *A per-gate-port bearer token remains the documented FALLBACK if UDS proves untenable
@@ -11,7 +11,7 @@ on-device. Nothing below is claimed as working on device.*
 > EngineGate is *designed* to do — nothing is claimed as working on device. The accurate
 > security statement today is: the engine is reachable ONLY through the app-private socket
 > file; loopback TCP no longer exists. See
-> [p1-attack-surface.md](p1-attack-surface.md) §4 for the pivot, and §2–§3 for why the
+> [p1-attack-surface.md](p1-attack-surface.md) §8 for the pivot, and §2–§3 for why the
 > old TCP spawn was an F01-grade exposure.
 
 ## 1. Threat model recap (5 lines)
@@ -102,3 +102,19 @@ actually runs** — "passed" is recorded only from real run output, never by ass
 ---
 
 **Wiring: pending enumeration (CrushApi/SSE/3 probes). On-device attacker-UID test: pending.**
+
+---
+
+**Addendum 2026-10-31.** The fallback design above stays unbuilt and the pivot
+holds, so nothing in §1–§6 is claimed as working — but two reference facts are
+now newer than this note:
+
+- The engine in the bundle is **0.98.2** (`v0.98.2+dirty`, locally built;
+  upstream released 2026-10-23), not the v0.98.1 named in the threat recap.
+  The "no authentication on the listener" claim is still true for the HTTP
+  layer; the transport boundary is still the app-private socket file.
+- The P1.6 upstream-native-auth proposal (*to be filed upstream*) exists as
+  [charmbracelet/crush#4092](https://github.com/charmbracelet/crush/issues/4092)
+  and was **closed by upstream on 2026-10-21** with no token-auth mechanism
+  landed — the per-port Bearer fallback described here remains the plan if
+  UDS transport is ever withdrawn.

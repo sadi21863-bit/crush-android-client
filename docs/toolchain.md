@@ -2,6 +2,12 @@
 
 ## Current state (verified on device, 2026-10-02)
 
+*Re-verified against the build files on **2026-10-31**: every version in this
+table is unchanged (wrapper 9.8.0; AGP 9.4.1, Kotlin 2.4.10 and Compose plugin
+2.4.20 in the root `build.gradle.kts`; bytecode 17 in `app/build.gradle.kts`;
+`build-install.bat` still documents JBR 25.0.3). R8/minify stays off and lint
+stays disabled by decision in `app/build.gradle.kts`.*
+
 | Component | Version | Notes |
 |---|---|---|
 | Build JDK | **25.0.3** (Android Studio JBR) | set in `build-install.bat` |
@@ -25,8 +31,9 @@ versioned on its own track.
 An external audit recommended matching them at a tested version, on the grounds
 that Kotlin's own guidance treats them as sharing one version reference. That is
 a reasonable de-risking step, but it is a **change to be made deliberately**, not
-a bug to be fixed: the build is green across 401 unit tests and repeated signed
-release builds on AGP 9.4.1 / Gradle 9.8 with the split in place. If aligning,
+a bug to be fixed: the build was green across 401 unit tests and repeated signed
+release builds on AGP 9.4.1 / Gradle 9.8 with the split in place. (The suite has
+grown since: 455 `@Test` methods in 39 files as of 2026-10-31.) If aligning,
 change both to 2.4.20 in one commit and re-run the full suite.
 
 ## The AGP 10 problem
@@ -48,6 +55,11 @@ AGP 10 removes both. When it arrives:
 ### Step 0 — Do nothing yet
 AGP 10 is not released. Latest stable is 9.4.1. There is nothing to action today.
 This document exists so the next agent does not rediscover it from scratch.
+
+> **2026-10-31 re-check:** still nothing to action. Google Maven (metadata
+> updated 2026-10-28) tops out at **9.5.0 stable** with 9.6.0 alphas only; no
+> AGP 10 exists in the version list. The project deliberately remains on
+> 9.4.1; 9.4.1 is still the newest patch of its own 9.4 line.
 
 ### Step 1 — Revert to AGP-managed Kotlin (2-line change, guaranteed)
 Delete both properties from `gradle.properties`:

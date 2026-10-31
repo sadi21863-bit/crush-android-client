@@ -92,6 +92,17 @@ same broken path — the bubble stayed "thinking" until `run_complete` painted t
 final text. See D12 in project-analysis.md. AUTO-approve turns run tools end to
 end and stream a complete turn (proven 2026-10-20).
 
+> **2026-10-31 engine-update note.** The bundled engine is no longer the v0.98.1
+> named in half (1) above: `jniLibs/arm64-v8a/libcrush.so` is locally built from
+> upstream **v0.98.2** (Go buildinfo `v0.98.2+dirty`; upstream released
+> 2026-10-23), so that engine half is no longer a live defect in the shipped
+> bundle. Upstream ask
+> [#4092](https://github.com/charmbracelet/crush/issues/4092) (UDS scheme
+> documentation, optional TCP auth) was closed by upstream on 2026-10-21 with
+> nothing landed there. Caution: `tools/fetch-crush.ps1` still defaults to
+> 0.98.1 and pins only 0.97.1/0.98.1 — a run with the binary deleted would
+> re-fetch and downgrade the bundle.
+
 ### Delete treating transport failure as success — FIXED
 
 `CrushApi.deleteSession` used to convert a dropped connection,
@@ -135,7 +146,7 @@ An earlier revision of this page called `WorkspaceLease`, `reattachIfStale`, and
 the force-retry paths dead scaffolding from the per-turn-connection era.
 **Re-checked 2026-10: they are still live code** — the send path falls back to
 `reattachIfStale` + lease + force-retry whenever the shared connection is not
-`CONNECTED`. `WorkspaceLease` is used at `WorkspaceManager.kt:132`; the
+`CONNECTED`. `WorkspaceLease.isFresh` is used at `WorkspaceManager.kt:248`; the
 force-retry path is live in the ChatViewModel send loop. The audit that gloated
 here was wrong that time.
 
@@ -161,8 +172,11 @@ All verified on-device against Crush v0.97.1→v0.98.1, not read from docs.
 
 ## Testing posture
 
-- **401 JVM unit tests**, all passing (as of 2026-10-20).
-- Two `MockWebServer`-backed suites assert on real HTTP order and on requests
+- **455 JVM unit tests** in 39 files (2026-10-31 count; 401 "all passing" was
+  the 2026-10-20 statement — the suite has grown since, not run through this
+  count here).
+- **Six** `MockWebServer`-backed test files (2026-10-31 count; two as of
+  2026-10-20) assert on real HTTP order and on requests
   actually reaching the server — the latter exists because a method that throws
   before the call produces a *passing-looking* no-op, which is exactly how
   `deleteSession` failed silently for so long.

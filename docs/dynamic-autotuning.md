@@ -63,8 +63,18 @@ already-shrunk value". The code did the opposite. Consequences:
 The fix separates the two states. `desiredBase` holds the unadjusted
 user/auto-resolved policy and is only written when settings change;
 `effectiveTuningFor()` derives the applied value from it on every poll and never
-writes the result back. `lastEffective` distinguishes "settings changed" from
-"we adjusted it ourselves".
+writes the result back.
+
+> **2026-10-31 correction to the mechanism, not the fix:** the third state
+> originally read "`lastEffective` distinguishes "settings changed" from "we
+> adjusted it ourselves"". That variable is gone. The equality pair (`tuning !=
+> desiredBase && tuning != lastEffective`) could not tell a real user settings
+> change from the loop's own derived write, and missed a user changing a value
+> back to a previously-derived value entirely. Superseded 2026-10-29 (commit
+> `4cd9c19`): the public `tuning` setter bumps a revision counter
+> (`tuningRevision`), and the health poll absorbs any counter newer than its
+> own `absorbedRevision` into `desiredBase` — a counter value newer than the
+> one already absorbed is an external settings change, whatever the values say.
 
 ## Integration defect — RESOLVED
 

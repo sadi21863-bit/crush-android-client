@@ -9,6 +9,26 @@
 > (`CrushApi.kt`, `CrushConnection.kt`). No endpoint name appears here that is not in the
 > pinned spec. This is a static-analysis map; nothing here demonstrates a live exploit.
 
+> **Addendum 2026-10-31.** The engine named in the header is no longer what ships:
+> `app/src/main/jniLibs/arm64-v8a/libcrush.so` is now locally built from upstream
+> **`v0.98.2`** (Go buildinfo reads `v0.98.2+dirty` alongside `go1.27.1`; upstream
+> released 0.98.2 on 2026-10-23 — see `docs/ecosystem-research-2026-10-25.md` §1 for
+> what that range changed, chiefly session-scoped permission/question prompt
+> delivery). §1–§6 stand as the 0.98.1-spec snapshot they were generated as.
+> Two facts that stand today:
+>
+> - `tools/fetch-crush.ps1` still defaults to `-Version 0.98.1` and pins only
+>   0.97.1/0.98.1. With `libcrush.so` present the script is a no-op
+>   ("already present"); with the binary deleted, a zero-arg run re-fetches and
+>   **downgrades** the bundle to 0.98.1 — the pin's floor did not rise with the
+>   engine.
+> - The upstream asks recorded in §8 are filed as
+>   [charmbracelet/crush#4092](https://github.com/charmbracelet/crush/issues/4092),
+>   which upstream **closed** on 2026-10-21 (`state_reason: completed`, one
+>   comment, discussion locked). No engine-side auth/redaction landed from it,
+>   so §4 (plaintext `api_key` in config responses) remains valid engine
+>   behaviour and §5's "redaction is not sufficient" reasoning is untouched.
+
 ## 1. Scope and attacker model
 
 **Scope.** The engine's loopback HTTP/SSE listener only. The app's separate client for

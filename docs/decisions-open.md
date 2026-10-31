@@ -46,13 +46,27 @@ therefore ~66% DEX by mass and ~34% engine — the recorded "92 MB engine
 dominates the payload, R8 has no size win" rationale (retired from
 `build.gradle.kts` in `5325d68`) had the composition backwards. A typical
 R8 shrink on a dependency-heavy Compose app cuts such DEX half or better;
-**the measured ceiling is an APK of roughly ~45–55 MB** (a 20–30 MB cut),
-at the cost of keep-rules for junixsocket / Gson / OkHttp-SSE + Compose and
+**the measured ceiling is an APK of roughly ~45–55 MB** (a 20–30 MB cut),at the cost of keep-rules for junixsocket / Gson / OkHttp-SSE + Compose and
 a device-verified run before commit. Updated recommendation on the R8
 sub-decision: worth a gated, isolated attempt now that lint is green —
 build-config-only batch (`isMinifyEnabled = true` for release + the
 `proguard-rules.pro` keep-rules) — with the mandatory device sanity check
 (one UDS turn end-to-end). The risk/effort call stays the user's.
+> **Attempt executed and BEAT the ceiling: 2026-10-31, landed `37c93cb`.**
+> First pass failed exactly where R8 predicted it would - four missing
+> classes (junixsocket's compile-only annotations + a desktop-only `java.rmi`
+> path), adopted verbatim as `-dontwarn` rules from R8's own
+> `missing_rules.txt`. Second pass: `:app:testDebugUnitTest
+> :app:assembleDebug :app:assembleRelease :app:lintRelease` -> BUILD
+> SUCCESSFUL (24m30s; release lint green; vital analyze clean; no vital
+> findings). **Measured: 73.2 -> 28.8 MB on disk; DEX 47.76 MB across 14
+> files -> 3.39 MB in ONE classes.dex**; engine .so untouched at 92.7 MB
+> raw; 40.8 KB obfuscation map (mapping.txt, build-only) captured for
+> future stack-trace deobfuscation. Remaining verification (mandatory,
+> blocked on decision 2's keystore): install the SIGNED minified APK on
+> device and run one end-to-end UDS turn - the reflected code has to prove
+> itself at runtime before this reads done-done. The debug artifact stays
+> unminified and the device stays on the latest debug build.
 
 Current state (both deliberate, both commented in [`app/build.gradle.kts`](../app/build.gradle.kts)):
 

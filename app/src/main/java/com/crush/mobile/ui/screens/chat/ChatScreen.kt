@@ -34,7 +34,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -209,6 +212,7 @@ bottomBar = {
                 // this early would swallow the message with no visible error.
                 sendEnabled = s.engineReady,
                 streaming = s.isStreaming,
+                enterSends = settings.enterSendMode == "send",
                 onChange = { text ->
                     // The on-demand start that prewarm=off defers to, so the
                     // engine is already booting by the time the user finishes
@@ -756,6 +760,7 @@ value: String,
      */
     sendEnabled: Boolean,
     streaming: Boolean,
+    enterSends: Boolean,
     onChange: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit
@@ -773,7 +778,25 @@ value: String,
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Message") },
                 maxLines = 5,
-                enabled = enabled && !streaming
+                enabled = enabled && !streaming,
+                // ENTER-SEND SETTING (analysis §4 P2): the preference existed
+                // end-to-end in the model, DataStore and ViewModel with no
+                // consumer and no UI. In "send" mode the IME action becomes
+                // the send arrow and the action fires onSend under the same
+                // guards the send button uses; in the "newline" default the
+                // action stays Default, so the enter key keeps inserting a
+                // newline exactly as before. Soft newlines in send mode are a
+                // mode-switch away; Settings says so beside the toggle.
+                keyboardOptions = KeyboardOptions(
+                    imeAction = if (enterSends) ImeAction.Send else ImeAction.Default
+                ),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (enabled && !streaming && sendEnabled && value.isNotBlank()) {
+                            onSend()
+                        }
+                    }
+                )
             )
             Spacer(Modifier.width(8.dp))
             if (streaming) {

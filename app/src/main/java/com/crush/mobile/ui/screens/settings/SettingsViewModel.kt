@@ -97,7 +97,7 @@ class SettingsViewModel(
         viewModelScope.launch { settingsRepository.saveThemeMode(mode) }
     }
 
-fun saveEnterSendMode(mode: String) {
+    fun saveEnterSendMode(mode: String) {
         viewModelScope.launch { settingsRepository.saveEnterSendMode(mode) }
     }
 

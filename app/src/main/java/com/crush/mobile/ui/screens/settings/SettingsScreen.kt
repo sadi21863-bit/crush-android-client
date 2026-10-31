@@ -476,6 +476,36 @@ Card(modifier = Modifier.fillMaxWidth()) {
                 }
             }
 
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Keyboard", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = settings.enterSendMode == "send",
+                            onClick = { viewModel.saveEnterSendMode("send") },
+                            label = { Text("Enter sends") }
+                        )
+                        FilterChip(
+                            selected = settings.enterSendMode == "newline",
+                            onClick = { viewModel.saveEnterSendMode("newline") },
+                            label = { Text("Enter = newline") }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "In \"Enter sends\" the keyboard action button sends the " +
+                            "message; the key stops inserting newlines. Switch back " +
+                            "to write multi-line drafts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
 // The "Generation" section - and with it the temperature slider - was
             // REMOVED rather than wired up, and the whole header went with it.
             //

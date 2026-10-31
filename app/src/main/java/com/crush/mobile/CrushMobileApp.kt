@@ -52,6 +52,17 @@ class CrushMobileApp : Application() {
      * and NO further heartbeat, that proves the process was killed from outside
      * (system/OOM/native) rather than crashing, which is what the
      * "Start chatting" death looked like.
+     *
+     * INTERVAL (analysis §4 P2): this used to fire every 2 seconds - roughly
+     * 30 lines a minute, 1800 an hour. With the 512KB log keeping only the
+     * newest ~200 lines, the diagnostics tail was mostly "alive" lines, so the
+     * actual fault the user came for was routinely folded out of the copy-out.
+     * 30 seconds keeps the forensic property the heartbeat exists for - a
+     * killed process stops ticking while a crash leaves an UNCAUGHT line, so
+     * kill-vs-crash attribution holds at any interval - and the cost is only
+     * that the exact moment of an external kill is now known to a 30s window
+     * instead of a 2s one, which is acceptable against a tail that must keep
+     * real evidence visible.
      */
     private fun startHeartbeat() {
         val handler = Handler(Looper.getMainLooper())
@@ -59,10 +70,10 @@ class CrushMobileApp : Application() {
         val tick = object : Runnable {
             override fun run() {
                 AppLog.d(TAG, "alive t=${SystemClock.elapsedRealtime() - started}ms")
-                handler.postDelayed(this, 2000)
+                handler.postDelayed(this, 30_000)
             }
         }
-        handler.postDelayed(tick, 2000)
+        handler.postDelayed(tick, 30_000)
     }
 
     /** Makes the navigation that precedes a crash visible after the fact. */

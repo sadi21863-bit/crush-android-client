@@ -46,7 +46,7 @@ subscription** account into this build.
 | Model picker catalogue | **PASS with the split fix** | `catalogue prices loaded for 37 models`, sheet listed 28 Go models; BEFORE the fix the app drew the PAYG console list (Zen-era ids uncallable by a Go key — the user's "only zen models visible" report) |
 | Automatic model selection | **PASS** | scoped to `beam-free` in ONE probe (pre-fix: 24 probes, no pick) |
 | Turn: streaming + tool rounds | **PASS** on beam-free | SSE attached `ac9bff4c`; permission cards (`fetch`, `agentic_fetch`, `bash`, `write`) delivered + answered on device; `ToolActivity observed tool_call` for bash/fetch/write; **file write of 72 lines with a fully rendered diff** |
-| Key model rejection (deepseek-v4.1-flash) | **PENDING exact status** | probed three times, "did not answer a probe" — a diagnostic build now logs verdict + per-base detail; hypothesis from the Go doc: workspace privacy defaults region-block DeepSeek ("allowed regions are Europe & United States") for a user outside them |
+| Key model rejection (deepseek-v4.1-flash) | **CAUSE NAMED 2026-11-01 (account-side, not app-side)** | with the full measurement chain live (plan-walk + classification), the probe returned `PAYMENT_REQUIRED: Upstream request failed: Insufficient account funds` on the Go base — the Console API doc explains the routing: *"Each key works in one workspace, chosen when it is created"* and billing goes to THAT workspace's budget (Harnesses doc: "Use a key from a workspace subscribed to Go for Go"). A Go model 402ing "insufficient funds" on the Go base means the KEY was minted in a workspace the Go subscription is not attached to. THE FIX is account-side: mint a fresh personal key INSIDE the subscribed workspace (Console > Account > Personal API keys > choose Workspace) and paste it in the app; the app now SPELLS this out on the rejected-model card instead of burying it in a log line |
 
 Findings that are NOT app bugs:
 - the unknown engine event `client_session` is a NEW 0.99.0 event type the
@@ -61,4 +61,8 @@ Findings that are NOT app bugs:
 Verdict so far: **v0.99.0 + OpenCode Go WORKS end to end for entitled
 models** — with the entire app-side model layer now split correctly
 (list/chat/plan), and the last open question (status codes on rejected
-models) is one diagnostic tap away.
+models) now ANSWERED: rejected taps name precise verdicts, the
+PAYMENT_REQUIRED class carries the workspace-key guidance inline (2026-11-01;
+the official mechanics: one key = one workspace, billing per that
+workspace's budget), and `deepseek-v4.1-flash`'s 402 on the Go base is the
+key's workspace lacking the subscription, not an app defect.

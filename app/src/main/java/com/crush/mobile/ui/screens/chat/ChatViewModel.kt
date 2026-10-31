@@ -1186,30 +1186,42 @@ class ChatViewModel(
             // the ?: exit keeps the nullability checker happy without !!.
             val providerRow = Providers.byId(providerId) ?: return@launch
             val base = providerRow.modelsBase ?: providerRow.modelsListBase
+            val probe = if (base == null) null else ZenModelsApi(
+                keyProvider = { key },
+                baseUrl = base,
+                chatBaseCandidates = providerRow.chatBases
+            ).probe(id)
+            AppLog.w(TAG, "probe $id -> ${probe?.verdict} detail=${probe?.detail}")
+            // The plan-walk already turned every 404 into a NEXT-base attempt;
+            // what remains after the walk is a REAL gateway verdict on the
+            // right plan base, so the message now says why rather than
+            // "did not answer a probe".
             val rejection = when {
                 base == null ->
                     "Cannot verify \"$id\": provider \"$providerName\" has no live " +
                         "model list in this build, so taps cannot be trusted."
-                !run {
-                    // DIAGNOSTIC (2026-11-01/v099): log the FULL probe verdict —
-                    // verdict + per-base detail — so a rejected tap names its
-                    // exact HTTP class instead of "did not answer a probe".
-                    val probe = ZenModelsApi(
-                        keyProvider = { key },
-                        baseUrl = base,
-                        chatBaseCandidates = providerRow.chatBases
-                    ).probe(id)
-                    AppLog.w(
-                        TAG,
-                        "probe $id -> ${probe.verdict} detail=${probe.detail}"
-                    )
-                    probe.verdict == com.crush.mobile.data.api.ProbeVerdict.WORKS
-                } ->
-                    "\"$id\" is listed by $providerName but cannot be called. Pick another."
-                else -> null
+                probe == null -> "Verification did not run (no reachable base)."
+                probe.verdict == com.crush.mobile.data.api.ProbeVerdict.WORKS -> null
+                // 2026-11-01, measured + officially explained: the OpenCode
+                // gateway bills the WORKSPACE the key was minted in ("each key
+                // works in one workspace, chosen when it is created"; harness
+                // routing: "a workspace subscribed to Go for Go"). A Go-
+                // entitled model answering 402 Insufficient account funds on
+                // the Go base means THIS key's workspace is not the subscribed
+                // one - the fix is a fresh key minted there, not a top-up.
+                probe.verdict == com.crush.mobile.data.api.ProbeVerdict.PAYMENT_REQUIRED &&
+                    providerRow.chatBases.isNotEmpty() ->
+                    "\"$id\" returned \"Insufficient account funds\" on the Go " +
+                        "gateway: this key was minted in a workspace without the " +
+                        "Go subscription. Create a new personal API key inside the " +
+                        "Go-subscribed workspace (Console > Account > Personal API " +
+                        "keys > choose the Workspace), then paste that key here."
+                probe.verdict == com.crush.mobile.data.api.ProbeVerdict.RETIRED ->
+                    "\"$id\" is not callable on your plan's gateway right now " +
+                        "(\"Model is unavailable\"). Pick another."
+                else -> "\"$id\" answered ${probe.verdict}: ${probe.detail ?: "no detail"}"
             }
             if (rejection != null) {
-                AppLog.w(TAG, "rejected model $id (probe verdict logged above)")
                 if (myTap != modelSelection) return@launch
                 revertModelSelection(previousModel, rejection)
                 return@launch

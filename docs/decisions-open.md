@@ -8,7 +8,12 @@ silently rotting.
 
 ## 1. Re-enable lint and decide on R8/minify
 
-**Status: OPEN — blocked on triage of the AGP/lint crash.**
+**Status: EXECUTING — triage passed 2026-10-31 (verdict above), the
+user picked GO on the enablement batch the same day, and the batch
+(4 code fixes + `app/lint.xml` waivers + flag flip + gate) landed with
+the same-day commit; R8/minify stays OFF, reaffirmed on the standing
+size rationale (max-possible-DEX-gain number pending the APK
+composition analysis).**
 
 Current state (both deliberate, both commented in [`app/build.gradle.kts`](../app/build.gradle.kts)):
 
@@ -96,7 +101,12 @@ instead of relying on a gitignore to make an on-disk key safe.
 
 ## 4. Injector-vs-engine concurrent `crush.json` write needs a design
 
-**Status: OPEN — deferred, needs a design rather than a patch.**
+**Status: OPEN — direction chosen 2026-10-31 (user adopted the
+recommendation), design doc pending. Chosen direction: single-writer
+— key injection moves to the socket only, the engine becomes the sole
+writer of `crush.json`; the app injects at bootstrap and on key
+change. The guard note this trades against (item 6) folds into the
+same design.**
 
 When the app's `EngineConfigInjector` rewrites `crush.json` with the provider
 key and the engine writes its own config changes concurrently, one write can
@@ -107,7 +117,10 @@ rather than patched.
 
 ## 5. No-lockscreen fail-open: confirm or block a store release
 
-**Status: OPEN — currently a deliberate beta stand.**
+**Status: DECIDED 2026-10-31 — the beta-only stand is blessed by the
+user; a store-distribution build additionally requires the fail-closed
+lock first (fail-open stays a documented beta property until that
+ships).**
 
 With no lock configured, the app opens without any lock prompt
 (`DeviceAuth.kt:54–62`; README "First-launch app lock bypass", D9). This is
@@ -119,7 +132,9 @@ store while the stance is unresolved-by-silence.
 
 ## 6. Key at rest in plaintext inside `crush.json`
 
-**Status: OPEN — documented trade, still deserves its guard.**
+**Status: DECIDED 2026-10-31 — accepted as a documented trade; the
+agent-prompt guard folds into the decision-4 design (single-writer
+key path) instead of landing as a separate patch.**
 
 The provider key lives plaintext in `crush.json` (engine requires it there;
 `EngineConfigInjector.kt:36–38/129`). The README documents it, including why
@@ -144,7 +159,8 @@ stays visible next to the decisions it must not be confused with.
 
 ## 8. How long may the agent wait on ONE ask or question dialog?
 
-**Status: OPEN — default applied, awaiting your call (or your "stand" note).**
+**Status: DECIDED 2026-10-31 — 10 minutes confirmed as the parked-prompt
+ceiling.**
 
 The 2026-10-29 device-verification pass removed the old 180 s whole-turn
 timeout (it could only ever kill healthy turns: a user still reading an ask,
@@ -175,3 +191,29 @@ app teardown only. Unless you choose otherwise, 10 minutes stands.
   companion with the awaited-server-cancel path — item 8's description
   matches the code.
 - Items 4/5/6/7 remain open as written; no tree change observed.
+
+
+## Adopted 2026-10-31 (user: "I will go with that")
+
+Item-by-item adoption of the agent's recommendation set:
+
+- **1 lint/R8** — GO on the enablement batch (see item 1 above); **R8 stays
+  OFF**; AGP-10 opt-out flags (`gradle.properties:42/47`) intentionally STAY
+  until an actual AGP-10 upgrade, because they are what permits the pinned
+  KGP 2.4.10 (their exit condition is that migration, not this year).
+- **2 keystore** — user creates it (command handed over 2026-10-31);
+  signing + device verification follows the stopBlocking re-measure.
+- **3 test key** — rotate at provider, delete the file (user; unchanged).
+- **4 injector** — direction chosen (see item 4); design doc is the next
+  artifact, before any code.
+- **5 lock** — beta-only blessed (item 5 above).
+- **6 key at rest** — accepted as trade (item 6 above).
+- **7 model persistence** — stays deferred.
+- **8 prompt wait** — 10 minutes confirmed (item 8 above).
+
+Order of play from here: stopBlocking + backgrounding re-measure (user
+drives two turns, agent measures from adb) → signed release →
+androidTest smoke suite → decision-4 design doc.
+Context: CI shipped this day (`3162bbe`); v0.99.0 evaluation deferred
+("NOT adopted", capabilities.md); Hyper real-key turn deferred until the
+user funds credits.

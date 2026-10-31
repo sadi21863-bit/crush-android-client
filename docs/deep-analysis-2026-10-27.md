@@ -431,4 +431,5 @@ force-stop+relaunch+one fingerprint.
   the file is ~2327 lines today. Historical count left as written.
 - Engine of record: code comments and the D12 evidence name v0.98.2; the
   jniLibs binary does not hash to the 0.98.1 BASELINE checksum and
-  `tools/fetch-crush.ps1` still pins 0.98.1 (divergence recorded in README).
+  `tools/fetch-crush.ps1` was re-pinned to 0.98.2 on 2026-10-31 (`9402531`);
+  the in-tree binary remains the instrumented `+dirty` build of that release.

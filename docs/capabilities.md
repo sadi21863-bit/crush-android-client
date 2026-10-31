@@ -99,9 +99,9 @@ end and stream a complete turn (proven 2026-10-20).
 > bundle. Upstream ask
 > [#4092](https://github.com/charmbracelet/crush/issues/4092) (UDS scheme
 > documentation, optional TCP auth) was closed by upstream on 2026-10-21 with
-> nothing landed there. Caution: `tools/fetch-crush.ps1` still defaults to
-> 0.98.1 and pins only 0.97.1/0.98.1 — a run with the binary deleted would
-> re-fetch and downgrade the bundle.
+> nothing landed there. RESOLVED 2026-10-31: `tools/fetch-crush.ps1` now
+> defaults to 0.98.2 with the upstream SHA-256 pinned from the signed
+> checksums.txt (`9402531`) —; the downgrade path is closed.
 
 ### Delete treating transport failure as success — FIXED
 

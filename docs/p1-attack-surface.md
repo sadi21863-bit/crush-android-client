@@ -17,10 +17,10 @@
 > delivery). §1–§6 stand as the 0.98.1-spec snapshot they were generated as.
 > Two facts that stand today:
 >
-> - `tools/fetch-crush.ps1` still defaults to `-Version 0.98.1` and pins only
->   0.97.1/0.98.1. With `libcrush.so` present the script is a no-op
->   ("already present"); with the binary deleted, a zero-arg run re-fetches and
->   **downgrades** the bundle to 0.98.1 — the pin's floor did not rise with the
+> - RESOLVED 2026-10-31: `tools/fetch-crush.ps1` now defaults to
+>   `-Version 0.98.2` and pins the upstream tarball SHA-256 from the signed
+>   checksums.txt (`9402531`); the pin's floor rose with the engine and the
+>   deleted-binary downgrade is no longer possible — the pin's floor did not rise with the
 >   engine.
 > - The upstream asks recorded in §8 are filed as
 >   [charmbracelet/crush#4092](https://github.com/charmbracelet/crush/issues/4092),

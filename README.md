@@ -316,9 +316,12 @@ Upstream pins: the engine of record is **Crush v0.98.2** since the 2026-10-27
 instrumented upgrade (D12 ask delivery requires it; code comments and the
 D12 evidence all reference v0.98.2, and the working-tree `libcrush.so` does
 not hash to the v0.98.1 checksum recorded in BASELINE). **`tools/fetch-crush.ps1`
-still defaults to 0.98.1** — re-pin 0.98.2 with its signed checksum before
-trusting a fresh-clone fetch (recorded 2026-10-31 as a repo divergence, not
-yet changed). (0.98.1 was the 2026-10-18 upgrade for the `unix://` listen
+now defaults to 0.98.2** —; the upstream v0.98.2 (published 2026-10-23)
+`crush_0.98.2_Android_arm64.tar.gz` SHA-256 pin was added 2026-10-31 from the
+signed release's checksums.txt (`9402531`), so a fresh-clone fetch no longer
+downgrades. Caveat that stays: the in-tree binary is the locally instrumented
+`v0.98.2+dirty` build, so a fresh-clone fetch yields the clean upstream engine
+of the same version, minus the instrumentation. (0.98.1 was the 2026-10-18 upgrade for the `unix://` listen
 scheme; the older 0.97.1 binary is backed up under `engine-backups/`. A
 `nightly` tag also exists and is not used.) **Bubble Tea is not used** — it is
 Crush's terminal UI framework, compiled into the binary but unreachable from

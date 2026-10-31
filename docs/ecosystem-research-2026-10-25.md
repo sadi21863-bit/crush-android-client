@@ -20,12 +20,12 @@ Research for the Kotlin/Compose Android client ("crush-mobile") embedding charmb
 > - **"Finish-error turns render as empty assistant bubbles" landed too:**
 >   the cline-ErrorRow-style typed error card with Retry shipped (commit
 >   `0dca731`, 2026-10-31).
-> - **"401 JVM tests" row:** now 455 `@Test` methods across 39 files
+> - **"401 JVM tests" row:** now 455 `@Test` methods across 38 files
 >   (2026-10-31 count); still no instrumentation suite.
-> - **Caution for the fetch script:** `tools/fetch-crush.ps1` still defaults
->   to `-Version 0.98.1` and pins only 0.97.1/0.98.1 — with `libcrush.so`
->   present a run is a no-op ("already present"), but with the binary deleted
->   it re-fetches and **downgrades** the bundle to 0.98.1.
+> - **Fetch-script caution RESOLVED 2026-10-31:** the script now defaults
+>   to `-Version 0.98.2` with the upstream tarball SHA-256 pinned from the
+>   signed checksums.txt (`9402531`) —; the 0.98.1
+>   downgrade path is closed.
 
 ## TL;DR — 5 highest-leverage adoptables
 

@@ -66,3 +66,15 @@ PAYMENT_REQUIRED class carries the workspace-key guidance inline (2026-11-01;
 the official mechanics: one key = one workspace, billing per that
 workspace's budget), and `deepseek-v4.1-flash`'s 402 on the Go base is the
 key's workspace lacking the subscription, not an app defect.
+
+**PROMOTED 2026-11-01.** The user called it: `main` now bundles the upstream
+**v0.99.0** clean engine (fetch pin advanced, checksum
+`d18cd1f9…f78c` from the signed checksums.txt), and the model-layer work
+from this branch is merged: `Provider.modelsListBase`/`chatBases`, the
+plan-walking probe, the app User-Agent, dynamic Go listing (no hardcoded
+ids, per the user's directive), and the 402 workspace-key guidance. The
+0.98.2+dirty instrumented binary remains the evidence base for the 2026-10
+z-sessions; new evidence accretes against 0.99.0. The standard two-turn
+on-device verification cycle on the promoted build (ask-card approval +
+file-edit diff, plus the standing stopBlocking/backgrounding re-measure)
+is the remaining gate to call the promotion finished.

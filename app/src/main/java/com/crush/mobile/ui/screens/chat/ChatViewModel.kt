@@ -730,7 +730,11 @@ class ChatViewModel(
         // from Zen by default: constructing the client with Zen's base for a
         // non-Zen provider would probe opencode.ai with that provider's key and
         // fail with an opaque 401 that described nothing.
-        val modelsBase = Providers.byId(providerId)?.modelsBase
+        // v099 lane (2026-10-31): the OpenCode/Console family serves the list
+        // on a DIFFERENT base than chat - provider.modelsListBase covers that
+        // split.
+        val provider = Providers.byId(providerId) ?: return
+        val modelsBase = provider.modelsBase ?: provider.modelsListBase
         if (modelsBase == null) {
             AppLog.w(TAG, "no compat base for provider '$providerId'; cannot fetch a catalogue")
             _state.update {
@@ -743,7 +747,11 @@ class ChatViewModel(
             }
             return
         }
-        val zen = ZenModelsApi({ key }, modelsBase)
+        val zen = ZenModelsApi(
+            keyProvider = { key },
+            baseUrl = modelsBase,
+            chatBaseCandidates = provider.chatBases
+        )
 
         // Load REAL prices before parsing the catalogue.
         //
@@ -1005,7 +1013,8 @@ class ChatViewModel(
             // the key factory lambda below is `() -> String`, so it cannot
             // suspend, and a mirror read inside it can still be cold.
             val providerId = currentProviderId()
-            val base = currentModelsBase()
+            val providerRow = Providers.byId(providerId) ?: return@launch
+            val base = providerRow.modelsBase ?: providerRow.modelsListBase
             if (base == null) {
                 _state.update {
                     it.copy(
@@ -1018,7 +1027,8 @@ class ChatViewModel(
             }
             val r = ZenModelsApi(
                 { container.keySession.require(secureKeys, providerId) },
-                base
+                baseUrl = base,
+                chatBaseCandidates = providerRow.chatBases
             ).fetch()
             _state.update {
                 it.copy(
@@ -1064,11 +1074,11 @@ class ChatViewModel(
         Providers.resolve(currentPersistedProvider()).id
 
     /**
-     * Base of the selected provider's OpenAI-compatible API, or null when the
-     * picker cannot talk to that provider directly (see Provider.modelsBase).
+     * (removed 2026-10-31, v099 lane) — replaced by provider-aware construction
+     * of [ZenModelsApi] at its three call sites: the OpenCode/Console family
+     * needs list-vs-chat split bases ([Provider.modelsListBase],
+     * [Provider.chatBases]), which a single-base reads cannot express.
      */
-    private suspend fun currentModelsBase(): String? =
-        Providers.byId(currentProviderId())?.modelsBase
 
     /**
      * Switches provider and re-bootstraps - the single switch reducer.
@@ -1172,17 +1182,34 @@ class ChatViewModel(
                 return@launch
             }
             val providerName = Providers.byId(providerId)?.displayName ?: providerId
-            val base = currentModelsBase()
+            // resolve() guarantees a known id, so a missing row cannot happen;
+            // the ?: exit keeps the nullability checker happy without !!.
+            val providerRow = Providers.byId(providerId) ?: return@launch
+            val base = providerRow.modelsBase ?: providerRow.modelsListBase
             val rejection = when {
                 base == null ->
                     "Cannot verify \"$id\": provider \"$providerName\" has no live " +
                         "model list in this build, so taps cannot be trusted."
-                !ZenModelsApi({ key }, base).probeWorks(id) ->
+                !run {
+                    // DIAGNOSTIC (2026-11-01/v099): log the FULL probe verdict —
+                    // verdict + per-base detail — so a rejected tap names its
+                    // exact HTTP class instead of "did not answer a probe".
+                    val probe = ZenModelsApi(
+                        keyProvider = { key },
+                        baseUrl = base,
+                        chatBaseCandidates = providerRow.chatBases
+                    ).probe(id)
+                    AppLog.w(
+                        TAG,
+                        "probe $id -> ${probe.verdict} detail=${probe.detail}"
+                    )
+                    probe.verdict == com.crush.mobile.data.api.ProbeVerdict.WORKS
+                } ->
                     "\"$id\" is listed by $providerName but cannot be called. Pick another."
                 else -> null
             }
             if (rejection != null) {
-                AppLog.w(TAG, "rejected model $id (did not answer a probe)")
+                AppLog.w(TAG, "rejected model $id (probe verdict logged above)")
                 if (myTap != modelSelection) return@launch
                 revertModelSelection(previousModel, rejection)
                 return@launch

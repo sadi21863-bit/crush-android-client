@@ -108,7 +108,24 @@ data class Provider(
      * The plumbing (CrushSession.ensureAgentReady + POST /agent/main after
      * init) stays because it is provider-generic.
      */
-    val mainAgent: String = ""
+    val mainAgent: String = "",
+    /**
+     * 2026-10-31 (v099 experiment lane): the OpenCode/Console family does NOT
+     * serve its model list on the same base its chat API lives at (probes:
+     * /inference/v1/models -> 200 without auth, /inference/openai/v1/models ->
+     * 404, chat documented at /inference/openai/v1/chat/completions). When
+     * this is set, [ZenModelsApi] fetches the list here and probes against
+     * [chatBases] instead of deriving both from [modelsBase].
+     */
+    val modelsListBase: String? = null,
+    /**
+     * Chat base candidates to PROBE, plan-dependent first (Go subscribers are
+     * routed by /opencode.ai/inference/go; pay-as-you-go keys by
+     * /opencode.ai/inference). A 404 on one candidate means "wrong plan base",
+     * never "model unavailable": probe order matters and 401/402/403 are
+     * FINAL verdicts.
+     */
+    val chatBases: List<String> = emptyList()
 )
 
 object Providers {
@@ -180,7 +197,28 @@ object Providers {
             id = "opencode-go",
             displayName = "OpenCode Go",
             isKnown = false,
-            keyHint = "opencode.ai/go"
+            keyHint = "opencode.ai/go",
+            // v099-experiment lane (2026-10-31): the Console/Go split wiring.
+            // LIST lives on the GO plan base (/inference/go/v1/models — the
+            // Console /inference/v1 list is a DIFFERENT plan's catalogue: that
+            // mismatch is why the picker showed PayG/Zen-era ids the Go key
+            // cannot call). CHAT lives at /inference/go/openai/v1/chat/compl
+            // etions for a Go subscription (the PAYG /inference fallback kept
+            // for keys that are not Go). The x-opencode-session header is
+            // 0.99.0-engine-side; the gateway also REJECTS generic SDK user
+            // agents (python urllib 403 vs browser UA 200 — Go doc req #2),
+            // so request UA is set in ZenModelsApi.
+            modelsListBase = "https://opencode.ai/inference/go/v1",
+            chatBases = listOf(
+                "https://opencode.ai/inference/go/openai/v1",
+                "https://opencode.ai/inference/openai/v1"
+            )
+            // NO preferredModelIds (user directive 2026-11-01): models are
+            // listed dynamically from /inference/go/v1/models — the gateway
+            // list is the authority. The picker still sorts free-first and
+            // probes before seating a model; if ordering by "coded-agent
+            // quality" is ever wanted it must come from a fetched/category
+            // source, not a hardcoded id list.
         ),
         Provider(
             id = "groq",

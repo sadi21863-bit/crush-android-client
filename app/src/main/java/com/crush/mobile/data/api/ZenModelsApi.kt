@@ -130,11 +130,53 @@ class ZenModelsApi(
     /**
      * Base URL of the provider to talk to. Defaults to Zen for source
      * compatibility; callers MUST pass the selected provider's
-     * [com.crush.mobile.domain.provider.Provider.modelsBase] instead.
+     * [com.crush.mobile.domain.provider.Provider.modelsBase] instead - OR, for
+     * the OpenCode/Console split-layout providers (2026-10-31, v099 lane),
+     * the LIST base [com.crush.mobile.domain.provider.Provider.modelsListBase]
+     * with [chatBaseCandidates]; both defaulting back to this base when
+     * absent, so plain OpenAI-shaped providers (Hyper, OpenRouter, DeepSeek
+     * ...) stay untouched.
      */
     private val baseUrl: String = ZenModelsApi.BASE,
+    /**
+     * If set, /models is fetched from HERE (the OpenCode family keeps its
+     * model LIST on a different host path than its chat API).
+     */
+    private val listBaseOverride: String? = null,
+    /**
+     * Chat base candidates, in priority order. `probe()` walks them; a 404
+     * means "wrong plan base for this key", never a definitive verdict, while
+     * 401/402/403 and any HTTP success are FINAL and stop the walk.
+     */
+    private val chatBaseCandidates: List<String> = emptyList(),
     private val client: OkHttpClient = defaultClient()
 ) {
+
+    /** Effective list base for /models (override > provider default). */
+    private val listBase: String = listBaseOverride ?: baseUrl
+
+    /**
+     * Probe targets in order: callers' candidates first, the provider's own
+     * base last (deduplicated), so a plain OpenAI-shaped provider simply
+     * probes its own chat endpoint.
+     */
+    private val chatBases: List<String> =
+        if (chatBaseCandidates.isEmpty()) {
+            listOf(baseUrl)
+        } else {
+            chatBaseCandidates +
+                (if (chatBaseCandidates.none { it == baseUrl }) listOf(baseUrl) else emptyList())
+        }
+
+    /**
+     * Stable process-local session id for the x-opencode-session header that
+     * OpenCode Go REQUIRES on chat requests (Harnesses doc, 2026-10-31). The
+     * ENGINE generates its own for real turns; this one exists so the PICKER's
+     * one-token probes pass the same gateway contract. Per-process steadiness
+     * is enough: each app start presents a fresh but consistent id.
+     */
+    private val probeSessionHeader: String =
+        "ses_probe_" + java.util.UUID.randomUUID().toString().substring(0, 8)
 
 data class Result(
         val models: List<LiveZenModel>,
@@ -181,8 +223,9 @@ data class Result(
         }
         runCatching {
             val req = Request.Builder()
-                .url("$baseUrl/models")
+                .url("$listBase/models")
                 .header("Authorization", "Bearer $key")
+                .header("User-Agent", USER_AGENT)
                 .get()
                 .build()
             client.newCall(req).execute().use { resp ->
@@ -242,6 +285,17 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
     companion object {
         const val BASE = "https://opencode.ai/zen/v1"
 
+        /**
+         * 2026-10-31 (v099 lane): the OpenCode gateway REJECTS generic SDK
+         * user agents - measured live (python urllib -> HTTP 403, a browser
+         * UA -> 200 on the same URL) and documented on the Go page ("identify
+         * itself with its own user agent... rather than a generic SDK or
+         * HTTP-library name"). Every request this client makes carries an
+         * app-identifying UA.
+         */
+        const val USER_AGENT =
+            "crush-mobile/1.0 (Android; +https://github.com/sadi21863-bit/crush-android-client)"
+
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
 
         private fun defaultClient() = OkHttpClient.Builder()
@@ -292,6 +346,12 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
      * is what broke a shipped build; this is the fix.
      *
      * Costs one token (max_tokens=1) and returns no usable content.
+     *
+     * 2026-10-31 (v099 lane): walks [chatBases] because the OpenCode family
+     * is plan-dependent - a 404 from a base means this KEY belongs to the
+     * OTHER plan, never that the model is gone, so only 401/402/403/200/4xx
+     * -model-verdicts stop the walk. Every probe carries the
+     * x-opencode-session header Go requires (0.99.0-engine gateway).
      */
     suspend fun probe(model: String): Probe = withContext(Dispatchers.IO) {
         runCatching {
@@ -310,20 +370,21 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
                     }
                 )
             }
-            client.newCall(
-                Request.Builder()
-                    .url("$baseUrl/chat/completions")
+            var lastProbe = Probe(model, ProbeVerdict.UNKNOWN, "no base attempted")
+            var sawPlanMiss = false
+            for (chatBase in chatBases) {
+                val request = Request.Builder()
+                    .url("$chatBase/chat/completions")
                     .addHeader("Authorization", "Bearer ${keyProvider()}")
+                    .addHeader("x-opencode-session", probeSessionHeader)
+                    .addHeader("User-Agent", USER_AGENT)
                     .post(body.toString().toRequestBody(JSON_MEDIA))
                     .build()
-            ).execute().use { resp ->
-                val text = runCatching { resp.body?.string() }.getOrNull().orEmpty()
-                if (resp.isSuccessful) {
-                    Probe(model, ProbeVerdict.WORKS, null)
-                } else {
-                    // The upstream reason matters: 402/403 "Model access is
-                    // disabled" means this KEY may not use this model, which is
-                    // a different problem from the model being retired.
+                client.newCall(request).execute().use { resp ->
+                    val text = runCatching { resp.body?.string() }.getOrNull().orEmpty()
+                    if (resp.isSuccessful) {
+                        return@withContext Probe(model, ProbeVerdict.WORKS, null)
+                    }
                     val msg = Regex("\"message\"\\s*:\\s*\"([^\"]+)\"")
                         .find(text)?.groupValues?.get(1).orEmpty()
                     val verdict = if (resp.code == 401) {
@@ -334,12 +395,25 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
                         ProbeVerdict.PAYMENT_REQUIRED
                     } else if (resp.code == 403) {
                         ProbeVerdict.NOT_ENTITLED
+                    } else if (resp.code == 404) {
+                        // Plan-miss on this base: another candidate may match.
+                        sawPlanMiss = true
+                        ProbeVerdict.UNKNOWN
                     } else {
                         ProbeVerdict.UNKNOWN
                     }
-                    Probe(model, verdict, msg.ifBlank { "HTTP ${resp.code}" })
+                    lastProbe = Probe(model, verdict, msg.ifBlank { "HTTP ${resp.code} from $chatBase" })
+                    if (verdict != ProbeVerdict.UNKNOWN) {
+                        return@withContext lastProbe
+                    }
+                    continue
                 }
             }
+            lastProbe.copy(
+                detail = if (sawPlanMiss && lastProbe.verdict == ProbeVerdict.UNKNOWN)
+                    "every chat base answered 404/plan-miss for this key: ${lastProbe.detail}"
+                else lastProbe.detail
+            )
         }.getOrElse { Probe(model, ProbeVerdict.UNKNOWN, it.message ?: "probe failed") }
     }
 

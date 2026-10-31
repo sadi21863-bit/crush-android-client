@@ -24,25 +24,41 @@ so it coexists with the reference install and never disturbs the z-lab
 - **First boot**: MainActivity Displayed +4.2 s with ProfileInstaller; no
   FATAL/ANR; app sits on onboarding (fresh app data — expected).
 
-## Stage 2 — engine-level verdict (needs one human tap)
+## Stage 2 — engine-level verdict (plan, from opening)
 
-The engine spawns only after onboarding, so the boot verdict on-device needs
-the user to complete onboarding in the EXPERIMENT app (pink `.v099` icon):
-pick a provider, paste a key of their choosing, and open the chat once.
+The engine spawns only after onboarding, so the boot verdict on-device
+needed the user to complete onboarding in the EXPERIMENT app (pink `.v099`
+icon): pick a provider, paste a key, and open the chat once. The agent then
+reads `logcat`/`run-as` app logs for the UDS bind line, the 60-second
+readiness gate, a workspace/session bootstrap + SSE connect, and the
+engine's own version banner (buildinfo is authoritative).
 
-Agent then reads `logcat` for (TAGs `CrushEngine`, `CrushMobile`,
-`EngineSupervisor`):
-1. `unix://` bind line on the v0.99.0 engine,
-2. readiness within the 60 s gate over the UDS socket,
-3. a workspace/session bootstrap + SSE connect,
-4. the engine's own banner: buildinfo should read `v0.99.0` (check
-   `go buildinfo` strings in logcat or via `dumpsys`? — the boot log line is
-   authoritative).
+## Stage 2 — engine-level verdict (live results, 2026-11-01)
 
-## Verdict rules
+The user picked `opencode-go` and pasted a real key from a **Go
+subscription** account into this build.
 
-- PASS = all four Stage-2 items observed → record "drop-in candidate";
-  upgrade remains a USER decision (the evidence engine of record stays
-  0.98.2+dirty until the main branch chooses).
-- FAIL = bind/readiness/SSE wrinkle → capture the exact failure line here;
-  the branch exists precisely to hold that diff without touching main.
+| Test | Result | Evidence |
+| --- | --- | --- |
+| Engine boot on 0.99.0 + UDS bind | **PASS** | `exec: ... server -H unix://<datadir>/.../crush.sock`, banner `version=v0.99.0` go1.27.1 android/arm64 |
+| Workspace bootstrap → session creation | **PASS** | workspace id issued (first: `e5434f10`, later `ac9bff4c`), session `cdf2c32a` (47 msgs) |
+| agent/init with model slots | **PASS after the list-split fix** | `ensureAgentReady: key set for provider 'opencode-go'; model[large]=beam-free; agent/init ok; is_ready=true` — the same call 500'd with `coder agent configuration is missing` before the split fix |
+| Model picker catalogue | **PASS with the split fix** | `catalogue prices loaded for 37 models`, sheet listed 28 Go models; BEFORE the fix the app drew the PAYG console list (Zen-era ids uncallable by a Go key — the user's "only zen models visible" report) |
+| Automatic model selection | **PASS** | scoped to `beam-free` in ONE probe (pre-fix: 24 probes, no pick) |
+| Turn: streaming + tool rounds | **PASS** on beam-free | SSE attached `ac9bff4c`; permission cards (`fetch`, `agentic_fetch`, `bash`, `write`) delivered + answered on device; `ToolActivity observed tool_call` for bash/fetch/write; **file write of 72 lines with a fully rendered diff** |
+| Key model rejection (deepseek-v4.1-flash) | **PENDING exact status** | probed three times, "did not answer a probe" — a diagnostic build now logs verdict + per-base detail; hypothesis from the Go doc: workspace privacy defaults region-block DeepSeek ("allowed regions are Europe & United States") for a user outside them |
+
+Findings that are NOT app bugs:
+- the unknown engine event `client_session` is a NEW 0.99.0 event type the
+  router skips silently (observed once during attach; it is additive, not
+  fatal — worth an additive handler later);
+- Go's own model endpooints demand three things the CASUAL integrations miss
+  (plan-family list base, full /openai/v1 chat path, non-SDK User-Agent);
+  each failure mode was verified independently: wrong-plan list (payg
+  catalogue), short chat path (404 plan-miss), and the UA filter (python
+  urllib 403 vs browser 200 on the same URL).
+
+Verdict so far: **v0.99.0 + OpenCode Go WORKS end to end for entitled
+models** — with the entire app-side model layer now split correctly
+(list/chat/plan), and the last open question (status codes on rejected
+models) is one diagnostic tap away.

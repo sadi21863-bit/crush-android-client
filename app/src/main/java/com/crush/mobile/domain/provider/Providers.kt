@@ -205,7 +205,18 @@ object Providers {
             id = "opencode-go",
             displayName = "OpenCode Go",
             isKnown = false,
-            keyHint = "opencode.ai/go"
+            keyHint = "opencode.ai/go",
+            // 2026-10-31 endpoint research (Console models doc + live probes):
+            // the OpenCode/Console family splits its paths - models LIST at
+            // /opencode.ai/inference/v1/models (HTTP 200, no auth), OpenAI-
+            // compat CHAT at /inference/openai/v1/chat/completions, while
+            // /inference/openai/v1/models is a 404. A single modelsBase
+            // cannot express list+probe versus chat honestly, so it stays
+            // null until ZenModelsApi grows a list/chat split (and a real
+            // Console/Go key verifies the probe) - NOT silently probed
+            // against a wrong base. Free-tier ids are locked to the OpenCode
+            // agent: "Free-tier chat models require OpenCode; use paid
+            // models or Go from other clients" (Console models doc).
         ),
         Provider(
             id = "groq",

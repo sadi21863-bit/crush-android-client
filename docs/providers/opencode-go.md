@@ -5,6 +5,32 @@ anomalyco/opencode repo, Docker's AI docs, plus **live wire probes** against
 `opencode.ai/inference/go/*` from this machine (marked `probe`). App context:
 Crush Mobile (Crush 0.97.1 engine at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29, OpenAI-compatible chat completions).
 
+## 2026-10-31 addendum: the Console rename + how Go is reachable from OTHER clients
+
+The day's context (verified against official sources, and recorded in full in
+[the Zen doc's addendum](opencode-zen.md)): the pay-as-you-go side is being
+rebranded **OpenCode Console** (docs tree `/v2/docs`, integration picker
+Console-then-Go from changelog v2.2.0), while Go remains the
+**subscription-with-included-usage tier** and is actively maintained (the
+v2.2.4 changelog of 2026-10-30 raises Go limits). For a THIRD-PARTY client —
+which is what this app is:
+
+| Probe (GET, no auth) | Result |
+| --- | --- |
+| `opencode.ai/inference/v1/models` | **200** — the one model-list home |
+| `opencode.ai/zen/v1/models` | 200 (alias of the same gateway) |
+| `opencode.ai/inference/openai/v1/models` | **404** — models are NOT at the openai-compat base |
+| OpenAI-compat chat | documented at `opencode.ai/inference/openai/v1/chat/completions` (needs a key) |
+
+Consequences for the registry: a single `modelsBase` cannot honestly serve
+both list and probe vs chat for this family (list base ≠ chat base), so
+`opencode-go.modelsBase` stays **null** in `Providers.kt` with the finding
+recorded there, until `ZenModelsApi` grows a list/chat split verified with a
+real Console/Go key. And the free-model wall quoted in the Console doc
+stands: **"Free-tier chat models require OpenCode; use paid models or Go
+from other clients"** — a Go subscription (or a funded Console balance) is
+the official route for a third-party client to use what was free.
+
 ## TL;DR
 
 | Question | Answer |

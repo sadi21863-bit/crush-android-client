@@ -2,6 +2,8 @@ package com.crush.mobile.ui.screens.chat
 
 import com.crush.mobile.data.crush.Session
 
+import java.util.Locale
+
 /**
  * Presentation rules for the session list.
  *
@@ -54,7 +56,12 @@ object SessionList {
 
         // cost is a Double and free models legitimately report exactly 0.0, so
         // only spend is worth surfacing.
-        if (session.cost > 0.0) bits += "$" + String.format("%.2f", session.cost)
+        // Locale.US pins the money string: the "$" is already explicit, and a
+        // device locale like Turkish would otherwise rewrite the decimal
+        // separator under the user's number formatting instead of the
+        // invariant "$x.xx" the row always meant. (Lint DefaultLocale,
+        // 2026-10-31 enablement batch.)
+        if (session.cost > 0.0) bits += "$" + String.format(Locale.US, "%.2f", session.cost)
 
         if (session.isBusy) bits += "running"
 

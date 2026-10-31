@@ -2,7 +2,6 @@ package com.crush.mobile.domain.model
 
 import android.app.KeyguardManager
 import android.content.Context
-import android.os.Build
 import android.os.PowerManager
 
 /**
@@ -42,13 +41,10 @@ data class RuntimeSignals(
 
             val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
 
-            // getCurrentThermalStatus is API 29+. Below that there is no signal
-            // at all, so report unknown rather than a reassuring zero.
-            val thermal = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                runCatching { pm?.currentThermalStatus }.getOrNull() ?: THERMAL_UNKNOWN
-            } else {
-                THERMAL_UNKNOWN
-            }
+            // getCurrentThermalStatus is API 29+ and this build's floor IS 29,
+            // so no guard is needed (lint ObsoleteSdkInt); report unknown only
+            // if the power service call itself fails.
+            val thermal = runCatching { pm?.currentThermalStatus }.getOrNull() ?: THERMAL_UNKNOWN
 
             return RuntimeSignals(
                 thermalStatus = thermal,

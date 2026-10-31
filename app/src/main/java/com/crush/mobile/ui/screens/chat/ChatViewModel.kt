@@ -291,8 +291,14 @@ val selectedModel: String = "",
  * The backend contract this relies on was all proven by the Phase 3 end-to-end
  * test, so this layer is deliberately thin - it owns UI state and nothing else.
  */
-class ChatViewModel(private val context: Context, private val container: AppContainer) :
-    ViewModel() {
+class ChatViewModel(
+    // LINT StaticFieldLeak waived 2026-10-31: the ONLY construction site
+    // (the factory, ~line 2410) passes context.applicationContext, so this
+    // field holds the app context and outlives no Activity - the generic
+    // Context parameter type is what trips the detector.
+    @Suppress("StaticFieldLeak") private val context: Context,
+    private val container: AppContainer
+) : ViewModel() {
 
     private val gson = Gson()
     private val secureKeys = SecureKeyStore(context)
@@ -961,7 +967,6 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     override fun onCleared() {
         runCatching { eventConnection?.stop() }
         runCatching { eventRouter.close() }
-        super.onCleared()
     }
 
     /**

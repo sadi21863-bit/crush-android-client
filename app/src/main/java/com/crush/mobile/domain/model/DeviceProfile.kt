@@ -64,8 +64,9 @@ data class DeviceProfile(
                 availableRamMb = (info.availMem / (1024 * 1024)).toInt(),
                 cores = Runtime.getRuntime().availableProcessors(),
                 isLowRamDevice = lowRam,
-                hasStrongBox = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
-                    context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE),
+                // SDK_INT guard dropped (lint ObsoleteSdkInt): minSdk 29 makes
+                // "API 28 introduced StrongBox" always true here.
+                hasStrongBox = context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE),
                 hasSecureLockScreen = lockScreen,
                 // setUserAuthenticationParameters arrived in API 30. Below that
                 // the legacy validity-seconds gate is the only option, which is

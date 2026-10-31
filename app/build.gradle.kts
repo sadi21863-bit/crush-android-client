@@ -152,21 +152,18 @@ buildFeatures {
         unitTests.isReturnDefaultValues = true
     }
 
-    lint {
-        // Lint's "vital" pass crashes the release build outright rather than
-        // reporting a finding:
-        //   Unexpected failure during lint analysis (this is a bug in lint or
-        //   one of the libraries it depends on)
-        //   @NotNull method com/intellij/openapi/application/
-        //     AsyncExecutionService.getService must not return null
-        // thrown while parsing Kotlin imports in SettingsViewModel.kt.
-        //
-        // It is an AGP/lint defect, not a code defect, and it blocks the build
-        // entirely - so it has to be off for a release artefact to exist at all.
-        // The compiler still enforces everything that matters here.
-        checkReleaseBuilds = false
-        abortOnError = false
-    }
+    // LintEnabled 2026-10-31 (decision item 1): the historical
+    // "lintVital crashes the release build" blocker does NOT reproduce on
+    // AGP 9.4.1 - same-day evidence: :app:lintDebug and :app:lintRelease both
+    // ran green (1 error + 33/34 warnings, all either fixed in the same batch
+    // or waived with dated reasons in app/lint.xml; see that file first).
+    // The overrides used to defuse the crash (checkReleaseBuilds=false,
+    // abortOnError=false) are therefore GONE - the AGP defaults are in
+    // force: lintVitalRelease runs as part of every release assemble, and a
+    // lint ERROR (not a warning) aborts any explicit lint task. Warnings
+    // stay non-fatal on purpose. The retired comment here claimed the
+    // "compiler still enforces everything that matters" - lint helps too
+    // now.
 
     packaging {
         resources {

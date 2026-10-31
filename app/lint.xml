@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Lint severity policy for Crush Mobile (app/).
+
+  NOT a dump: every entry below records a finding the project inspected on
+  2026-10-31 (the lint-enablement triage - both :app:lintDebug and
+  :app:lintRelease pass on AGP 9.4.1) and a DATED reason it is deliberate,
+  deferred, or a false positive in THIS app. Findings that carried real value
+  were fixed in code in the same batch, not waived here.
+
+  Rule going forward: a waiver needs a reason that still reads as true.
+-->
+<lint>
+    <!-- Engine-log redaction and app-path mapping MUST hardcode /data/user/0/:
+         the whole point of these calls is to rewrites engine log paths to a
+         readable form and to map the two historical Android data-dir spellings
+         against each other. getFilesDir() cannot express either. -->
+    <issue id="SdCardPath" severity="ignore" />
+
+    <!-- targetSdk 36 with compileSdk 37 is a pinned decision: 37's behaviour
+         changes are still being re-measured on device. Revisit with the
+         target-37 re-measure, not as drive-by churn. -->
+    <issue id="OldTargetApi" severity="ignore" />
+
+    <!-- arm64-only by design: the embedded engine is a statically linked
+         arm64 ELF, so x86_64 devices could not run it anyway. -->
+    <issue id="ChromeOsAbiSupport" severity="ignore" />
+
+    <!-- The Gradle wrapper (9.8.0) and every library are CURATED pins; the
+         upgrade cadence is a deliberate review item, not something lint
+         should nag into a surprise upgrade. -->
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+
+    <!-- SharedPreferences.edit {} KTX style: the imperative edit() chain is
+         the project's established idiom in SecureKeyStore; converting five
+         sites buys nothing but diff noise. -->
+    <issue id="UseKtx" severity="ignore" />
+
+    <!-- Remaining ObsoleteSdkInt occurrence is the mipmap-anydpi-v26 resource
+         split, which folds into the launcher-icon work (that same set of files
+         also needs the MonochromeLauncherIcon pass) - deferred to one icon
+         batch rather than renamed twice. -->
+    <issue id="ObsoleteSdkInt" severity="ignore" />
+    <issue id="MonochromeLauncherIcon" severity="ignore" />
+</lint>

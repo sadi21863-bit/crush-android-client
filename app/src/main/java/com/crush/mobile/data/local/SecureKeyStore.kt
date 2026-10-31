@@ -269,7 +269,8 @@ open class SecureKeyStore(context: Context) {
  * modest change in protection rather than a loss of function.
  */
 fun isStrongBoxBacked(): Boolean {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+    // SDK_INT guard dropped (lint ObsoleteSdkInt): StrongBox arrived at API 28
+    // and this build's floor is 29.
     val ks: KeyStore = runCatching {
         KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
     }.getOrNull() ?: return false
@@ -291,8 +292,9 @@ fun isStrongBoxBacked(): Boolean {
 }
 
 private fun isStrongBoxHardwarePresent(context: Context): Boolean =
-    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
-        context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
+    // SDK_INT guard dropped (lint ObsoleteSdkInt): same floor reasoning as
+    // [isStrongBoxBacked] - P is below this build's minSdk 29.
+    context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
 
     private fun getOrCreateMasterKey(): SecretKey {
         (KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) })

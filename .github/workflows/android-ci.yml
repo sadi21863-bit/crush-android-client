@@ -46,8 +46,10 @@ jobs:
           key: gradle-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'app/build.gradle.kts') }}
           restore-keys: gradle-
 
-      - name: Gate - JVM tests and debug APK
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain
+      - name: Gate - JVM tests, debug APK, and release lint
+        # lintRelease: full static analysis with the 2026-10-31 waivers
+        # (app/lint.xml, each entry dated). Errors fail the build.
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintRelease --console=plain
 
       - name: Upload test reports on failure
         if: failure()

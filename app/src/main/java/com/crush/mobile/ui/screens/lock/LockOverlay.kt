@@ -1,5 +1,6 @@
 package com.crush.mobile.ui.screens.lock
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -19,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -53,6 +53,7 @@ fun LockOverlay(
     store: SecureKeyStore,
     keySession: KeySession,
     onUnlocked: () -> Unit,
+    modifier: Modifier = Modifier,
     /**
      * Which provider's credential is being unlocked.
      *
@@ -60,10 +61,13 @@ fun LockOverlay(
      * unlocking while `hyper` is selected must fetch the Hyper key or the user
      * reaches a chat that authenticates with the wrong provider's token.
      */
-    providerId: String = SecureKeyStore.LEGACY_PROVIDER,
-    modifier: Modifier = Modifier
+    providerId: String = SecureKeyStore.LEGACY_PROVIDER
 ) {
-    val activity = LocalContext.current as? FragmentActivity
+    // LINT ContextCastToActivity (2026-10-31 enablement batch): LocalActivity is
+    // the intended API instead of casting LocalContext; the Narrower
+    // FragmentActivity subtype remains the same as before since [DeviceAuth]
+    // runs on the platform credential screen.
+    val activity = LocalActivity.current as? FragmentActivity
     var attempts by remember { mutableIntStateOf(0) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }

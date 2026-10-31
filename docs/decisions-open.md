@@ -8,12 +8,32 @@ silently rotting.
 
 ## 1. Re-enable lint and decide on R8/minify
 
-**Status: EXECUTING — triage passed 2026-10-31 (verdict above), the
-user picked GO on the enablement batch the same day, and the batch
-(4 code fixes + `app/lint.xml` waivers + flag flip + gate) landed with
-the same-day commit; R8/minify stays OFF, reaffirmed on the standing
-size rationale (max-possible-DEX-gain number pending the APK
-composition analysis).**
+**Status: LANDED 2026-10-31 — commit `5325d68`.** The batch (4 code fixes
++ `app/lint.xml` waivers with reasons + the two defusal overrides deleted +
+CI gained `:app:lintRelease`) is gated and green in one run:
+`:app:testDebugUnitTest :app:assembleDebug :app:lintRelease
+:app:lintVitalRelease` → BUILD SUCCESSFUL (455/455 tests; the fresh full
+release lint analysis reports **"No issues found."**; the vital analyze
+pass ran clean; `lintVitalReportRelease` skipped itself as there are no
+vital findings). The gate proves both defused paths in one go — the exact
+historical crash pass is re-enabled and green. APK installed on device
+(`bbf8ca69`).
+
+Two recorded numbers from the same day's analysis:
+
+- AGP landscape: Google Maven tops at stable **9.5.0** (our AGP 9.4.1 is
+  one behind; candidate for a deliberate review-time upgrade) and
+  9.6.0-alpha02 (metadata 2026-10-28). **AGP 10 is not released** — the
+  `builtInKotlin=false`/`newDsl=false` opt-outs stay in place, exactly per
+  their in-file comments.
+- APK composition (debug, `app-debug.apk` on disk 122.2 MB): engine .so
+  92.7 MB raw, **14 `classes*.dex` totalling 66.95 MB raw** (the debug DEX
+  carries the debug-only Compose tooling at 12.4 + 10.2 MB). The recorded
+  "engine dominates, R8 has no size win" rationale is therefore numerically
+  STALE for the debug artifact; a release-DEX measurement (pending, from an
+  unsigned `assembleRelease`) supplies the honest R8 ceiling. The reflection
+  risk half of the rationale (junixsocket/Gson) is untouched and still the
+  hard part.
 
 Current state (both deliberate, both commented in [`app/build.gradle.kts`](../app/build.gradle.kts)):
 

@@ -244,7 +244,7 @@ claim, verified against the tree at `0d061cc`:
 | remaining edge of the same row | holds | cancel mid-edit + app-backgrounding during an edit round still unmeasured — the standing `stopBlocking` device re-measure item covers exactly this |
 | "Hyper: no successful device chat turn documented" | still true | `Providers.kt` keeps hyper `isKnown = false`; a real-key turn is still owed (needs a user Hyper account) |
 | "Multi-provider: Zen + OpenRouter tested" | agreed | matches the provider row evidence (ProviderSwitchPolicy tests, on-device OpenRouter/OAI-compatible turns) |
-| "No `androidTest` suite" | still true | A1's 2026-10-31 tree pass confirmed none exists |
+| "No `androidTest` suite" | closed at build level | `459f908` (2026-10-31): instrumented smoke suite (`MainActivitySmokeTest` — compose tree attaches, activity RESUMED with attached window), compile-gated via `assembleDebugAndroidTest`; the on-device `connectedDebugAndroidTest` run is queued with the signed-release device session |
 | "Licences/public release incomplete" | mostly still true | CI landed (`3162bbe`, 2026-10-31, same JVM gate on push/PR); root LICENCE/NOTICE/GitHub About/topics/demo video remain (user) |
 
 Upstream facts it cites, **verified first-hand today**:

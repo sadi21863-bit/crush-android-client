@@ -9,6 +9,7 @@ import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.file.FileDiff
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -246,7 +247,38 @@ bottomBar = {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(s.messages, key = { it.id }) { m -> Bubble(m) }
+                itemsIndexed(s.messages, key = { _, m -> m.id }) { idx, m ->
+                    // D13 RETRY WIRING. The retry prompt is derived at render
+                    // time, not stored on the model: the nearest preceding user
+                    // row IS the prompt whose turn failed, so re-sending it as
+                    // a NEW turn keeps history honest - the failed pair stays
+                    // visible and the retry appears as a fresh exchange. The
+                    // take(idx) scan only ever runs on failed rows.
+                    val retryText = if (m.error != null) {
+                        s.messages.take(idx)
+                            .lastOrNull { it.role == "user" && it.text.isNotBlank() }?.text
+                    } else {
+                        null
+                    }
+                    Bubble(
+                        m = m,
+                        retryText = retryText,
+                        retryEnabled = s.engineReady && !s.isStreaming,
+                        onRetry = {
+                            retryText?.let { t ->
+                                // setInput puts the prompt visibly back in the
+                                // composer before send() consumes it; a send
+                                // clears input only inside streamSend, so this
+                                // is the exact sequence the send button itself
+                                // follows. Going through the same gates also
+                                // means send()'s own isStreaming/empty guards
+                                // back this call up.
+                                vm.setInput(t)
+                                vm.send()
+                            }
+                        }
+                    )
+                }
 
                 // What the agent actually changed, at the END of the turn.
                 //
@@ -410,8 +442,20 @@ private fun EmptyState(phase: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** Assistant-bubble silhouette, shared by the reply path and the error card. */
+private val AssistantBubbleShape = RoundedCornerShape(
+    topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp
+)
+
 @Composable
-private fun Bubble(m: ChatMessage) {
+private fun Bubble(
+    m: ChatMessage,
+    // D13: non-null only on a failed assistant row that has a preceding user
+    // prompt available to re-send; drives the card's Retry affordance.
+    retryText: String? = null,
+    retryEnabled: Boolean = false,
+    onRetry: () -> Unit = {}
+) {
     val isUser = m.role == "user"
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -427,37 +471,142 @@ private fun Bubble(m: ChatMessage) {
             ToolActivityList(m.tools)
             Spacer(Modifier.height(6.dp))
         }
-        Box(
-            modifier = Modifier
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp, topEnd = 16.dp,
-                        bottomStart = if (isUser) 16.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 16.dp
+        if (!isUser && m.error != null) {
+            // D13 RETRY CARD: a failed assistant turn is not a normal bubble
+            // with error text bolted on - it is a failed object. Giving it its
+            // own surface (errorContainer), its own announcement and its own
+            // recovery affordance is what turns a recorded failure into an
+            // actionable one.
+            FailedBubbleCard(
+                error = m.error,
+                partialText = m.text,
+                retryText = retryText,
+                retryEnabled = retryEnabled,
+                onRetry = onRetry
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 16.dp, topEnd = 16.dp,
+                            bottomStart = if (isUser) 16.dp else 4.dp,
+                            bottomEnd = if (isUser) 4.dp else 16.dp
+                        )
                     )
-                )
-                .background(
-                    if (isUser) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Column {
-                if (m.text.isEmpty() && m.isStreaming && m.error == null) {
-                    Text(
-                        if (m.tools.isEmpty()) "thinking..." else "working...",
-                        style = MaterialTheme.typography.bodyMedium
+                    .background(
+                        if (isUser) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant
                     )
-                } else {
-                    MarkdownText(m.text, modifier = Modifier.fillMaxWidth())
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Column {
+                    if (m.text.isEmpty() && m.isStreaming && m.error == null) {
+                        Text(
+                            if (m.tools.isEmpty()) "thinking..." else "working...",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        MarkdownText(m.text, modifier = Modifier.fillMaxWidth())
+                    }
                 }
-                m.error?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                        fontFamily = FontFamily.Monospace
+            }
+        }
+    }
+}
+
+/**
+ * The failed-reply card (analysis D13 follow-up).
+ *
+ * Before this, a failed turn rendered its assistant bubble with a tiny
+ * monospace error string appended inside the regular surfaceVariant bubble -
+ * the same visual grammar as content, no recovery affordance, and easy to
+ * read past. Now the failure gets the scheme's errorContainer surface, a
+ * plain-language headline, the raw engine error in
+ * monospace beneath it, and - when a preceding user prompt exists for this
+ * turn - a Retry button that re-sends that prompt as a NEW turn. History is
+ * not rewritten: the failed pair stays in the transcript and the retry is a
+ * visible follow-up, so "what did I send and what failed" stays auditable.
+ *
+ * Any partial text the turn produced before dying is kept above the error
+ * line, because deleting real output would lie about what happened.
+ */
+@Composable
+private fun FailedBubbleCard(
+    error: String,
+    partialText: String,
+    retryText: String?,
+    retryEnabled: Boolean,
+    onRetry: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            // Same silhouette as a normal assistant bubble: the card must read
+            // as the same conversational object that failed, aligned left.
+            .clip(AssistantBubbleShape)
+            .background(scheme.errorContainer)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                // Live region scoped to the HEADLINE (skill a11y rule: one
+                // meaningful contextual status, not the whole card): a run
+                // dying mid-turn is a status the user may reach from anywhere
+                // in the list, so the plain phrase announces politely, once,
+                // without moving focus - the long partial text and raw error
+                // stay at the reader's fingers to explore.
+                modifier = Modifier.semantics {
+                    liveRegion = LiveRegionMode.Polite
+                }
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = scheme.onErrorContainer
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "This reply failed",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = scheme.onErrorContainer
+                )
+            }
+            if (partialText.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                MarkdownText(partialText, modifier = Modifier.fillMaxWidth())
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                error,
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onErrorContainer,
+                fontFamily = FontFamily.Monospace
+            )
+            if (retryText != null) {
+                // The button stays VISIBLE but disabled when the engine cannot
+                // take it (no live port, or another run is streaming): a
+                // vanished affordance would hide the fact that retry exists
+                // and will come back.
+                Spacer(Modifier.height(2.dp))
+                TextButton(
+                    onClick = onRetry,
+                    enabled = retryEnabled,
+                    // error accent rather than primary: on an errorContainer
+                    // surface a primary-colored button would read as a "carry
+                    // on as usual" cue, which a retry after failure is not.
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = scheme.error
                     )
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Retry")
                 }
             }
         }

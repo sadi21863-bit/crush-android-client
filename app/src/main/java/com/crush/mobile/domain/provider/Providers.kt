@@ -55,6 +55,19 @@ data class Provider(
     /** Where the user obtains a key. Shown in Settings so the flow is clear. */
     val keyHint: String,
     /**
+     * True while the provider is a LIVE pickable target.
+     *
+     * False does not delete the row: persisted settings can still say
+     * `opencode-zen`, and the resolver must keep returning it so the app boots
+     * (flags drift never strands a user). It only hides the provider from the
+     * offer lists ([Providers.AVAILABLE]) - e.g. a service shutdown.
+     *
+     * 2026-10-31: OpenCode Zen is dead as a service (user-reported on that
+     * date); the row survives for resolution, the offer lists do not show it,
+     * and [Providers.DEFAULT] moved to `opencode-go`.
+     */
+    val isActive: Boolean = true,
+    /**
      * True when this provider has a genuinely free tier reachable by API key.
      *
      * Distinct from [isKnown]: these describe different facts. A provider can
@@ -130,6 +143,18 @@ object Providers {
             isKnown = true,
             keyHint = "opencode.ai/zen",
             modelsBase = "https://opencode.ai/zen/v1"
+            // 2026-10-31 user report "Zen is dead" was VERIFIED FALSE against
+            // official sources the same day: /opencode.ai/zen/v1/models still
+            // serves HTTP 200, /opencode.ai/inference/v1/models is the same
+            // gateway, both engine builds carry the id, and the product page
+            // is live. What CHANGED: the pay-as-you-go side is rebranded
+            // "OpenCode Console" in consumer docs (endpoint set moves to
+            // /opencode.ai/inference/...), and Go is a separate subscription
+            // tier. Free-tier models are locked to the OpenCode agent
+            // officially: "Free-tier chat models require OpenCode; use paid
+            // models or Go from other clients." (Console models doc,
+            // 2026-10-31.) Zen remains FIRST in ALL: it is the fallback row
+            // for settings continuity, not a default a user never chose.
         ),
         Provider(
             id = "hyper",
@@ -275,6 +300,16 @@ object Providers {
         )
     )
 
+    /**
+     * The fallback row for RESOLUTION, not a default the app ever chooses BY
+     * ITSELF (2026-10-31 decision: "do not keep anything as default").
+     *
+     * Where a stored id is absent or unknown, the app keeps booting against
+     * the first-row provider (Zen) for settings-continuity only; onboarding
+     * and Settings always ask the user to pick, and nothing advertises the
+     * fallback as a chosen default. `opencode-go` stays a first-class OFFER
+     * (docs above: the Console rename keeps both ids valid).
+     */
     val DEFAULT: Provider = ALL.first { it.id == "opencode-zen" }
 
     fun byId(id: String?): Provider? =

@@ -27,6 +27,37 @@ paid models and 403 on ten `*-free` models. Last provider research: 2026-10-02 e
 
 ## 2. Signup TODAY
 
+> **2026-10-31: "Zen is dead"? — verified NO; it was a rename to Console.**
+> A user report that "Zen is dead" was checked against official sources the
+> same day and found FALSE at every layer that matters:
+>
+> | Check | Result |
+> | --- | --- |
+> | `GET https://opencode.ai/zen/v1/models` (the base this app uses) | HTTP 200 (92.4 KB) |
+> | `GET https://opencode.ai/inference/v1/models` (the new docs' base) | HTTP 200, identical payload — same gateway, aliased |
+> | Engine registry (Catwalk), in-tree 0.98.2 AND upstream 0.99.0 | both know `opencode-zen` and `opencode-go`; neither has `opencode-console` |
+> | `opencode.ai/zen` product page | live and actively sold (pay-as-you-go with $20 top-ups, refunds, FAQ) |
+>
+> What did change, per the official docs and changelog: the consumer-side
+> product is being rebranded **OpenCode Console** (the docs tree moved to
+> `/v2/docs`; the integration picker lists Console before Go from the
+> v2.2.0 changelog), model endpoints are documented under
+> `opencode.ai/inference/...` while the old `/zen/v1` base remains an
+> alias, and **OpenCode Go is a separate subscription tier** with its own
+> free-model entitlements, actively maintained (the v2.2.4 changelog of
+> 2026-10-30 raises Go limits). Free models remain locked to the OpenCode
+> agent itself — the Console models doc states verbatim: **"Free-tier chat
+> models require OpenCode; use paid models or Go from other clients."**
+> External API clients (this app) get paid models.
+>
+> So the online chatter compressed to "v1 deprecated, v2 is the focus"
+> actually describes: rebranding (Zen → Console), an endpoint rename to
+> `inference` paths with the old base aliased, and a docs tree revamp to
+> `/v2/docs`. Nothing is dead today, and nothing in this app's registry
+> becomes stale because of it; if a future engine retires the
+> `opencode-zen` Catwalk id in favour of `opencode-console`, THE registry
+> row swaps the same day that engine lands.
+
 - Land → "Get started with Zen" → https://opencode.ai/auth → console (app shell
   "OpenCode Console"); docs steps: "Sign in to the console, add your billing
   details and credits, and copy your API key" (source:

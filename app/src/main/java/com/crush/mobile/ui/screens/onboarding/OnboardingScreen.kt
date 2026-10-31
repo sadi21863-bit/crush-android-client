@@ -153,6 +153,9 @@ fun OnboardingScreen(
                 expanded = providerMenuOpen,
                 onDismissRequest = { providerMenuOpen = false }
             ) {
+                // ALL (2026-10-31): nothing is inactive - the "Zen is dead"
+                // report was verified false against official sources, and the
+                // registry keeps explicit user choice over auto-defaults.
                 Providers.ALL.forEach { p ->
                     DropdownMenuItem(
                         text = {

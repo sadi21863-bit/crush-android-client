@@ -298,6 +298,11 @@ fun SettingsScreen(
             // encouraged exactly that.
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    // ALL (2026-10-31): the "Zen is dead" report was verified
+                    // false against official sources; every curated id stays
+                    // offered, and there is no silent default - the resolver
+                    // falls back to Zen for boot continuity only, and
+                    // onboarding/Settings always require an explicit choice.
                     Providers.ALL.forEach { p ->
                         val selected = p.id == providerId
                         Row(

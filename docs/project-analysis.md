@@ -20,9 +20,9 @@ Architecture, the defects that shaped it, and what is left.
 | App lock | Fixed and verified; bypass removed and now covered |
 | Markdown | Implemented, streaming-safe, hand-rolled |
 | Tool-call visibility | Built; wire shape confirmed on the wire 2026-10-25 (D3 closed) - parser pinned by tests |
-| File diffs | Built and JVM-tested; wire path verified, no edited-file turn yet |
+| File diffs | Built and JVM-tested; a real edited-file turn rendered on device 2026-10-29 (z6/z7, after the `readNBytes` API-33 fix); multi-file real-code turn still untested |
 | Security | Key encrypted; engine transport app-private UDS (cross-app reach closed); HTTP layer still unauthenticated |
-| Test coverage | 401 JVM tests; **no instrumentation suite** |
+| Test coverage | 455 JVM tests (455 `@Test` methods, grep-counted 2026-10-31; 38 test files); **no instrumentation suite** |
 
 ## 1a. The Zen free tier is gone (measured 2026-10-11)
 
@@ -154,7 +154,9 @@ carried forward.
 Ordered by how much each matters for a coding agent. Detail in
 [`capabilities.md`](capabilities.md).
 
-1. **File diffs** — the agent writes files invisibly.
+1. **File diffs** — now device-verified once (created +1/-0 and diff-edit
+   routes, 2026-10-29, after the `readNBytes` API-33 fix); a multi-file,
+   real-code-edit turn is still the largest untested prong.
 2. **Tool-call timeline** — summary per message, not a live view.
 3. **Per-turn cost display**.
 4. **Verify a third provider** — `opencode-zen` and `openrouter` are verified end to end (OpenRouter since 2026-10-17, including the model-probe fallback order); `groq` is probe-verified but parked (8K TPM). Next candidates: `hyper` (device-code flow, no OAuth plumbing needed) or `gemini`. See [providers.md](providers.md).
@@ -199,21 +201,23 @@ Re-baselined 2026-10-20 after the D-table audit: D1 was already fixed, D10 the
 "remove the scaffolding" instruction was closed as incorrect (the lease is the
 live fallback path), and D2 was resolved by the UDS pivot — so the original
 items 3, 6, 7 drop out. The exposed **Groq** key was rotated by the user
-(2026-10-25); groq stays parked as a test target.
+(2026-10-25); groq stays parked as a test target. **2026-10-31 re-check:**
+items 1 and 2 below are closed (D12 verified on device 2026-10-29; the
+file-diff turn and the "1 unreadable" miss were closed the same day by
+`d779c17`/`584bf3d` + z7 verification), so the live list is 3–5.
 
-1. **Verify a live ask-then-grant turn on device (D12)** - the engine half is
-   done (v0.98.2 delivers session-scoped asks, verified with instrumented
-   breadcrumbs 2026-10-27) and the app half is done (CrushEventRouter now fans
-   run-id-less events to registered runs; unit tests pin it). What remains is
-   the end-to-end proof: ASK-mode turn → ask card → Allow → file written.
-   Gated on provider daily quota at the time of the 2026-10-27 verification
-   attempt. Evidence and re-test matrix:
-   [`ecosystem-research-2026-10-25.md`](ecosystem-research-2026-10-25.md) §1.
-2. **Verify a real file-diff turn on device** - the diff feature is built and
-   JVM-tested but was only ever exercised on a turn that tracked zero files;
-   the engine already ships `metadata{diff,additions,removals}` per
-   `tool_result` (research §3/§8). Also chase the "1 unreadable" miss seen on
-   the auto-approve turn.
+1. ~~Verify a live ask-then-grant turn on device (D12)~~ — **CLOSED
+   2026-10-29**: z6/z7 live on device (ask card → automated Allow-once →
+   file written → turn resumed), evidence `build/d12-evidence/`; the
+   `question_batch_request` handler shipped in `3235f7e`. Parked prompts
+   are bounded by `PROMPT_WAIT_MS` = 10 min (decisions-open item 8).
+2. ~~Verify a real file-diff turn on device~~ — **CLOSED 2026-10-29**: the
+   phantom "unreadable" cause was the Java-11 `readNBytes` in
+   `WorkspaceSnapshotter.looksBinary()` (API 33-only; deep-analysis-2026-10-27.md
+   §9 Defect B); the portable 512-byte read fix and the verification
+   addendum shipped in `4403593`, and z7 rendered `diff-created(+1/-0)` and
+   diff-edit routes with `0 unreadable`.
+   Residual: chase a multi-file real-code-edit turn.
 3. **File diffs** - the largest remaining user-visible gap.
 4. **Instrumentation tests** for the lock gate, so the auth bypass cannot
    return.
@@ -221,5 +225,23 @@ items 3, 6, 7 drop out. The exposed **Groq** key was rotated by the user
    edited-file diff turn and a permission-mode walkthrough before
    distribution. Review the FSL-1.1-MIT license posture for any public
    release (research §1 - crush is NOT plain MIT).
+
+## Tree-verification pass 2026-10-31
+
+- All D-row commits verified in history and marker code: `9498a67` (D11),
+  `bda07d9` (D13 base), `0dca731` (D13 error card — present in `ChatScreen.kt`),
+  `e090d9e` (D5 retention), `d50f26e`/`3235f7e`/`4cd9c19`/`c22b394`/`584bf3d`
+  (D14 class) — a close-2026-10-29 statement, consistent.
+- D14 file cites checked: 404-unwind now at `CrushConnection.kt:195`
+  ("THE 404-ZOMBIE BUG (P1-4)" marker, was 178-183 when the row was written —
+  historical bug location, not re-cited), bounded run-id search at
+  `CrushEventRouter.kt:239` (P1-5), `runCatchingNonCancellation` in
+  `CrushSession.kt`, FLAG_SECURE ordering comment in `MainActivity.kt:283`.
+- Security postures re-confirmed: `EnginePaths`/UDS launch, AES/GCM slots,
+  `allowBackup=false`, cleartext loopback-only in `network_security_config.xml`.
+- Scorecard/test-count updated to the current 455 `@Test` methods / 38 files;
+  the §5 strengths line cites (`CrushEventRouter.kt:58-64`,
+  `CrushConnection.kt:78-124`, `KeySession.kt:107-111`, `EngineSupervisor`
+  hysteresis ranges) still resolve to the described constructs.
 
 

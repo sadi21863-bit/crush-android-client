@@ -154,3 +154,28 @@ descriptions on icon buttons (several of ours already lack them).
 - **No typewriter effect.** We have real deltas; faking them adds lag.
 - **No plan/build agent toggle yet.** It is a *feature flag in Crush*, not a
   different app — revisit after chat is solid.
+
+## Tree-verification pass 2026-10-31
+
+The P0/P1/P2 sections above are preserved as design rationale (per the
+2026-10-09 status header); the pass recorded where the tree has since moved:
+
+- Still accurate: stable BOM `2026.09.00` with no M3 Expressive alpha
+  (`app/build.gradle.kts:198`); no typewriter effect; no plan/build agent
+  toggle; hand-rolled `MarkdownParser` (now budget-guarded,
+  `INLINE_SCAN_BUDGET_CHARS`), streaming-safe.
+- Roadmap items that shipped: #2 unlock prompt, #3 markdown renderer,
+  #6 model picker redesign (ModelSheet with free-first groups and, since
+  `a67aee5`, a "selected" stateDescription), #7 session list
+  (`SessionSheet`, phone overlay — drawer itself not adopted), plus
+  enter-send as an IME-action toggle card (`a02d882`, this was never on the
+  original list).
+- Still open against the tree: #4 pinned user message, #8 follow mode +
+  jump-to-bottom FAB (no follow/FAB code found), item 6's "context window
+  and cost per 1M" detail (ModelSheet shows name + id only), and item 11's
+  friendly empty state — `EmptyState` still renders the bare centered phase
+  word (`ChatScreen.kt:437`). What DID ship from item 11 is the error half:
+  the D13 failed-turn card `0dca731` (inline, actionable, Retry).
+- "Several icon buttons lack content descriptions" — re-checked: recent
+  audit waves added human phrases + `Role.Button` on tool rows and the
+  model "FREE" chip is now a labelled non-interactive Text (`fb5e6dc`).

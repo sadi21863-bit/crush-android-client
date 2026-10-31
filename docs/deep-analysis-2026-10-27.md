@@ -17,7 +17,8 @@ localhost HTTP+JSON+SSE surface. The app supplies model provider keys
 session model (workspace ids change per engine restart; identities are
 path-derived), a biometric app lock, a chat UI with streaming bubbles, tool
 activity rows, file diffs, diagnostics/crash reporting, and an ASK/AUTO
-permission model. 37 JVM unit test files; no instrumentation suite.
+permission model. 38 JVM unit test files (455 `@Test` methods, counted
+2026-10-31; `ChatStateMergeTest` joined 2026-10-31); no instrumentation suite.
 
 ## 2. Verdict at a glance
 
@@ -43,13 +44,19 @@ untestable and the source of most P0/P1 behavioral bugs.
 
 ### P0 — break core behavior, do next
 
-1. **Recomposition storm during streaming** (new): every frame rebuilds the
-   whole `messages` list with unstable `List` fields, no `@Immutable`
-   (`ChatViewModel.kt:1788-1795`, `ChatViewModel.kt:94-114`,
-   `ToolActivity.kt:50`), and `remember(src)` re-parses the entire markdown
-   string per token (`MarkdownText.kt:56-57`) — O(n²) per turn; this is why
-   uiautomator cannot snapshot the app. Fix: `@Immutable` models, mutate only
-   the streaming bubble, incremental markdown parse (append-only last block).
+1. **Recomposition storm during streaming** — **PARTIALLY RESOLVED in
+   `3235f7e` (verified 2026-10-31)**: the message and tool-row models now
+   carry `@Immutable` (`ChatViewModel.kt:129/162`, `ToolActivity.kt:58`,
+   each annotated with an "analysis §4 P0-1" citation), and stream updates
+   replace the affected row (`ChatViewModel.kt:2398` map transform) instead
+   of touching all rows — correctness claim partially addressed, the
+   O(n²) absolutes below no longer hold as written. **Still open**: the
+   full-per-frame markdown re-parse — `remember(src) { parse(src) }` at
+   `MarkdownText.kt:67` re-parses the entire string every streaming frame
+   (incremental/append-only block parse is the remaining fix). (Original
+   finding: every frame rebuilt the whole `messages` list with unstable
+   `List` fields, no `@Immutable`, `remember(src)` full re-parse per frame;
+   this is why uiautomator cannot snapshot the app.)
 2. **Stream timeout semantics** — **RESOLVED 2026-10-28→29** (`3235f7e`
    built the per-event idle deadline + awaited server cancel; `a870939`-era
    device work then proved the ask-parked case wrong both ways: an open ask
@@ -267,8 +274,9 @@ No `androidTest` at all (documented).
   backup/transfer fully excluded, Keystore loss fails closed
   (`SecureKeyStore.kt`, `KeySession.kt:107-111`, manifest +
   `data_extraction_rules.xml`).
-- Test discipline where it exists: 37 JVM suites pin contracts at the pure
-  layers; read the "verdict = well" table in §4 (tests agent).
+- Test discipline where it exists: 38 JVM suites (455 `@Test` methods,
+  counted 2026-10-31) pin contracts at the pure layers; read the "verdict =
+  well" table in §4 (tests agent).
 - Documentation: baseline/audit snapshots frozen by design; README honest
   ✅/⚠️ status language; the ledger pattern (D1–D13) makes findings durable.
 
@@ -401,3 +409,26 @@ gate as a 0-byte screencap, which doubles as the unlock detector; the
 permission mode only re-binds at `doBootstrap` (the settings screen even
 labels it "next time the agent starts a session"), so a mode flip needs
 force-stop+relaunch+one fingerprint.
+
+## Tree-verification pass 2026-10-31
+
+- Every commit cited in §4 rows verified in `git log`: `d50f26e`, `3235f7e`,
+  `4cd9c19`, `c22b394`, `584bf3d`, `a870939`, `d779c17`, `a268aca`, plus the
+  10-31 additions `9a01b0f` (UI wave 2), `a02d882` (enter-send + 30 s
+  heartbeat), `0dca731` (D13 card), `ce43c7a` (R1/R3), `a67aee5` (UI sweep).
+- Code-marker grep confirmed `P1-4`…`P1-11`, `P2-16`, `P2-21`, `P2-22`,
+  `SUP-01`, `runCatchingNonCancellation`, "FLAG_SECURE BEFORE…" — all present
+  with the claims' semantics; `INLINE_SCAN_BUDGET_CHARS = 64*1024`
+  (`MarkdownParser.kt:185`), `CODE_MAX_LINES` (`MarkdownText.kt:39`),
+  `PROMPT_WAIT_MS = 600_000L` (`ChatViewModel.kt:2438`).
+- a67aee5 diff verified: "Open chats list" trigger, ModelSheet
+  `stateDescription = "selected"` + active check, Diagnostics Copy/Share
+  Spacers + merged StatusRow, onboarding spinner, "Unlock Crush Mobile".
+- The bounded run-id search now sits at `CrushEventRouter.kt:239` and the
+  404 unwind at `CrushConnection.kt:195`; the older §5 line cites drifted a
+  few lines but still resolve to the described constructs.
+- §2's "1900 lines" for the ChatViewModel monolith was the 10-27 measure;
+  the file is ~2327 lines today. Historical count left as written.
+- Engine of record: code comments and the D12 evidence name v0.98.2; the
+  jniLibs binary does not hash to the 0.98.1 BASELINE checksum and
+  `tools/fetch-crush.ps1` still pins 0.98.1 (divergence recorded in README).

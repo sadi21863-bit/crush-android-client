@@ -135,3 +135,23 @@ Get-ChildItem app\build\test-results\testDebugUnitTest -Filter TEST-*.xml | % { 
 .\tools\fetch-crush.ps1            # verify pin against network + tarball
 Get-FileHash app\src\main\jniLibs\arm64-v8a\libcrush.so -Algorithm SHA256
 ```
+
+## Tree-verification pass 2026-10-31
+
+This file documents the 2026-10-17 freeze and is left frozen; the pass below
+only re-checked that its claims are true statements about that state:
+
+- Tag `baseline/2026-10-17` and commit `4e67aae608ada9778a0f48f94d7a5e2f7f39911a`
+  both resolve; `git log -1 4e67aae` = "Finish-error parsing: nested-object
+  details…", consistent with the freeze date.
+- `app/build.gradle.kts:54` still points at `minSdk = 29` (targetSdk 36 at :55,
+  compileSdk 37 at :40); toolchain rows (JBR 25.0.3 not re-hashed, Gradle 9.8.0,
+  AGP 9.4.1, Kotlin 2.4.10, Compose compiler 2.4.20, BOM 2026.09.00) all match
+  the current build files and wrapper.
+- NOT re-run (gradle/adb forbidden this session): the 386-test runner count and
+  the artifact hashes; they stand as recorded for the freeze, not for today.
+- Divergence recorded (not changed): the working tree's `libcrush.so` now
+  hashes `38DBD141…` — an instrumented v0.98.2 build from the 2026-10-27 D12
+  engine work — so the §4 v0.98.1 SHA table describes the freeze
+  configuration, not the current binary (see README Toolchain,
+  deep-analysis-2026-10-27.md).

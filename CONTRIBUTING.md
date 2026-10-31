@@ -24,7 +24,7 @@ Then, if you have a physical arm64 device attached:
 
 ```powershell
 ./tools/chaos.ps1        # engine lifecycle (S01-S10)
-./tools/chaos-ui.ps1     # UI + Keystore (S16-SS21)
+./tools/chaos-ui.ps1     # UI + Keystore (S16-S21)
 ```
 
 An x86_64 emulator **cannot** run this app — the Crush engine is an arm64 ELF
@@ -56,3 +56,18 @@ still has no authentication; the transport is a kernel-enforced app-private
 Unix-domain socket, so cross-app reach is closed but same-UID (and
 root-equivalent) access remains — see the README Security section for what is
 proven and what the limits are.
+
+## Tree-verification pass 2026-10-31
+
+- Confirmed `tools/chaos-ui.ps1` defines S16/S17/S18/S21 scenario functions
+  (S18 is deliberately opt-in), so "(S16-S21)" (typo "SS21" fixed here) and
+  README's range wording are both honest.
+- The five "never" rules re-verified in code: exec from `nativeLibraryDir`
+  via jniLibs + `useLegacyPackaging = true` (`app/build.gradle.kts:181`),
+  UDS-only launch (`-H unix://`), no hardcoded model id
+  (`CrushSession.DEFAULT_MODEL = ""`, probing from `ModelChoice`/`ZenModelsApi`),
+  and `KeySession.require()`'s documented non-caching contract.
+- Not re-verifiable this pass: whether any specific past commit carried the
+  trailer (conditional on AI assistance); the convention statement itself is
+  untouched.
+

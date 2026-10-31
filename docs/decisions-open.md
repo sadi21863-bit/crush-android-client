@@ -41,7 +41,7 @@ not shareable" rule means the app still cannot be handed to anyone.
 
 ## 3. Rotate/delete the plaintext test key file at repo root
 
-**Status: OPEN — key is live, file confirmed present 2026-10-27.**
+**Status: OPEN — key is live, file re-confirmed present 2026-10-31.**
 
 `"opencode api key for testing.txt"` sits at the repo root. It is gitignored
 (`*key*.txt`, `.gitignore:15`) so it will never be committed, but the key
@@ -94,7 +94,9 @@ out-of-file key injection design (ties into decision 4).
 **Status: DEFERRED — for cross-agent API design, not an ask.**
 
 Bootstrapping per resume costs up to three one-token probes plus a duplicate
-catalogue fetch (`ChatViewModel.kt:634/654/745`). Persisting which model ids
+catalogue fetch (the catalogue+probe block in `ChatViewModel.kt`, ~lines
+691–815 as of 2026-10-31; previously cited at 634/654/745 before the file
+grew). Persisting which model ids
 each provider has already verified would kill that cost, but the item was
 parked pending an API design that outlives this session. Kept here so it
 stays visible next to the decisions it must not be confused with.
@@ -116,3 +118,19 @@ different bound (longer / shorter / never-ending interrupted by manual Stop).
 The trade: a shorter bound cleans abandoned dialogs sooner but can cancel a
 genuinely reading user mid-thought; "never" relies on the Stop button and
 app teardown only. Unless you choose otherwise, 10 minutes stands.
+
+## Tree-verification pass 2026-10-31
+
+- Every citation re-checked and accurate: lint flags at
+  `app/build.gradle.kts:167–168` (inside the cited 155–169), minify
+  rationale at 93–94, signing block 111–114 inside 99–117,
+  `requireReleaseSigning` property verified; `DeviceAuth.kt:54–62` is the
+  exact no-lockscreen fail-open branch; `EngineConfigInjector` writes
+  `<globalDataDir>/crush.json` and skips old cost fields (`P2-21` at :185).
+- `.gitignore:15` (`*key*.txt`) verified; the test-key file exists on disk,
+  untracked; `keystore/` gitignored, no keystore present yet — items 1–3
+  remain genuinely open.
+- `PROMPT_WAIT_MS = 600_000L` (10 min) confirmed in the ChatViewModel
+  companion with the awaited-server-cancel path — item 8's description
+  matches the code.
+- Items 4/5/6/7 remain open as written; no tree change observed.

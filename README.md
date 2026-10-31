@@ -24,9 +24,9 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 | Live model discovery with probing | ✅ verified — never hardcoded |
 | Long-lived workspace SSE | ✅ verified — no ~30s reap between turns |
 | Tool-call visibility | ✅ built — wire format CONFIRMED 2026-10-25 (D3): tool_call parts carry data {id, name, input (args as a JSON string), finished (bool)}; parser reads data first, pinned by unit tests |
-| File diffs | ✅ built and JVM-tested — on device, verified only for a turn that tracked zero files; untested on a real edit |
-| Permission prompts (ask / always / never) | ⚠️ implemented, not device-tested |
-| In-app diagnostics + crash reports | ⚠️ implemented, not device-tested |
+| File diffs | ✅ built and JVM-tested — a real edited-file turn rendered on device 2026-10-29 (z6/z7: `diff-created(+1/-0)`, diff-edit routes, `snapKeys=[4 files]`, `0 unreadable` after the `readNBytes` API-33 defect was fixed); a multi-file, real-code-edit turn is still untested |
+| Permission prompts (ask / always / never) | ✅ ask-mode grant verified end-to-end on device 2026-10-29 (z6/z7: ask card rendered, automated Allow-once granted, turn resumed); always / never modes not device-walked |
+| In-app diagnostics + crash reports | ⚠️ implemented — the on-device log path was exercised during the 2026-10-29 D12 pass; the screen/crash-export flow itself is not fully walked |
 
 `minSdk 29` · `targetSdk 36` · `compileSdk 37` · arm64-v8a only
 
@@ -201,7 +201,7 @@ App-side mitigations:
 
 ## Known issues
 
-- **ASK-mode ask cards: two defects, both fixed — live device re-test pending (D12).**
+- **ASK-mode ask cards: two defects, both fixed and re-verified live on device (D12 closed 2026-10-29).**
   Captured live 2026-10-25 on engine v0.98.1: the engine never published
   permission asks at all (that half needed the v0.98.2 engine). On
   2026-10-27 an instrumented v0.98.2 engine proved the ask WAS published,
@@ -212,10 +212,13 @@ App-side mitigations:
   catch-all channels, and nothing in the app subscribes to catch-alls, so
   the frames were silently dropped. The fix fans anonymous events to every
   registered run (i.e. the in-flight turn) and is pinned by unit tests.
-  Side effect of the same bug now fixed: streaming text should now render
-  live instead of appearing only when the turn ends. Workaround while the
-  fix is untested on device: AUTO mode runs mutating tools end to end
-  (proven). See docs/project-analysis.md D12.
+  Side effect of the same bug now fixed: streaming text renders live
+  instead of appearing only when the turn ends. The 2026-10-29 device pass
+  closed the loop with a full ask-then-grant turn (z6/z7: ask card rendered,
+  automated Allow-once granted, file written, turn resumed; evidence
+  `build/d12-evidence/`), and the `question_batch_request` handler shipped
+  in `3235f7e`. A parked prompt is bounded by `PROMPT_WAIT_MS` = 10 minutes
+  (docs/decisions-open.md item 8). See docs/project-analysis.md D12.
 - **Tool-call wire format — CONFIRMED (D3, 2026-10-25).** `tool_call` parts
   arrive as `{"type":"tool_call","data":{"id","name","input","finished"}}`,
   where `input` is the tool arguments as a JSON string and `finished` is a
@@ -238,11 +241,17 @@ App-side mitigations:
   rather than confirmed, so a stale `AlreadyGone` remains possible.
 - **No tool-call timeline or per-turn cost.** Tool activity is a per-message
   summary, not a live view of what the agent is doing.
-- **File diffs have never seen a real turn.** The whole path is built and
-  JVM-tested (snapshot → tracked files → diff → render) and the endpoint and
-  collector are verified running on device, but the only turn measured tracked
-  zero files. That confuses "it works" with "it works on edited files", so treat
-  it as untested until a turn that actually edits something has been checked.
+- **File diffs: the real-turn prong is now checked (2026-10-29).** The whole
+  path is built and JVM-tested (snapshot → tracked files → diff → render),
+  and the first measured device turn tracked zero files. The 10-29 pass then
+  surfaced a worse miss: `WorkspaceSnapshotter.looksBinary()` used the
+  Java-11 `readNBytes`, so on the API 29 device EVERY non-empty file captured
+  as binary — no diff content ever stored, and the card reported
+  `N file(s) not shown (unreadable…)` for healthy files (deep-analysis-2026-10-27.md
+  §9 Defect B). After the portable 512-byte read fix, verification turn z7
+  closed the loop: `diff-created(+1/-0)`, diff-edit routes on the earlier
+  files, `snapKeys=[4 files]`, `0 unreadable`. Still untested: a multi-file
+  turn editing real code.
 - **A slow turn still strands a bubble.** `streamSend`'s `finally` now finalises
   the live bubble, but a turn whose provider simply never replies leaves an
   empty bubble marked "no reply received". That is honest. A FAILED turn
@@ -252,7 +261,11 @@ App-side mitigations:
 - **First-launch app lock bypass.** On a *fresh* install the first session opens
   without a lock prompt, because there is no stored key at that moment. Later
   cold starts do prompt.
-- **Permission prompts and diagnostics are unverified on device.**
+- **Diagnostics/crash-export is still under-verified on device; permission
+  ask mode is verified.** The ask-mode prompt was verified end-to-end on
+  2026-10-29 (Status table, D12), but the always/never permission modes and
+  the diagnostics screen/crash-report export have not been device-walked
+  (the log path itself was exercised during that pass).
 - **The `FALLBACK_PROBE_MODEL` literal was removed.** The early agent init now
   runs only when a model is actually chosen; with none selected, no retired
   hardcoded id is fed to the provider any more (that guess was the "large model
@@ -299,16 +312,22 @@ See [`docs/toolchain.md`](docs/toolchain.md) for the contingency plan.
 AGP 9 migration notes that silently broke the `exec()` architecture are in
 [`app/build.gradle.kts`](app/build.gradle.kts).
 
-Upstream pins: **Crush v0.98.1** (upgraded 2026-10-18 for the `unix://` listen
-scheme; the previous 0.97.1 binary is backed up under `engine-backups/`. A
-`nightly` tag also exists and is not used). **Bubble Tea is not used** — it is
+Upstream pins: the engine of record is **Crush v0.98.2** since the 2026-10-27
+instrumented upgrade (D12 ask delivery requires it; code comments and the
+D12 evidence all reference v0.98.2, and the working-tree `libcrush.so` does
+not hash to the v0.98.1 checksum recorded in BASELINE). **`tools/fetch-crush.ps1`
+still defaults to 0.98.1** — re-pin 0.98.2 with its signed checksum before
+trusting a fresh-clone fetch (recorded 2026-10-31 as a repo divergence, not
+yet changed). (0.98.1 was the 2026-10-18 upgrade for the `unix://` listen
+scheme; the older 0.97.1 binary is backed up under `engine-backups/`. A
+`nightly` tag also exists and is not used.) **Bubble Tea is not used** — it is
 Crush's terminal UI framework, compiled into the binary but unreachable from
 Compose.
 
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 401 JVM unit tests
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 455 JVM unit tests (455 @Test methods, grep-counted 2026-10-31)
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -374,9 +393,11 @@ This app redistributes the Crush binary, so its terms apply directly.
 FSL-1.1-MIT grants use and redistribution for permitted purposes, requires that
 redistributions retain and link the licence and copyright notices, restricts
 competing commercial use, and **≥ converts each version to MIT on the second
-anniversary of its availability**. The bundled build is **v0.98.1**; confirm its
-future-MIT date before relying on MIT terms for that version. The backup of the
-retired v0.97.1 binary under `engine-backups/` has its own future-MIT date.
+anniversary of its availability**. The bundled build is now **v0.98.2**
+(instrumented 2026-10-27 build — see the Upstream-pins note in Toolchain);
+confirm its future-MIT date before relying on MIT terms for that version.
+The backup of the retired v0.97.1 binary under `engine-backups/` has its own
+future-MIT date.
 
 > An earlier revision of this README stated "Crush is MIT-licensed". That was
 > wrong. Verify licence claims against upstream before repeating them.
@@ -389,3 +410,27 @@ licence will be chosen when that notice is written.
 
 Bubble Tea is MIT-licensed. This repository is not affiliated with Charm or
 OpenCode Zen. You supply your own OpenCode Zen API key; it is never committed.
+
+## Tree-verification pass 2026-10-31
+
+Spot-checked against the current tree; items not listed above were found accurate:
+
+- All 17 named test suites exist, including `RotateKeepingTailTest`,
+  `RetentionPruneTest`, `SecretMaskingTest` (top-level classes inside
+  `AppLogTest.kt`); `ChatStateMergeTest` added 2026-10-31 (`ce43c7a`). No
+  `app/src/androidTest` directory — "no instrumentation suite" stands.
+- `minSdk 29` / `targetSdk 36` / `compileSdk 37` (`app/build.gradle.kts:54/55/40`),
+  `useLegacyPackaging = true`, `android.builtInKotlin=false`
+  (`gradle.properties:42`), Kotlin 2.4.10 / Compose-compiler 2.4.20 / BOM
+  2026.09.00, Gradle wrapper 9.8.0 all re-confirmed.
+- `CrushSession.DEFAULT_MODEL` is still `""`; `Providers.ALL` offers exactly
+  13 Catwalk ids; no `FALLBACK_PROBE_MODEL` literal anywhere in the tree.
+- `WorkspaceManager.kt:132` (least-recent-attach field) and the D12 fan-out +
+  `mergeReplay`/`modelSelection` fixes in `ChatViewModel.kt` (`ce43c7a`),
+  the D13 error card ("This reply failed" + Retry, `0dca731`), and the
+  a67aee5 UI batch ("Unlock Crush Mobile", "Open chats list", save spinner,
+  StatusRow spoken merge) all verified present.
+- D11 commit `9498a67`, baseline commit `4e67aae…` and tag
+  `baseline/2026-10-17` verified. `WorkspaceLease`/force-retry still live.
+- Not run this session: any gradle command (forbidden here), so 455 is a
+  structural `@Test` count, not a runner count.

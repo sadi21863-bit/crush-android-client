@@ -55,6 +55,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
+        // Instrumented smoke tests run through the standard runner; declared
+        // here so `connectedDebugAndroidTest` works without per-run flags.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Crush ships only a statically-linked aarch64 binary (CGO_ENABLED=0).
         // Upstream's goreleaser explicitly EXCLUDES android/arm, android/386 and
@@ -252,6 +255,20 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling:1.12.1")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.12.1")
+
+    // Instrumented smoke suite (2026-10-31): the review's "no androidTest"
+    // gap. The suite is deliberately launch-level to start - it proves the
+    // APK installs, MainActivity composes, and the Compose tree attaches,
+    // without depending on provider keys or an engine turn (those already
+    // have z-session device evidence and stay on-device evidence, not CI).
+    // The explicit androidx.test coordinates are pinned to the versions the
+    // Compose test stack enforces strictly (core 1.5.0 / ext-junit 1.1.5 /
+    // runner 1.5.0 via espresso 3.5.0) - deviating from them is a hard
+    // resolution failure, not a warning.
+    androidTestImplementation("androidx.test:core:1.5.0")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:runner:1.5.0")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.12.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")

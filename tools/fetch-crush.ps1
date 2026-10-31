@@ -13,10 +13,15 @@
 # extract it and exec() will fail.
 
 param(
-    # Default tracks the bundled engine (libcrush.so in jniLibs). Running this
-    # script as-is on a missing binary MUST NOT silently downgrade the app to an
-    # older engine - the default advanced to 0.98.1 when the binary did.
-    [string]$Version = "0.98.1",
+    # Default tracks the engine of record. Running this script as-is on a
+    # missing binary MUST NOT silently downgrade the app to an older engine -
+    # the default advanced to 0.98.1 with the binary in 2026-10-18, and to
+    # 0.98.2 on 2026-10-31 once the upstream release checksum was recorded.
+    # One honest caveat: the libcrush.so currently in jniLibs is a locally
+    # instrumented "0.98.2+dirty" build of that upstream release (landed
+    # in-tree at d50f26e, 2026-10-29); a fresh-clone fetch reconstitutes the
+    # clean upstream 0.98.2 engine - same version, minus the instrumentation.
+    [string]$Version = "0.98.2",
     # Expected SHA-256 of the release TARBALL, not the extracted binary.
     #
     # WHY THIS EXISTS
@@ -40,7 +45,14 @@ param(
     # (Zero-arg runs of THIS script are where the pin matters; the local
     # tarball was byte-verified against the hash below on 2026-10-17 and the
     # extracted libcrush.so hashes 7bbfb0fe... aa052.)
-    [string]$ExpectedSha256 = $(if ($Version -eq "0.98.1") {
+    [string]$ExpectedSha256 = $(if ($Version -eq "0.98.2") {
+        # Recorded 2026-10-31 from the SIGNED release's checksums.txt (v0.98.2,
+        # published 2026-10-23), for asset crush_0.98.2_Android_arm64.tar.gz:
+        #   5224fab3...9b08  crush_0.98.2_Android_arm64.tar.gz
+        # Cross-checked: the downloaded checksums.txt hashed to the digest the
+        # GitHub release API attests for it (343f90ac...4a688).
+        "5224fab3b8eea3555b7ba3d8b9c6f3558fa60d8bafe018f77ac61520c7a49b08"
+    } elseif ($Version -eq "0.98.1") {
         "88f42f9302cbf72cd268d05b52395266acecd9b44afa4a1c4dec8c6cf0879ab3"
     } elseif ($Version -eq "0.97.1") {
         "5b76ea03ee1382c6bcb91c3e56ee683a59abf19b678ab8c3d2dcfeb969f70711"

@@ -118,6 +118,18 @@ end and stream a complete turn (proven 2026-10-20).
 > re-measure, and re-verify the full bootstrap - stream - ask - approve
 > - finish cycle on device against the v3 engine before flipping the
 > fetch pin.
+>
+> **Experiment stage 1 complete (2026-10-31, same day; the user green-lit
+> running it in parallel).** Isolated branch `v099-experiment` (worktree,
+> commit `d326e60`) with a `.v099`-suffixed applicationId so the experiment
+> installs ALONGSIDE the reference app; engine fetched with a
+> checksums.txt-verified pin (branch-only default 0.99.0); static API-surface
+> binary diff: near-drop-in surface (only `/v1/config` gains `host_theme`;
+> permission plumbing additive; no workspaces/SSE/attach changes); build
+> green; experiment app installed and boots clean, parked on onboarding.
+> Stage 2 (bind/readiness/SSE verdict) needs the user's one onboarding pass
+> in the experiment app; evidence log: `docs/v099-experiment.md` on the
+> branch. Main tree stays on 0.98.2+dirty.
 
 ### Delete treating transport failure as success — FIXED
 

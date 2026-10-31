@@ -179,8 +179,15 @@ note; label sizes unchanged from the original analysis):
   (`a02d882`).
 - Security: key plaintext at rest in `crush.json` — decision item 6 (open,
   user trade); no-lockscreen fail-open — decision item 5 (open, user
-  store stance); `KeySession` default-arg DI trap; Keystore-invalidation
-  comment wrong.
+  store stance). **CLEARED 2026-10-31, the other two halves of this row
+  were already fixed in-tree**: `KeySession`'s default-arg DI trap is
+  defused by construction — `SettingsDataStore(context, keySession)`
+  takes no default and its kdoc records why (a self-built instance wired
+  a second unmanaged cache; AppContainer is the single constructor
+  site), and the Keystore-invalidation comment's wrong claim ("device
+  credentials changed") was corrected in `c22b394` to the real remaining
+  failure mode — backup restore onto other hardware, where ciphertext
+  travels without the hardware-backed key material.
 - Build/repo: R8 off + lint fully disabled — decision item 1 (open; blocked
   on triaging the AGP/lint crash); no signed release has ever been
   produced; **plaintext test key file still at repo root** ("opencode api

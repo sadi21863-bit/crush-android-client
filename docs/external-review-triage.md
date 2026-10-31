@@ -245,7 +245,7 @@ claim, verified against the tree at `0d061cc`:
 | "Hyper: no successful device chat turn documented" | still true | `Providers.kt` keeps hyper `isKnown = false`; a real-key turn is still owed (needs a user Hyper account) |
 | "Multi-provider: Zen + OpenRouter tested" | agreed | matches the provider row evidence (ProviderSwitchPolicy tests, on-device OpenRouter/OAI-compatible turns) |
 | "No `androidTest` suite" | still true | A1's 2026-10-31 tree pass confirmed none exists |
-| "Licences/public release incomplete" | still true | no root LICENCE, no NOTICE, no CI; decision item list holds (user) |
+| "Licences/public release incomplete" | mostly still true | CI landed (`3162bbe`, 2026-10-31, same JVM gate on push/PR); root LICENCE/NOTICE/GitHub About/topics/demo video remain (user) |
 
 Upstream facts it cites, **verified first-hand today**:
 
@@ -269,9 +269,11 @@ Recommendation mapping to the ledger (their §4, our state):
    cancel-during-edit on device.
 3. Hyper completion — needs a real Hyper key from the user; then a verified
    turn would let `Providers.kt` flip its `isKnown` honestly.
-4. Release readiness — still the user's decision stack (licence, notices,
-   GitHub About/topics, CI, demo). The fetch-pin divergence they cannot have
-   seen was additionally closed today (`9402531`).
+4. Release readiness — the CI half landed 2026-10-31 (`3162bbe`: gate on
+   every push/PR, engine-less checkout documented); the rest — licence,
+   notices, GitHub About/topics, demo video — stays the user's decision
+   stack. The fetch-pin divergence they cannot have seen was additionally
+   closed today (`9402531`).
 
 Its overall verdict ("postponed Termux + local-models until permission
 handling, file-edit proof and release readiness land") matches the standing

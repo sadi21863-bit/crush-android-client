@@ -371,6 +371,15 @@ Device scripts:
 ./tools/chaos-ui.ps1     # Layer 2: UI + Keystore (S16–S21)
 ```
 
+## Continuous integration
+
+`.github/workflows/android-ci.yml` runs the same gate on every push and
+pull request: `./gradlew :app:testDebugUnitTest :app:assembleDebug`. The
+engine binary is gitignored, so a CI checkout builds a gate APK **without
+the embedded engine** — CI proves the code compiles and all JVM suites
+pass; runtime behavior still needs real arm64 hardware (see [Build from
+source](#build-from-source)).
+
 ## Docs
 
 | Document | Contents |

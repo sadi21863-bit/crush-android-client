@@ -101,7 +101,23 @@ end and stream a complete turn (proven 2026-10-20).
 > documentation, optional TCP auth) was closed by upstream on 2026-10-21 with
 > nothing landed there. RESOLVED 2026-10-31: `tools/fetch-crush.ps1` now
 > defaults to 0.98.2 with the upstream SHA-256 pinned from the signed
-> checksums.txt (`9402531`) —; the downgrade path is closed.
+> checksums.txt (`9402531`); the downgrade path is closed.
+>
+> **Upstream v0.99.0 (published 2026-10-29, verified via the GitHub
+> release API): evaluated 2026-10-31, NOT adopted.** Its Catwalk v3
+> retypes providers by API format (`completions`/`responses`/`messages`,
+> with automatic config migration); the client/server block is aimed at
+> exactly this app's shape - host themes, host context, append-to-
+> next-prompt, shared viewing, and `CRUSH_PERMISSIONS_PIPED=1` so the
+> host answers permission prompts and the engine asks once. None of it
+> is needed today: the provider registry/key slots/model probes sit
+> above the engine, and in-band permission and question cards already
+> work device-verified on v0.98.2 (D12). Sequencing decision (2026-10-31,
+> agreeing with the second external review): evaluate the upgrade in an
+> isolated branch AFTER the parked stopBlocking/backgrounding
+> re-measure, and re-verify the full bootstrap - stream - ask - approve
+> - finish cycle on device against the v3 engine before flipping the
+> fetch pin.
 
 ### Delete treating transport failure as success — FIXED
 

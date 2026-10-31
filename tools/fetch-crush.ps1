@@ -21,7 +21,7 @@ param(
     # instrumented "0.98.2+dirty" build of that upstream release (landed
     # in-tree at d50f26e, 2026-10-29); a fresh-clone fetch reconstitutes the
     # clean upstream 0.98.2 engine - same version, minus the instrumentation.
-    [string]$Version = "0.98.2",
+    [string]$Version = "0.99.0",
     # Expected SHA-256 of the release TARBALL, not the extracted binary.
     #
     # WHY THIS EXISTS
@@ -45,7 +45,12 @@ param(
     # (Zero-arg runs of THIS script are where the pin matters; the local
     # tarball was byte-verified against the hash below on 2026-10-17 and the
     # extracted libcrush.so hashes 7bbfb0fe... aa052.)
-    [string]$ExpectedSha256 = $(if ($Version -eq "0.98.2") {
+    [string]$ExpectedSha256 = $(if ($Version -eq "0.99.0") {
+        # Recorded 2026-10-31 from the SIGNED release's checksums.txt
+        # (v0.99.0, published 2026-10-29), asset crush_0.99.0_Android_arm64.tar.gz,
+        # for the isolated v099 experiment build.
+        "d18cd1f961a4c587f26a50aad8ef1fed38ad4362bb6237807e57cda1c170f78c"
+    } elseif ($Version -eq "0.98.2") {
         # Recorded 2026-10-31 from the SIGNED release's checksums.txt (v0.98.2,
         # published 2026-10-23), for asset crush_0.98.2_Android_arm64.tar.gz:
         #   5224fab3...9b08  crush_0.98.2_Android_arm64.tar.gz

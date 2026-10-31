@@ -40,6 +40,13 @@ android {
     compileSdk = 37
 
     defaultConfig {
+        // v099 EXPERIMENT build (isolated branch): the suffix installs this
+        // ALONGSIDE the reference app instead of replacing it, so the device's
+        // z-lab evidence baseline (0.98.2+dirty engine) is never disturbed by
+        // an experiment. First launch = onboarding; the verdict here concerns
+        // the engine itself (UDS bind, SSE, /v1/config), not a configured chat.
+        applicationIdSuffix = ".v099"
+        versionNameSuffix = "-v099"
         applicationId = "com.crush.mobile"
         // API 29, not 26.
         //

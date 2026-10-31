@@ -99,6 +99,26 @@ internal fun replayRow(m: StreamMessage): ChatMessage? {
 }
 
 /**
+ * Merges a freshly fetched transcript with any live turn rows a concurrent
+ * send has already appended (analysis R1).
+ *
+ * This is a race SEAM, not a cosmetic dedupe: [openSession] fetches history
+ * over the network, and between that fetch landing and its state write the
+ * user can finish sending a turn - send() claims `isStreaming` synchronously,
+ * so the window is real. The merge keeps replayed order first (it defines the
+ * transcript), and appends any live rows the replay does not contain: the
+ * user row and the streaming bubble of the turn that beat the history.
+ * Pure so the shape stays pinned by a test.
+ */
+internal fun mergeReplay(
+    replayed: List<ChatMessage>,
+    live: List<ChatMessage>
+): List<ChatMessage> {
+    val replayedIds = replayed.map { it.id }.toSet()
+    return replayed + live.filter { it.id !in replayedIds }
+}
+
+/**
  * [Immutable] is an ASSERTION, not a derivation (analysis §4 P0-1): without it
  * Compose sees a data class carrying a List and treats every row as
  * possible-mutating, so a role/stability meta cannot mark bubble rows skippable
@@ -404,6 +424,24 @@ class ChatViewModel(private val context: Context, private val container: AppCont
      * assignments once nothing references it.
      */
     private var existingSessionWorkspace: String? = null
+
+    /**
+     * Generation token for model picks (analysis R3). Incremented on every
+     * tap; only the coroutine whose token still equals the field after each
+     * await may settle, so a slow verify from an earlier tap can never
+     * overwrite a later decision.
+     */
+    private var modelSelection = 0
+
+    /**
+     * A rejected pick restores [model] (the pre-tap selection) and shows
+     * [error] - but ONLY while the same tap still owns the selection; a newer
+     * tap meanwhile has already written its own optimistic value, and an old
+     * rejection must not undo it.
+     */
+    private fun revertModelSelection(model: String, error: String) {
+        _state.update { it.copy(selectedModel = model, modelsError = error) }
+    }
 
     /** Guards against two concurrent bootstraps racing to create two workspaces. */
     private var bootstrapping: Boolean = false
@@ -1097,7 +1135,19 @@ class ChatViewModel(private val context: Context, private val container: AppCont
     }
 
     fun setModel(id: String) {
+        // STATEFLOW RACE R3 (analysis 2026-10-31): the tap optimistically
+        // wrote `selectedModel = id` and the VERIFY below could reject - but
+        // nothing reverted the optimistic write, so the TopBar showed a model
+        // the engine slots had actually refused. Two writers (tap vs verified
+        // slots) disagreed, and the tap always won on screen.
+        //
+        // Fix: capture the pre-tap value, keep, and (a) revert to it when this
+        // tap's verification rejects, (b) ignore the result entirely when a
+        // NEWER tap replaced this one - the generation token makes the latest
+        // tap the only writer that may settle. Both writers now agree.
+        val previousModel = _state.value.selectedModel
         _state.update { it.copy(selectedModel = id) }
+        val myTap = ++modelSelection
         val ws = wsId ?: return
         val p = port ?: return
         val providerId = Providers.resolve(_state.value.providerId).id
@@ -1109,12 +1159,11 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // hardcoded default, just user-triggered.
             val key = runCatching { container.keySession.require(secureKeys, currentProviderId()) }
                 .getOrNull()
+            if (myTap != modelSelection) return@launch
             if (key == null) {
-                _state.update {
-                    it.copy(
-                        modelsError = "No API key is stored yet. Add one in Settings."
-                    )
-                }
+                // Superseded taps never own the error or the revert: the latest
+                // tap decides what the picker shows.
+                revertModelSelection(previousModel, "No API key is stored yet. Add one in Settings.")
                 return@launch
             }
             val providerName = Providers.byId(providerId)?.displayName ?: providerId
@@ -1129,11 +1178,13 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             }
             if (rejection != null) {
                 AppLog.w(TAG, "rejected model $id (did not answer a probe)")
-                _state.update {
-                    it.copy(modelsError = rejection)
-                }
+                if (myTap != modelSelection) return@launch
+                revertModelSelection(previousModel, rejection)
                 return@launch
             }
+            // Superseded taps do not write the slots either: they lost the race
+            // and their verification belongs to a selection nobody made.
+            if (myTap != modelSelection) return@launch
             // Both slots: Crush uses the small one for session titles.
             runCatching {
                 val api = crushApi(p)
@@ -1225,10 +1276,23 @@ class ChatViewModel(private val context: Context, private val container: AppCont
             // an unanswered permission or question belongs to the run stream
             // that was being watched, and answering it from a different chat
             // forwards the wrong session's context (analysis §4 P1-7).
+            // STATEFLOW RACE R1 (analysis 2026-10-31): between the history
+            // fetch above and this write, the user can finish sending a turn -
+            // send() claims isStreaming synchronously, so the window is real on
+            // a slow network. The old unconditional `messages = replayed,
+            // isStreaming = false` erased that turn's user row + streaming
+            // bubble and dead-stopped the UI while the run was live.
+            //
+            // Fix, inside the CAS loop so the freshest state is what wins:
+            // MERGE - replayed rows first (they define the transcript order),
+            // then any live rows the replay does not contain (the user row and
+            // the streaming bubble of the turn that beat the history) - and
+            // only drop isStreaming when no live run exists. [mergeReplay]
+            // is the extracted, unit-pinned shape.
             _state.update {
                 it.copy(
-                    messages = replayed,
-                    isStreaming = false,
+                    messages = mergeReplay(replayed, it.messages),
+                    isStreaming = if (activeRun != null) it.isStreaming else false,
                     activeSessionId = sessionId,
                     fileChanges = null,
                     pendingPermission = null,

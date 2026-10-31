@@ -1,0 +1,61 @@
+# Continuous integration for Crush Mobile.
+#
+# Runs the same gate the repo uses locally, on every push and pull request:
+# the full JVM unit-test suite plus the debug APK build. README documents the
+# gate as `./gradlew :app:testDebugUnitTest :app:assembleRelease`; CI builds
+# assembleDebug (the artifact users install from source) so the two checks
+# cover both configurations:
+#   - testDebugUnitTest: every pinned defect has a test, so a green CI run
+#     means the regressions the suites caught stay caught.
+#
+# One property to keep in mind when reading a green CI run: the engine binary
+# (app/src/main/jniLibs/arm64-v8a/libcrush.so) is deliberately gitignored,
+# so CI checkouts build a **gate APK without the embedded engine binary**.
+# CI proves the code compiles and the logic suites pass; runtime behavior is
+# still verified on real arm64 hardware locally, same as before the workflow
+# existed. See README ("Fetching the engine") for that contract.
+
+name: android-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Make the Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache the Gradle toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml', 'app/build.gradle.kts') }}
+          restore-keys: gradle-
+
+      - name: Gate - JVM tests and debug APK
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.run_id }}
+          path: |
+            app/build/reports/tests/**
+            app/build/reports/problems/**
+          if-no-files-found: ignore
+          retention-days: 7

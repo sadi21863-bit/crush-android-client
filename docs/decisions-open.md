@@ -35,6 +35,25 @@ Two recorded numbers from the same day's analysis:
   risk half of the rationale (junixsocket/Gson) is untouched and still the
   hard part.
 
+---
+
+### R8 ceiling — measured 2026-10-31 (release artifact)
+
+Unsigned `app-release.apk` (73.2 MB on disk) holds **47.76 MB of DEX across
+3 files** (30.71 + 9.58 + 7.47 MB, stored uncompressed) while the engine
+`.so` is 92.7 MB raw but only **24.84 MB compressed**. The compressed APK is
+therefore ~66% DEX by mass and ~34% engine — the recorded "92 MB engine
+dominates the payload, R8 has no size win" rationale (retired from
+`build.gradle.kts` in `5325d68`) had the composition backwards. A typical
+R8 shrink on a dependency-heavy Compose app cuts such DEX half or better;
+**the measured ceiling is an APK of roughly ~45–55 MB** (a 20–30 MB cut),
+at the cost of keep-rules for junixsocket / Gson / OkHttp-SSE + Compose and
+a device-verified run before commit. Updated recommendation on the R8
+sub-decision: worth a gated, isolated attempt now that lint is green —
+build-config-only batch (`isMinifyEnabled = true` for release + the
+`proguard-rules.pro` keep-rules) — with the mandatory device sanity check
+(one UDS turn end-to-end). The risk/effort call stays the user's.
+
 Current state (both deliberate, both commented in [`app/build.gradle.kts`](../app/build.gradle.kts)):
 
 - Lint is fully switched off (`checkReleaseBuilds=false`, `abortOnError=false`,

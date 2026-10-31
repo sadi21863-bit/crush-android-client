@@ -158,6 +158,37 @@ class EngineSupervisor(
         _state.value = EngineState.Stopped
     }
 
+    /**
+     * A deliberate restart, requested by the app rather than by failed health
+     * (decision item 4's restart-boundary contract: settings that need the
+     * engine to re-read its config - provider key changes are currently
+     * per-request, but a config-level change landing later rides THIS).
+     *
+     * Sequencing mirrors [stop] exactly - cancel the supervised loop FIRST,
+     * then the synchronous stopBlocking, and only then re-launch the loop -
+     * precisely so a starting engine can never outlive the stop. The wanted
+     * flag stays true, which keeps after `[restart]` everything it was before
+     * except a fresh engine process. A restart while the engine is already
+     * down is a plain [start].
+     */
+    fun restart(reason: String) {
+        val wasWanted = synchronized(sync) { wanted }
+        if (!wasWanted) {
+            Log.i(TAG, "restart($reason) ignored: supervisor not running")
+            return
+        }
+        Log.i(TAG, "restart requested: $reason")
+        synchronized(sync) {
+            supervisorJob?.cancel()
+            supervisorJob = null
+            wanted = true
+        }
+        engine.stopBlocking()
+        synchronized(sync) {
+            supervisorJob = scope.launch { supervise() }
+        }
+    }
+
     private suspend fun supervise() {
         var attempt = 0
         // Wedge tracking (P1-25SUP): how many restarts in a row happened

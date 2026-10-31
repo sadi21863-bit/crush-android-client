@@ -77,6 +77,23 @@ class EngineConfigInjectorTest {
     }
 
     @Test
+    fun `a write during the engine's live window is refused and the file is untouched`() {
+        // Decision item 4's single-writer contract (docs/key-path-single-writer-design.md):
+        // the ONLY legal write window for crush.json is "engine down". A caller
+        // that arrives out of window must DEFER, not race - the engine holds the
+        // file open in its own write cycles and a lost update silently deletes
+        // keys or models.
+        val dir = tmp.newFolder("alive")
+        assertTrue(sync(dir).changed)
+        val file = java.io.File(dir, "crush.json")
+        val before = file.readBytes()
+        val refused = EngineConfigInjector.syncProviderModels(dir, "groq", groq, engineRunning = true)
+        assertFalse("an out-of-window write must not claim success", refused.changed)
+        assertTrue("out-of-window write must not state ids", refused.ids.isEmpty())
+        assertTrue("file must survive the refusal byte-for-byte", before.contentEquals(file.readBytes()))
+    }
+
+    @Test
     fun `a malformed file is left alone, not truncated`() {
         val dir = tmp.newFolder("bad")
         val broken = "{providers: sintaxe"

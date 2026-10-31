@@ -1,5 +1,6 @@
 package com.crush.mobile.data.crush
 
+import com.crush.mobile.util.AppLog
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -124,7 +125,28 @@ object EngineConfigInjector {
      *   unchanged rather than rewritten, because a half-parse rewrite could
      *   delete the engine's stored key.
      */
-    fun syncProviderModels(globalDataDir: File, providerId: String, overrides: List<ModelSpec>): SyncResult {
+    fun syncProviderModels(
+        globalDataDir: File,
+        providerId: String,
+        overrides: List<ModelSpec>,
+        /**
+         * Decision item 4 (single-writer contract, see
+         * docs/key-path-single-writer-design.md): the ONLY legal write window
+         * for this file is before an engine process is up. Callers pass
+         * `engineRunning = true` to DEFER a write that arrived out of window
+         * instead of racing the engine's own config writes (lost update).
+         * The default `false` keeps the existing call shape working;
+         * CrushEngine.start() passes it explicitly to pin the ordering.
+         */
+        engineRunning: Boolean = false
+    ): SyncResult {
+        if (engineRunning) {
+            AppLog.w(
+                "EngineConfigInjector",
+                "sync refused: engine is running; the write window is 'engine down' only"
+            )
+            return SyncResult(false, emptyList())
+        }
         val file = File(globalDataDir, "crush.json")
         if (overrides.isEmpty()) return SyncResult(false, emptyList())
         if (!globalDataDir.isDirectory && !globalDataDir.mkdirs()) {

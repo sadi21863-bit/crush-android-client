@@ -180,7 +180,12 @@ class CrushEngine(
                 val injected = com.crush.mobile.data.crush.EngineConfigInjector.syncProviderModels(
                     paths.globalData,
                     "groq",
-                    com.crush.mobile.data.crush.EngineConfigInjector.providerCatalog("groq")
+                    com.crush.mobile.data.crush.EngineConfigInjector.providerCatalog("groq"),
+                    // Single-writer contract (decision item 4): this call site
+                    // IS the pre-spawn window - no engine process exists yet -
+                    // so the parameter is passed explicitly to pin the
+                    // ordering against future call-site drift.
+                    engineRunning = false
                 )
                 if (injected.changed) {
                     Log.i(TAG, "provider catalogue override applied: ${injected.ids.size} models")

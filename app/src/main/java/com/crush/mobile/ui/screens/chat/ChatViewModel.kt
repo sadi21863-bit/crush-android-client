@@ -730,7 +730,11 @@ class ChatViewModel(
         // from Zen by default: constructing the client with Zen's base for a
         // non-Zen provider would probe opencode.ai with that provider's key and
         // fail with an opaque 401 that described nothing.
-        val modelsBase = Providers.byId(providerId)?.modelsBase
+        // 2026-11-01 (promoted from the v099 lane): the OpenCode/Console
+        // family serves the list on a DIFFERENT, plan-dependent base than
+        // chat - Provider.modelsListBase covers that split.
+        val provider = Providers.byId(providerId) ?: return
+        val modelsBase = provider.modelsBase ?: provider.modelsListBase
         if (modelsBase == null) {
             AppLog.w(TAG, "no compat base for provider '$providerId'; cannot fetch a catalogue")
             _state.update {
@@ -743,7 +747,12 @@ class ChatViewModel(
             }
             return
         }
-        val zen = ZenModelsApi({ key }, modelsBase)
+        val zen = ZenModelsApi(
+            keyProvider = { key },
+            baseUrl = modelsBase,
+            listBaseOverride = provider.modelsListBase ?: provider.modelsBase,
+            chatBaseCandidates = provider.chatBases
+        )
 
         // Load REAL prices before parsing the catalogue.
         //
@@ -1005,7 +1014,13 @@ class ChatViewModel(
             // the key factory lambda below is `() -> String`, so it cannot
             // suspend, and a mirror read inside it can still be cold.
             val providerId = currentProviderId()
-            val base = currentModelsBase()
+            // 2026-11-01 (promoted from the v099 lane): OpenCode/Console
+            // families serve the list on a plan-dependent base - prefer
+            // Provider.modelsListBase, then the plain compat base. resolve()
+            // guarantees a known id, so the ?: exit is unreachable in
+            // practice but keeps the checker honest without !!.
+            val providerRow = Providers.byId(providerId) ?: return@launch
+            val base = providerRow.modelsBase ?: providerRow.modelsListBase
             if (base == null) {
                 _state.update {
                     it.copy(
@@ -1018,7 +1033,8 @@ class ChatViewModel(
             }
             val r = ZenModelsApi(
                 { container.keySession.require(secureKeys, providerId) },
-                base
+                baseUrl = base,
+                chatBaseCandidates = providerRow.chatBases
             ).fetch()
             _state.update {
                 it.copy(
@@ -1064,11 +1080,12 @@ class ChatViewModel(
         Providers.resolve(currentPersistedProvider()).id
 
     /**
-     * Base of the selected provider's OpenAI-compatible API, or null when the
-     * picker cannot talk to that provider directly (see Provider.modelsBase).
+     * (retired 2026-11-01, 0.99.0 promotion) — replaced by provider-aware
+     * construction of [ZenModelsApi] at its three call sites: the
+     * OpenCode/Console family needs list-vs-chat split bases
+     * ([Provider.modelsListBase], [Provider.chatBases]) which a single-base
+     * read cannot express.
      */
-    private suspend fun currentModelsBase(): String? =
-        Providers.byId(currentProviderId())?.modelsBase
 
     /**
      * Switches provider and re-bootstraps - the single switch reducer.
@@ -1172,17 +1189,46 @@ class ChatViewModel(
                 return@launch
             }
             val providerName = Providers.byId(providerId)?.displayName ?: providerId
-            val base = currentModelsBase()
+            // 2026-11-01 (promoted from the v099 lane): resolve() guarantees a
+            // known id, so a missing row cannot happen; the ?: exit keeps the
+            // nullability checker honest without !!.
+            val providerRow = Providers.byId(providerId) ?: return@launch
+            val base = providerRow.modelsBase ?: providerRow.modelsListBase
+            val probe = if (base == null) null else ZenModelsApi(
+                keyProvider = { key },
+                baseUrl = base,
+                listBaseOverride = providerRow.modelsListBase ?: providerRow.modelsBase,
+                chatBaseCandidates = providerRow.chatBases
+            ).probe(id)
+            // The plan-walk turns 404s into NEXT-base attempts, so what remains
+            // after the walk is a real gateway verdict on the right base; the
+            // message now explains WHY rather than saying "did not answer".
+            AppLog.w(TAG, "probe $id -> ${probe?.verdict} detail=${probe?.detail}")
             val rejection = when {
                 base == null ->
                     "Cannot verify \"$id\": provider \"$providerName\" has no live " +
                         "model list in this build, so taps cannot be trusted."
-                !ZenModelsApi({ key }, base).probeWorks(id) ->
-                    "\"$id\" is listed by $providerName but cannot be called. Pick another."
-                else -> null
+                probe == null -> "Verification did not run (no reachable base)."
+                probe.verdict == com.crush.mobile.data.api.ProbeVerdict.WORKS -> null
+                // 2026-11-01, officially explained: the OpenCode gateway bills
+                // the WORKSPACE the key was minted in ("each key works in one
+                // workspace, chosen when it is created"). A Go-entitled model
+                // 402ing "Insufficient account funds" on the Go base means this
+                // key's workspace is not the subscribed one - a fresh key
+                // minted there fixes it, not a top-up.
+                probe.verdict == com.crush.mobile.data.api.ProbeVerdict.PAYMENT_REQUIRED &&
+                    providerRow.chatBases.isNotEmpty() ->
+                    "\"$id\" returned \"Insufficient account funds\" on the Go " +
+                        "gateway: this key was minted in a workspace without the " +
+                        "Go subscription. Create a new personal API key inside the " +
+                        "Go-subscribed workspace (Console > Account > Personal API " +
+                        "keys > choose the Workspace), then paste that key here."
+                probe.verdict == com.crush.mobile.data.api.ProbeVerdict.RETIRED ->
+                    "\"$id\" is not callable on your plan's gateway right now " +
+                        "(\"Model is unavailable\"). Pick another."
+                else -> "\"$id\" answered ${probe.verdict}: ${probe.detail ?: "no detail"}"
             }
             if (rejection != null) {
-                AppLog.w(TAG, "rejected model $id (did not answer a probe)")
                 if (myTap != modelSelection) return@launch
                 revertModelSelection(previousModel, rejection)
                 return@launch

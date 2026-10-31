@@ -309,6 +309,13 @@ class CrushConnection(
 
         val pType = CrushEvent.PayloadType.entries.firstOrNull { it.wire == outer }
         if (pType == null) {
+            // 2026-11-01 (0.99.0 promotion): `client_session` is an ADDITIVE
+            // engine event first seen on 0.99.0 during the v099 experiment -
+            // session-visibility metadata the client does not consume yet.
+            // Recognised-but-ignored so each attach does not trip the
+            // unknown-type diagnostic below; revisit when the payload is
+            // specified upstream.
+            if (outer == "client_session") return null
             // P1-15: the drop itself is correct (expecting unknown types is part
             // of the contract with the engine), but it USED to be invisible:
             // an engine release that added an event type left zero trace behind,

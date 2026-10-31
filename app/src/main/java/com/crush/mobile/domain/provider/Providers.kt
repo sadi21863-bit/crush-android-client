@@ -62,9 +62,12 @@ data class Provider(
      * (flags drift never strands a user). It only hides the provider from the
      * offer lists ([Providers.AVAILABLE]) - e.g. a service shutdown.
      *
-     * 2026-10-31: OpenCode Zen is dead as a service (user-reported on that
-     * date); the row survives for resolution, the offer lists do not show it,
-     * and [Providers.DEFAULT] moved to `opencode-go`.
+     * Dormant infrastructure as of 2026-11-01: the 2026-10-31 "Zen is dead"
+     * report was verified FALSE against official sources (the product was
+     * rebranded "Console" and Go added as a subscription tier — see
+     * docs/providers/opencode-zen.md), so no row is inactive today, and
+     * `Providers.DEFAULT` stays the first row. The mechanism stays for a real
+     * future sunset.
      */
     val isActive: Boolean = true,
     /**
@@ -121,7 +124,27 @@ data class Provider(
      * The plumbing (CrushSession.ensureAgentReady + POST /agent/main after
      * init) stays because it is provider-generic.
      */
-    val mainAgent: String = ""
+    val mainAgent: String = "",
+    /**
+     * 2026-11-01 (promoted from the v099-experiment lane): the OpenCode/
+     * Console family does NOT serve its model list on the same base its
+     * chat API lives at, and the LIST URL is PLAN-DEPENDENT (measured +
+     * official): Console/PAYG lists at /inference/v1/models, GO subscribers
+     * at /inference/go/v1/models, while chat is /inference[/go]/openai/v1/
+     * chat/completions. When this is set, [ZenModelsApi] fetches the list
+     * HERE and probes against [chatBases] instead of deriving both from
+     * [modelsBase]. Dynamic listing only - this file intentionally hardcodes
+     * NO model ids (user directive, 2026-11-01).
+     */
+    val modelsListBase: String? = null,
+    /**
+     * Chat base candidates to PROBE, plan-dependent first (Go subscribers on
+     * /opencode.ai/inference/go, pay-as-you-go keys on /opencode.ai/inference).
+     * A 404 on one candidate means "wrong plan base for this key", never "model
+     * unavailable": probe order matters, and 401/402/403/2xx are FINAL
+     * verdicts that stop the walk.
+     */
+    val chatBases: List<String> = emptyList()
 )
 
 object Providers {
@@ -206,26 +229,24 @@ object Providers {
             displayName = "OpenCode Go",
             isKnown = false,
             keyHint = "opencode.ai/go",
-            // 2026-10-31 endpoint research (Console models doc + live probes):
-            // the OpenCode/Console family splits its paths - models LIST at
-            // /opencode.ai/inference/v1/models (HTTP 200, no auth), OpenAI-
-            // compat CHAT at /inference/openai/v1/chat/completions, while
-            // /inference/openai/v1/models is a 404. A single modelsBase
-            // cannot express list+probe versus chat honestly, so it stays
-            // null until ZenModelsApi grows a list/chat split (and a real
-            // Console/Go key verifies the probe) - NOT silently probed
-            // against a wrong base. Free-tier ids are locked to the OpenCode
-            // agent: "Free-tier chat models require OpenCode; use paid
-            // models or Go from other clients" (Console models doc).
-            //
-            // GO-BY-ENGINE constraint (2026-10-31 harnesses doc + binary
-            // probes): Go REQUIRES a stable `x-opencode-session: ses_...`
-            // header on every request, and only the 0.99.0 engine carries it
-            // (0.98.2 has zero occurrences; 0.99.0 has two). A Go turn on
-            // this build's main-tree engine would 4xx at the gateway - the
-            // v099-experiment branch is the Go-capable lane. Go's chat base
-            // is plan-dependent as well: PAYG = opencode.ai/inference, Go =
-            // opencode.ai/inference/go (per-request key routes to the plan).
+            // 2026-11-01 PROMOTION (from the v099-experiment lane, device-
+            // proven): the earlier "cannot fetch a catalogue" stance is
+            // resolved by the split wiring below. Facts carried forward:
+            // models LIST is plan-dependent (Console /inference/v1 vs Go
+            // /inference/go/v1), chat path carries the FULL /openai/v1
+            // segment on the plan's base, the gateway rejects generic SDK
+            // user agents, Go requires x-opencode-session (engine 0.99.0
+            // sends it; this build's engine IS 0.99.0 since this promotion),
+            // and free-tier ids are locked to the OpenCode agent ("Free-tier
+            // chat models require OpenCode; use paid models or Go from other
+            // clients" — Console models doc). NO preferredModelIds here:
+            // models are listed dynamically from the plan's /models endpoint
+            // (user directive 2026-11-01).
+            modelsListBase = "https://opencode.ai/inference/go/v1",
+            chatBases = listOf(
+                "https://opencode.ai/inference/go/openai/v1",
+                "https://opencode.ai/inference/openai/v1"
+            )
         ),
         Provider(
             id = "groq",

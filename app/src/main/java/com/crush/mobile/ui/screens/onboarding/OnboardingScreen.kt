@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -13,6 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -56,6 +61,13 @@ fun OnboardingScreen(
     var errorText by remember { mutableStateOf<String?>(null) }
     var apiKey by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
+    // SUBMIT FEEDBACK (skill audit 2026-10-31): saveApiKeyAwait is a keystore
+    // write that can take a couple of seconds on a cold device. The button used
+    // to sit there looking dead while it ran, so a user who assumes the tap
+    // missed re-taps it - the second save is harmless but the impression is not.
+    // While saving the button disables, shows a spinner, and says what it is
+    // doing; the guards also make a re-entrant tap impossible.
+    var saving by remember { mutableStateOf(false) }
 
     Scaffold { padding ->
         Column(
@@ -104,6 +116,12 @@ fun OnboardingScreen(
             // Provider selector. Plain DropdownMenu, not ExposedDropdownMenuBox:
             // the box's menuAnchor() API has churned across material3 versions,
             // and the plain popup needs no anchor plumbing at all.
+            //
+            // Dropdown affordance (skill audit 2026-10-31): the button used to
+            // read as a static label with no hint it opens a list. A trailing
+            // chevron is the convention every Android picker uses, and the
+            // merged contentDescription says what the button DOES rather than
+            // reciting a bare provider name into the reader out of context.
             OutlinedButton(
                 onClick = { providerMenuOpen = true },
                 modifier = Modifier.fillMaxWidth()
@@ -113,7 +131,22 @@ fun OnboardingScreen(
                         "${provider.displayName} (free tier)"
                     } else {
                         provider.displayName
-                    }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        // Spoken as one phrase out of context (skill audit:
+                        // a bare provider name belongs to the provider list,
+                        // not the button that opens it).
+                        .semantics {
+                            contentDescription =
+                                "Provider: ${provider.displayName}" +
+                                    if (provider.hasFreeTier) ", free tier" else ""
+                        }
+                )
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             DropdownMenu(
@@ -167,11 +200,15 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             errorText?.let {
+                // Live region: a save failure is announced the moment it lands,
+                // once, without the reader having to hunt the screen for it.
                 Text(
                     it,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { liveRegion = LiveRegionMode.Polite }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -186,26 +223,42 @@ fun OnboardingScreen(
                     // needs an AppCompat theme this app did not have). The key is
                     // now encrypted but not auth-gated, so saving is a plain
                     // write and the app lock at Chat entry is the user-facing
-                    // gate instead.
+                    // gate instead. While saving runs the button is disabled
+                    // (enabled below), so no extra re-entry guard is needed.
                     scope.launch {
-                        val ok = viewModel.saveApiKeyAwait(apiKey, providerId)
-                        // Persist the choice only after the key landed: the chat
-                        // screen reads the persisted provider on its first
-                        // bootstrap to decide which key scope to read.
-                        if (ok) {
-                            viewModel.saveProviderId(providerId)
-                            onCompleted()
-                        } else {
-                            errorText = "Could not save key - please try again"
+                        saving = true
+                        errorText = null
+                        try {
+                            val ok = viewModel.saveApiKeyAwait(apiKey, providerId)
+                            // Persist the choice only after the key landed: the chat
+                            // screen reads the persisted provider on its first
+                            // bootstrap to decide which key scope to read.
+                            if (ok) {
+                                viewModel.saveProviderId(providerId)
+                                onCompleted()
+                            } else {
+                                errorText = "Could not save key - please try again"
+                            }
+                        } finally {
+                            saving = false
                         }
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                enabled = apiKey.isNotBlank()
+                enabled = apiKey.isNotBlank() && !saving
             ) {
-                Text("Start chatting")
+                if (saving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Saving key...")
+                } else {
+                    Text("Start chatting")
+                }
             }
         }
     }

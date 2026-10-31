@@ -20,6 +20,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
@@ -73,7 +76,10 @@ fun LockOverlay(
 
         DeviceAuth.authenticate(
             activity = host,
-            title = "Unlock OpenCode",
+            // Rebrand catch (skill audit 2026-10-31): this prompt still said
+            // "Unlock OpenCode" - pre-rebrand copy leaking into the one dialog
+            // every user sees at least once a day.
+            title = "Unlock Crush Mobile",
             subtitle = "Your chats and API key are stored on this device",
             onResult = { ok ->
                 busy = false
@@ -168,11 +174,17 @@ fun LockOverlay(
             }
             errorText?.let {
                 Spacer(Modifier.height(24.dp))
+                // Live region: a cancel or a failed unlock is announced when it
+                // appears (once, politely) instead of waiting for the reader
+                // to stumble onto the fresh line.
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.semantics {
+                        liveRegion = LiveRegionMode.Polite
+                    }
                 )
             }
         }

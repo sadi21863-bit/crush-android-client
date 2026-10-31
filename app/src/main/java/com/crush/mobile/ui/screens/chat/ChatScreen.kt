@@ -172,7 +172,9 @@ fun ChatScreen(onOpenSettings: () -> Unit, isLocked: Boolean = false) {
                 },
                 navigationIcon = {
                     IconButton(onClick = { showSessions = true; vm.loadSessions() }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Chats")
+                        // Describes the ACTION (skill audit 2026-10-31): the old
+                        // "Chats" named a widget, not what tapping it does.
+                        Icon(Icons.Default.Menu, contentDescription = "Open chats list")
                     }
                 },
                 actions = {
@@ -1160,6 +1162,15 @@ private fun ModelSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onPick(m.id) }
+                        // Active state: visible check for sighted users,
+                        // speakable state for readers.
+                        .let { base ->
+                            if (m.id == selected) {
+                                base.semantics { stateDescription = "selected" }
+                            } else {
+                                base
+                            }
+                        }
                         .padding(horizontal = 20.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1170,6 +1181,18 @@ private fun ModelSheet(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    if (m.id == selected) {
+                        // Active-state rule (skill audit 2026-10-31): the sheet
+                        // received the selected id but never rendered it, so
+                        // the list gave no feedback about the current choice
+                        // and a reload looked like the selection was lost.
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(10.dp))
                     }
                     if (m.isFree) {
                         // Non-interactive badge (analysis §4 P2): the AssistChip

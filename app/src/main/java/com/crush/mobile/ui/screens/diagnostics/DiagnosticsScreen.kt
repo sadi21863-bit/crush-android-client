@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -177,7 +179,11 @@ fun DiagnosticsScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null)
-                        Text("  Copy")
+                        // Spacer, not leading whitespace in the label (skill
+                        // audit: the old "  Copy" was read with the spaces by
+                        // some readers and is layout-as-content either way).
+                        Spacer(Modifier.width(6.dp))
+                        Text("Copy")
                     }
                     OutlinedButton(
                         onClick = {
@@ -194,7 +200,8 @@ fun DiagnosticsScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null)
-                        Text("  Share")
+                        Spacer(Modifier.width(6.dp))
+                        Text("Share")
                     }
                 }
 
@@ -337,7 +344,14 @@ private fun StatusSection(report: DiagnosticsReport) {
 
 @Composable
 private fun StatusRow(label: String, value: String) {
-    Row(Modifier.padding(vertical = 3.dp)) {
+    Row(
+        // One spoken unit, not two (skill audit): label and value merge into
+        // "App version, 1.0 (12)" - unmerged, the reader read "App version"
+        // and then had to find "its" value among every other row's values.
+        modifier = Modifier
+            .semantics(mergeDescendants = true) {}
+            .padding(vertical = 3.dp)
+    ) {
         Text(
             label,
             style = MaterialTheme.typography.bodySmall,

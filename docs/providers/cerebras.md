@@ -5,7 +5,7 @@
 `https://api.cerebras.ai/public/v1/models` (fetched 2026-10-17, output on file). Third-party
 sites used only to locate official URLs; tied claims are marked.
 
-App context: phone agent app embedding Crush 0.97.1 → OpenAI-compatible `/v1/chat/completions`
+App context: phone agent app embedding Crush 0.97.1 (at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29) → OpenAI-compatible `/v1/chat/completions`
 with streaming + tool calls. Base `https://api.cerebras.ai/v1`.
 
 ---

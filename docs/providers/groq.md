@@ -6,7 +6,7 @@ groq.com, community.groq.com, github.com/groq) + websearch to locate official pa
 Secondary blogs used only to locate official URLs; their claims are NOT used except
 where explicitly marked.
 
-**App context:** phone-agent embedding Crush 0.97.1, OpenAI-compatible chat
+**App context:** phone-agent embedding Crush 0.97.1 (at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29), OpenAI-compatible chat
 completions with streaming + tool calls, base `https://api.groq.com/openai/v1`.
 
 ---
@@ -397,7 +397,7 @@ cheaper ~$0.15/$0.60 paid). The old Llama tool-calling workhorses
 (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`) are **dead for free/dev keys
 since 2026-08-16** (source: https://console.groq.com/docs/deprecations).
 
-### Field checklist for Crush 0.97.1 integration
+### Field checklist for the engine integration (researched against 0.97.1; the app bundles v0.98.2+dirty since `d50f26e`)
 
 - Base: `https://api.groq.com/openai/v1`, Bearer `gsk_…` key.
 - Use `max_completion_tokens` (not `max_tokens`); never send `logit_bias`/`logprobs`;

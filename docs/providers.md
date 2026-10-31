@@ -26,10 +26,12 @@ environment. Its id comes from that line, not from a JSON file.
 
 ## Version caveat
 
-Crush **0.97.1** embeds a Catwalk *snapshot*, not Catwalk `main`. Ids read from
-`main` may not resolve on this engine:
+The engine embeds a Catwalk *snapshot*, not Catwalk `main`. This caveat was
+written against **0.97.1** and still holds — the bundled build moved to
+**v0.98.2+dirty** (bundled since `d50f26e`, 2026-10-29) with its own, still-not-`main` snapshot. Ids
+read from `main` may not resolve on this engine:
 
-- a provider added to Catwalk after 0.97.1 shipped may not exist on device
+- a provider added to Catwalk after the pinned snapshot shipped may not exist on device
 - one removed since may no longer be offered
 
 `GET /v1/workspaces/{id}/providers` remains the authority at runtime. The table in
@@ -102,7 +104,9 @@ on 2026-10-16 — not from inference:
   loopback scheme, which is exactly what blocked OAuth for every other provider.
 
 Not verified: a key has not yet completed a chat turn on-device. Until one does,
-the app labels the row unverified, the same as every non-Zen provider.
+`Providers.kt` keeps the row `isKnown = false`, as it does for every provider
+that has not completed a handshake — only `opencode-zen`, `openrouter` and
+`groq` are verified today.
 
 ## Testing without a paid plan
 
@@ -135,7 +139,7 @@ Paste the key whole, env assignment included if that is what you copied, then
 pick a model. On OpenRouter choose one whose id ends `:free`.
 
 Crush's bundled Catwalk snapshot decides which provider models are visible.
-Since engine v0.98.1 the OpenRouter snapshot is fresh (15 `:free` models with
+Since engine v0.98.1 (the bundled snapshot is v0.98.2+dirty) the OpenRouter snapshot is fresh (15 `:free` models with
 shapes — `dots-studio/dots-3-note-preview:free` among them). Groq-specific:
 the snapshot predates Groq's 2026-08-16 llama shutdown for free/developer
 tiers, so if the picker offers `llama-3.3-70b-versatile` under `groq` it will
@@ -175,8 +179,10 @@ hold a provider's raw API key.
    that registration line. Do not derive the id from the provider's name.
 2. Add a `Provider` entry in `domain/provider/Providers.kt` with an honest
    `isKnown`.
-3. Add a `ProvidersTest` case. `ProvidersTest` asserts no id is ever a bare
-   provider name — that is the check that would have caught the original 500.
+3. Add a `ProvidersTest` case. Its invariant today: plain `opencode` is never
+   an id, no id is a `-`-prefix of another (ambiguity, not bare names, is the
+   hazard — `openai`/`anthropic` taught the suite that bare names are
+   legitimate Catwalk ids), and ids stay unique with non-blank key hints.
 4. Never add it to a default path or a hardcoded model list. The app is
    dynamic-model-only by design; a hardcoded id is what produced
    `large model not found in provider`.

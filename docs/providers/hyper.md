@@ -5,7 +5,7 @@
 > Playwright against the live SPA (landing, signup, FAQ, terms), live API probes
 > via curl (`/v1/models`, `/v1/credits`, `/v1/provider`), and raw source reads at
 > tag `v0.97.1` of `charmbracelet/crush`.
-> App context: Crush Mobile embeds **Crush 0.97.1**; Crush registers `hyper`
+> App context: Crush Mobile embeds **Crush 0.97.1** (at research time; the app bundles v0.98.2+dirty since `d50f26e`, 2026-10-29); Crush registers `hyper`
 > reading `HYPER_API_KEY`; base `https://hyper.charm.land/v1`; OpenAI-compatible.
 >
 > Legend: (source: URL) = verified against that URL today. **UNVERIFIED** = could

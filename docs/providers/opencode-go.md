@@ -3,7 +3,7 @@
 Research date: **2026-10-17**. Sources: official opencode.ai pages/docs, the
 anomalyco/opencode repo, Docker's AI docs, plus **live wire probes** against
 `opencode.ai/inference/go/*` from this machine (marked `probe`). App context:
-Crush Mobile (Crush 0.97.1 engine, OpenAI-compatible chat completions).
+Crush Mobile (Crush 0.97.1 engine at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29, OpenAI-compatible chat completions).
 
 ## TL;DR
 

@@ -1,7 +1,7 @@
 # Provider research: xAI (Catwalk id: `xai`)
 
 **Date of research: 2026-10-17.** Base URL: `https://api.x.ai/v1`.
-Written for **Crush Mobile** (Crush 0.97.1 engine, OpenAI-compatible chat completions with streaming + tool calls).
+Written for **Crush Mobile** (Crush 0.97.1 engine at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29, OpenAI-compatible chat completions with streaming + tool calls).
 
 Convention: every claim carries `(source: URL)`. Claims without a source URL are marked **UNVERIFIED**.
 Note: docs use "SpaceXAI/SpaceXSI" branding in fetched HTML — same site, irrelevant.

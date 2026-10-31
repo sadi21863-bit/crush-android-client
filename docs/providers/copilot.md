@@ -1,6 +1,6 @@
 # GitHub Copilot as a Model-API Provider (Catwalk id: `copilot`)
 
-Research date: **2026-10-17** · App context: Crush Mobile (Crush 0.97.1 engine, OpenAI-compatible
+Research date: **2026-10-17** · App context: Crush Mobile (Crush 0.97.1 engine at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29, OpenAI-compatible
 chat completions + streaming + tool calls) on API 29 phone · Target: authorize Copilot models
 from a phone app with device-flow OAuth (`/config/refresh-oauth`).
 

@@ -89,9 +89,15 @@ android {
 
     buildTypes {
         release {
-            // Kept off deliberately: minify + a Go binary in jniLibs adds risk
-            // for no size win on a 92MB payload dominated by the engine.
-            isMinifyEnabled = false
+            // R8 ON (2026-10-31, decision item 1): the measured release
+            // artifact carries 47.76 MB of DEX (3 files) against 24.84 MB of
+            // compressed engine - the retired "engine dominates the payload"
+            // rationale had the compressed composition backwards. Measured
+            // ceiling ~45-55 MB APK. Keep rules in proguard-rules.pro
+            // (junixsocket JNI, Gson reflection, our DTO/model packages);
+            // MANDATORY before a released artifact: one end-to-end UDS turn
+            // on device (engine start, streaming, a real model call).
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

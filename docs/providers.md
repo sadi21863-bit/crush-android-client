@@ -172,6 +172,23 @@ It is worth doing: a Copilot or ChatGPT subscription is the cheapest route to a
 *working* paid provider, and it is the one route that does not need this app to
 hold a provider's raw API key.
 
+> **2026-10-31: user asked whether OpenCode offers OAuth — verified no.**
+> The Console/Go family authenticates third-party clients with a **pasted
+> Console API key only** (`oc_sk_...`, one-time-shown; Harnesses doc
+> "Get an API key"). Its ONLY OAuth is the Console **MCP server**
+> (`opencode.ai/console/mcp`, browser sign-in with dynamic client
+> registration) for *workspace management*, not model inference. The engine
+> binaries back this: `github.com/login/device` + `refresh-oauth` exist in
+> both 0.98.2 and 0.99.0 (Copilot-class device flows), but no
+> `opencode.ai/console` OAuth surface exists in either. **Decision recorded
+> the same day: no OAuth batch** — keeping the deliberate gap documented
+> above rather than wiring a flow the only candidate provider (this
+> family) does not offer, per the user's pick. The Copilot device-flow
+> remains the one real OAuth feature the engine backs, if it is ever
+> wanted. Related registry findings recorded the same day: Go requires
+> `x-opencode-session` on every request AND only the 0.99.0 engine carries
+> it (0.98.2 has none) — see `docs/providers/opencode-go.md`.
+
 ## Adding a provider
 
 1. Confirm the id. Either Catwalk's `internal/providers/configs/`, or — for

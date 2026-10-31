@@ -217,6 +217,15 @@ object Providers {
             // against a wrong base. Free-tier ids are locked to the OpenCode
             // agent: "Free-tier chat models require OpenCode; use paid
             // models or Go from other clients" (Console models doc).
+            //
+            // GO-BY-ENGINE constraint (2026-10-31 harnesses doc + binary
+            // probes): Go REQUIRES a stable `x-opencode-session: ses_...`
+            // header on every request, and only the 0.99.0 engine carries it
+            // (0.98.2 has zero occurrences; 0.99.0 has two). A Go turn on
+            // this build's main-tree engine would 4xx at the gateway - the
+            // v099-experiment branch is the Go-capable lane. Go's chat base
+            // is plan-dependent as well: PAYG = opencode.ai/inference, Go =
+            // opencode.ai/inference/go (per-request key routes to the plan).
         ),
         Provider(
             id = "groq",

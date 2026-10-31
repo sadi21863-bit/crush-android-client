@@ -22,6 +22,25 @@ which is what this app is:
 | `opencode.ai/inference/openai/v1/models` | **404** — models are NOT at the openai-compat base |
 | OpenAI-compat chat | documented at `opencode.ai/inference/openai/v1/chat/completions` (needs a key) |
 
+**Plan-dependent chat bases** (Harnesses doc, 2026-10-31): pay-as-you-go
+serves `opencode.ai/inference`, **Go serves `opencode.ai/inference/go`**,
+with API paths appended (`/openai/v1/chat/completions`, `/openai/v1/responses`,
+`/anthropic/v1/messages`, `/google/v1beta/...`). And Go **requires** a stable
+session header on every request: `x-opencode-session: ses_...`.
+Engine-binary reality on 2026-10-31: the header string exists in the
+0.99.0 engine (2 occurrences) and NOT in 0.98.2 (0) — **Go turns are only
+servable by the 0.99.0 engine**; the main-tree 0.98.2 build cannot speak
+the Go header requirement.
+
+**No OAuth for model traffic.** Harnesses authenticate with a pasted
+Console API key (`oc_sk_...`, shown once; personal or service-account keys).
+The only OAuth OpenCode offers is the **Console MCP server**
+(`opencode.ai/console/mcp`) — browser sign-in with dynamic client
+registration for WORKSPACE MANAGEMENT, not for model inference. The engine
+binary agrees: generic provider OAuth machinery exists (the Copilot device
+flow, `github.com/login/device`, plus `/config/refresh-oauth`), but there
+is no Console/Go OAuth surface to implement against.
+
 Consequences for the registry: a single `modelsBase` cannot honestly serve
 both list and probe vs chat for this family (list base ≠ chat base), so
 `opencode-go.modelsBase` stays **null** in `Providers.kt` with the finding

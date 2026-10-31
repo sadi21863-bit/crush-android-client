@@ -22,7 +22,48 @@ Current state (both deliberate, both commented in [`app/build.gradle.kts`](../ap
 
 **The decision:** triage the lint crash (AGP version pitch, or a lint-only
 isolate) and then choose: re-enable lint, and either enable minify or confirm
-the size argument stands. Neither may be flipped while the crash is untriaged.
+the size argument stands. ~~Neither may be flipped while the crash is
+untriaged.~~ **Triage VERDICT 2026-10-31: the crash does not reproduce.**
+
+Same-day reproduction, both variants invoked explicitly:
+
+- `./gradlew.bat :app:lintDebug` — `BUILD SUCCESSFUL`, ~6m03s (fresh analysis,
+  `results-debug` written 12:20:06).
+- `./gradlew.bat :app:lintRelease` — `BUILD SUCCESSFUL`, 48s (full release
+  analysis completed today at 12:43:16; `/app/build/reports/lint-results-*.txt`
+  on disk, debug "1 error, 33 warnings", release "1 error, 34 warnings").
+
+The historical crash was the `lintVitalRelease` pass — exactly what
+`checkReleaseBuilds = false` disables — and the AGP surface evidently changed
+under it (AGP 9.4.1 today as opposed to the crash-era plugin state). The
+immediate blocker is gone; what remains before flipping the flags is a small
+enablement batch (one gated commit):
+
+1. Fix the one lint ERROR — `LockOverlay.kt:66` casts `LocalContext` to
+   Activity (`ContextCastToActivity`); 2026-10-31 UI-batch code, and
+   `LocalActivity` is the intended API. Its `ModifierParameter` neighbor
+   (:64) goes along.
+2. Fix the findings with real correctness value:
+   `SessionList.kt:57` money formatting under `DefaultLocale` (a Turkish
+   locale shifts the decimal separator in "$x.xx"), the ViewModel-context
+   retention lint flags at `ChatViewModel:294` (`SecureKeyStore(context)`
+   keeps an Activity-context reference in a ViewModel that outlives
+   rotation — pass an Application context), the empty `super.onCleared()`
+   (`EmptySuperCall` ChatViewModel:964), and the `ObsoleteSdkInt`/v26-resource
+   simplifications if wanted.
+3. Waive the DELIBERATE findings with a dated `lint.xml`: `SdCardPath` x8
+   (engine-log redaction and path mapping code that must hardcode
+   `/data/user/0/`), `OldTargetApi 36` (compileSdk 37/target 36 is a pinned
+   decision), `ChromeOsAbiSupport` (arm64-only by design), and the curated
+   dependency pins (`GradleDependency`/`NewerVersionAvailable`).
+4. Flip `checkReleaseBuilds = true` (warnings stay warnings; keep
+   `abortOnError` semantics so nosy findings cannot block a build) and
+   refresh the now-false crash comment at `build.gradle.kts:156–165`,
+   citing this triage.
+
+**R8/minify stays a separate call** — the recorded size rationale (92 MB
+engine dominates the APK; DEX shrinkage gains are marginal against the
+socket/Gson reflective risk) is untouched by today's result.
 
 ## 2. Create the release keystore and ship one signed assembleRelease
 

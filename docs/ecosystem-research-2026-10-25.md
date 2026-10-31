@@ -221,3 +221,5 @@ Research for the Kotlin/Compose Android client ("crush-mobile") embedding charmb
 6. Adopt the "never-reported fail-open" semantics intentionally: decide whether we always POST `current-session` (mirror TUI) and, if not, fallback behavior after fail-open.
 7. Spec out per-session permission mode persistence (Happy's `permission-resolution.md` precedence) and a rules list (goose-style) backed by the engine's `allow_for_session`.
 8. Investigate `question_batch_request` handling for multi-choice prompts (payload fields verified in proto; payload-at-runtime UNVERIFIED) as the natural next remote-interactive surface after permissions.
+
+- **Engine promotion 2026-11-01:** the bundle advanced from the locally built `v0.98.2+dirty` to upstream **v0.99.0** (published 2026-10-29; check-sum pinned). The D12 fixes this research recommended all stand in-tree, and the model layer gained a Console/Go plan-split wiring beyond what this research scoped — see `docs/capabilities.md`.

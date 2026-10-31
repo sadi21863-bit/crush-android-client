@@ -278,3 +278,5 @@ Recommendation mapping to the ledger (their §4, our state):
 Its overall verdict ("postponed Termux + local-models until permission
 handling, file-edit proof and release readiness land") matches the standing
 decisions already open in decisions-open.md.
+
+- **Context shift 2026-11-01:** the engine of record advanced again/ — the bundle is now upstream **v0.99.0** (promoted with the model-layer split; `x-opencode-session` and OpenCode Go support included), and the review's remaining Critical rows closed on the promoted build the same day (two-turn device cycle: ask card + write card + file diff +1, on top of the rows below).

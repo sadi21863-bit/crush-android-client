@@ -155,3 +155,7 @@ only re-checked that its claims are true statements about that state:
   engine work — so the §4 v0.98.1 SHA table describes the freeze
   configuration, not the current binary (see README Toolchain,
   deep-analysis-2026-10-27.md).
+
+## Engine-home promotion — 2026-11-01
+
+The working-tree `libcrush.so` is now upstream **v0.99.0** (published 2026-10-29, checksum-pinned from the signed checksums.txt; fetch default advanced). The instrumented `v0.98.2+dirty` build it retired remains the device evidence base for the 2026-10 z-sessions (D12/D13/D14); app-day evidence from 2026-11-01 accretes against v0.99.0 (see `docs/capabilities.md` and the `v099-experiment` branch log). The v0.98.1 rows above stay frozen as the 2026-10-17 snapshot.

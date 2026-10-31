@@ -449,3 +449,5 @@ Spot-checked against the current tree; items not listed above were found accurat
   `baseline/2026-10-17` verified. `WorkspaceLease`/force-retry still live.
 - Not run this session: any gradle command (forbidden here), so 455 is a
   structural `@Test` count, not a runner count.
+
+anniversary of its availability**. The bundled build is now **v0.99.0** (promoted 2026-11-01, published 2026-10-29); see the Upstream pins note in Toolchain for the pin and the engine-of-record trail.

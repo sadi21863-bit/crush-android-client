@@ -49,7 +49,7 @@ These are the real gaps, ordered by how much they matter for a coding agent.
 | **Multi-provider** | Plumbing in, 13 ids offered, two verified end to end (`opencode-zen`, `openrouter`) plus `groq` probe-verified but parked as a test target. See [providers.md](providers.md) |
 | **Multi-project / workspaces** | One app-private workspace, path-derived id |
 | **Attachments / image input** | Text only |
-| **Instrumentation tests** | No `androidTest` suite at all |
+| **Instrumentation tests** | **OK (8 tests) on device 2026-11-01**: `MainActivitySmokeTest` (2, launch-level) + `MainActivityLockFlowTest` (6, app-lock security contract — gate↔FLAG_SECURE, recreation-survival, no-decrypted-key-on-locked-resume, **real Keystore** roundtrip/isolation/tamper-clear, `require()`-never-caches). CI compiles androidTest on every push (`:app:assembleDebugAndroidTest`); connected runs still need a device (`connectedDebugAndroidTest` when attached) |
 | **Remote crash reporting** | In-app export only |
 
 ## Known defects
@@ -219,6 +219,10 @@ All verified on-device against Crush v0.97.1→v0.98.1, not read from docs.
   actually reaching the server — the latter exists because a method that throws
   before the call produces a *passing-looking* no-op, which is exactly how
   `deleteSession` failed silently for so long.
-- No instrumentation tests. The highest-risk areas — Keystore, device-credential
-  lifecycle, coroutine flow hot/cold ordering, child-process behaviour — remain
-  device-only.
+- Instrumentation coverage is no longer absent (2026-11-01): **OK (8 tests)** on
+  device — launch-level smoke + the `MainActivityLockFlowTest` security
+  contract, including the previously device-only Keystore behaviours
+  (real-cipher roundtrip, tamper-clear) and the `require()`-never-caches
+  bypass regression. Remaining device-only areas: the answered biometric
+  paths (a test cannot tap the real system dialog) and child-process
+  lifecycle; coroutine flow hot/cold ordering stays JVM-tested.

@@ -377,11 +377,30 @@ Device scripts:
 ## Continuous integration
 
 `.github/workflows/android-ci.yml` runs the same gate on every push and
-pull request: `./gradlew :app:testDebugUnitTest :app:assembleDebug`. The
-engine binary is gitignored, so a CI checkout builds a gate APK **without
-the embedded engine** — CI proves the code compiles and all JVM suites
-pass; runtime behavior still needs real arm64 hardware (see [Build from
-source](#build-from-source)).
+pull request:
+`./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintRelease`.
+The engine binary is gitignored, so a CI checkout builds a gate APK
+**without the embedded engine** — CI proves the code compiles and all
+JVM suites pass; runtime behavior still needs real arm64 hardware (see
+[Build from source](#build-from-source)).
+
+Bring-up facts (measured 2026-11-01, first green pending):
+
+- **Runner SDK**: newer `ubuntu-latest` images no longer ship an Android
+  SDK, and `android-actions/setup-android@v3` failed on the migrated
+  image. The workflow provisions directly from Google's
+  `commandlinetools` zip, accepts licenses, installs `platform-tools`,
+  and writes `sdk.dir` into a generated `local.properties`.
+- **Log access**: the job-log endpoint needs repo admin (measured HTTP
+  403 with the push credential), so the failing gate step prints the
+  head/tail of the gradle output as `::error::` check-run annotations —
+  publicly readable without any log download.
+- **Wrapper defect CI caught**: the committed unix `gradlew` invoked
+  `java -jar gradle-wrapper.jar`, but the Gradle 9.x wrapper jar carries
+  no `Main-Class` manifest attribute — instant
+  `no main manifest attribute` exit 1 on Linux. The local lane never
+  exercised it (Windows runs `gradlew.bat`, which uses the classpath
+  form). Fix: regenerate the wrapper scripts from the tool itself.
 
 ## Docs
 

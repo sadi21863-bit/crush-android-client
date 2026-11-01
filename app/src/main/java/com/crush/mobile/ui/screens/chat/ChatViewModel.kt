@@ -1529,6 +1529,10 @@ class ChatViewModel(
             // dialog open so the user can retry instead of a silently blocked
             // turn (P1-7).
             if (granted.isSuccess) {
+                // SOAK DIAGNOSTIC (2026-11-01): the idle guard fired once with
+                // a card standing; log this clear so the transition timeline
+                // is first-hand next run.
+                AppLog.w(TAG, "prompt CLOSED (grant ok; id=${req.id.take(8)}); pendingPermission cleared")
                 _state.update { it.copy(pendingPermission = null) }
             }
         }
@@ -2143,6 +2147,11 @@ class ChatViewModel(
                 // stray frame) hands control back to the frame loop's
                 // normal idle regime.
                 suspend fun receiveWhilePromptOpen(): kotlinx.coroutines.channels.ChannelResult<CrushEvent> {
+                    // SOAK DIAGNOSTIC (2026-11-01): the backgrounding soak
+                    // measured the idle branch firing while a card should
+                    // have held this loop OPEN. Log entry/exit here so the
+                    // next run states the transition timeline directly.
+                    AppLog.w(TAG, "prompt-wait: entering (run ${handle.turnId})")
                     var promptStartMs = 0L
                     while (true) {
                         val nowMs = System.currentTimeMillis()
@@ -2160,7 +2169,10 @@ class ChatViewModel(
                             throw StopStream()
                         }
                         val waiting = withTimeoutOrNull(remaining) { frames.receiveCatching() }
-                        if (waiting != null) return waiting
+                        if (waiting != null) {
+                            AppLog.w(TAG, "prompt-wait: frame received; loop resumes (run ${handle.turnId})")
+                            return waiting
+                        }
                     }
                 }
                 try {
@@ -2234,8 +2246,10 @@ class ChatViewModel(
                             CrushEvent.PayloadType.PERMISSION_REQUEST -> {
                                 val req = gson.fromJson(ev.body, PermissionRequest::class.java)
                                 if (req.id.isNotBlank()) {
-                                    AppLog.i(TAG, "permission requested: ${req.toolName}")
+                                    AppLog.i(TAG, "permission requested: ${req.toolName} (id=${req.id.take(8)}); pendingPermission SET for run $runId")
                                     _state.update { it.copy(pendingPermission = req) }
+                                } else {
+                                    AppLog.w(TAG, "permission request with BLANK id dropped; pendingPermission NOT set")
                                 }
                             }
 

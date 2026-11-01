@@ -19,6 +19,11 @@ name: android-ci
 
 on:
   push:
+    # Every branch push fired a full gate run, which made the closed
+    # v099-experiment evidence lane go red forever (it predates the wrapper
+    # fix). Push builds belong on main; any branch's changes still get
+    # gate runs the moment they open a pull request.
+    branches: [main]
   pull_request:
 
 jobs:

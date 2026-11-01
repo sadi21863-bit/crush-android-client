@@ -424,3 +424,38 @@ web UI at `/device` ("Activate Device") for Crush sign-in.
 - curl: `GET /v1/models` = 200 (22 models); `GET /v1/credits` unauth = 401
   verbatim error; `GET /v1/provider` = 200 (catwalk JSON incl. `prism`).
 - Raw source reads at tag `v0.97.1` exactly as pinned in §8.
+
+---
+
+### App-side verdict with a REAL key at $0 credits (2026-11-01, measured)
+
+A real Hyper key (`sk-hyper-…`, pasted by the user into the app vault) with a
+freshly-minted account holding **no credits**. This is the app's observed
+lifecycle, not a curl probe — the key's plaintext never left the app process:
+
+1. `provider switched to hyper; re-bootstrapping` → `bootstrap key empty` at the
+   switch moment (key was stored shortly after), then re-bootstrap.
+2. **Live catalogue bootstrapped**: `catalogue prices loaded for 23 models`
+   (the no-auth `GET /v1/models` lane; 22 at the 2026-10-17 curl probe, 23 now).
+3. **Model probes**: `no usable model: probed=23 retired=0 denied=0
+   badKey=false` — the decisive flags: `badKey=false` means no probe answered
+   `401` (the key is AUTHENTICATED by the gateway); zero `denied` means no
+   `403` "access disabled"; constant `retired=0` (no id removed). All 23 fell
+   to the 402 class — payment required.
+4. **UI verdict rendered** (screenshot 2026-11-01): *"This API key is valid,
+   but every model … lists (23) requires payment. A plan with model access is
+   needed."* — the predicted $0-lane app behaviour exactly: 402≠401
+   distinguished, and the insufficiency explained inline rather than surfacing
+   as a cryptic chat error.
+
+Verdict recorded as: `402 authentic-but-unfunded` for every listed model — a
+$0 verdict, deliberately NOT treated as a failure. The one thing this lane
+cannot prove is a completed billed turn (SSE stream, `usage.cost` fields,
+trailers); that stays until a funded key exists (PAYG $5 minimum).
+
+**Copy defect found + fixed by this exercise**: the verdict text said *"every
+model Zen lists"* while Hyper was the active provider — the explainer predated
+the multi-provider registry and hardcoded Zen in every branch. Fixed
+(`ModelChoice.explainNoUsableModel(providerName, …)`, from the active
+provider's `displayName`) and pinned by a new unit test asserting the active
+provider is named and the inactive one is absent.

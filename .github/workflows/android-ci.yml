@@ -37,6 +37,22 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up the Android SDK
+        # The newer ubuntu runner images no longer ship a preinstalled
+        # Android SDK; without this (and an sdk.dir for AGP to find), the
+        # gate dies in the configuration phase with "SDK location not
+        # found" — measured on the first push (2026-11-01).
+        uses: android-actions/setup-android@v3
+
+      - name: Point AGP at the SDK (local.properties)
+        run: |
+          echo "runner ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+          if [ -z "$ANDROID_HOME" ]; then
+            echo "SDK: ANDROID_HOME unset after setup-android; failing fast" >&2
+            exit 1
+          fi
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
       - name: Cache the Gradle toolchain
         uses: actions/cache@v4
         with:

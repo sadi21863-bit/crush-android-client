@@ -66,7 +66,35 @@ jobs:
       - name: Gate - JVM tests, debug APK, and release lint
         # lintRelease: full static analysis with the 2026-10-31 waivers
         # (app/lint.xml, each entry dated). Errors fail the build.
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintRelease --console=plain
+        id: gate
+        run: |
+          set -o pipefail
+          ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintRelease --console=plain 2>&1 | tee gate-output.log
+
+      - name: Publish the gate failure as annotations
+        # The job log endpoint needs repo admin, which pushed credentials do
+        # not have (measured: HTTP 403 "Must have admin rights"). The
+        # check-run annotations endpoint, however, is publicly readable — so
+        # printf the head and tail of the gradle output through ::error:: to
+        # make the failure self-describing without any log download.
+        if: failure() && steps.gate.outcome == 'failure'
+        run: |
+          dump() {
+            max=$1; shift
+            while IFS= read -r line; do
+              # Cap each line so annotations stay within the 4 KB message budget.
+              printf '::error::%s\n' "${line:0:250}"
+            done < <(head -n "$max" gate-output.log)
+          }
+          echo "=== gradle output: FIRST 12 lines (launcher errors live here) ==="
+          dump 12
+          echo "=== gradle output: LAST 28 lines (the real error lives here) ==="
+          while IFS= read -r line; do
+            printf '::error::%s\n' "${line:0:250}"
+          done < <(tail -n 28 gate-output.log)
+          echo "=== launcher facts ==="
+          printf '::error::JAVA_HOME=%s\n' "$JAVA_HOME"
+          printf '::error::gradle-wrapper.jar size: %s bytes\n' "$(stat -c%s gradle/wrapper/gradle-wrapper.jar 2>/dev/null || echo MISSING)"
 
       - name: Upload test reports on failure
         if: failure()

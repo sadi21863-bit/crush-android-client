@@ -58,6 +58,40 @@ Findings that are NOT app bugs:
   catalogue), short chat path (404 plan-miss), and the UA filter (python
   urllib 403 vs browser 200 on the same URL).
 
+### Soak verdict — 2026-11-01 morning (the standing item, now measured)
+
+The stopBlocking/backgrounding soak ran as a REAL mid-run backgrounding,
+on the promoted build, with the prompt lifecycle instrumented first
+(`pendingPermission SET/CLOSED` + `prompt-wait entering/resumes`):
+
+1. **A mid-run background with a PENDING permission card held**: the card
+   rose (fresh session, first tool ask), the loop parked in
+   `receiveWhilePromptOpen` (1 ms after SET), the app was HOME-backgrounded
+   for 40 s with the card pending — **no idle-cancel fired** — and on
+   resume the card was still live and answering it (Allow once) resumed
+   the run cleanly.
+2. **The full multi-card chain measured**: fetch → bash → agentic_fetch,
+   three separate cards in one turn, each parking + resuming the loop in
+   milliseconds; between cards the run streamed tool rows (view/grep/
+   web_fetch) and the turn continued.
+3. **A real model behavior note**: asked for the releases list, the agent
+   chose to paginate web_fetch through EVERY releases page (page=12…15+,
+   all finished) — long-running, correct, and the SSE kept flowing under
+   it.
+4. **The 07:51 idle-cancel anomaly** (the original soak trigger) did NOT
+   reproduce under the instrumented build across several cycles; the
+   instrumented path is now the evidence record. One candidate cause for
+   the original was identified but not proven (a mid-card pause/unlock
+   interleave before the diagnostics landed) — if it recurs, the new
+   timeline lines answer it in one run.
+5. **Draft-loss finding** (recorded, not fixed): the composer draft is
+   cleared across a stop/saveState backgrounding cycle — small UX gap, no
+   correctness impact.
+
+**The stopBlocking/backgrounding backlog item is CLOSED as measured**:
+guard holds, park/resume works, multi-card turns survive backgrounding on
+the promoted build.
+
 ### Promotion VERIFIED on device — 2026-11-01
 
 Two-turn cycle executed on the promoted MAIN app (agent-driven via taps +

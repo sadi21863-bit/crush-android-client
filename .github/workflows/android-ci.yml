@@ -39,19 +39,20 @@ jobs:
 
       - name: Set up the Android SDK
         # The newer ubuntu runner images no longer ship a preinstalled
-        # Android SDK; without this (and an sdk.dir for AGP to find), the
-        # gate dies in the configuration phase with "SDK location not
-        # found" — measured on the first push (2026-11-01).
-        uses: android-actions/setup-android@v3
-
-      - name: Point AGP at the SDK (local.properties)
+        # Android SDK, and android-actions/setup-android@v3 failed on the
+        # migrated image (measured 2026-11-01). This provisions directly
+        # from Google's commandline-tools and lets AGP fetch the platform/
+        # build-tools it needs once licenses are accepted.
         run: |
-          echo "runner ANDROID_HOME=${ANDROID_HOME:-<unset>}"
-          if [ -z "$ANDROID_HOME" ]; then
-            echo "SDK: ANDROID_HOME unset after setup-android; failing fast" >&2
-            exit 1
-          fi
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          set -e
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/clt.zip
+          mkdir -p "$HOME/android-sdk/cmdline-tools"
+          unzip -q /tmp/clt.zip -d "$HOME/android-sdk/cmdline-tools"
+          mv "$HOME/android-sdk/cmdline-tools/cmdline-tools" "$HOME/android-sdk/cmdline-tools/latest"
+          yes | "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --licenses > /dev/null
+          "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" "platform-tools" > /dev/null
+          echo "ANDROID_HOME=$HOME/android-sdk" >> "$GITHUB_ENV"
+          echo "sdk.dir=$HOME/android-sdk" > local.properties
 
       - name: Cache the Gradle toolchain
         uses: actions/cache@v4

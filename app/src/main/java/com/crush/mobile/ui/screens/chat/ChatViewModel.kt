@@ -805,7 +805,15 @@ class ChatViewModel(
             )
             _state.update {
                 it.copy(
-                    phase = ModelChoice.explainNoUsableModel(models.size, result),
+                    phase = ModelChoice.explainNoUsableModel(
+                        // Name the ACTIVE provider: the message is the model
+                        // access verdict for THIS key, and every registry row
+                        // (hyper measured 2026-11-01) must be described by its
+                        // own display name, never by the Zen-era constant.
+                        providerName = Providers.byId(providerId)?.displayName ?: providerId,
+                        listed = models.size,
+                        result = result
+                    ),
                     models = models,
                     engineReady = false
                 )

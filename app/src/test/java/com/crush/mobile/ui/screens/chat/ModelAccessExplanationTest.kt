@@ -28,8 +28,10 @@ class ModelAccessExplanationTest {
         denied: Int,
         payment: Int = 0,
         retired: Int = 0,
-        badKey: Boolean = false
+        badKey: Boolean = false,
+        provider: String = "OpenCode Zen"
     ) = ModelChoice.explainNoUsableModel(
+        providerName = provider,
         listed = 43,
         result = FirstWorking(
             model = null,
@@ -108,6 +110,20 @@ class ModelAccessExplanationTest {
         assertTrue(
             "with zero failures we know nothing, so must not blame the key: $msg",
             msg.contains("Could not reach", ignoreCase = true)
+        )
+    }
+
+    @Test
+    fun `the active provider is named, not the zen-era constant`() {
+        // Measured on Charm Hyper, 2026-11-01: key valid, 23 listed models, all
+        // 402 - and the verdict said "every model Zen lists". Naming the wrong
+        // provider in a security-adjacent verdict sends the user to fix the
+        // provider they are not using.
+        val msg = explain(denied = 0, payment = 23, provider = "Charm Hyper")
+        assertTrue("must name the active provider: $msg", msg.contains("Charm Hyper"))
+        assertFalse(
+            "must never name an inactive provider: $msg",
+            msg.contains("Zen")
         )
     }
 }

@@ -80,10 +80,20 @@ object ModelChoice {
      * is disabled" for this key - while only one worked. So the overwhelmingly
      * likely cause is a key without access to paid models, NOT a broken app and
      * not a dead catalogue. Saying so saves the user from chasing the wrong bug.
+     *
+     * [providerName] came later: every string here originally said "Zen" as a
+     * constant, because Zen was the only listing provider. With the
+     * multi-provider registry (hyper active, 2026-11-01: 23 listed models, all
+     * 402 while the key itself was valid), naming the WRONG provider in a
+     * security-adjacent verdict is a copy defect, not a stylistic one.
      */
-    fun explainNoUsableModel(listed: Int, result: com.crush.mobile.data.api.FirstWorking): String {
+    fun explainNoUsableModel(
+        providerName: String,
+        listed: Int,
+        result: com.crush.mobile.data.api.FirstWorking
+    ): String {
         if (result.badKey) {
-            return "OpenCode Zen rejected this API key while checking which models it can " +
+            return "$providerName rejected this API key while checking which models it can " +
                 "call. Replace it in Settings."
         }
         // MEASURED 2026-10-11: a key that the provider's own dashboard calls
@@ -96,7 +106,7 @@ object ModelChoice {
         // disabled" is what left the question "why does the website say it is
         // active?" unanswerable: the key IS active, the models are not.
         if (result.paymentRequired > 0 && result.denied > 0) {
-            return "Your API key works - Zen serves its model list to it - but no listed " +
+            return "Your API key works - $providerName serves its model list to it - but no listed " +
                 "model is callable with it. ${result.paymentRequired} model(s) require " +
                 "payment and ${result.denied} (the *-free ones) returned \"model access " +
                 "is disabled\". The free tier appears to have been withdrawn; this key " +
@@ -104,17 +114,17 @@ object ModelChoice {
         }
         return when {
             result.paymentRequired > 0 ->
-                "This API key is valid, but every model Zen lists ($listed) requires " +
+                "This API key is valid, but every model $providerName lists ($listed) requires " +
                     "payment. A plan with model access is needed."
             result.denied > 0 && result.retired == 0 ->
-                "This API key cannot call any of the $listed models Zen lists - Zen answered " +
+                "This API key cannot call any of the $listed models $providerName lists - $providerName answered " +
                     "\"Model access is disabled\" ${result.denied} time(s). It likely needs a " +
-                    "Zen plan with model access."
+                    "plan with model access."
             result.retired > 0 ->
-                "None of the models Zen lists can be called right now " +
+                "None of the models $providerName lists can be called right now " +
                     "(${result.retired} retired, ${result.denied} not enabled for this key)."
             else ->
-                "Could not reach OpenCode Zen to check which models this key can call."
+                "Could not reach $providerName to check which models this key can call."
         }
     }
 

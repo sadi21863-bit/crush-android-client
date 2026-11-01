@@ -84,9 +84,15 @@ on the promoted build, with the prompt lifecycle instrumented first
    the original was identified but not proven (a mid-card pause/unlock
    interleave before the diagnostics landed) — if it recurs, the new
    timeline lines answer it in one run.
-5. **Draft-loss finding** (recorded, not fixed): the composer draft is
-   cleared across a stop/saveState backgrounding cycle — small UX gap, no
-   correctness impact.
+5. **Draft-loss finding RETRACTED after instrumented retest (2026-11-01)**:
+   the original note said the composer draft was cleared across a
+   stop/saveState backgrounding cycle. A controlled retest disproves it:
+   nonce `draftcheck xyz NOSEND` typed and NOT sent, HOME for 35 s,
+   resume — the draft was still seated in the composer (draftA/draftB
+   screenshots). The original observation was a misread: the composer was
+   empty because that send had SUCCEEDED (the turn logged and answered),
+   which clears the field by design. No defect; composer state is hoisted
+   and survived the cycle intact.
 
 **The stopBlocking/backgrounding backlog item is CLOSED as measured**:
 guard holds, park/resume works, multi-card turns survive backgrounding on

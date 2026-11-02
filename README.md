@@ -497,8 +497,10 @@ Spot-checked against the current tree; items not listed above were found accurat
 
 - All 17 named test suites exist, including `RotateKeepingTailTest`,
   `RetentionPruneTest`, `SecretMaskingTest` (top-level classes inside
-  `AppLogTest.kt`); `ChatStateMergeTest` added 2026-10-31 (`ce43c7a`). No
-  `app/src/androidTest` directory — "no instrumentation suite" stands.
+  `AppLogTest.kt`); `ChatStateMergeTest` added 2026-10-31 (`ce43c7a`).
+  Instrumentation suite note: this October-31 pass said none existed; the
+  suite since landed and runs on device - see the `androidTest` section
+  above (8 tests OK, 2026-11-01).
 - `minSdk 29` / `targetSdk 36` / `compileSdk 37` (`app/build.gradle.kts:54/55/40`),
   `useLegacyPackaging = true`, `android.builtInKotlin=false`
   (`gradle.properties:42`), Kotlin 2.4.10 / Compose-compiler 2.4.20 / BOM
@@ -515,4 +517,6 @@ Spot-checked against the current tree; items not listed above were found accurat
 - Not run this session: any gradle command (forbidden here), so 455 is a
   structural `@Test` count, not a runner count.
 
-anniversary of its availability**. The bundled build is now **v0.99.0** (promoted 2026-11-01, published 2026-10-29); see the Upstream pins note in Toolchain for the pin and the engine-of-record trail.
+- Engine of record updated later in the day: the bundled build is now
+  **v0.99.0** (promoted 2026-11-01, published 2026-10-29); see the Upstream
+  pins note in Toolchain for the pin and the engine-of-record trail.

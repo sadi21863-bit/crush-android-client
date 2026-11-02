@@ -410,6 +410,15 @@ happily through the same gateway (`app.log`, lines 285-330):
   the wall is upstream (gateway-side) — plan-tier differentiation then only
   matters for extra headroom (Go includes DeepSeek V4 Pro at $15/mo, V4.1
   Flash at $100/mo; Go Plus raises both).
+- Base-shape equivalence, recorded because it matters for triage: the
+  ENGINE (real turns) dials Go's in-binary base
+  `opencode.ai/zen/go/v1/chat/completions` while the app-side probes walk
+  the currently documented `opencode.ai/inference/go/openai/v1` (+ the
+  plan-walk fallback); BOTH shapes returned the identical 402 funds body for
+  paid ids and identical success for `beam-free` — the base shape is NOT
+  the differential, and the app-side fix wave of 2026-11-02 (bridge,
+  catalogue-retry, view-epoch) is verifiably not in the paid-lane failure
+  path.
 
 
 ## Sources

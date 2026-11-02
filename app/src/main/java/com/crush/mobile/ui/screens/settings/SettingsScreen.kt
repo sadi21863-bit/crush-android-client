@@ -570,8 +570,14 @@ Card(modifier = Modifier.fillMaxWidth()) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    // This line used to say "Powered by OpenCode Zen" - a
+                    // PROVIDER claim that was wrong for every other provider
+                    // (fourth Zen-hardcode, found in the 2026-11-02 audit
+                    // request). What this app is powered by is the ENGINE,
+                    // which stays the same regardless of which provider the
+                    // user keys; attribution lives in NOTICE.md.
                     Text(
-                        "Powered by OpenCode Zen",
+                        "Powered by the bundled Crush engine (see NOTICE)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

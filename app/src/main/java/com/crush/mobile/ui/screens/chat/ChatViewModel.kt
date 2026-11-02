@@ -691,6 +691,27 @@ class ChatViewModel(
         }
         AppLog.i(TAG, "permissionMode=$permissionMode providerId=$providerId")
 
+        // SYNC THE VIEW with the provider this boot actually configures
+        // (2026-11-02, user-audit request "check all places OpenCode Zen is
+        // hardcoded"): state.providerId used to stay at the DEFAULT
+        // ("opencode-zen") until a manual setProvider(), because bootstrap
+        // only ever wrote it there. The visible cost was measured live: cold
+        // boot on OpenCode Go, the model sheet's subtitle interpolated the
+        // stale state and read "Live list from OpenCode Zen" under a Go
+        // catalogue - and every other consumer of _state.value.providerId
+        // (send preflight re-config) risks disagreeing with the engine the
+        // same way. The resolution above is the boot's truth; publish it
+        // before any decision composes off it. Guard: a switch chosen during
+        // this window (pendingProviderId, P1-07) must win over this write.
+        _state.update {
+            if (pendingProviderId == null && it.providerId != providerId) {
+                AppLog.d(TAG, "state.providerId synced to the boot's provider: ${it.providerId} -> $providerId")
+                it.copy(providerId = providerId)
+            } else {
+                it
+            }
+        }
+
         val opened = session.openWorkspace("$d/workspace", "$d/crush/state", permissionMode, providerId)
         // Read the key for the provider we are about to configure, not for whatever
         // was cached last.

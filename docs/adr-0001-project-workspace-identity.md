@@ -8,6 +8,48 @@ and persistence), §22 (minimum engineering contracts), §23 (first implementati
 sprint, hard stop). Grounded in the current tree as of 2026-11-02; every code
 citation below was read against that tree.**
 
+> **2026-11-03 MEASURED UPDATE — both integration proofs ran on device and
+> PASS ("OK (2 tests)", `am instrument`, device `bbf8ca69`):
+> `TwoProjectAttachTest` (single-engine workspace attach facts + the
+> global-pool finding preserved as measured behavior) and
+> `TwoEngineInstancesPerProjectTest` (per-project engine instances
+> `pa`/`pb` — each engine lists EXACTLY its own project's marker session,
+> workspaces cross-invisible between instances). The hard stop is
+> SATISFIED on the per-instance shape; P2's Room/UI layers may now proceed
+> per this model.**
+>
+> **2026-11-03 AMENDMENT — first proof measured, hard stop triggered, fallback
+> selected.** `TwoProjectAttachTest` (instrumented, real engine inside the app
+> process, device `bbf8ca69`) measured PASS on the WORKSPACE attach guarantees
+> and a FAIL on the session guarantee, exactly along the boundary predicted
+> here:
+>
+> 1. Two distinct project cwds mint two DISTINCT, coexisting workspace ids
+>    (`assert distinct` + `listWorkspaces` contains both; opening B does not
+>    evict A) — the single-active-workspace limitation is an APP-side cache.
+> 2. A fresh manager re-posting the same path re-attaches to the SAME logical
+>    workspace id (path-keyed determinism holds).
+> 3. **Sessions bleed across workspaces**: `listSessions` IGNORES the
+>    requested workspace id — A's and B's lists were IDENTICAL (each contained
+>    BOTH marker sessions plus every historical session in the shared data
+>    dir). In crush v0.99.0, sessions are a GLOBAL pool per `-D` data dir;
+>    there is NO engine-side session boundary across workspaces on one engine
+>    process.
+>
+> Consequence per §8's hard stop: do NOT build Chat/Code isolation on
+> single-engine workspace separation. The L0 multi-project shape therefore
+> pivots to this ADR's own fallback: **one ENGINE INSTANCE PER PROJECT** — a
+> separate child process with its own UDS socket file and its own `-D` data
+> dir per project (engine-per-project; bounded by device pressure, and worth
+> revisiting upstream if crush later scopes sessions by workspace). The
+> follow-up proof (`TwoEngineInstancesPerProjectTest`, TBD once
+> `EngineSockets`/`CrushEngine` accept per-instance socket + state dirs)
+> must show marker-session isolation between the two engine instances
+> BEFORE P2+'s Room/UI layers are built.
+> (§8's Workspace-attach guarantees 1–2 are recorded as measured-they-hold:
+> they stay load-bearing facts for re-attach semantics regardless of the
+> engine-instance topology chosen.)
+
 > **Non-claiming rule.** This is a decision record for a design, not a report of
 > working features. Nothing below asserts that the engine already hosts multiple
 > concurrent workspaces with isolation — that is exactly what the two integration

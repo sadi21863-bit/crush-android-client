@@ -26,22 +26,35 @@ class EnginePaths(
      * needing a process restart. The value is read from env() at launch, so a
      * change applies to the NEXT start, not to an already-running engine.
      */
-    @Volatile var idleTimeoutSec: Int = 3600
+    @Volatile var idleTimeoutSec: Int = 3600,
+    /**
+     * Per-instance key (ADR-0001 amendment, 2026-11-03). "" is the
+     * production legacy instance: engine dirs under the filesDir/crush tree
+     * and the socket at filesDir/crush.sock. A non-empty key redirects every
+     * engine-STATE dir under filesDir/crush-<key> so each project hosts
+     * its own engine process with its own session pool (measured:
+     * sessions are a global pool per -D data dir in crush v0.99.0). The
+     * legacy workspace filesDir/workspace stays SHARED: project cwds are
+     * handed to the engine per openWorkspace call, not via EnginePaths.
+     */
+    instanceKey: String = ""
 ) {
 
     private val filesDir: File = context.filesDir
+    private val crushBase: File =
+        if (instanceKey.isBlank()) File(filesDir, "crush") else File(filesDir, "crush-$instanceKey")
 
     /** Extracted engine binary. Must be lib*.so to be extracted at install. */
     val binary: File =
         File(context.applicationInfo.nativeLibraryDir, "libcrush.so")
 
     val workspace: File = File(filesDir, "workspace").apply { mkdirs() }
-    val dataDir: File = File(filesDir, "crush/state").apply { mkdirs() }
-    val globalConfig: File = File(filesDir, "crush/cfg").apply { mkdirs() }
-    val globalData: File = File(filesDir, "crush/data").apply { mkdirs() }
-    val cache: File = File(filesDir, "crush/cache").apply { mkdirs() }
-    val skills: File = File(filesDir, "crush/skills").apply { mkdirs() }
-    val tmp: File = File(filesDir, "crush/tmp").apply { mkdirs() }
+    val dataDir: File = File(crushBase, "state").apply { mkdirs() }
+    val globalConfig: File = File(crushBase, "cfg").apply { mkdirs() }
+    val globalData: File = File(crushBase, "data").apply { mkdirs() }
+    val cache: File = File(crushBase, "cache").apply { mkdirs() }
+    val skills: File = File(crushBase, "skills").apply { mkdirs() }
+    val tmp: File = File(crushBase, "tmp").apply { mkdirs() }
 
     val isBinaryUsable: Boolean get() = binary.exists() && binary.canExecute()
 

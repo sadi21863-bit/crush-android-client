@@ -67,12 +67,25 @@ class CrushEngine(
      * engine binds ([EngineSockets.socketPath]). AppContainer passes the
      * application context, so the engine never pins an Activity.
      */
-    private val appContext: Context
+    private val appContext: Context,
+    /**
+     * Per-instance key (ADR-0001 amendment, 2026-11-03): "" is the
+     * production engine (socket at filesDir/crush.sock, legacy engine state
+     * under the filesDir/crush tree). A non-empty key isolates THIS child's
+     * socket (crush-<key>.sock) so each project can host its own engine
+     * process with its own session pool. Callers must pair it with an
+     * [EnginePaths] built with the same key.
+     */
+    private val instanceKey: String = ""
 ) {
 
     /** Engine idle linger, in seconds, from static auto-tuning. */
     constructor(context: Context, idleTimeoutSec: Int = 3600) :
         this(EnginePaths(context, idleTimeoutSec), context)
+
+    /** Per-instance variant (see the primary constructor's key doc). */
+    constructor(context: Context, instanceKey: String, idleTimeoutSec: Int = 3600) :
+        this(EnginePaths(context, idleTimeoutSec, instanceKey), context, instanceKey)
 
     /**
      * Updates the idle linger. Takes effect on the NEXT engine start because
@@ -178,7 +191,7 @@ class CrushEngine(
             // previous run is removed by the engine itself (net_other.go)
             // before it listens, and EngineSockets.probe reports "not up" for
             // a file with no listener behind it.
-            val socketFile = EngineSockets.socketPath(appContext)
+            val socketFile = EngineSockets.socketPath(appContext, instanceKey)
 
             // LAST-MINUTE CATALOG OVERRIDE.
             //

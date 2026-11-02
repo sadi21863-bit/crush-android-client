@@ -44,7 +44,16 @@ object EngineSockets {
     }
 
     /** Socket file path inside the app-private, app-owned directory. */
-    fun socketPath(context: Context): File = File(context.filesDir, "crush.sock")
+    fun socketPath(context: Context): File = socketPath(context, "")
+    /**
+     * Per-instance variant (ADR-0001 amendment, 2026-11-03): the empty key is
+     * the production legacy instance (filesDir/crush.sock); a non-empty key
+     * isolates THIS engine child's transport so each project can host its own
+     * engine process (the measured fallback for the session-pool finding).
+     */
+    fun socketPath(context: Context, instanceKey: String): File =
+        if (instanceKey.isBlank()) File(context.filesDir, "crush.sock")
+        else File(context.filesDir, "crush-$instanceKey.sock")
 
     /**
      * Client for all ENGINE traffic (REST + SSE): connects to the socket file.

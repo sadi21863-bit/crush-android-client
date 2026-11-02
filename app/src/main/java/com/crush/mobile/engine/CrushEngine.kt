@@ -119,6 +119,19 @@ class CrushEngine(
     }
 
     /**
+     * Loopback egress bridge for the engine child (see [EngineProxy]).
+     *
+     * Wires the child's HTTPS_PROXY/HTTP_PROXY to an app-local CONNECT relay
+     * so the engine NEVER resolves DNS itself: a statically linked Go binary
+     * on Android has no /etc/resolv.conf and its resolver falls back to
+     * loopback :53, which nothing serves here - measured via live device
+     * traces 2026-11-02 ("works only while plugged into the computer"/tether
+     * windows; dial refused stands alone). Started before spawn, stopped at
+     * true engine shutdown.
+     */
+    private val egressBridge = EngineProxy()
+
+    /**
      * Log hygiene. The engine binds app-private paths (the socket file, the
      * state dir); they are not secrets, but abbreviating the device-absolute
      * prefix keeps the exec line short, portable between devices, and free of
@@ -192,6 +205,17 @@ class CrushEngine(
                 }
             }.onFailure { Log.w(TAG, "catalog override skipped: ${it.message}") }
 
+            // START THE EGRESS BRIDGE BEFORE SPAWNING: the child env below
+            // aims HTTPS_PROXY/HTTP_PROXY at this port. Without it the
+            // engine's Go resolver has no usable server on Android (no
+            // /etc/resolv.conf; fallback ::1:53, measured dead) and every
+            // provider call dies whenever the phone is not tethering - the
+            // "works only while plugged into the computer" defect,
+            // root-caused 2026-11-02. Idempotent across the supervisor's
+            // bounded retry ladder.
+            val bridgeUp = egressBridge.start()
+            Log.i(TAG, "egress bridge ${if (bridgeUp) "up port=${egressBridge.port}" else "UNAVAILABLE"}")
+
             val cmd = listOf(
                 paths.binary.absolutePath,
                 "server",
@@ -204,6 +228,24 @@ class CrushEngine(
             val proc = try {
                 ProcessBuilder(cmd).apply {
                     environment().putAll(paths.env())
+                    // Route ALL engine egress through the loopback bridge: the
+                    // engine's Go http honours these vars (stdlib
+                    // ProxyFromEnvironment), so it never resolves a hostname
+                    // itself and never depends on the broken Android DNS
+                    // fallback. NO_PROXY keeps loopback targets out of the
+                    // bridge so nothing can loop into itself. The bridge only
+                    // relays: TLS stays end-to-end engine<->provider.
+                    if (egressBridge.port > 0) {
+                        val proxyUrl = "http://127.0.0.1:${egressBridge.port}"
+                        with(environment()) {
+                            this["HTTPS_PROXY"] = proxyUrl
+                            this["https_proxy"] = proxyUrl
+                            this["HTTP_PROXY"] = proxyUrl
+                            this["http_proxy"] = proxyUrl
+                            this["NO_PROXY"] = "127.0.0.1,localhost,::1"
+                            this["no_proxy"] = "127.0.0.1,localhost,::1"
+                        }
+                    }
                     redirectErrorStream(true)
                 }.start()
             } catch (e: IOException) {
@@ -303,6 +345,9 @@ class CrushEngine(
                 proc.destroyForcibly()
             }
         }.onFailure { Log.w(TAG, "stop failed", it) }
+        // The child is gone, so the bridge has no more peers; a later
+        // start() brings it back up (idempotent).
+        egressBridge.stop()
     }
 
     @Volatile

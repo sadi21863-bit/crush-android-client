@@ -46,6 +46,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -117,6 +118,26 @@ internal fun mergeReplay(
     val replayedIds = replayed.map { it.id }.toSet()
     return replayed + live.filter { it.id !in replayedIds }
 }
+
+/**
+ * Decides which of the on-screen rows may ride along when a session's
+ * transcript is (re)opened.
+ *
+ * Pure and pinned because 2026-11-02 the call site fed the PREVIOUS session's
+ * whole transcript into [mergeReplay] on every switch, which is the reported
+ * "the other session's chats get transferred to the chat I am currently in".
+ * The only legitimate carry-over is a live turn's rows in the R1
+ * reopen-during-run case: the target session was already on screen AND a run
+ * is still in flight in it. Everything else keeps a clean transcript; a
+ * completed turn reappears through the engine's own history replay.
+ */
+internal fun liveRowsForOpenSession(
+    currentlyViewedSession: String?,
+    targetSession: String,
+    runInFlight: Boolean,
+    onScreen: List<ChatMessage>
+): List<ChatMessage> =
+    if (currentlyViewedSession == targetSession && runInFlight) onScreen else emptyList()
 
 /**
  * [Immutable] is an ASSERTION, not a derivation (analysis §4 P0-1): without it
@@ -333,6 +354,23 @@ class ChatViewModel(
 
     private var wsId: String? = null
     private var sessionId: String? = null
+
+    /**
+     * Monotonic id of the chat VIEW. Every session switch bumps it; history
+     * fetches and turn preflights snapshot it and DROP their effects when it
+     * has moved on.
+     *
+     * 2026-11-02 measured defect (user report, device traces): rapid switches
+     * between existing chats let the compartment with the slower network call
+     * win - either a stale history fetch writing the OLD session's replayed
+     * transcript over the CURRENT chat, or a turn's rows being inserted into
+     * whatever transcript the user later switched to - which read as exactly
+     * "the other session's chats get transferred to the chat I am currently
+     * in". One epoch guards the three writers: [openSession], [newThread] and
+     * the send preflight/stream-insert seam.
+     */
+    @Volatile
+    private var sessionViewEpoch = 0
 
     /** Drops [handle] as the active run if it still is one; safe either way. */
     private fun abandonRun(handle: RunHandle) {
@@ -774,14 +812,27 @@ class ChatViewModel(
         AppLog.i(TAG, "catalogue prices loaded for ${prices.size} models")
 
         val catalogue = runCatching { zen.fetch() }.getOrNull()
-        val models = catalogue?.models.orEmpty()
+        // ONE bounded retry of the whole catalogue read (measured on device
+        // 2026-11-02, traces 02:15 + 12:44): the same fetch succeeded seconds
+        // later on both occasions, and a transient 200-empty/dial flake used to
+        // strand the chat in a dead "no usable model" state that only a manual
+        // provider re-tap healed. ZenModelsApi returns labelled errors for
+        // everything short of a hard throw, so "unusable" == null or empty
+        // models with any error state.
+        val usable = if (catalogue?.models.orEmpty().isEmpty()) {
+            AppLog.w(TAG, "catalogue fetch unusable (${catalogue?.error}); retrying once")
+            delay(1_200)
+            val retried = runCatching { zen.fetch() }.getOrNull()
+            if (retried?.models.isNullOrEmpty()) catalogue else retried
+        } else catalogue
+        val models = usable?.models.orEmpty()
         if (models.isEmpty()) {
-            AppLog.w(TAG, "no usable model: ${catalogue?.error}")
+            AppLog.w(TAG, "no usable model: ${usable?.error}")
             _state.update {
                 it.copy(
-                    phase = ModelChoice.explainFetchFailure(catalogue?.error),
+                    phase = ModelChoice.explainFetchFailure(usable?.error),
                     models = models,
-                    modelsError = catalogue?.error,
+                    modelsError = usable?.error,
                     engineReady = false
                 )
             }
@@ -1296,12 +1347,23 @@ class ChatViewModel(
     fun openSession(sessionId: String) {
         val mgr = workspaces ?: return
         val p = port ?: return
+        val epoch = ++sessionViewEpoch
         viewModelScope.launch {
             if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) return@launch
             val ws = mgr.currentWorkspaceId ?: return@launch
             val history = runCatching { crushApi(p).messages(ws, sessionId) }
                 .onFailure { AppLog.w(TAG, "history failed: ${it.message}") }
                 .getOrDefault(emptyList())
+
+            // Stale-switch guard (2026-11-02): while this history fetch was in
+            // flight the user may have switched to another session (or a new
+            // thread). Without this check the last fetch to land won - writing
+            // the OLD session's replayed transcript, wsId and sessionId over
+            // the user's CURRENT chat. Only the newest switch may write.
+            if (epoch != sessionViewEpoch) {
+                AppLog.w(TAG, "openSession($sessionId) dropped: the view moved on while the history loaded")
+                return@launch
+            }
 
             // Replay through the one seam that decides what a row is worth
             // keeping: tool activity is replayed too, finish-error rows are
@@ -1349,8 +1411,24 @@ class ChatViewModel(
             // only drop isStreaming when no live run exists. [mergeReplay]
             // is the extracted, unit-pinned shape.
             _state.update {
+                // MERGE ONLY WHAT BELONGS TO THIS TRANSCRIPT (2026-11-02). At
+                // this moment it.messages still holds the PREVIOUS session's
+                // rows, and mergeReplay appends every live row the fetched
+                // history does not contain - so switching A->B rendered A's
+                // whole transcript under B's. Live rows only ever belong here
+                // in the R1 reopen-during-run case: the target session was
+                // ALREADY on screen when the write lands AND a turn is still
+                // streaming in it. Switching away drops the old rows from
+                // view; switching back replays the engine's own history,
+                // which by then includes the completed turn.
+                val liveRows = liveRowsForOpenSession(
+                    currentlyViewedSession = it.activeSessionId,
+                    targetSession = sessionId,
+                    runInFlight = activeRun != null,
+                    onScreen = it.messages
+                )
                 it.copy(
-                    messages = mergeReplay(replayed, it.messages),
+                    messages = mergeReplay(replayed, liveRows),
                     isStreaming = if (activeRun != null) it.isStreaming else false,
                     activeSessionId = sessionId,
                     fileChanges = null,
@@ -1364,6 +1442,7 @@ class ChatViewModel(
     /** Starts a fresh thread, leaving history intact and reachable. */
     fun newThread() {
         val mgr = workspaces ?: run { bootstrap(); return }
+        val epoch = ++sessionViewEpoch
         viewModelScope.launch {
             if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
                 bootstrap()
@@ -1371,6 +1450,13 @@ class ChatViewModel(
             }
             val ws = mgr.currentWorkspaceId ?: return@launch
             val sid = runCatching { mgr.newSession("chat").id }.getOrNull() ?: return@launch
+            // Same stale-switch contract as openSession: creating the engine
+            // session across the network must not let a slower write of a
+            // PREVIOUS switch overwrite the view the user is actually on.
+            if (epoch != sessionViewEpoch) {
+                AppLog.w(TAG, "newThread dropped: the view moved on while the session was created")
+                return@launch
+            }
             wsId = ws
             sessionId = sid
             existingSessionWorkspace = ws
@@ -1598,6 +1684,13 @@ class ChatViewModel(
     fun send() {
         val text = _state.value.input.trim()
         if (text.isEmpty() || _state.value.isStreaming) return
+        // View epoch snapshot (2026-11-02): if the user switches chats while
+        // the send's preflight (two network round-trips) is in flight, the
+        // turn no longer belongs to the chat on screen - it is dropped BEFORE
+        // any prompt is posted, the same policy the app already applies to a
+        // permission prompt raised by the chat that was switched away from
+        // (analysis §4 P1-7).
+        val sendEpoch = sessionViewEpoch
         // Claim the send IMMEDIATELY. isStreaming was previously only set inside
         // streamSend, which runs after re-attach and newSession - two network
         // round-trips. The composable keeps the Send button enabled for that
@@ -1711,6 +1804,19 @@ class ChatViewModel(
                 return@launch
             }
 
+            // Stale-view drop (2026-11-02): nothing has been posted yet, and
+            // everything below - binding writes, the current-session report
+            // and the prompt POST itself - belongs to the session the user
+            // was on at [send()] entry. If they switched while the re-attach
+            // and (possibly) session creation ran, the honest move is to stop
+            // here: the prompt was for a chat the user navigated away from.
+            if (sendEpoch != sessionViewEpoch) {
+                AppLog.w(TAG, "send dropped: the chat view switched while the prompt was being prepared; nothing was posted")
+                abandonRun(handle)
+                _state.update { it.copy(isStreaming = false) }
+                return@launch
+            }
+
             wsId = ws
             sessionId = sid
             existingSessionWorkspace = ws
@@ -1723,7 +1829,7 @@ class ChatViewModel(
             // whatever the view model points at when the tap arrives.
             handle.freezeTarget(ws = ws, sid = sid, port = p)
             val stream = viewModelScope.launch(start = CoroutineStart.LAZY) {
-                streamSend(text, ws, sid, mgr, p, handle)
+                streamSend(text, ws, sid, mgr, p, handle, sendEpoch)
             }
             handle.streamJob = stream
             stream.start()
@@ -1738,7 +1844,8 @@ class ChatViewModel(
         sid: String,
         mgr: WorkspaceManager,
         p: Int,
-        handle: RunHandle
+        handle: RunHandle,
+        sendEpoch: Int
     ) {
         // Fresh id per turn, owned by the handle. ChatScreen keys its
         // LazyColumn by message id, and a constant sentinel produced
@@ -1747,12 +1854,22 @@ class ChatViewModel(
         // THIS turn can update this bubble.
         val bubbleId = "streaming-${UUID.randomUUID()}"
         handle.bubbleId = bubbleId
-        _state.update {
-            it.copy(
+        _state.update { st ->
+            // The transcript write is VIEW-SCOPED (2026-11-02): if the user
+            // switched chats while the preflight ran, this turn's rows must
+            // not be appended to the chat now on screen; isStreaming must
+            // stay honest and the other chat's composer must keep its text.
+            // The preflight epoch guard normally drops the turn before this
+            // point - this is the second fastener for any future asynchrony
+            // added above it.
+            if (sendEpoch != sessionViewEpoch) {
+                AppLog.w(TAG, "run rows withheld: the chat view moved on; turn continues for session ${sid.take(8)}")
+                st
+            } else st.copy(
                 input = "",
                 isStreaming = true,
                 activeSessionId = sid,
-                messages = it.messages + ChatMessage(
+                messages = st.messages + ChatMessage(
                     id = UUID.randomUUID().toString(),
                     role = "user",
                     text = text

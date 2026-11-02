@@ -250,6 +250,21 @@ data class Result(
                         isFree = isFree(o)
                     )
                 }
+                if (list.isEmpty()) {
+                    // 2026-11-02, measured twice on device (02:15 + 12:44
+                    // traces): the SAME endpoint returned a healthy catalogue
+                    // seconds earlier and seconds later - an HTTP 200 with an
+                    // empty data[] is a server-side flake, not "the key sees
+                    // no models". It used to pass through as a VALID
+                    // error-free result, which the bootstrap treated as a
+                    // healthy-but-empty state and left the app permanently
+                    // dead ("no usable model: null") until a manual provider
+                    // re-tap.
+                    return@withContext Result(
+                        emptyList(),
+                        "HTTP 200 with an empty model list from ${hostForError()}/models (server flake; retry)"
+                    )
+                }
                 Result(
                     list.sortedWith(
                         compareByDescending<LiveZenModel> { it.isFree }.thenBy { it.name }

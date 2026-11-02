@@ -329,6 +329,20 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            // Per-provider vault badge (2026-11-01). The vault
+                            // holds one credential per provider, but until now
+                            // only the ACTIVE one's saved state was visible ("API
+                            // key saved" below), so the user could not know a
+                            // switch would actually work. Slot presence only:
+                            // this never implies the plaintext is shown here.
+                            if (p.id in uiState.vaultIds) {
+                                Text(
+                                    "key stored",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
+                            }
                         }
                     }
                     Text(

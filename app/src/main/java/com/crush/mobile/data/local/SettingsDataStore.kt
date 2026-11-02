@@ -146,6 +146,16 @@ class SettingsDataStore(context: Context, private val keySession: KeySession) {
         keySession.clear(providerId)
     }
 
+    /**
+     * Which providers hold ciphertext RIGHT NOW — the per-provider "key stored"
+     * indicator's data source, and nothing else.
+     *
+     * METADATA ONLY. Unlike [readApiKey] this never decrypts and never touches
+     * [KeySession]: the settings screen shows slot presence, and the only place
+     * the plaintext is allowed to exist is the process-scoped session cache.
+     */
+    fun providersWithKeys(): Set<String> = secureKeys.providersWithKeys()
+
     suspend fun saveSelectedModel(model: String) {
         context.dataStore.edit { prefs -> prefs[SELECTED_MODEL] = model }
     }

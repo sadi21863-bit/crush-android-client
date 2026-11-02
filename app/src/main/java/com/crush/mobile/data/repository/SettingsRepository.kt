@@ -13,6 +13,18 @@ class SettingsRepository(private val dataStore: SettingsDataStore) {
 
     suspend fun saveApiKey(key: String, providerId: String) = dataStore.saveApiKey(key, providerId)
 suspend fun clearApiKey(providerId: String) = dataStore.clearApiKey(providerId)
+
+    /**
+     * Slot-presence per provider, for the settings UI's per-row "key stored"
+     * badge. Passes through to the vault's metadata read — no decryption.
+     *
+     * Distinguish from [saveApiKey]/[clearApiKey]: those change a provider's
+     * vault entry, this reports across ALL providers, which is why it is a
+     * snapshot and not part of the settings flow — the flow describes only the
+     * ACTIVE provider's key state.
+     */
+    fun providersWithKeys(): Set<String> = dataStore.providersWithKeys()
+
     suspend fun saveProviderId(id: String) = dataStore.saveProviderId(id)
     suspend fun saveSelectedModel(model: String) = dataStore.saveSelectedModel(model)
     suspend fun saveThemeMode(mode: String) = dataStore.saveThemeMode(mode)

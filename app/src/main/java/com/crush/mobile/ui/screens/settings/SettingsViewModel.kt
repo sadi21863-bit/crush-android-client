@@ -7,15 +7,24 @@ import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.domain.model.PermissionMode
 import com.crush.mobile.util.AppLog
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
     /** Non-fatal problem worth showing, e.g. a failed Keystore write. */
-    val error: String? = null
+    val error: String? = null,
+    /**
+     * Provider ids holding ciphertext in the vault right now - the per-row
+     * "key stored" badges. Deliberately a SNAPSHOT refreshed with settings,
+     * not part of [settings]: the settings flow describes the ACTIVE provider's
+     * key (hasApiKey/hint), while this describes every slot, per [SettingsRepository.providersWithKeys].
+     */
+    val vaultIds: Set<String> = emptySet()
 )
 
 class SettingsViewModel(
@@ -32,8 +41,23 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _uiState.value = _uiState.value.copy(settings = settings)
+                refreshVaultIds()
             }
         }
+    }
+
+    /**
+     * Re-reads slot presence. Called on every settings emission: saving a key,
+     * deleting one, or switching provider all rewrite settings, so all three
+     * user-reachable vault mutations refresh the badges with no extra wiring.
+     * The read is the store's metadata (which slots hold ciphertext) and never
+     * decrypts, so running it here does not put plaintext anywhere near the UI.
+     */
+    private suspend fun refreshVaultIds() {
+        val ids = withContext(Dispatchers.IO) {
+            runCatching { settingsRepository.providersWithKeys() }.getOrDefault(emptySet())
+        }
+        _uiState.value = _uiState.value.copy(vaultIds = ids)
     }
 
 /**

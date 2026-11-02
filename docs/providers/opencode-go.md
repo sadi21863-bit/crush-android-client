@@ -354,10 +354,16 @@ engine v0.99.0 — closing the P1-P8 curl-dump era of this page:
   constraints (the "one key = one workspace" story + generic-SDK-UA 403s from
   2026-10-17) do not obstruct a turn when the calls originate from the
   engine's own client, not a hand-rolled curl shape.
-- Honest scope: the turn ran on `beam-free`, the FIRST candidate of the
-  provider's preferred list — it does not by itself verify DeepSeek/GLM
-  (the paid per-model budget lines). Those need an explicit model selection;
-  see the Follow-up note below if untried.
+- Honest scope + the DeepSeek/GLM measurement (same session, 08:23): with the
+  model sheet these ids are user-selectable. Selecting `deepseek-v4-pro` made
+  the app probe it immediately and render: **`"deepseek-v4-pro" answered
+  PAYMENT_REQUIRED: Upstream request failed: Insufficient account funds`**.
+  So DeepSeek/GLM turns are blocked by FUNDING (no paid-model budget in the
+  workspace), not by integration: same key, same transport, same workspace
+  answered the free lane. If/when the account is funded, those per-model
+  budgets (doc §8) are what lights them up — the row now carries measured
+  semantics for both lanes: `beam-free = works`, `deepseek/glm = 402
+  unfunded`.
 - The 2026-10-31 engine-version note holds: engine bundle 0.99.0 in this
   build; Go answers live only on 0.99.0+ engine shapes.
 

@@ -134,18 +134,24 @@ object ModelChoice {
      * The distinction that matters: a network failure and a rejected key look
      * identical to a user otherwise, and they need different responses - one is
      * "try again later", the other is "check your key".
+     *
+     * [providerName] is the ACTIVE provider's display name. The wording used
+     * to hardcode "OpenCode Zen", the same copy-defect class as the model
+     * sheet and the no-model verdict: found live on 2026-11-02 in the r8probe
+     * app, where a Go key pasted under the Zen default produced
+     * "OpenCode Zen rejected this API key" - correct only by coincidence.
      */
-    fun explainFetchFailure(error: String?): String {
+    fun explainFetchFailure(error: String?, providerName: String): String {
         val e = error.orEmpty()
         return when {
-            e.isBlank() -> "Could not reach OpenCode Zen. Check your connection."
+            e.isBlank() -> "Could not reach $providerName. Check your connection."
             e.contains("no API key", ignoreCase = true) ->
                 "No API key is stored yet. Add one in Settings."
-            // 401/403 is the signature of a key Zen will not accept. Worth
-            // naming explicitly because it is the single most likely reason a
-            // friend's fresh install cannot chat.
+            // 401/403 is the signature of a key the provider will not accept.
+            // Worth naming explicitly because it is the single most likely
+            // reason a friend's fresh install cannot chat.
             e.contains("401") || e.contains("403") || e.contains("Unauthorized", true) ->
-                "OpenCode Zen rejected this API key. Check it in Settings and try again."
+                "$providerName rejected this API key. Check it in Settings and try again."
             e.contains("empty", ignoreCase = true) ->
                 "This API key cannot see any models right now. Check it in Settings."
             // Connectivity must be named as connectivity. These all used to fall
@@ -153,8 +159,8 @@ object ModelChoice {
             // "Could not load models ... timeout" - indistinguishable from a
             // broken app, and it sent people to re-type a key that was fine.
             NETWORK_MARKERS.any { e.contains(it, ignoreCase = true) } ->
-                "Could not reach OpenCode Zen. Check your connection."
-            else -> "Could not load models from OpenCode Zen: $e"
+                "Could not reach $providerName. Check your connection."
+            else -> "Could not load models from $providerName: $e"
         }
     }
 

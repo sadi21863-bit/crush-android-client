@@ -207,9 +207,20 @@ class ModelChoiceTest {
     fun `a 401 is reported as a key problem not a network problem`() {
         assertTrue(ModelChoice.isCredentialProblem("HTTP 401"))
         assertTrue(
-            ModelChoice.explainFetchFailure("HTTP 401")
+            ModelChoice.explainFetchFailure("HTTP 401", "OpenCode Zen")
                 .contains("rejected this API key", ignoreCase = true)
         )
+    }
+
+    @Test
+    fun `the rejection names the ACTIVE provider, never the Zen constant`() {
+        // THIRD live Zen-hardcode (r8probe app, 2026-11-02): a Go key under the
+        // Zen-labelled default said "OpenCode Zen rejected this API key" -
+        // correct only by coincidence. The wording must follow the provider
+        // the user actually keyed.
+        val msg = ModelChoice.explainFetchFailure("HTTP 401", "OpenCode Go")
+        assertTrue("got: $msg", msg.contains("OpenCode Go rejected this API key"))
+        assertTrue("got: $msg", !msg.contains("OpenCode Zen"))
     }
 
     @Test
@@ -217,8 +228,9 @@ class ModelChoiceTest {
         // A connectivity failure and a rejected key look identical to the user
         // otherwise, so the wording must not slide between them - otherwise
         // people go re-typing a perfectly good key because the wifi dropped.
-        val msg = ModelChoice.explainFetchFailure("timeout")
+        val msg = ModelChoice.explainFetchFailure("timeout", "OpenCode Go")
         assertTrue("got: $msg", msg.contains("connection", ignoreCase = true))
         assertTrue("must not blame the key, got: $msg", !msg.contains("API key", ignoreCase = true))
+        assertTrue("must name the active provider, got: $msg", msg.contains("OpenCode Go"))
     }
 }

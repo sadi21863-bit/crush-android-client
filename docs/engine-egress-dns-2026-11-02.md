@@ -92,10 +92,35 @@ never-fixed root.)
 ## Validation plan (truth-ledger style)
 
 - Unit: `EngineProxyConnectTest` (handshake + relay + 502 + resolver seam),
-  `ChatSessionTranscriptGuardTest` (see the companion note for the session
-  defect fixed alongside).
+  `ChatSessionTranscriptGuardTest` (the session-bleed companion,
+  [session-transcript-bleed-2026-11-02.md](session-transcript-bleed-2026-11-02.md)).
 - Device: after install, a real turn must complete **while the engine log
   shows `CONNECT … ok` through the bridge** rather than any `<host>:53`
   attempt; full standalone proof is the user's unplugged test — the fix
   removes the loopback-DNS dependency entirely, so any working network path
   suffices.
+
+## 2026-11-02 19:05 + 20:07 addendum: BOTH device plans passed
+
+- **Main app (debug build, committed `2c1c629`)**: `bridge up on
+  127.0.0.1:38849` at 19:01:17, then `CONNECT opencode.ai:443 ok` at
+  19:05:28 completing a full streaming turn ("Reply with exactly: OK" →
+  `OK`). The engine's OWN startup calls, which used to die:
+  `CONNECT hyper.charm.land:443 ok`, `CONNECT catwalk.charm.land:443 ok`,
+  `CONNECT api.github.com:443 ok` — all through the bridge.
+- **User's unplugged test (19:0x)**: the user confirmed independent use
+  works — the definitive standalone pass, on pure Airtel LTE with WiFi off
+  and USB disconnected.
+- **R8 runtime proof (20:07)**: the `r8probe` build (minified, R8,
+  release-signed, non-debuggable — `run-as` refused, as intended) ran its
+  OWN fresh bootstrap + a completed streaming turn through ITS bridge
+  instance, closing the review item's mandated check. Recorded in the
+  external-review triage.
+- **Found live during the r8probe drive — the THIRD Zen-hardcode**: a Go key
+  under the Zen-labelled default rendered "OpenCode Zen rejected this API
+  key". `ModelChoice.explainFetchFailure` now takes the ACTIVE provider's
+  display name (same defect class as the model sheet + no-model verdict;
+  `ModelChoiceTest` pins the provider-naming behavior). The pitfall itself —
+  a key stored under the wrong provider slot at onboarding — is honest app
+  behavior (badges + row copy now name the provider); no code change was
+  made for the mechanics.

@@ -830,7 +830,10 @@ class ChatViewModel(
             AppLog.w(TAG, "no usable model: ${usable?.error}")
             _state.update {
                 it.copy(
-                    phase = ModelChoice.explainFetchFailure(usable?.error),
+                    phase = ModelChoice.explainFetchFailure(
+                        usable?.error,
+                        Providers.byId(providerId)?.displayName ?: providerId
+                    ),
                     models = models,
                     modelsError = usable?.error,
                     engineReady = false

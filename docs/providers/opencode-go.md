@@ -410,6 +410,21 @@ happily through the same gateway (`app.log`, lines 285-330):
   the wall is upstream (gateway-side) — plan-tier differentiation then only
   matters for extra headroom (Go includes DeepSeek V4 Pro at $15/mo, V4.1
   Flash at $100/mo; Go Plus raises both).
+- **RESOLVED the same night (21:54–21:59).** Propagation was the verdict:
+  fresh probes flipped to success with no client change —
+  `probe deepseek-v4.1-flash -> WORKS detail=null` (21:54:46),
+  `probe glm-5.3-flash -> WORKS detail=null` (21:55:34) — and the user's
+  turns completed on BOTH lanes (`CONNECT opencode.ai:443 ok` +
+  `file changes` at 21:55:10 and 21:55:52; 9:59 PM screenshot shows the
+  `glm-5.3-flash` chip and two streamed GLM replies on screen). The
+  morning reading "funding-gated, not integration" therefore refines to:
+  **paid-lane provisioning lags the purchase by roughly an hour; after the
+  gate flips, identical client code answers WORKS with zero changes.** The
+  client-side audit that ruled the app out: probe request shape (Bearer +
+  `x-opencode-session` + app UA on the documented base), the engine turn
+  path (bridge `CONNECT ok`), the revert-to-verified-model behavior on a
+  failed probe, and base-shape equivalence across the engine's and the
+  app's bases.
 - Base-shape equivalence, recorded because it matters for triage: the
   ENGINE (real turns) dials Go's in-binary base
   `opencode.ai/zen/go/v1/chat/completions` while the app-side probes walk

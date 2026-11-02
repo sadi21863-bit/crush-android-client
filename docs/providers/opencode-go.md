@@ -367,6 +367,51 @@ engine v0.99.0 — closing the P1-P8 curl-dump era of this page:
 - The 2026-10-31 engine-version note holds: engine bundle 0.99.0 in this
   build; Go answers live only on 0.99.0+ engine shapes.
 
+## 2026-11-02 evening: the SAME verdict AFTER a Go subscription + Global regions
+
+The workspace later subscribed to a Go plan (user-side, evening of
+2026-11-02), and Console privacy was set so DeepSeek's **Regions = Global**
+(the documented requirement for `deepseek-v4.1-flash`/`deepseek-v4-pro`
+outside EU/US). Discounting that as the fixture, fresh probes from the app
+that evening were identical for every paid lane while the free lane streamed
+happily through the same gateway (`app.log`, lines 285-330):
+
+```
+20:52:53  probe iceman-contributor-free -> RETIRED
+          detail=Upstream request failed: Model is unavailable.
+20:53:25  probe gemini-4-argon       -> PAYMENT_REQUIRED
+          detail=Upstream request failed: Insufficient account funds
+20:53:29  probe deepseek-v4.1-flash  -> PAYMENT_REQUIRED
+          detail=Upstream request failed: Insufficient account funds
+21:07 → 21:12  deepseek-v4.1-flash ×4  -> same PAYMENT_REQUIRED
+```
+
+- The gateway accepts the key (these are UPSTREAM failures, not auth
+  rejections) — but reports the vendor lane as short of funds for a paid
+  plan holder, AND answers `RETIRED: Model is unavailable` for
+  `iceman-contributor-free`, a model the current plan lists as
+  **unlimited free**. `beam-free` completes turns throughout.
+- Both an October-era workspace key and a **freshly copied key** (pasted into
+  the side-by-side r8probe app, again selected provider OpenCode Go) produced
+  the same verdict the same evening.
+- Reading left: either the workspace↔key↔subscription binding still misses
+  (a fresh key copied from a workspace whose Go page does not actually hold
+  the subscription), or the PAID lanes' provisioning on the gateway is in
+  flux ("the list of models may change", doc-verbatim; + iceman's RETIRED).
+  The app-side integration is measured good on this lane for
+  `beam-free`; nothing in the client blocks DeepSeek.
+- The app's own selection UX: probe-first — a failed probe un-commits the
+  model and the chip falls back to the verified free model, which read as
+  "keeps going back to beam" to the user.
+- Console-side checklist recorded for the tester: (1) which workspace in the
+  selector actually shows the Go subscription; (2) copy a key FROM that
+  workspace; (3) paste it under OpenCode Go in the app; (4) re-probe
+  DeepSeek. If a confirmed-subscribed-workspace key still 402s identically,
+  the wall is upstream (gateway-side) — plan-tier differentiation then only
+  matters for extra headroom (Go includes DeepSeek V4 Pro at $15/mo, V4.1
+  Flash at $100/mo; Go Plus raises both).
+
+
 ## Sources
 
 - Landing page: https://opencode.ai/go

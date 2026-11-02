@@ -278,13 +278,35 @@ App-side mitigations:
   per-turn-connection era. Re-checked 2026-10: they are the path the send loop
   takes whenever the shared connection is **not** `CONNECTED`. Live at
   `WorkspaceManager.kt:132` and in the ChatViewModel send loop.
-- **No `androidTest` instrumentation suite.** The app-lock flow is covered by a
-  JVM policy suite; the real credential + Keystore path can only run on device.
-- **Store/R8/keystore decisions are parked, not lost.** Lint stays disabled
-  behind an untriaged AGP/lint crash, no signed release has ever shipped, a
-  plaintext test key still sits at the repo root, and a few other
-  human-gated trades are catalogued with their evidence in
-  [docs/decisions-open.md](docs/decisions-open.md).
+- **Instrumented suite — landed and verified ON DEVICE (2026-11-01).** The
+  one-time gap ("no `androidTest` instrumentation suite"; the app-lock flow
+  covered only by a JVM policy suite while the real credential + Keystore path
+  ran on nothing) is closed: **8 `androidTest` tests OK on device** in 326 s
+  via `am instrument` — `MainActivityLockFlowTest` (6: gate↔FLAG_SECURE
+  contract, recreation-survival of the process-scoped lock state,
+  fresh-process-holds-no-decrypted-key, and a **real AndroidKeyStore**
+  roundtrip with per-provider isolation + tamper-clears, which the JVM suite's
+  stand-in cannot reach) plus the rebuilt `MainActivitySmokeTest` (2).
+  Throwaway provider slots are cleaned afterwards (0 residue in
+  `secure_api_keys.xml`). The CI gate now also compiles the test APK
+  (`:app:assembleDebugAndroidTest`) so test-code breakage cannot ship. Honest
+  scope, documented in-file: the tests do not answer real biometric prompts —
+  those unlock paths carry standing hands-on evidence instead. Evidence:
+  [docs/external-review-triage.md](docs/external-review-triage.md)
+  ("App-lock flow verified only manually" row, closed),
+  [docs/capabilities.md](docs/capabilities.md).
+- **Store/R8/keystore decisions: largely landed; residue still parked.** The
+  parking item's two "never shipped" clauses are now closed: lint is green
+  since 2026-10-31 (`5325d68` — re-enabled with waivers, fresh release lint
+  "No issues found."), and signed release-R8 ran on device 2026-11-02 — the
+  `r8probe` signed minified buildType (release signing + R8) completed a
+  real streaming turn with a 28.92 MB APK (triage row "R8 minified release:
+  runtime unproven" — closed). Still parked: a plaintext test key file sits
+  at the repo root (decisions-open item 3), and a few other human-gated
+  trades are catalogued with their evidence in
+  [docs/decisions-open.md](docs/decisions-open.md) — whose own "keystore +
+  credentials.properties are missing" note (item 2, OPEN) now predates the
+  evidence above.
 
 ## Toolchain
 
@@ -378,13 +400,25 @@ Device scripts:
 
 `.github/workflows/android-ci.yml` runs the same gate on every push and
 pull request:
-`./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintRelease`.
+`./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintRelease`
+(`:app:assembleDebugAndroidTest` was added 2026-11-01 with the instrumented
+suite, so test-code breakage cannot ship).
 The engine binary is gitignored, so a CI checkout builds a gate APK
 **without the embedded engine** — CI proves the code compiles and all
 JVM suites pass; runtime behavior still needs real arm64 hardware (see
 [Build from source](#build-from-source)).
 
-Bring-up facts (measured 2026-11-01, first green pending):
+**First green recorded 2026-11-02.** The bring-up day's pending item closed on
+2026-11-02, and the gate has stayed green: monitor runs 12–20 completed on
+2026-11-02, latest success at the time of writing on commit `bb76e49`. One
+flake is on record, not on code: run 16 exited 1 in the unit-test step on code
+that passed identically in runs 18–20 (re-trigger documented in the commit
+message of `95b2ebf`). Locally, the same day produced three green full-gate
+runs — 47m57s, 32m36s and 26m11s (machine-local tee logs `gate-zen-copy`,
+`gate-egress2`, `gate-sync`; the first two also built the signed R8 probe
+artifact via `:app:assembleR8probe`).
+
+Bring-up facts (measured 2026-11-01, first green recorded 2026-11-02):
 
 - **Runner SDK**: newer `ubuntu-latest` images no longer ship an Android
   SDK, and `android-actions/setup-android@v3` failed on the migrated
@@ -427,20 +461,32 @@ This app redistributes the Crush binary, so its terms apply directly.
 FSL-1.1-MIT grants use and redistribution for permitted purposes, requires that
 redistributions retain and link the licence and copyright notices, restricts
 competing commercial use, and **≥ converts each version to MIT on the second
-anniversary of its availability**. The bundled build is now **v0.98.2**
-(instrumented 2026-10-27 build — see the Upstream-pins note in Toolchain);
-confirm its future-MIT date before relying on MIT terms for that version.
-The backup of the retired v0.97.1 binary under `engine-backups/` has its own
-future-MIT date.
+anniversary of its availability**. The bundled build is now **v0.99.0** (the
+upstream clean release, published 2026-10-29; promoted to this repo's engine
+of record 2026-11-01 — see the Upstream pins note in Toolchain), so its
+future-MIT date computes to two years from publication; confirm it against
+upstream before relying on MIT terms for that version. The backup of the
+retired v0.97.1 binary under `engine-backups/` has its own future-MIT date.
 
 > An earlier revision of this README stated "Crush is MIT-licensed". That was
 > wrong. Verify licence claims against upstream before repeating them.
 
-There is **no root `LICENSE` file** yet — the third-party notice for the embedded
-engine still needs adding, and legal review of FSL "Competing Use" is
-recommended before any commercial distribution. The app's own code is
-**unlicensed for now**: all rights are reserved by the repository owner, and a
-licence will be chosen when that notice is written.
+The licence gap that this section used to record is closed. The repo root now
+carries both files (added 2026-11-02, commit `0741e77`):
+
+- **[`LICENSE`](LICENSE) — MIT, © 2025-2026 sadi21863-bit (Crush Mobile).**
+  It covers THIS REPOSITORY'S code: the Kotlin app, its UI, its tests and its
+  build scripts.
+- **[`NOTICE.md`](NOTICE.md) — the third-party attribution an APK build must
+  ship alongside the app.** The embedded engine `libcrush.so` is
+  **FSL-1.1-MIT** (Copyright 2025-2026 Charmbracelet, Inc., terms linked there),
+  the OpenCode-derived segment inside the engine lineage carries its MIT text
+  verbatim, and the runtime dependencies surfaced in the shipped APK are
+  tabled (AndroidX/Compose, OkHttp + OkHttp-SSE, junixsocket, Gson,
+  kotlinx-coroutines — all Apache-2.0; test-only deps ship nowhere).
+
+One caveat survives the paperwork: legal review of FSL "Competing Use" is
+still recommended before any commercial distribution of the bundled engine.
 
 Bubble Tea is MIT-licensed. This repository is not affiliated with Charm or
 OpenCode Zen. You supply your own OpenCode Zen API key; it is never committed.

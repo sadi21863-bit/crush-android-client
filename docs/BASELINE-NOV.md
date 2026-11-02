@@ -235,16 +235,20 @@ proven as of 2026-11-02 (`bb76e49`), graded **C / not started**:
    but a real turn editing **two or more source files** has never run on
    device. This is the plan's first P1 proof (§P1 step 1) and the README's
    standing open row in the Status table.
-2. **ProjectRegistry / per-project workspace mapping — not started as code.**
+2. **ProjectRegistry / per-project workspace mapping — prototype in flight.**
    The Chat/Code separation depends on it (the plan's
    code-experience layer, projected as
-   `ProjectRegistry -> Explore/Build/Review`; no ProjectRegistry source
-   exists in the tree today). ADR note, recorded honestly: an
-   ADR-0001 "Project / workspace / session / run identity" **PROPOSED (not
-   accepted)** draft appeared in the working copy at 23:15 during this
-   writing session — untracked, so it is absent from the committed baseline
-   checkout recorded in §1 and waits on whichever lane authors the
-   acceptance or revision.
+   `ProjectRegistry -> Explore/Build/Review`).
+   Update 2026-11-03: ADR-0001 ("Project / workspace / session / run
+   identity") is now **PROPOSED + COMMITTED** on `main` (`b1e715f`),
+   grounded in the real seams (`openWorkspace`, `RunHandle`,
+   `sessionViewEpoch`), and the first code prototyped against it is an
+   in-memory `ProjectRef`/`ProjectRegistry` (no persistence by design)
+   plus the ADR's first integration proof, `TwoProjectAttachTest`
+   (instrumented; two distinct project cwds must attach as distinct
+   workspaces on вооружив the same engine with no cross-workspace
+   session bleed). Proof status is recorded in the ledger once that gate
+   and the on-device `am instrument` run land.
 3. **Termux L1–L3 — not started.** The separate environment-related project
    has its own plan
    ([termux-project-plan.md](termux-project-plan.md)); the level taxonomy

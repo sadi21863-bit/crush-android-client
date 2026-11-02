@@ -125,6 +125,25 @@ android {
                 }
             }
         }
+
+        create("r8probe") {
+            // Side-by-side R8 runtime-proof build (2026-11-02, decision item 1
+            // continuation). PURPOSE: run the mandated R8 end-to-end device
+            // check WITHOUT uninstalling the debug app - installing a
+            // release-signed applicationId over it is impossible (signature
+            // mismatch) and uninstalling destroys the vault ciphertext and
+            // every local session, unrecoverably by design.
+            //
+            // Release-rigored ON PURPOSE: inherits everything above via
+            // initWith (minify, proguard rules, release signing), then only
+            // the identity differs, so the artifact that proves R8 runtime is
+            // byte-equivalent in rigour to what ships. installable BESIDE the
+            // debug app because of the suffix.
+            initWith(getByName("release"))
+            applicationIdSuffix = ".r8probe"
+            versionNameSuffix = "-r8probe"
+            matchingFallbacks += listOf("release")
+        }
     }
 
     compileOptions {

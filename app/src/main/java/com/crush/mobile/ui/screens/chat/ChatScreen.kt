@@ -7,6 +7,7 @@ import com.crush.mobile.domain.file.DiffLine
 import com.crush.mobile.ui.theme.LocalDiffColors
 import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.file.FileDiff
+import com.crush.mobile.domain.provider.Providers
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -425,6 +426,7 @@ bottomBar = {
         ModelSheet(
             models = s.models,
             selected = s.selectedModel,
+            providerName = Providers.byId(s.providerId)?.displayName ?: s.providerId,
             error = s.modelsError,
             onPick = { vm.setModel(it); showModels = false },
             onDismiss = { showModels = false }
@@ -1129,9 +1131,19 @@ Row(verticalAlignment = Alignment.CenterVertically) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * The live model catalogue sheet.
+ *
+ * [providerName] is the ACTIVE provider's display name: the subtitle names the
+ * provider the list came from. It hardcoded "OpenCode Zen" until the first
+ * hyper key stored in the vault made the line lie ("Live list from OpenCode
+ * Zen" under an OpenCode Go catalogue) — the same copy-defect class the
+ * no-model verdict had.
+ */
 private fun ModelSheet(
     models: List<com.crush.mobile.data.api.LiveZenModel>,
     selected: String,
+    providerName: String,
     error: String?,
     onPick: (String) -> Unit,
     onDismiss: () -> Unit
@@ -1143,7 +1155,7 @@ private fun ModelSheet(
             modifier = Modifier.padding(horizontal = 20.dp)
         )
         Text(
-            "Live list from OpenCode Zen. Free models cost nothing.",
+            "Live list from $providerName. Free models cost nothing.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)

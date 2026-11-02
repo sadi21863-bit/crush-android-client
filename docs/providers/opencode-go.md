@@ -334,6 +334,33 @@ the official route for a third-party client to use what was free.
 | P7 | `inference/openai/v1/chat/completions`, free model | user's Zen key | 403 `FreeTierError` (client-gated, key accepted) |
 | P8 | `inference/openai/v1/chat/completions`, free model | bogus key | 403 `FreeTierError` (gate ignores key) |
 
+## 2026-11-02 addendum: FIRST verified in-app turn (workspace-corrected key)
+
+The workspace-corrected Go key (held in the app vault, never printed by the
+agent) produced a real completed turn from the app UI on 2026-11-02, through
+engine v0.99.0 — closing the P1-P8 curl-dump era of this page:
+
+- App-side bootstrap after the Settings provider switch: `catalogue prices
+  loaded for 37 models` → `probed 1 candidate(s), using beam-free (of 28
+  listed)` → `ensureAgentReady: key set for provider 'opencode-go';
+  model[large] = beam-free; model[small] = beam-free; agent/init ok`.
+- Session SSE long-lived stream attached (`workspace 07a880ce…`), previous
+  session resumed (8 msgs).
+- In-app turn: composer text "Reply with exactly: OK" → assistant reply
+  rendered exactly `OK` (screenshot 08:15 device-local). Full streaming
+  lifecycle: send → SSE → per-token render → completion, zero interventions.
+- What this proves that curl probes could not: the workspace binding the
+  P-era 402s complained about is satisfied for THIS key, and the transport
+  constraints (the "one key = one workspace" story + generic-SDK-UA 403s from
+  2026-10-17) do not obstruct a turn when the calls originate from the
+  engine's own client, not a hand-rolled curl shape.
+- Honest scope: the turn ran on `beam-free`, the FIRST candidate of the
+  provider's preferred list — it does not by itself verify DeepSeek/GLM
+  (the paid per-model budget lines). Those need an explicit model selection;
+  see the Follow-up note below if untried.
+- The 2026-10-31 engine-version note holds: engine bundle 0.99.0 in this
+  build; Go answers live only on 0.99.0+ engine shapes.
+
 ## Sources
 
 - Landing page: https://opencode.ai/go

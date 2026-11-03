@@ -1,5 +1,6 @@
 package com.crush.mobile.data.api
 
+import android.util.Log
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -300,6 +301,8 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
     companion object {
         const val BASE = "https://opencode.ai/zen/v1"
 
+        private const val TAG = "ZenModelsApi"
+
         /**
          * 2026-11-01 (promoted from the v099 lane): the OpenCode gateway
          * REJECTS generic SDK user agents - measured live (python urllib ->
@@ -397,6 +400,11 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
                     .post(body.toString().toRequestBody(JSON_MEDIA))
                     .build()
                 client.newCall(request).execute().use { resp ->
+                    // Per-attempt provenance (standing item, 2026-11-03): what
+                    // base was tried and what answered, exactly as attempted.
+                    // Without this, a plan-miss walk leaves no trace of the
+                    // intermediate bases in any artifact.
+                    Log.d(TAG, "probe $model base=$chatBase -> HTTP ${resp.code}")
                     val text = runCatching { resp.body?.string() }.getOrNull().orEmpty()
                     if (resp.isSuccessful) {
                         return@withContext Probe(model, ProbeVerdict.WORKS, null)

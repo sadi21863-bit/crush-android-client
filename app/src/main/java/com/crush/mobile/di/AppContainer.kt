@@ -5,6 +5,7 @@ import com.crush.mobile.data.crush.WorkspaceManager
 import com.crush.mobile.data.local.KeySession
 import com.crush.mobile.data.local.LockState
 import com.crush.mobile.data.local.SettingsDataStore
+import com.crush.mobile.data.project.RoomProjectStore
 import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.TuningPolicy
@@ -60,6 +61,15 @@ class AppContainer(context: Context) {
     }
 
     val deviceProfile: DeviceProfile by lazy { DeviceProfile.detect(appContext) }
+
+    /**
+     * The durable project registry (ADR-0001 P2, accepted 2026-11-03). The
+     * Projects surface (P3, this slice) is its first in-app READER: the
+     * screen lists/creates rows and triggers the idempotent legacy-workspace
+     * migration on entry. Chat binding to per-project engine instances is
+     * the ADR's slice-2 work and deliberately NOT here yet.
+     */
+    val projectStore: RoomProjectStore by lazy { RoomProjectStore(appContext) }
 
     val crushEngine: CrushEngine by lazy {
         CrushEngine(

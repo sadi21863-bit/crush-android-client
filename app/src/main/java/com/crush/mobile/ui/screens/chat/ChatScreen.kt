@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -52,7 +53,7 @@ import com.crush.mobile.engine.EngineState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(onOpenSettings: () -> Unit, isLocked: Boolean = false) {
+fun ChatScreen(onOpenSettings: () -> Unit, onOpenProjects: () -> Unit, isLocked: Boolean = false) {
     val context = LocalContext.current
     val container: AppContainer = (context.applicationContext as CrushMobileApp).container
     val vm: ChatViewModel = viewModel(factory = ChatViewModel.Factory(context, container))
@@ -418,6 +419,7 @@ bottomBar = {
             onDelete = { vm.deleteSession(it) },
             onNew = { vm.newThread(); showSessions = false },
             onSettings = { showSessions = false; onOpenSettings() },
+            onProjects = { showSessions = false; onOpenProjects() },
             onDismiss = { showSessions = false }
         )
     }
@@ -991,6 +993,7 @@ private fun SessionSheet(
     onDelete: (String) -> Unit,
     onNew: () -> Unit,
     onSettings: () -> Unit,
+    onProjects: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val now = remember { System.currentTimeMillis() }
@@ -1044,6 +1047,19 @@ private fun SessionSheet(
                     Icon(Icons.Default.Settings, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Settings")
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Full-width second row: the Projects surface (ADR-0001 P3).
+                // Kept out of the two-button row so neither shrinks below a
+                // comfortable label width on a phone.
+                OutlinedButton(onClick = onProjects, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.FolderOpen, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Projects")
                 }
             }
             Spacer(Modifier.height(12.dp))

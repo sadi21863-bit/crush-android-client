@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.crush.mobile.ui.screens.chat.ChatScreen
 import com.crush.mobile.ui.screens.onboarding.OnboardingScreen
+import com.crush.mobile.ui.screens.projects.ProjectsScreen
 import com.crush.mobile.ui.screens.settings.SettingsScreen
 
 sealed class Screen(val route: String) {
@@ -14,6 +15,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Models : Screen("models")
     object Diagnostics : Screen("diagnostics")
+    object Projects : Screen("projects")
 }
 
 @Composable
@@ -48,8 +50,15 @@ fun NavGraph(
         composable(Screen.Chat.route) {
             ChatScreen(
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                onOpenProjects = { navController.navigate(Screen.Projects.route) },
                 isLocked = isLocked
             )
+        }
+
+        // Reachable from the chat sheet (next to Settings). The Projects
+        // surface is the ADR-0001 registry's in-app reader (P3 slice 1).
+        composable(Screen.Projects.route) {
+            ProjectsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.Settings.route) {

@@ -226,3 +226,11 @@ All verified on-device against Crush v0.97.1→v0.98.1, not read from docs.
   bypass regression. Remaining device-only areas: the answered biometric
   paths (a test cannot tap the real system dialog) and child-process
   lifecycle; coroutine flow hot/cold ordering stays JVM-tested.
+- CI separates the two certification profiles (MODE-25, 2026-11-03): every
+  `android-ci` run attaches a **provenance manifest** (job summary +
+  downloadable artifact) stating, measured from the checkout, whether the
+  assembled APK is **engine-less** (CI's usual shape — the engine binary is
+  gitignored: compile + JVM suites + lint certified, runtime NOT proven) or
+  **engine-included** (vendored blob possible on a source build), plus the
+  debug APK's sha256/size. Engine-included device-gate evidence stays with
+  the on-device ledger rows in this file.

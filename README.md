@@ -408,6 +408,15 @@ The engine binary is gitignored, so a CI checkout builds a gate APK
 JVM suites pass; runtime behavior still needs real arm64 hardware (see
 [Build from source](#build-from-source)).
 
+**Provenance manifest (MODE-25).** Every run — success or failure — attaches
+a provenance manifest (also a downloadable workflow artifact) that reports
+which certification profile the run represents, measured from the checkout
+itself: `engine_blob PRESENT/ABSENT`, the debug APK's sha256 and size, and a
+plain-language `certifies` row saying what a green run proves (compile + JVM
+suites + lint) and what it does not (on-device engine behavior). The device
+gate evidence — real arm64 hardware — is recorded in
+[docs/capabilities.md](docs/capabilities.md) and the docs ledger.
+
 **First green recorded 2026-11-02.** The bring-up day's pending item closed on
 2026-11-02, and the gate has stayed green: monitor runs 12–20 completed on
 2026-11-02, latest success at the time of writing on commit `bb76e49`. One

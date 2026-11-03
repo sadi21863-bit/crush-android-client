@@ -14,6 +14,16 @@
 # CI proves the code compiles and the logic suites pass; runtime behavior is
 # still verified on real arm64 hardware locally, same as before the workflow
 # existed. See README ("Fetching the engine") for that contract.
+#
+# MODE-25 (docs/crush-plan-2026-11-02.md §"CI reports engine-less compile
+# gate vs engine-included device gate"): every run attaches a PROVENANCE
+# MANIFEST (also a downloadable artifact) that reports which certification
+# profile this run represents - engine-less compile gate vs engine-included
+# artifact - measured from the checkout itself (not assumed), including the
+# debug APK's sha256. A green manifest row therefore says "these exact bytes
+# passed compile + JVM suites + lint", and says plainly that this is NOT
+# on-device runtime proof; the device gate's measured evidence lives in
+# docs/capabilities.md and the docs ledger.
 
 name: android-ci
 
@@ -113,3 +123,55 @@ jobs:
             app/build/reports/problems/**
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Build the provenance manifest (MODE-25)
+        # Distinguish the two certification profiles a run can represent,
+        # measured from THIS checkout rather than assumed:
+        #   engine-LESS  = compile gate. The engine binary is gitignored and
+        #                  never reaches CI, so the APK assembled here cannot
+        #                  exec the engine. The run proves code compiles, JVM
+        #                  suites pass, androidTest compiles, lint is green.
+        #   engine-IN    = engine-included artifact (full runtime candidate),
+        #                  only possible if the blob is vendored into the
+        #                  checkout; on-device behavior remains the device
+        #                  gate, run on real arm64 hardware locally.
+        # Runs always() so even a failed run is self-describing: its manifest
+        # still names what the checkout contained and whether an APK exists.
+        if: always()
+        run: |
+          set -e
+          out="provenance-manifest-${{ github.run_id }}.md"
+          engine="app/src/main/jniLibs/arm64-v8a/libcrush.so"
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          {
+            echo "# Build provenance - Crush Mobile (run ${{ github.run_id }}, ${{ github.event_name }})"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| git_sha | $(git rev-parse HEAD) |"
+            echo "| gate_tasks | :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintRelease |"
+            if [ -f "$engine" ]; then
+              echo "| engine_blob | PRESENT - sha256 $(sha256sum "$engine" | cut -d' ' -f1), $(stat -c%s "$engine") bytes |"
+              echo "| certifies | ENGINE-INCLUDED artifact; on-device behavior is the remaining gate (device gate: real arm64 hardware, evidence in docs) |"
+            else
+              echo "| engine_blob | ABSENT (deliberately gitignored; see README 'Fetching the engine') |"
+              echo "| certifies | ENGINE-LESS compile gate - compiles + JVM suites + lint. This APK cannot exec the engine; it is NOT runtime proof |"
+            fi
+            if [ -f "$apk" ]; then
+              echo "| debug_apk | sha256 $(sha256sum "$apk" | cut -d' ' -f1), $(stat -c%s "$apk") bytes |"
+            else
+              echo "| debug_apk | not produced (gate failed before assembly) |"
+            fi
+            echo ""
+            echo "Engine-included device-gate evidence is measured on real arm64 hardware and recorded in docs/capabilities.md and the docs ledger."
+          } > "$out"
+          cat "$out" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the provenance manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provenance-manifest-${{ github.run_id }}
+          path: provenance-manifest-*.md
+          if-no-files-found: warn
+          retention-days: 14

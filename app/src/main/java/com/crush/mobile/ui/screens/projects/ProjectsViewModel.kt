@@ -127,6 +127,7 @@ class ProjectsViewModel(
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            ProjectsViewModel(appContext, container.projectStore) as T
+            // application-scoped like every other container-held context.
+            ProjectsViewModel(appContext.applicationContext, container.projectStore) as T
     }
 }

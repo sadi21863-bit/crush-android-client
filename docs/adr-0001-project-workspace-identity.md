@@ -1,6 +1,10 @@
 # ADR-0001 — Project / workspace / session / run identity
 
-**Status: PROPOSED (not accepted)**
+**Status: ACCEPTED (2026-11-03)** — accepted by the project owner after the
+hard-stop proofs measured below (workspace attach multi-capable; session
+pool global on one engine; the per-project-engine-instance fallback proven
+isolating on device) and the P2 Room persistence layer landed with its own
+restart-survival proof. See the 2026-11-03 MEASURED UPDATE block.
 **Date: 2026-11-02**
 **Author: Crush Mobile roadmap (P2/P3)**
 **Source: [`crush-plan-2026-11-02.md`](crush-plan-2026-11-02.md) §5 (canonical identity
@@ -390,9 +394,15 @@ pseudo-item this repo has already retired once with real numbers.
 
 ## 9. Status and what this ADR does not decide
 
-**PROPOSED** for the P2/P3 slices; not accepted, not implemented. Accepted would
-mean: Proof A and Proof B passed on the reference device (arm64, API 29), their
-traces/recordings archived next to this file, and the capabilities table updated.
+**ACCEPTED 2026-11-03** on the evidence above: Proof A (workspace attach
+guarantees 1–2, measured holding) ran as `TwoProjectAttachTest`, the
+session-pool finding triggered the hard stop, the §6 fallback was selected
+and ran as `TwoEngineInstancesPerProjectTest` ("OK (2 tests)" on the
+reference device, arm64 API 29, real engine processes), and the P2
+persistence layer (`RoomProjectStore`, restart survival + idempotent legacy
+migration) is committed with its device proof. The capabilities table is
+updated (`docs/capabilities.md` multi-project row). P3 productization
+(Projects UI, DI wiring) proceeds on this model.
 
 **Deliberately left undecided here:**
 

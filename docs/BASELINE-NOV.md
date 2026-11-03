@@ -240,7 +240,7 @@ proven as of 2026-11-02 (`bb76e49`), graded **C / not started**:
    code-experience layer, projected as
    `ProjectRegistry -> Explore/Build/Review`).
    Update 2026-11-03: ADR-0001 ("Project / workspace / session / run
-   identity") is **PROPOSED + COMMITTED** on `main` (`b1e715f`), grounded in
+   identity") is **ACCEPTED (2026-11-03)** on `main` (draft committed at `b1e715f`), grounded in
    the real seams (`openWorkspace`, `RunHandle`, `sessionViewEpoch`). The
    plan's hard stop was measured, not assumed: `TwoProjectAttachTest` proved
    workspace attach is path-keyed and multi-capable on one engine process,

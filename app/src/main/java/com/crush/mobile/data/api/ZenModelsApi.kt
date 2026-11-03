@@ -351,6 +351,43 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
             }
             return out
         }
+
+        /**
+         * The model ids THE ENGINE still knows for [providerId], extracted from
+         * the engine's own /providers payload (the same payload
+         * [pricesFromProviders] reads).
+         *
+         * Why a separate filter (user-reported 2026-11-03, measured on device):
+         * the engine's plan catalog (what agent/init validates against) and the
+         * provider's documented /models list DIVERGE in real time - the app's
+         * probe even got HTTP 200 for `beam-free` from the gateway while the
+         * engine's refreshed catalog had already dropped it, so agent/init
+         * failed with "large model not found in provider config" exactly for
+         * the id the picker happily showed and the probe happily passed. Showing
+         * only engine-known ids is the fix: a model the picker offers can no
+         * longer be one the engine has already retired upstream.
+         *
+         * Empty set means the engine returned NO models block for this provider
+         * (or the call failed): callers must NOT filter in that state, or a
+         * plumbing failure would masquerade as "no models available". Callers
+         * log loudly instead and let the probe/init chew the failure.
+         */
+        fun engineVisibleModelIds(
+            providers: List<JsonObject>,
+            providerId: String
+        ): Set<String> {
+            val out = mutableSetOf<String>()
+            for (p in providers) {
+                if (p.get("id")?.asString != providerId) continue
+                val models = p.getAsJsonArray("models") ?: return emptySet()
+                for (m in models) {
+                    val id = m.asJsonObject.get("id")?.asString ?: continue
+                    out.add(id)
+                }
+                return out
+            }
+            return emptySet()
+        }
     }
 
     /**

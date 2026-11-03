@@ -334,7 +334,45 @@ class ChatViewModel(
      * junixsocket's factory onto the socket file.
      */
     private fun crushApi(port: Int): CrushApi =
-        CrushApi(port, socketPath = EngineSockets.socketPath(context))
+        CrushApi(port, socketPath = EngineSockets.socketPath(context, instanceKey))
+
+    /**
+     * The engine INSTANCE this session binds to (ADR-0001 accepted shape,
+     * slice 2 2026-11-03): "" = the legacy workspace on the process-single
+     * engine, "p<uuid8>" = a project on ITS OWN engine child (own socket +
+     * own state dir - the measured isolation unit). Written ONLY through
+     * [bindProject], which is what the Projects surface drives via the
+     * composition; [container.activeProjectRef] stays the single source of
+     * truth for WHICH project (the ViewModel mirrors it to survive process
+     * death naturally: repoDir is re-read from the container, not stored as
+     * ViewModel state).
+     */
+    private var instanceKey: String = ""
+
+    /** The workspace cwd handed to the engine for THIS instance. */
+    private fun workspacePathFor(): String {
+        val ref = container.activeProjectRef
+        return ref?.repoDir?.absolutePath ?: File(context.filesDir, "workspace").absolutePath
+    }
+
+    /** The engine state dir for THIS instance (isolated per project). */
+    private fun engineStateDirFor(): String =
+        container.runtimeFor(instanceKey).engine.paths.dataDir.absolutePath
+
+    /** The supervisor of the engine instance THIS session is bound to. */
+    private val engineSupervisorFor: com.crush.mobile.engine.EngineSupervisor
+        get() = container.runtimeFor(instanceKey).supervisor
+
+    /**
+     * What the ENGINE still knows for [engineVisibleProviderId] (the
+     * agent/init-validatable id set, measured from the engine's /providers
+     * payload at bootstrap). The picker filters through this so a
+     * retired-upstream id can never be offered again after any successful
+     * bootstrap. Empty set = engine returned no models (or boot failed before
+     * the fetch) - callers keep the raw list in that state.
+     */
+    @Volatile private var engineVisibleIdsCache: Set<String> = emptySet()
+    @Volatile private var engineVisibleProviderId: String = ""
 
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
@@ -569,6 +607,43 @@ class ChatViewModel(
         if (wsId == null) bootstrap()
     }
 
+    /**
+     * Projects-surface entry (ADR-0001 slice 2, 2026-11-03): binds this
+     * session to a project's OWN engine instance, or to the legacy workspace
+     * for null. The container's [com.crush.mobile.di.AppContainer.activeProjectRef]
+     * is the single source of truth for WHICH project (the Projects surface
+     * writes it) - this method reads it and re-targets everything
+     * engine-derived.
+     *
+     * A no-op when the key did not change, so composition-time callbacks can
+     * fire it freely.
+     */
+    fun bindProject() {
+        val containerRef = container.activeProjectRef
+        val key = if (containerRef == null) "" else container.instanceKeyFor(containerRef.id)
+        if (key == instanceKey) return
+        instanceKey = key
+        // An instance switch invalidates every engine-derived handle: the
+        // new engine owns its own workspace/session id space (the same reset
+        // bindEngine does on an engine replacement - here the switch IS the
+        // replacement).
+        port = null
+        wsId = null
+        sessionId = null
+        workspaces = null
+        _state.update {
+            it.copy(
+                phase = if (containerRef == null) "switching to the workspace..."
+                else "switching to ${containerRef.label}...",
+                engineReady = false
+            )
+        }
+        // Re-drive the target instance immediately: if it is already Running
+        // (a previously-opened project, or the kept-warm legacy engine), no
+        // later state TRANSITION will announce it.
+        bindEngine(container.runtimeFor(key).supervisor.state.value)
+    }
+
 /**
      * True while the lock gate demands authentication.
      *
@@ -645,6 +720,10 @@ class ChatViewModel(
         val session = CrushSession(api, mgr)
         val d = File(context.filesDir, "").absolutePath
 
+        // Other things below still use $d for paths unrelated to the engine
+        // state; keep the meaning intact here.
+        AppLog.d(TAG, "bootstrap instance=$instanceKey workspacePath=${workspacePathFor()}")
+
         // WHICH PROVIDER, resolved ONCE, from the PERSISTED settings we await
         // right below - not from any in-memory mirror.
         //
@@ -712,7 +791,12 @@ class ChatViewModel(
             }
         }
 
-        val opened = session.openWorkspace("$d/workspace", "$d/crush/state", permissionMode, providerId)
+        val opened = session.openWorkspace(
+            workspacePathFor(),
+            engineStateDirFor(),
+            permissionMode,
+            providerId
+        )
         // Read the key for the provider we are about to configure, not for whatever
         // was cached last.
         val key = container.keySession.require(secureKeys, providerId)
@@ -813,7 +897,7 @@ class ChatViewModel(
             chatBaseCandidates = provider.chatBases
         )
 
-        // Load REAL prices before parsing the catalogue.
+        // Load REAL prices + the ENGINE'S VISIBLE model set before parsing the catalogue.
         //
         // Without this the shortlist had no free-first ordering and fell back to
         // raw catalogue order, which begins with paid Claude models. Measured on
@@ -821,11 +905,25 @@ class ChatViewModel(
         // model the key CAN call, space-bunny-free, sits at position 78 of 86.
         // So the fix is not a bigger probe budget - it is knowing which models
         // are free, which is exactly what this supplies.
+        //
+        // 2026-11-03 (user-reported catalog drift): the engine's /providers
+        // payload is ALSO the ground truth of what agent/init will accept. The
+        // app's own list endpoint still advertised `beam-free` and the gateway
+        // even answered its probe with 200, but the engine's refreshed catalog
+        // had dropped it, and init died with "large model not found in provider
+        // config" for exactly the id the app then configured. The visible set
+        // below is what keeps retired-upstream ids out of the picker and out of
+        // the probe shortlist.
+        val engineProviders = runCatching {
+            api.providers(opened.workspaceId)
+        }.getOrDefault(emptyList())
+        val visibleEngineIds = ZenModelsApi.engineVisibleModelIds(engineProviders, providerId)
+        // Cache for the picker path (loadModels re-fetching through the cache
+        // when the workspace-attach already proved what the engine accepts).
+        engineVisibleIdsCache = visibleEngineIds
+        engineVisibleProviderId = providerId
         val prices = runCatching {
-            ZenModelsApi.pricesFromProviders(
-                api.providers(opened.workspaceId),
-                providerId
-            )
+            ZenModelsApi.pricesFromProviders(engineProviders, providerId)
         }.getOrDefault(emptyMap())
         if (prices.isNotEmpty()) {
             zen.applyPricing(prices)
@@ -846,7 +944,29 @@ class ChatViewModel(
             val retried = runCatching { zen.fetch() }.getOrNull()
             if (retried?.models.isNullOrEmpty()) catalogue else retried
         } else catalogue
-        val models = usable?.models.orEmpty()
+        val models = usable?.models.orEmpty().let { listed ->
+            if (visibleEngineIds.isEmpty()) {
+                if (listed.isNotEmpty()) {
+                    AppLog.w(
+                        TAG,
+                        "engine /providers returned no models for '$providerId'; " +
+                            "keeping the raw list (filter would hide everything)"
+                    )
+                }
+                listed
+            } else {
+                val dropped = listed.filter { it.id !in visibleEngineIds }.map { it.id }
+                if (dropped.isNotEmpty()) {
+                    AppLog.w(
+                        TAG,
+                        "hiding ${dropped.size} model(s) the engine no longer knows: " +
+                            dropped.joinToString(",")
+                    )
+                }
+                // Preserve catalogue order probe-shortlist assumptions.
+                listed.filter { it.id in visibleEngineIds }
+            }
+        }
         if (models.isEmpty()) {
             AppLog.w(TAG, "no usable model: ${usable?.error}")
             _state.update {
@@ -1119,9 +1239,29 @@ class ChatViewModel(
                 baseUrl = base,
                 chatBaseCandidates = providerRow.chatBases
             ).fetch()
+            // Engine-aware filtering (2026-11-03): drop ids the engine's
+            // config no longer knows, using the cache bootstrap recorded for
+            // THIS provider. Without the cache (failed boot) the raw list
+            // stands - the picker must not lie about availability it cannot
+            // verify yet.
+            val visible = engineVisibleIdsCache
+                .takeIf { engineVisibleProviderId == providerId && it.isNotEmpty() }
+            val models = if (visible == null) {
+                r.models
+            } else {
+                val dropped = r.models.filter { it.id !in visible }.map { it.id }
+                if (dropped.isNotEmpty()) {
+                    AppLog.w(
+                        TAG,
+                        "picker: hiding ${dropped.size} model(s) the engine no longer knows: " +
+                            dropped.joinToString(",")
+                    )
+                }
+                r.models.filter { it.id in visible }
+            }
             _state.update {
                 it.copy(
-                    models = r.models,
+                    models = models,
                     modelsError = r.error
                 )
             }
@@ -1213,6 +1353,10 @@ class ChatViewModel(
             }
             ProviderSwitchPolicy.Decision.ApplyNow -> pendingProviderId = null
         }
+        // The engine-visible cache is provider-scoped: a new provider must not
+        // inherit the old one's accepted-id set.
+        engineVisibleIdsCache = emptySet()
+        engineVisibleProviderId = ""
         AppLog.i(TAG, "provider switched to ${provider.id}; re-bootstrapping")
         _state.update {
             it.copy(
@@ -1908,7 +2052,7 @@ class ChatViewModel(
 
         // Tell the supervisor a long request is live so hang detection cannot
         // restart the engine underneath the stream.
-        container.engineSupervisor.setWorkActive(true)
+        engineSupervisorFor.setWorkActive(true)
 
         try {
             val api = crushApi(p)
@@ -2115,7 +2259,7 @@ class ChatViewModel(
             // here - the moment the local job unwinds - would let hang
             // detection judge the engine idle while it is still working on the
             // run we just asked it to stop.
-            if (!handle.isStopped) container.engineSupervisor.setWorkActive(false)
+            if (!handle.isStopped) engineSupervisorFor.setWorkActive(false)
             abandonRun(handle)
             // The turn is over in every sense: any permission or question this
             // run raised is addressed to a run that no longer exists, and once
@@ -2545,7 +2689,7 @@ class ChatViewModel(
                 // Preflight window: nothing was posted, no bubble exists, and
                 // mayPost() keeps it that way. Local cancellation is complete.
                 abandonRun(handle)
-                container.engineSupervisor.setWorkActive(false)
+                engineSupervisorFor.setWorkActive(false)
                 // A prompt raised during preflight belongs to a run that was
                 // never posted and can never be answered; retire it (P1-7).
                 _state.update {
@@ -2574,7 +2718,7 @@ class ChatViewModel(
                     if (!confirmed) {
                         AppLog.w(TAG, "stop: server cancel not confirmed for ${action.sid}")
                     }
-                    container.engineSupervisor.setWorkActive(false)
+                    engineSupervisorFor.setWorkActive(false)
                     finalizeStoppedRun(handle, requestConfirmed = confirmed)
                 }
             }

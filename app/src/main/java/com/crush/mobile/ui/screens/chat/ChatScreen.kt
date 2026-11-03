@@ -71,11 +71,6 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenProjects: () -> Unit, isLocked:
     // exactly how the engine booted and the key decrypted while locked.
     LaunchedEffect(isLocked) { vm.onLockStateChanged(isLocked) }
 
-    // Projects-surface binding (ADR-0001 slice 2): any active-instance change
-    // (first composition included") retargets the session. bindProject() is a
-    // no-op when the key did not change.
-    LaunchedEffect(activeInstanceKey) { vm.bindProject() }
-
     val listState = rememberLazyListState()
     var showModels by remember { mutableStateOf(false) }
     var showSessions by remember { mutableStateOf(false) }
@@ -114,18 +109,25 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenProjects: () -> Unit, isLocked:
     // ~3s boot instead of meeting a warm engine, paid for ~59MB of RAM not being
     // held on a device that may never chat. This must NOT be "simplified" back
     // into an unconditional start().
-    DisposableEffect(prewarm) {
+    // START the ACTIVE engine instance when composing (prewarm on), and again
+    // every time the ACTIVE INSTANCE changes (ADR-0001 slice 2, 2026-11-03).
+    // bindProject alone cannot start the new instance's engine, and nothing
+    // else in the app calls start() except the composer's first keystroke -
+    // without this the project chat sat on "engine stopped" with no way out
+    // (measured 21:39 on device, test-project). With prewarm OFF the boot
+    // defers to the first keystroke instead, which targets the bound instance
+    // too (vm.startEngine()).
+    LaunchedEffect(activeInstanceKey) {
+        vm.bindProject()
         if (prewarm) {
-            AppLog.i("Chat", "starting supervisor (prewarm on)")
-            container.engineSupervisor.start()
+            AppLog.i("Chat", "starting supervisor for instance '$activeInstanceKey' (prewarm on)")
+            vm.startEngine()
         } else {
-            AppLog.i("Chat", "prewarm off; supervisor deferred to first input")
+            AppLog.i("Chat", "prewarm off; supervisor deferred to first input for $activeInstanceKey")
         }
-        onDispose { }
     }
 
-    LaunchedEffect(engineState) { vm.bindEngine(engineState) }
-    // Provider is chosen on the Settings screen, which has its own ViewModel.
+    LaunchedEffect(engineState) { vm.bindEngine(engineState) }    // Provider is chosen on the Settings screen, which has its own ViewModel.
     LaunchedEffect(Unit) { vm.observeProviderChanges() }
     // An unlock is the only event that can make a blocked bootstrap retryable;
     // engine state does not change when the user authenticates.
@@ -234,8 +236,10 @@ bottomBar = {
                     // engine is already booting by the time the user finishes
                     // typing. start() is idempotent (it returns early on a live
                     // supervisor job), so this is safe on every keystroke and
-                    // doubles as a retry after a failed boot.
-                    if (!prewarm) container.engineSupervisor.start()
+                    // doubles as a retry after a failed boot. Routes through
+                    // the ACTIVE instance (legacy or per-project engine; see
+                    // the LaunchedEffect above and vm.bindProject).
+                    if (!prewarm) vm.startEngine()
                     vm.setInput(text)
                 },
                 onSend = vm::send,

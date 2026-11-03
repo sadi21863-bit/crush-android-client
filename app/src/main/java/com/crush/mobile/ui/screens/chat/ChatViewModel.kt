@@ -364,6 +364,16 @@ class ChatViewModel(
         get() = container.runtimeFor(instanceKey).supervisor
 
     /**
+     * Idempotent start of the ACTIVE instance's supervisor (legacy singleton
+     * or per-project engine child). The composition's start path calls this,
+     * and the composer's first keystroke defers here under prewarm=off - both
+     * must target the bound instance, never hard-code the legacy singleton.
+     */
+    fun startEngine() {
+        engineSupervisorFor.start()
+    }
+
+    /**
      * What the ENGINE still knows for [engineVisibleProviderId] (the
      * agent/init-validatable id set, measured from the engine's /providers
      * payload at bootstrap). The picker filters through this so a

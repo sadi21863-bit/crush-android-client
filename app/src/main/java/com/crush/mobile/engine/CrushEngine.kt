@@ -61,7 +61,8 @@ internal fun pidFromReflective(raw: Any?): Int {
 internal const val UDS_PORT_SENTINEL: Int = 1
 
 class CrushEngine(
-    private val paths: EnginePaths,
+    /** Engine-owned paths; internal so the chat layer reads (never rebuilds) them. */
+    internal val paths: EnginePaths,
     /**
      * Application context, needed to resolve the Unix-domain-socket path the
      * engine binds ([EngineSockets.socketPath]). AppContainer passes the

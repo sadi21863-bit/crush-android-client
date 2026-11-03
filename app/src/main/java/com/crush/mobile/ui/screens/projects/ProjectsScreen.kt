@@ -54,7 +54,7 @@ import com.crush.mobile.project.ProjectRef
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProjectsScreen(onBack: () -> Unit) {
+fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val container = (context.applicationContext as CrushMobileApp).container
     val vm: ProjectsViewModel = viewModel(factory = ProjectsViewModel.Factory(context, container))
@@ -121,15 +121,33 @@ fun ProjectsScreen(onBack: () -> Unit) {
                     modifier = Modifier.weight(1f)
                 ) {
                     items(s.projects, key = { it.id }) { project ->
-                        ProjectRow(project)
+                        // Opening a row = binding the chat to that row's OWN
+                        // engine instance (ADR-0001 slice 2). EXCEPTION: the
+                        // legacy workspace row binds "" - the legacy workspace
+                        // keeps its history on the unkeyed engine (the ADR's
+                        // additive-migration invariant), it must never be
+                        // re-instanced onto a fresh engine child.
+                        val legacyPath = java.io.File(
+                            context.filesDir, "workspace"
+                        ).absolutePath
+                        ProjectRow(
+                            project,
+                            onOpen = {
+                                when (project.repoDir.absolutePath) {
+                                    legacyPath -> container.setActiveProject(null)
+                                    else -> container.setActiveProject(project)
+                                }
+                                onOpenProject()
+                            }
+                        )
                     }
                 }
             }
 
             Spacer(Modifier.height(8.dp))
             Text(
-                "Slice-1 note: projects are stored and listed here; opening one " +
-                    "in chat (its own engine instance) lands in the next slice.",
+                "Tapping a project opens it in chat on its OWN engine instance; " +
+                    "opening the legacy workspace returns to the shared engine.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -174,9 +192,10 @@ fun ProjectsScreen(onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProjectRow(project: ProjectRef) {
-    Card(Modifier.fillMaxWidth()) {
+private fun ProjectRow(project: ProjectRef, onOpen: () -> Unit) {
+    Card(onClick = onOpen, Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(

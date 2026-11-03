@@ -56,9 +56,15 @@ fun NavGraph(
         }
 
         // Reachable from the chat sheet (next to Settings). The Projects
-        // surface is the ADR-0001 registry's in-app reader (P3 slice 1).
+        // surface is the ADR-0001 registry's in-app reader; opening a row
+        // returns to chat bound to that row's engine instance.
         composable(Screen.Projects.route) {
-            ProjectsScreen(onBack = { navController.popBackStack() })
+            ProjectsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenProject = {
+                    navController.navigate(Screen.Chat.route) { launchSingleTop = true }
+                }
+            )
         }
 
         composable(Screen.Settings.route) {

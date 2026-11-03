@@ -58,13 +58,24 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenProjects: () -> Unit, isLocked:
     val container: AppContainer = (context.applicationContext as CrushMobileApp).container
     val vm: ChatViewModel = viewModel(factory = ChatViewModel.Factory(context, container))
     val s by vm.state.collectAsState()
-    val engineState by container.engineSupervisor.state.collectAsStateWithLifecycle()
+    // The engine state of WHATEVER instance the chat layer is bound to ("" =
+    // legacy engine on the process-single supervisor; "p<uuid8>" = a project's
+    // own engine child). The container flips this flow when the Projects
+    // surface opens a project.
+    val engineState by container.engineStateForActiveInstance.collectAsStateWithLifecycle()
+    val activeInstanceKey by container.activeInstanceKey.collectAsStateWithLifecycle()
     val keyAvailable by container.keyAvailable.collectAsStateWithLifecycle()
 
     // Tell the ViewModel the gate is closed. It cannot infer this: the lock state
-    // lives in MainActivity, and composing this screen behind the overlay was
+    // lives in MainActivity, and composing this screen behind an overlay was
     // exactly how the engine booted and the key decrypted while locked.
     LaunchedEffect(isLocked) { vm.onLockStateChanged(isLocked) }
+
+    // Projects-surface binding (ADR-0001 slice 2): any active-instance change
+    // (first composition included") retargets the session. bindProject() is a
+    // no-op when the key did not change.
+    LaunchedEffect(activeInstanceKey) { vm.bindProject() }
+
     val listState = rememberLazyListState()
     var showModels by remember { mutableStateOf(false) }
     var showSessions by remember { mutableStateOf(false) }

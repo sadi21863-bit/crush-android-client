@@ -10,10 +10,13 @@ import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.CrushEngine
+import com.crush.mobile.engine.EngineState
 import com.crush.mobile.engine.EngineSupervisor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -119,10 +122,108 @@ class AppContainer(context: Context) {
             }
         }
 
-    private val _keyAvailable = MutableStateFlow(0)
+    // ----------------------------------------------------------------
+    // Per-instance engine runtimes (ADR-0001 accepted shape, P3 slice 2).
+    // ----------------------------------------------------------------
 
     /**
-     * Bumped every time the app is successfully unlocked.
+     * One RUNTIME BUNDLE per bound engine instance: the engine child, its own
+     * supervisor loop, and the instance key that isolates its socket file
+     * (`filesDir/crush-<key>.sock`) and its whole engine state tree — the
+     * measured isolation unit ("TwoEngineInstancesPerProjectTest": per-project
+     * engine instances hold exactly their own sessions).
+     *
+     * The legacy instance ("") stays the process-single
+     * [crushEngine]/[engineSupervisor] pair: today's behavior, byte-for-byte.
+     *
+     * The two-loops-for-one-engine hazard documented above does NOT apply
+     * here: that guard exists because a supervisor per CALL would make two
+     * loops race on the SAME engine. Distinct instances own distinct engine
+     * processes and distinct loops - which is the design, the same way two
+     * real crush desktops run two engines.
+     *
+     * Restart-pressure wiring is per instance: the P1-11 flush bumps
+     * WorkspaceManager's generation counter, which deliberately
+     * over-invalidates ACROSS instances - re-attach is path-derived and
+     * idempotent, so an over-invalidated id costs one extra POST per bound
+     * instance and never an isolation breach.
+     */
+    data class EngineRuntime(
+        val instanceKey: String,
+        val engine: CrushEngine,
+        val supervisor: EngineSupervisor,
+    )
+
+    private var projectRuntime: EngineRuntime? = null
+    private val runtimeLock = Any()
+
+    /**
+     * The engine instance the chat layer is bound to: "" = the legacy
+     * workspace, "p<uuid8>" = a project row (set ONLY by the Projects surface
+     * through [setActiveProject]; the chat ViewModel reads it, never writes).
+     * Explanation of the project's workspace path: [activeProjectRef].
+     */
+    private val _activeInstanceKey = MutableStateFlow("")
+    val activeInstanceKey: StateFlow<String> = _activeInstanceKey.asStateFlow()
+
+    @Volatile
+    var activeProjectRef: com.crush.mobile.project.ProjectRef? = null
+        private set
+
+    /** Stable id -> instance-key derivation; "" stays reserved for legacy. */
+    fun instanceKeyFor(id: java.util.UUID): String = "p" + id.toString().substring(0, 8)
+
+    /** Projects-surface entry point: null opens the legacy workspace. */
+    fun setActiveProject(ref: com.crush.mobile.project.ProjectRef?) {
+        activeProjectRef = ref
+        _activeInstanceKey.value = if (ref == null) "" else instanceKeyFor(ref.id)
+    }
+
+    /**
+     * The engine state of WHATEVER instance the chat layer is bound to, in one
+     * flow. Lazily started so the legacy supervisor's construction (and its
+     * tuning collector) keeps today's timing: on first chat render, not at
+     * container construction.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val engineStateForActiveInstance: StateFlow<EngineState> =
+        _activeInstanceKey.flatMapLatest { key ->
+            runtimeFor(key).supervisor.state
+        }.stateIn(
+            containerScope,
+            kotlinx.coroutines.flow.SharingStarted.Lazily,
+            EngineState.Stopped
+        )
+
+    /** Full runtime for an instance key; "" returns the legacy singleton. */
+    fun runtimeFor(instanceKey: String): EngineRuntime {
+        if (instanceKey.isBlank()) {
+            return EngineRuntime("", crushEngine, engineSupervisor)
+        }
+        synchronized(runtimeLock) {
+            projectRuntime?.takeIf { it.instanceKey == instanceKey }?.let { return it }
+            val resolvedTuning = TuningPolicy.resolve(deviceProfile, TuningPolicy.Overrides())
+            val engine = CrushEngine(appContext, instanceKey, resolvedTuning.engineIdleTimeoutSec)
+            val supervisor = EngineSupervisor(
+                engine,
+                containerScope,
+                tuning = resolvedTuning,
+                appContext = appContext
+            ).also { s ->
+                // P1-11 flush for THIS instance's restarts - the same
+                // registration the legacy singleton carries (see its .also
+                // block above for why the whole generation counter exists).
+                s.onEngineStart { WorkspaceManager.onEngineRestarted() }
+            }
+            val runtime = EngineRuntime(instanceKey, engine, supervisor)
+            projectRuntime = runtime
+            return runtime
+        }
+    }
+
+    private val _keyAvailable = MutableStateFlow(0)
+
+    /** Bumped every time the app is successfully unlocked.
      *
      * ChatViewModel only re-runs bootstrap when the ENGINE state changes, so an
      * unlock could not reach it any other way. Without this signal a user who
@@ -146,6 +247,11 @@ class AppContainer(context: Context) {
     private fun applyTuning(t: TuningPolicy.Resolved) {
         supervisorInstance?.tuning = t
         crushEngine.setIdleTimeoutSec(t.engineIdleTimeoutSec)
+        // Per-project runtimes (slice 2): same rules, same sources of truth.
+        projectRuntime?.let { rt ->
+            rt.supervisor.tuning = t
+            rt.engine.setIdleTimeoutSec(t.engineIdleTimeoutSec)
+        }
     }
 
     /**

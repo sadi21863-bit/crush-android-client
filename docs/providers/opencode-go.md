@@ -471,6 +471,22 @@ with the drop list written to the app log). An empty engine models-block
 disables the filter by design (a plumbing failure must not masquerade as
 an empty catalogue). The incident is also visible in `capabilities.md`.
 
+**Wedge closure (same day, `6edf259`)**: the same incident had exposed a
+second defect — the composer was HARD-DISABLED whenever `!engineReady`
+under prewarm, so the designed send-preflight recovery was unreachable and
+the screen wedged until a provider switch (the user's recovery, measured
+20:07). Fixed with `ChatUiState.recoverable`: armed ONLY at a settled
+init-failure (engine Running, agent not ready after the retry chain),
+cleared on bootstrap start and at ready; typing and send become available
+exactly then, and `send()`'s own architecture makes the first press re-run
+the (now filtered) bootstrap with the typed text surviving for the second
+press. Verification limits stated honestly: the wedge trigger no longer
+exists (the filter), so the fix is verified by the state model + the
+`send()` path inspection + this gate/CI over the full suite, plus the
+regression drive on the fix build (normal send unchanged: 23:41 "Say
+exactly: OK" → `OK`, legacy engine, deepseek-v4.1-flash per user choice
+for cost).
+
 
 ## Sources
 

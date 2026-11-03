@@ -254,9 +254,12 @@ proven as of 2026-11-02 (`bb76e49`), graded **C / not started**:
    `RoomProjectStore` (KSP 2.3.13), whose restart survival and idempotent
    legacy-workspace migration are proven by `ProjectStoreRoomPersistenceTest`
    (status: gate + device run recorded in the commit that lands them).
-   Downgrade resolved: "no ProjectRegistry source exists" no longer holds;
-   what is still absent is the P3 productization (Projects UI, DI wiring,
-   Room adoption in production paths).
+   Downgrade resolved: "no ProjectRegistry source exists" no longer holds,
+   and the P3 slice-1 productization is no longer absent either: a Projects
+   screen (session-sheet entry) reads the production registry — the legacy
+   workspace migrated in on first entry and project create is verified on
+   device (2026-11-03). Still absent: slice 2 (chat binding to each
+   project's OWN engine instance) and Room adoption in the chat launch path.
 3. **Termux L1–L3 — not started.** The separate environment-related project
    has its own plan
    ([termux-project-plan.md](termux-project-plan.md)); the level taxonomy

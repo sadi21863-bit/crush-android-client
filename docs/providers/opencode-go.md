@@ -435,6 +435,42 @@ happily through the same gateway (`app.log`, lines 285-330):
   catalogue-retry, view-epoch) is verifiably not in the paid-lane failure
   path.
 
+## 2026-11-03: `beam-free` retired upstream mid-day — plan catalog drift measured, and the recovery
+
+The free lane that carried the whole 2026-11-02 verification wave
+(`beam-free`) is **gone from the engine's own plan catalog as of this
+afternoon**, while the plan's documented surface still advertises and
+SERVES it. Measured sequence on device (all in one hour):
+
+1. Cold boot configured `beam-free` (the app's probe: **HTTP 200** from
+   `opencode.ai/inference/go/openai/v1/chat/completions`, one-token call;
+   the LIST endpoint still advertised it — "of 28 listed").
+2. The engine's freshly fetched `providers.json` (rewritten in the `-D`
+   data dir) contained the `opencode-go` provider with **31 models and NO
+   `beam-free`** (`space-bunny-free` is gone too; a `space-bunny` id exists).
+3. The workspace handshake then failed at the LAST step: key write +
+   both model-slot writes answered 2xx, and
+   `POST /v1/workspaces/{id}/agent/init` returned **HTTP 500** with the
+   engine log line
+   `Failed to create coder agent: large model not found in provider config`
+   — reproducibly, across two fresh engine processes and two workspace idns.
+4. The user recovered by switching provider (openrouter — its own catalog
+   drives the same machinery and init succeeded on the probed free id).
+
+ Filed upstream with the full measured chronology:
+ [charmbracelet/crush#4222](https://github.com/charmbracelet/crush/issues/4222)
+ — the two suggestions (drop the id from the documented list too, or relax
+ agent/init to ids the plan gateway currently serves) are the two ways
+ either side can close the gap.
+
+**App-side fix in the same day** (this repo): every fetch of the plan
+catalogue is now intersected with the ENGINE's `/providers` payload — the
+picker and the probe shortlist can no longer offer an id the engine's
+config has retired (`engineVisibleModelIds` + a bootstrap/picker filter,
+with the drop list written to the app log). An empty engine models-block
+disables the filter by design (a plumbing failure must not masquerade as
+an empty catalogue). The incident is also visible in `capabilities.md`.
+
 
 ## Sources
 

@@ -648,6 +648,7 @@ class ChatViewModel(
         val containerRef = container.activeProjectRef
         val key = if (containerRef == null) "" else container.instanceKeyFor(containerRef.id)
         if (key == instanceKey) return
+        val oldKey = instanceKey
         instanceKey = key
         // An instance switch invalidates every engine-derived handle: the
         // new engine owns its own workspace/session id space (the same reset
@@ -657,6 +658,22 @@ class ChatViewModel(
         wsId = null
         sessionId = null
         workspaces = null
+        // Stop the OUTGOING PROJECT engine on the switch (ADR-0001 lifecycle
+        // polish, 2026-11-04): each project engine child holds its own ~60MB
+        // Go runtime, and the default linger would let it idle for an hour on
+        // the phone for nothing. The engine holds only rebuildable state (the
+        // same ADR invariant that makes restarts cheap), and the registry rows
+        // survive - reopening the project reboots the engine in seconds.
+        // Deliberately NOT stopped when a turn is in flight: the known
+        // switch-away edge keeps that run alive engine-side, and killing the
+        // child would cancel it mid-work. Such an instance simply rides its
+        // own idle linger (nothing re-fires this stop later) - the normal
+        // one-hour case. The LEGACY engine ("") is also never stopped here -
+        // it is the host of the app's own history and pre-dates this feature.
+        if (oldKey.isNotBlank() && activeRun == null) {
+            AppLog.i(TAG, "stopping project engine for instance '$oldKey' (no run in flight)")
+            container.runtimeFor(oldKey).supervisor.stop()
+        }
         _state.update {
             it.copy(
                 phase = if (containerRef == null) "switching to the workspace..."
@@ -1201,11 +1218,31 @@ class ChatViewModel(
         val p = port ?: return
         val ws = wsId ?: mgr.currentWorkspaceId ?: return
         viewModelScope.launch {
-            runCatching { crushApi(p).currentSession(ws, mgr.clientId, sid.orEmpty()) }
-                .onFailure { AppLog.w(TAG, "current-session report failed: ${it.message}") }
-                .onSuccess {
+            // The engine requires the SSE attach (same client id) to be KNOWN
+            // before current-session, and on a FRESH engine the attach
+            // registration lands slower than this POST - measured 22:18
+            // (test-project's first ever boot: HTTP 409 "client not attached"
+            // on the very first call, repeated on the next boot). The fix is a
+            // tiny bounded retry, firing-and-forgetting as before (the caller
+            // was never blocked), and only for THAT race: a genuinely
+            // different failure (missing route on old engines) fails fast the
+            // way it always has.
+            val attempts = 4
+            var lastFailure: String? = null
+            for (n in 1..attempts) {
+                val outcome = runCatching { crushApi(p).currentSession(ws, mgr.clientId, sid.orEmpty()) }
+                if (outcome.isSuccess) {
                     AppLog.i(TAG, "current-session reported: ${sid?.take(8) ?: "(cleared)"}")
+                    return@launch
                 }
+                lastFailure = outcome.exceptionOrNull()?.message
+                if (lastFailure?.contains("client not attached") != true) break
+                if (n < attempts) delay(500)
+            }
+            AppLog.w(
+                TAG,
+                "current-session report failed after $attempts attempts: $lastFailure"
+            )
         }
     }
 

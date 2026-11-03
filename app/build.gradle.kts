@@ -8,6 +8,10 @@ plugins {
     // Compose compiler. Version comes from the root build script and is
     // independent of the Kotlin version.
     id("org.jetbrains.kotlin.plugin.compose")
+
+    // Room's KSP processor (ProjectRegistry persistence, ADR-0001 P2).
+    // Version lives in the root build script, like the other plugins.
+    id("com.google.devtools.ksp")
 }
 
 // Release signing credentials, read from a gitignored properties file.
@@ -235,6 +239,16 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("androidx.navigation:navigation-compose:2.10.2")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
+
+    // ProjectRegistry persistence (ADR-0001 P2, `RoomProjectStore`). Room
+    // 2.8.5 is the maintained 2.x line - a same-day stable release beside
+    // Room 3.0.3, which moved coordinates to the new androidx.room3 group;
+    // adopting THAT is a deliberate later migration, and this slice needs
+    // only the smallest proven stack. room-ktx powers the suspend DAO;
+    // room-compiler runs via KSP (root build script).
+    implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-ktx:2.8.5")
+    ksp("androidx.room:room-compiler:2.8.5")
     implementation("androidx.core:core-ktx:1.19.1")
     // FragmentActivity is needed to host the device-credential screen.
     //

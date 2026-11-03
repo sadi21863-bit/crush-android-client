@@ -43,23 +43,27 @@ data class ProjectRef(
 
 /**
  * Registry PROTOTYPE: PROCESS-LIFETIME ONLY (in memory, no persistence).
- * A crashed process forgets projects here - the recovery story belongs to
- * the P2 Room migration, not to this file. Single-writer discipline stays
+ * A crashed process forgets projects here - the durable story is the
+ * [ProjectStore] seam, implemented for real by
+ * `com.crush.mobile.data.project.RoomProjectStore` (P2 Room, 2026-11-03).
+ * This in-memory object remains as the zero-machinery fixture the
+ * integration proofs attach with, and it keeps the store contract exercised
+ * without storage machinery. Single-writer discipline stays
  * in the view layer (sessionViewEpoch etc.); this object only names things.
  */
-object ProjectRegistry {
+object ProjectRegistry : ProjectStore {
 
     private val projects = ConcurrentHashMap<UUID, ProjectRef>()
 
     /** Creates (or re-uses) a project for a canonical repo directory. */
-    fun create(label: String, repoDir: File): ProjectRef {
+    override suspend fun create(label: String, repoDir: File): ProjectRef {
         val dir = repoDir.apply { mkdirs() }
         val ref = ProjectRef(UUID.randomUUID(), label, dir)
         projects[ref.id] = ref
         return ref
     }
 
-    fun list(): List<ProjectRef> = projects.values.toList()
+    override suspend fun list(): List<ProjectRef> = projects.values.toList()
 
-    fun byId(id: UUID): ProjectRef? = projects[id]
+    override suspend fun byId(id: UUID): ProjectRef? = projects[id]
 }

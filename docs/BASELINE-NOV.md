@@ -235,20 +235,28 @@ proven as of 2026-11-02 (`bb76e49`), graded **C / not started**:
    but a real turn editing **two or more source files** has never run on
    device. This is the plan's first P1 proof (§P1 step 1) and the README's
    standing open row in the Status table.
-2. **ProjectRegistry / per-project workspace mapping — prototype in flight.**
+2. **ProjectRegistry / per-project workspace mapping — identity + persistence land measured.**
    The Chat/Code separation depends on it (the plan's
    code-experience layer, projected as
    `ProjectRegistry -> Explore/Build/Review`).
    Update 2026-11-03: ADR-0001 ("Project / workspace / session / run
-   identity") is now **PROPOSED + COMMITTED** on `main` (`b1e715f`),
-   grounded in the real seams (`openWorkspace`, `RunHandle`,
-   `sessionViewEpoch`), and the first code prototyped against it is an
-   in-memory `ProjectRef`/`ProjectRegistry` (no persistence by design)
-   plus the ADR's first integration proof, `TwoProjectAttachTest`
-   (instrumented; two distinct project cwds must attach as distinct
-   workspaces on вооружив the same engine with no cross-workspace
-   session bleed). Proof status is recorded in the ledger once that gate
-   and the on-device `am instrument` run land.
+   identity") is **PROPOSED + COMMITTED** on `main` (`b1e715f`), grounded in
+   the real seams (`openWorkspace`, `RunHandle`, `sessionViewEpoch`). The
+   plan's hard stop was measured, not assumed: `TwoProjectAttachTest` proved
+   workspace attach is path-keyed and multi-capable on one engine process,
+   and proved the SESSION boundary is NOT — crush v0.99.0 keeps sessions as
+   a global pool per data dir. The ADR amended in place (`4207828`) to the
+   measured fallback shape: **one engine instance per project** (own socket +
+   own state dir), proven isolating sessions/workspaces exactly per project
+   by `TwoEngineInstancesPerProjectTest` ("OK (2 tests)" on device). P2
+   persistence followed on the same day: a `ProjectStore` seam with the
+   in-memory `ProjectRegistry` fixture and a Room 2.8.5-backed
+   `RoomProjectStore` (KSP 2.3.13), whose restart survival and idempotent
+   legacy-workspace migration are proven by `ProjectStoreRoomPersistenceTest`
+   (status: gate + device run recorded in the commit that lands them).
+   Downgrade resolved: "no ProjectRegistry source exists" no longer holds;
+   what is still absent is the P3 productization (Projects UI, DI wiring,
+   Room adoption in production paths).
 3. **Termux L1–L3 — not started.** The separate environment-related project
    has its own plan
    ([termux-project-plan.md](termux-project-plan.md)); the level taxonomy

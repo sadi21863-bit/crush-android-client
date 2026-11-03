@@ -224,6 +224,22 @@ internal fun PendingQuestion.displayTitle(): String {
 data class ChatUiState(
     val phase: String = "starting engine",
     val engineReady: Boolean = false,
+    /**
+     * A SETTLED bootstrap failure the send-preflight can recover from.
+     *
+     * 2026-11-03 wedge (user-measured): the beam-free catalog-drift incident
+     * left the phase reading "agent not ready: ..." while the engine itself
+     * stayed Running - and with prewarm on, the composer was HARD-DISABLED
+     * whenever !engineReady, so the designed recovery path (send → preflight
+     * re-config → ensureAgentReady with a healthy model) was unreachable and
+     * the screen wedged until a provider switch. Recoverable=true is set
+     * exactly at that settle point; it enables TYPING and the send button so
+     * the preflight can re-drive the handshake. Transient states (starting,
+     * the auto-retry loop) stay false: pressing send mid-retry would be a
+     * silent no-op, which is the exact anti-pattern the sendEnabled guard
+     * exists to prevent.
+     */
+    val recoverable: Boolean = false,
     val isStreaming: Boolean = false,
     val messages: List<ChatMessage> = emptyList(),
     val models: List<LiveZenModel> = emptyList(),
@@ -723,7 +739,7 @@ class ChatViewModel(
     }
 
     private suspend fun doBootstrap() {
-        _state.update { it.copy(phase = "connecting to agent", engineReady = false) }
+        _state.update { it.copy(phase = "connecting to agent", engineReady = false, recoverable = false) }
         val p = port ?: return
         val api = crushApi(p)
         val mgr = WorkspaceManager(api)
@@ -1072,7 +1088,13 @@ class ChatViewModel(
             _state.update {
                 it.copy(
                     phase = "agent not ready: $summary",
-                    engineReady = false
+                    engineReady = false,
+                    // Settled failure: hand recovery back to the user via the
+                    // send preflight (recoverable=true arms the composer and
+                    // the send button - the 2026-11-03 wedge fix). The engine
+                    // itself is Running, so the preflight's re-config chain is
+                    // live; a healthy model resolves it on the next send.
+                    recoverable = true
                 )
             }
             return
@@ -1104,6 +1126,7 @@ class ChatViewModel(
             it.copy(
                 phase = "ready",
                 engineReady = true,
+                recoverable = false,
                 selectedModel = chosen,
                 models = models,
                 pendingPermission = null,

@@ -224,11 +224,21 @@ bottomBar = {
                 // field must stay typeable - it is the only thing that starts the
                 // supervisor, and a disabled field would leave the user with a
                 // permanently unusable screen and no way to recover.
-                enabled = s.engineReady || !prewarm,
+                //
+                // recoverable (2026-11-03 wedge fix): when a bootstrap failure
+                // SETTLES (engine Running, agent not ready), the send preflight
+                // is the designed recovery (it re-runs the handshake chain);
+                // arm the field and the send button for exactly that state.
+                // Mid-retry and starting states stay disabled so a press cannot
+                // silently no-op.
+                enabled = s.engineReady || !prewarm || s.recoverable,
                 // Sending still requires a live port. send() reads the port and
                 // returns without doing anything when it is null, so enabling
-                // this early would swallow the message with no visible error.
-                sendEnabled = s.engineReady,
+                // this early would swallow the message with no visible error -
+                // hence engineReady, or RECOVERABLE (the settled-failure state
+                // where the port exists and the preflight explicitly handles
+                // the not-ready agent).
+                sendEnabled = s.engineReady || s.recoverable,
                 streaming = s.isStreaming,
                 enterSends = settings.enterSendMode == "send",
                 onChange = { text ->

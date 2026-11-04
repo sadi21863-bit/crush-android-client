@@ -54,6 +54,63 @@ citation below was read against that tree.**
 > they stay load-bearing facts for re-attach semantics regardless of the
 > engine-instance topology chosen.)
 
+> **2026-11-04 MEASURED UPDATE + DECISION — per-project engine lifecycle
+> and the import-folder arc** (builds `293b005`/`28328b5`, device
+> `bbf8ca69`, traces in [`capabilities.md`](capabilities.md)):
+>
+> 1. The §6 fallback's lifecycle cost — "spawn/stop per switch" — is
+>    now PROVEN on device: with test-project's chat open there were two
+>    `libcrush.so` children (legacy + project), and switching back to
+>    the legacy row left ONE child plus the log line
+>    `I/Lifecycle: stopping project engine for instance 'p8a3825d0'
+>    (no run in flight)`. The first wiring attempt put the stop in the
+>    chat ViewModel's `bindProject` and it NEVER FIRED (measured
+>    09:27–09:30: both children alive, no stop line, while the legacy
+>    re-bootstrap ran and resumed its 4-msg session). Root cause: the
+>    chat ViewModel is scoped to the NAV BACK-STACK ENTRY — a
+>    projects↔chat round trip recreates it, the outgoing instance key
+>    dies with the old entry, and the fresh VM early-returned on its
+>    default `""` key. The stop moved to
+>    `AppContainer.setActiveProject`, which outlives every entry,
+>    guarded by the VM-reported run-in-flight marker
+>    (`reportRunInFlight`: set at `send()` start beside `activeRun`,
+>    cleared key-guarded in `abandonRun` on every exit path; a mid-run
+>    switch leaves the OLD key flagged so the run rides its own linger
+>    instead of being killed mid-work). Recorded lesson: the identity
+>    OWNER must outlive the identity CONSUMERS — the container holds
+>    the lifecycle precisely because ViewModels do not.
+> 2. The import-folder feature (SAF `OpenDocumentTree` →
+>    `FolderUriDecoder` → a REAL external cwd) needed NO new binding
+>    shape: Project → WorkspaceBinding → cwd → workspaceId is
+>    unchanged; only WHERE the cwd lives changed
+>    (`/storage/emulated/0/<name>` instead of a minted internal repo).
+>    I2 strengthens from "an existing POSIX directory" to "an existing,
+>    USER-VISIBLE one": a deepseek turn wrote `notes.md`+`todo.md`
+>    into the real folder (ASK approvals surfaced and honored), the
+>    engine self-verified via its own `ls`, and the sibling project's
+>    internal repo stayed EMPTY — the Proof-B contamination property
+>    holding with a real user folder in the chain.
+> 3. §7's predicted event-routing cost LANDED measurably: on the
+>    imported-folder instance the events socket never connects
+>    (`CrushConnection: events connect failed …: No such file or
+>    directory`, attempts 73→98+ at ~5s), so a run that genuinely
+>    completed (both writes + final summary) surfaced as a false
+>    "This reply failed — no reply received" banner and the changes
+>    rail classified the external files "(unreadable, binary, or too
+>    large)". The per-binding event routing debt named in §7 is now a
+>    measured defect and the top of the fix queue.
+> 4. DECISION (user, 2026-11-04): Projects are created ONLY via Import
+>    folder (the desktop-app model) — the "New project" minted-
+>    internal-repo path is removed, since `filesDir/projects/<uuid>/
+>    repo` content is invisible to the user's file manager and the
+>    engine's real value is editing places the user owns. Project
+>    removal is type-honest: an imported (external) folder row is a
+>    REFERENCE — removing it drops only the row (user data untouched);
+>    an app-minted internal repo is deleted together with its row. The
+>    legacy workspace row is permanent: it hosts the app's existing
+>    history, and the idempotent migration would re-create the row
+>    anyway (I2's anchor can be re-adopted, but never orphaned).
+
 > **Non-claiming rule.** This is a decision record for a design, not a report of
 > working features. Nothing below asserts that the engine already hosts multiple
 > concurrent workspaces with isolation — that is exactly what the two integration

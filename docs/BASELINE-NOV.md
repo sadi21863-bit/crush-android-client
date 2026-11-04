@@ -261,10 +261,48 @@ proven as of 2026-11-02 (`bb76e49`), graded **C / not started**:
    **slice 2 measured live (22:18)**: a project row opens the chat on the
    project's OWN engine instance (two `libcrush.so` children alive in `ps`,
    fresh session pool with no bleed from the legacy history, a real turn
-   landing there). Still open (noted in the ledger, not a ValueError):
-   per-instance lifecycle polish (stopping an unused project engine, the
-   409 "client not attached" first current-session poll) and the catalog
-   drift-filter's composer-edge fix (below).
+   landing there). Update 2026-11-04 (`28328b5`), measured on device:
+   that polish is CLOSED as FIXED — the stop-on-switch lives in
+   `AppContainer.setActiveProject` (container-owned, outliving the
+   nav-scoped chat ViewModel whose reconstruction across a
+   projects↔chat round trip had silenced the old `bindProject` stop),
+   guarded by the VM-reported run-in-flight marker (`reportRunInFlight`:
+   set at send() start, cleared key-guarded in `abandonRun`); the
+   close-out trace: two `libcrush.so` children with the project chat
+   open, then ONE child + `I/Lifecycle: stopping project engine for
+   instance 'p8a3825d0' (no run in flight)` after returning to the
+   legacy row (the pre-fix build on the same 09:27–09:30 trace kept
+   BOTH alive with no stop line). The same drive closed the
+   import-folder arc (`293b005`):
+   the picker flows into a REAL external workspace
+   (`/storage/emulated/0/Test project folder`, spaces intact,
+   L0_EMBEDDED), a deepseek-v4.1-flash turn wrote `notes.md`+`todo.md`
+   INTO that real folder (ASK approvals surfaced and honored; the
+   engine self-verified via its own `ls`), and the sibling internal
+   repo (`files/projects/83cc71bd/repo`) stayed EMPTY — contents and
+   isolation details in capabilities.md's 2026-11-04 multi-project
+   block. The 409 "client not attached" first current-session poll
+   (the other half of that old queue item) measured ABSENT in the same
+   boot
+   (the legacy rebind reported current-session with zero 409s).
+   NEW top-of-queue defect, discovered in the same drive: on the
+   imported-folder instance the events socket NEVER connects
+   (`CrushConnection: events connect failed …: No such file or
+   directory`, attempts 73→98+ at ~5s), so a run that genuinely
+   finished (both writes, engine-side `ls`, final summary bubble)
+   surfaced as a false "This reply failed — no reply received" banner,
+   and the changes rail classifies external files "(unreadable,
+   binary, or too large)".
+   PRODUCT DECISION (user, 2026-11-04): Projects are created ONLY via
+   Import folder (the desktop-app model) — the "New project" internal-
+   repo path is being removed (its minted rows under
+   filesDir/projects/<uuid>/repo are invisible to the user's file
+   manager), and a REMOVE-from-list action is added per row with
+   type-honest semantics: an imported folder is user DATA (only the
+   app's reference is dropped, never the folder), while an app-minted
+   internal repo is deleted together with its row; the legacy
+   workspace row is permanent (it hosts the app's existing history).
+   The catalog drift-filter's composer-edge fix (below) remains open.
 3. **Termux L1–L3 — not started.** The separate environment-related project
    has its own plan
    ([termux-project-plan.md](termux-project-plan.md)); the level taxonomy

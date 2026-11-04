@@ -255,20 +255,24 @@ object EngineConfigInjector {
     }
 
     /**
-     * Every built-in tool name this engine family documents (docs/config +
-     * the 2026-11-05 S1 device probe result). Q2 = deny ALL tools in Chat v1
-     * (pure conversation), so the list covers all built-ins the pinned
-     * release knows. Not enumerated: MCP- and skill-derived names (they are
-     * user-configurable surfaces, absent from the built-in list); if a
-     * future engine adds a NEW built-in, the injected list is the honest
-     * best-effort of this app version - the MODE-01 acceptance drive on the
-     * real engine is what proves a release.
+     * Every built-in tool name this engine family documents plus the names
+     * the 2026-11-05 chat-pool drive caught the model actually exercising:
+     * with bash/edit/view hidden, the model fell back to a `question` TOOL
+     * CALL (ask-the-user) trying to get a deletion confirmed - question and
+     * todos and the lsp/diagnostic surfaces belong out of Chat too (they are
+     * tools, Q2 = zero tools; hiding unknown ids is inert, hiding a REAL one
+     * is the security gain). Not enumerated: MCP- and skill-derived names
+     * (user-configurable surfaces, absent from the built-in list) - the
+     * MODE-01 acceptance drive on the real engine is what proves a release.
      */
     val CHAT_DISABLED_TOOLS: List<String> = listOf(
         "agent", "bash", "job_output", "job_kill", "download",
         "edit", "multiedit", "lsp_diagnostics", "lsp_references", "lsp_restart",
         "fetch", "agentic_fetch", "glob", "grep", "ls", "sourcegraph",
-        "write", "view"
+        "write", "view",
+        // 2026-11-05 chat-pool drive additions (seen exercised or named by
+        // the model itself after the first-eight list):
+        "todos", "question", "task", "diagnostics"
     )
 
     private fun ModelSpec.toJson(): JsonObject = JsonObject().apply {

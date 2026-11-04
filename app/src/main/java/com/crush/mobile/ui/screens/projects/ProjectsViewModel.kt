@@ -117,6 +117,52 @@ class ProjectsViewModel(
     }
 
     /**
+     * Import an EXISTING folder as a project (user feature, 2026-11-04):
+     * unlike [createProject] the repo dir is not minted under filesDir - the
+     * user points at a folder on shared storage (typically
+     * /storage/emulated/0/<name>) and the project's workspace IS that real
+     * folder, so the agent edits files in place, visible in any file
+     * manager.
+     *
+     * Guards, in order: dedupe BY PATH first (the engine keys workspaces on
+     * the path, so a twin row would be a second identity over one
+     * workspace), then require REALLY-a-folder and REALLY-writable - the
+     * engine child works the folder with the app's own UID, and if the app
+     * cannot write it today the first agent turn would die on EACCES
+     * instead (import fails early and legibly instead; the storage
+     * permission request lives in the screen, which owns the pickers).
+     */
+    fun importFolderAsProject(displayLabel: String, rawPath: String) {
+        val label = displayLabel.trim()
+        val path = rawPath.trim().trimEnd('/')
+        if (label.isEmpty() || path.isEmpty()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, showCreate = false)
+            try {
+                withContext(Dispatchers.IO) {
+                    val existing = store.byPath(path)
+                    if (existing == null) {
+                        val dir = File(path)
+                        check(dir.isDirectory) { "not a folder as seen by the app: $path" }
+                        check(dir.canWrite()) {
+                            "folder is not writable yet (storage permission?): $path"
+                        }
+                        store.create(label, dir)
+                    }
+                    Unit
+                }
+                refresh()
+            } catch (t: Throwable) {
+                _state.value = _state.value.copy(
+                    error = t.message ?: "import failed"
+                )
+            } finally {
+                _state.value = _state.value.copy(busy = false)
+            }
+        }
+    }
+
+    /**
      * Same shape as `ChatViewModel.Factory`: takes (context, container),
      * resolves the container's store itself. Used as
      * `viewModel(factory = ProjectsViewModel.Factory(context, container))`.

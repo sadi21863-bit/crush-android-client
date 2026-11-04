@@ -1,5 +1,15 @@
 package com.crush.mobile.ui.screens.projects
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,9 +49,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crush.mobile.CrushMobileApp
+import com.crush.mobile.project.FolderUriDecoder
 import com.crush.mobile.project.ProjectRef
 
 /**
@@ -60,6 +72,87 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
     val vm: ProjectsViewModel = viewModel(factory = ProjectsViewModel.Factory(context, container))
     val s by vm.state.collectAsStateWithLifecycle()
     var draftLabel by remember { mutableStateOf("") }
+    var importError by remember { mutableStateOf<String?>(null) }
+
+    // "Import folder as project" (user feature, 2026-11-04) - three launchers,
+    // composed: the SAF folder picker, the storage-permission request that
+    // guards it on API <= Q (this build's minimum), and the All-Files-Access
+    // settings screen that the same flow needs on API >= R. On R+ a
+    // content:// grant does NOT give the ENGINE child real filesystem access,
+    // so the flow refuses to open the picker until the user granted the
+    // manager-level permission; the decoded path is then handed to the
+    // Model, which re-checks writability before creating the row.
+    val pickTreeFolder = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        val docId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
+        val path = FolderUriDecoder.primaryPathFromTreeDocumentId(docId)
+        if (path == null) {
+            importError =
+                "That location has no real folder path on this phone - " +
+                    "please pick a folder in internal storage."
+        } else {
+            importError = null
+            vm.importFolderAsProject(FolderUriDecoder.displayNameFor(path), path)
+        }
+    }
+
+    val storagePermissions = arrayOf(
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+    )
+
+    val askStoragePermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (storagePermissions.all { grants[it] == true }) {
+            importError = null
+            pickTreeFolder.launch(null)
+        } else {
+            importError =
+                "Storage permission was refused - importing a folder on this " +
+                    "Android version cannot work without it."
+        }
+    }
+
+    val askAllFilesAccess = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val granted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            Environment.isExternalStorageManager()
+        if (granted) {
+            importError = null
+            pickTreeFolder.launch(null)
+        } else {
+            importError =
+                "All-files access was not granted - importing a folder on this " +
+                    "Android version cannot work without it."
+        }
+    }
+
+    val importClick = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Environment.isExternalStorageManager()) {
+                pickTreeFolder.launch(null)
+            } else {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:${context.packageName}")
+                )
+                askAllFilesAccess.launch(intent)
+            }
+        } else {
+            val missing = storagePermissions.filter {
+                ContextCompat.checkSelfPermission(context, it) !=
+                    PackageManager.PERMISSION_GRANTED
+            }
+            if (missing.isEmpty()) {
+                pickTreeFolder.launch(null)
+            } else {
+                askStoragePermission.launch(missing.toTypedArray())
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -79,12 +172,28 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Button(onClick = vm::showCreateDialog, enabled = !s.busy) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("New project")
                 }
+                Button(onClick = importClick, enabled = !s.busy) {
+                    Icon(Icons.Filled.FolderOpen, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Import folder")
+                }
+            }
+            importError?.let { err ->
+                Text(
+                    err,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
             Spacer(Modifier.height(12.dp))
 

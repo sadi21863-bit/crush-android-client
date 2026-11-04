@@ -122,6 +122,67 @@ before the next release.
 
 ### Import-removal first-use defects — BOTH FIXED (2026-11-04)
 
+**S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**
+
+Completed 2026-11-05 after midnight, entirely through the app + adb (no
+product code); evidence-first per the plan's slice contract.
+
+**S1 (engine tool-denial mechanism) — PROVEN:**
+
+- Writing `options.disabled_tools` (the full built-in list: agent, bash,
+  job_output, job_kill, download, edit, multiedit, lsp_*, fetch,
+  agentic_fetch, glob, grep, ls, sourcegraph, write, view) into the keyed
+  instance's global config HIDES the bash tool from the agent entirely:
+  asked to `run ls via bash`, the agent ATTEMPTED a tool call, the engine
+  answered the model "tool not available", and the model replied in plain
+  text "the bash tool is no longer available in this session. Restoring it
+  would be needed before I can list the folder." — NO ASK card, NOTHING
+  executed, no side effects. THIS is the Chat deny-all mechanism (engine
+  boundary proof); app-side auto-deny stays defense-in-depth.
+- The denial PERSISTS: the engine's config store MERGED the probe's
+  `options` block into its own `data/crush.json` (the single-writer
+  behavior decision-4 designed), so it survived even after the source
+  probe file was deleted and the engine respawned. Repair = strip the
+  `options` key from the engine-owned file in an app-stopped window and
+  respawn (done; bash verified live again on the next turn).
+- `POST /v1/workspaces/{id}/agent/main` with `agent_id` exists in the app
+  API layer (`CrushApi.setMainAgent`) — the S3 Chat-instance seating hook
+  is available without new plumbing.
+- Scoping: `disabled_tools` is a per-ENGINE-INSTANCE-global, so Chat's
+  deny-all must ride the DEDICATED chat instance state dir (crush-chat);
+  Code per-project instances keep their tools. Matches the planned
+  engine-instance architecture exactly.
+
+**S1b (imported-folder config trust) — PROVEN:**
+
+- Sentinel drive on the imported folder: a project-root `crushrc` file
+  carrying two `echo >> marker` lines was EXECUTED AS BASH BY THE ENGINE at
+  workspace attach, twice per attach cycle, with the app's full UID and
+  inherited All-Files-Access — BOTH markers landed (in the user's shared
+  folder AND inside the app's private tree). F04 is not a hypothesis: an
+  imported folder DOES get arbitrary shell execution upstream today, with
+  no trust decision.
+- `.crush.json` (project root) and `.crush/crush.json` were NOT executed
+  (PreToolUse hook sentinels never fired across no-tool turns AND a tool
+  attempt) — in the paths probed, the executable-config surface of this
+  engine is the project-root `crushrc`.
+- Implication for S3/S4: an import-time "include this folder's crushrc or
+  quarantine it" trust decision is REQUIRED before attaching an engine
+  (fold-in F04's acceptance A05), and the read-only-allowlist option
+  (Q2-later) gains a mechanically proven basis: `ls` ran WITHOUT a prompt
+  on this engine (upstream read-only behavior) while bash/edit asked.
+
+**Probe residue and repairs (disclosed):** the first sentinel had an
+unquoted path (its bash redirect created a stray file, cleaned); the probe's
+`disabled_tools` write-back had to be stripped manually (done, verified);
+the repair also removed the engine-owned `options` block from the keyed
+crush.json — if the user ever relied on an upstream "always allow" grant on
+this instance, regrant it. All sentinel artifacts are deleted from the test
+folder; the drive's leftover `app.log` lines about deepseek/tcp probes are
+recorded as-is.
+
+### Import-removal first-use defects — BOTH FIXED (2026-11-04)
+
 Driving the import-only removal on device (`5ef70f5`) surfaced two shipped
 defects, both fixed the same evening in the slot-fix build:
 

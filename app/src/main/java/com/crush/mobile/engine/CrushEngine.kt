@@ -219,6 +219,19 @@ class CrushEngine(
                 }
             }.onFailure { Log.w(TAG, "catalog override skipped: ${it.message}") }
 
+            // S3: THE CHAT POOL'S TOOL POLICY (S1-measured mechanism). The chat
+            // pool is conversation-only, so its process starts with every
+            // built-in tool hidden via options.disabled_tools. Same pre-spawn
+            // window as the catalogue override above - the engine parses its
+            // config ONCE per process, so anything later cannot reach it.
+            if (instanceKey == EnginePaths.CHAT_INSTANCE_KEY) {
+                runCatching {
+                    com.crush.mobile.data.crush.EngineConfigInjector.injectChatToolPolicy(
+                        paths.globalData
+                    )
+                }.onFailure { Log.w(TAG, "chat tool policy injection skipped: ${it.message}") }
+            }
+
             // START THE EGRESS BRIDGE BEFORE SPAWNING: the child env below
             // aims HTTPS_PROXY/HTTP_PROXY at this port. Without it the
             // engine's Go resolver has no usable server on Android (no

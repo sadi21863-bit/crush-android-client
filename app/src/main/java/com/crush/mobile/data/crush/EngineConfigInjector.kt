@@ -189,6 +189,88 @@ object EngineConfigInjector {
         return SyncResult(true, overrides.map { it.id })
     }
 
+    /**
+     * S3 (2026-11-05, S1 device probe): the CHAT pool's tool policy.
+     *
+     * The chat pool runs CONVERSATION-ONLY: every built-in tool the upstream
+     * engine knows is hidden from the agent via `options.disabled_tools`,
+     * which the S1 probe PROVED is honored by the pinned v0.99.0 (asked to
+     * run bash, the agent attempted a call, the engine answered
+     * tool-unavailable, and NOTHING executed). This is the engine-boundary
+     * half of deny-all Chat; the app-side auto-deny (S4) stays defense in
+     * depth. Per-instance by construction: [globalDataDir] for the chat pool
+     * resolves through the chat state dir, so per-project Code instances are
+     * untouched.
+     *
+     * Caller contract: the ONLY legal window is before an engine process is
+     * up (the same rule as [syncProviderModels]; the call site in
+     * CrushEngine.start() is pre-exec). Idempotent: writing the same list
+     * twice leaves bytes unchanged. Malformed files are reported unchanged,
+     * never rewritten (a half-parse rewrite could delete the engine's stored
+     * key - the same rule [syncProviderModels] runs under).
+     *
+     * @return SyncResult(changed, tools)
+     */
+    fun injectChatToolPolicy(globalDataDir: File): SyncResult {
+        val file = File(globalDataDir, "crush.json")
+        if (!globalDataDir.isDirectory && !globalDataDir.mkdirs()) {
+            return SyncResult(false, emptyList())
+        }
+        val root: JsonObject = runCatching {
+            val parsed = if (file.isFile) JsonParser.parseString(file.readText()) else JsonObject()
+            val obj = parsed.asJsonObject
+            val options = obj.getAsJsonObject("options") ?: JsonObject().also { obj.add("options", it) }
+            val existing = options.getAsJsonArray("disabled_tools")
+            val merged = JsonArray()
+            val seen = HashSet<String>()
+            if (existing != null) {
+                for (el in existing) {
+                    val name = el.takeIf { it.isJsonPrimitive }?.asString ?: continue
+                    if (seen.add(name)) merged.add(name)
+                }
+            }
+            for (name in CHAT_DISABLED_TOOLS) {
+                if (seen.add(name)) merged.add(name)
+            }
+            val before = if (options.has("disabled_tools"))
+                options.get("disabled_tools").toString() else null
+            if (before == merged.toString()) {
+                return SyncResult(false, CHAT_DISABLED_TOOLS)
+            }
+            options.add("disabled_tools", merged)
+            obj
+        }.getOrElse { return SyncResult(false, emptyList()) }
+
+        runCatching {
+            val tmp = File(globalDataDir, "crush.json.tmp")
+            tmp.writeText(root.toString())
+            if (!tmp.renameTo(file)) {
+                // rename across the same dir cannot fail for a real path, but
+                // on FAT/emulated storage it has; fall back to copy semantics.
+                file.writeText(root.toString())
+                tmp.delete()
+            }
+        }.onFailure { return SyncResult(false, emptyList()) }
+        return SyncResult(true, CHAT_DISABLED_TOOLS)
+    }
+
+    /**
+     * Every built-in tool name this engine family documents (docs/config +
+     * the 2026-11-05 S1 device probe result). Q2 = deny ALL tools in Chat v1
+     * (pure conversation), so the list covers all built-ins the pinned
+     * release knows. Not enumerated: MCP- and skill-derived names (they are
+     * user-configurable surfaces, absent from the built-in list); if a
+     * future engine adds a NEW built-in, the injected list is the honest
+     * best-effort of this app version - the MODE-01 acceptance drive on the
+     * real engine is what proves a release.
+     */
+    val CHAT_DISABLED_TOOLS: List<String> = listOf(
+        "agent", "bash", "job_output", "job_kill", "download",
+        "edit", "multiedit", "lsp_diagnostics", "lsp_references", "lsp_restart",
+        "fetch", "agentic_fetch", "glob", "grep", "ls", "sourcegraph",
+        "write", "view"
+    )
+
     private fun ModelSpec.toJson(): JsonObject = JsonObject().apply {
         addProperty("id", id)
         addProperty("name", displayName)

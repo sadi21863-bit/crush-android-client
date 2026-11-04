@@ -10,6 +10,7 @@ import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.CrushEngine
+import com.crush.mobile.engine.EnginePaths
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.engine.EngineSupervisor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -158,10 +159,30 @@ class AppContainer(context: Context) {
     private val runtimeLock = Any()
 
     /**
+     * S3: WHICH surface the chat layer is bound to. The derived
+     * [activeInstanceKey] stays the single engine selector ("" legacy /
+     * [EnginePaths.CHAT_INSTANCE_KEY] chat pool / "p<uuid8>" project row);
+     * the binding itself carries the SEMANTICS (a ChatPool session is
+     * conversation-only and has no project identity), which the chat
+     * ViewModel replays honestly in its phase text and routing.
+     */
+    sealed interface EngineBinding {
+        data object Legacy : EngineBinding
+        data object ChatPool : EngineBinding
+        data class Project(val ref: com.crush.mobile.project.ProjectRef) : EngineBinding
+    }
+
+    private val _activeBinding =
+        MutableStateFlow<EngineBinding>(EngineBinding.Legacy)
+
+    /** The binding surface drives compose observers (S4 UI). */
+    val activeBinding: StateFlow<EngineBinding> = _activeBinding.asStateFlow()
+
+    /**
      * The engine instance the chat layer is bound to: "" = the legacy
-     * workspace, "p<uuid8>" = a project row (set ONLY by the Projects surface
-     * through [setActiveProject]; the chat ViewModel reads it, never writes).
-     * Explanation of the project's workspace path: [activeProjectRef].
+     * workspace, [EnginePaths.CHAT_INSTANCE_KEY] = the chat pool,
+     * "p<uuid8>" = a project row. Written ONLY through the binding setters,
+     * never by the chat ViewModel.
      */
     private val _activeInstanceKey = MutableStateFlow("")
     val activeInstanceKey: StateFlow<String> = _activeInstanceKey.asStateFlow()
@@ -169,6 +190,12 @@ class AppContainer(context: Context) {
     @Volatile
     var activeProjectRef: com.crush.mobile.project.ProjectRef? = null
         private set
+
+    private fun keyFor(binding: EngineBinding): String = when (binding) {
+        is EngineBinding.Legacy -> ""
+        is EngineBinding.ChatPool -> EnginePaths.CHAT_INSTANCE_KEY
+        is EngineBinding.Project -> instanceKeyFor(binding.ref.id)
+    }
 
     /** Stable id -> instance-key derivation; "" stays reserved for legacy. */
     fun instanceKeyFor(id: java.util.UUID): String = "p" + id.toString().substring(0, 8)
@@ -196,13 +223,28 @@ class AppContainer(context: Context) {
 
     /** Projects-surface entry point: null opens the legacy workspace. */
     fun setActiveProject(ref: com.crush.mobile.project.ProjectRef?) {
+        applyBinding(
+            if (ref == null) EngineBinding.Legacy else EngineBinding.Project(ref)
+        )
+    }
+
+    /**
+     * S3 chat-pool entry (driven by the session surface, S4 UI): binds the
+     * chat layer to the DEDICATED conversation engine instance - no project
+     * cwd, and its spawn-time policy injection removes every Code tool
+     * (see CrushEngine.start()).
+     */
+    fun setActiveChatPool() = applyBinding(EngineBinding.ChatPool)
+
+    private fun applyBinding(binding: EngineBinding) {
         val oldKey = _activeInstanceKey.value
-        val newKey = if (ref == null) "" else instanceKeyFor(ref.id)
-        activeProjectRef = ref
+        activeProjectRef = (binding as? EngineBinding.Project)?.ref
+        _activeBinding.value = binding
+        val newKey = keyFor(binding)
         if (newKey == oldKey) return
         _activeInstanceKey.value = newKey
-        // Stop the OUTGOING PROJECT engine on the switch (ADR-0001 lifecycle
-        // polish, 2026-11-04). This lives HERE and NOT in the chat
+        // Stop the OUTGOING non-legacy engine on the switch (ADR-0001
+        // lifecycle polish, 2026-11-04). This lives HERE and NOT in the chat
         // ViewModel's bindProject: the ViewModel is scoped to the nav
         // back-stack entry, so a projects->chat round trip can recreate it
         // and the outgoing instance key dies with the old entry (measured
@@ -213,7 +255,9 @@ class AppContainer(context: Context) {
         // Run-in-flight guard: a turn in flight is never killed mid-work -
         // that instance rides its own idle linger instead. The LEGACY engine
         // ("") is never stopped here: it hosts the app's own history,
-        // survives every switch, and pre-dates per-instance engines.
+        // survives every switch, and pre-dates per-instance engines. The
+        // chat pool engine is stop-on-switch like every project child
+        // (S3): its linger is governed by the same guard.
         if (oldKey.isNotBlank() && engineRunInFlightFor != oldKey) {
             com.crush.mobile.util.AppLog.i(
                 "Lifecycle",

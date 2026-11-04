@@ -650,8 +650,18 @@ class ChatViewModel(
      * fire it freely.
      */
     fun bindProject() {
-        val containerRef = container.activeProjectRef
-        val key = if (containerRef == null) "" else container.instanceKeyFor(containerRef.id)
+        // S3: the container's ENGINE BINDING decides the instance. The
+        // method name predates modes; it re-targets everything engine-derived
+        // for whatever surface the user is on (legacy / chat pool / project).
+        val derivation = when (val binding = container.activeBinding.value) {
+            is AppContainer.EngineBinding.Project ->
+                container.instanceKeyFor(binding.ref.id) to "switching to ${binding.ref.label}..."
+            is AppContainer.EngineBinding.ChatPool ->
+                EnginePaths.CHAT_INSTANCE_KEY to "switching to the chat pool..."
+            is AppContainer.EngineBinding.Legacy ->
+                "" to "switching to the workspace..."
+        }
+        val (key, phaseText) = derivation
         if (key == instanceKey) return
         instanceKey = key
         // An instance switch invalidates every engine-derived handle: the
@@ -671,8 +681,7 @@ class ChatViewModel(
         // re-targeting only.
         _state.update {
             it.copy(
-                phase = if (containerRef == null) "switching to the workspace..."
-                else "switching to ${containerRef.label}...",
+                phase = phaseText,
                 engineReady = false
             )
         }
@@ -800,13 +809,21 @@ class ChatViewModel(
         }
         val permissionMode = persisted.getOrNull()?.permissionMode
             ?: com.crush.mobile.domain.model.PermissionMode.ASK
+        // S3 belt-and-braces: the chat pool is conversation-only, so yolo can
+        // never be armed for it even if a later global auto-approve setting
+        // ships - the engine-side tool hiding is the boundary, this is the
+        // second lock on the same door.
+        val effectivePermissionMode =
+            if (instanceKey == EnginePaths.CHAT_INSTANCE_KEY)
+                com.crush.mobile.domain.model.PermissionMode.ASK
+            else permissionMode
         val providerId = Providers.resolve(
             persisted.getOrNull()?.providerId ?: currentPersistedProvider()
         ).id
         if (persisted.isFailure) {
             AppLog.w(TAG, "settings read failed; configuring provider from mirror: $providerId")
         }
-        AppLog.i(TAG, "permissionMode=$permissionMode providerId=$providerId")
+        AppLog.i(TAG, "permissionMode=$effectivePermissionMode providerId=$providerId")
 
         // SYNC THE VIEW with the provider this boot actually configures
         // (2026-11-02, user-audit request "check all places OpenCode Zen is
@@ -832,7 +849,7 @@ class ChatViewModel(
         val opened = session.openWorkspace(
             workspacePathFor(),
             engineStateDirFor(),
-            permissionMode,
+            effectivePermissionMode,
             providerId
         )
         // Read the key for the provider we are about to configure, not for whatever

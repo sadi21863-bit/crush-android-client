@@ -103,6 +103,17 @@ class EnginePaths(
 
     companion object {
         /**
+         * The CHAT POOL instance key (S3): the dedicated conversation engine
+         * lives at filesDir/crush-chat (state dirs + crush-chat.sock), ITS
+         * own session pool, and NO project cwd (the shared legacy workspace
+         * dir is its working directory). Not a "p"-prefixed slot, so it can
+         * never collide with a project key; the spawn-time policy injection
+         * in CrushEngine.start() hides every Code tool for THIS instance
+         * only (S1 measured mechanism: options.disabled_tools).
+         */
+        const val CHAT_INSTANCE_KEY = "chat"
+
+        /**
          * Newest crush.log under the cache directory's server-listener
          * folders (server-tcp___host_port), or null when none exists yet.
          */

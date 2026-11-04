@@ -229,6 +229,45 @@ The trade: a shorter bound cleans abandoned dialogs sooner but can cancel a
 genuinely reading user mid-thought; "never" relies on the Stop button and
 app teardown only. Unless you choose otherwise, 10 minutes stands.
 
+## 9. Project creation model and per-row removal
+
+**Status: DECIDED 2026-11-04 (user) — IMPORT-ONLY creation, type-honest
+removal, legacy row permanent.**
+
+Decided during the import-folder verification drive. Projects are created
+ONLY via Import folder (the desktop-app model). The "New project"
+minted-internal-repo path (`filesDir/projects/<uuid>/repo`) is REMOVED: its
+content was invisible to the user's file manager, which is exactly the
+failure import-folder exists to fix. Removal is type-honest per row kind:
+
+- Imported (external) folder = USER DATA: removal drops only the app's
+  row/reference; the folder and every file stay untouched. Re-importing the
+  same folder later starts a FRESH project (fresh row id → fresh engine
+  state dir — no session bleed back into the old one).
+- App-minted internal repo = app-owned hidden data: deleted WITH its row
+  (the `filesDir/projects/...` tree plus its `filesDir/crush-<key>` engine
+  state dir; a removed row's UUID key can never recur).
+- Legacy workspace row = PERMANENT: it hosts the app's existing chat
+  history and the idempotent entry migration re-creates it; no Remove
+  affordance is rendered, and the VM also refuses a removal if one is
+  driven programmatically.
+
+Removal additionally REFUSES while a run is in flight on that row's engine
+("a run is active on this project's engine — remove it after the run
+finishes"); otherwise: stop the engine instance → drop the row → delete the
+internal trees.
+
+Implementation (2026-11-04 cycle): `ProjectDao.deleteById` →
+`RoomProjectStore.remove` (row-only) → `ProjectsViewModel.removeProject`
+(legacy guard + run-in-flight guard + ordered IO) → `ProjectsScreen`
+(single full-width Import button; per-row Remove icon with a type-honest
+confirmation dialog). Compile-green; on-device verification pending the
+four-task gate.
+
+No open residue. One follow-up noted for the backlog: clearing legacy chat
+history is a separate future feature ("delete chats"), NOT a project
+delete — the legacy row itself stays.
+
 ## Tree-verification pass 2026-10-31
 
 - Every citation re-checked and accurate: lint flags at

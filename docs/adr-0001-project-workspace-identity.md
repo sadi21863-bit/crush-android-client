@@ -305,7 +305,11 @@ depends on is renamed, moved, or re-keyed.
    Because the cwd is the workspace identity's anchor, **keeping that path means
    every existing session id, transcript, and workspace handle keeps resolving**
    — existing chats are claimed by the legacy project without touching engine
-   rows. New projects get `filesDir/projects/<uuid>/repo`. Any later relocation
+   rows. New projects get `filesDir/projects/<uuid>/repo` (2026-11-04
+   decision note: this minting path was RETIRED — Projects are created
+   ONLY via Import folder now; the paragraph is kept as written because
+   the store seam and the removal semantics still run through this
+   canonical cwd shape). Any later relocation
    of the legacy dir is an explicit, separately-tested operation (full re-bind +
    backup + rollback), never part of this migration.
 4. **Session backfill, idempotent.** On first launch after upgrade, enumerate the

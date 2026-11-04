@@ -36,7 +36,27 @@ class CrushConnection(
     private val port: Int,
     private val router: CrushEventRouter,
     private val gson: com.google.gson.Gson,
-    private val client: OkHttpClient
+    /**
+     * The socket FILE this connection's transport resolves through (S0/F03):
+     * transport identity is the socket file, NOT the URL port - every engine
+     * reports the sentinel port 1, so identity-by-port could never notice an
+     * instance switch.
+     */
+    private val socketFile: java.io.File,
+    /**
+     * Resolves THIS attempt's transport from [socketFile] (S0/F03+F11). The
+     * client used to be pinned once at construction: a pinned factory kept the
+     * PREVIOUS instance's socket when a connection was reused across an
+     * instance switch within one ViewModel, and when that engine had been
+     * stopped (Go's UnixListener unlinks its socket file on close) the retry
+     * loop connected into "No such file or directory" for the whole turn while
+     * call-time REST kept succeeding - the exact measured false
+     * "no reply received" signature. Resolving per attempt also removes the
+     * silent plain-TCP fallback: a missing socket is an explicit, logged
+     * attempt failure, and a respawned engine's socket is picked up by the
+     * next retry with no caller-side rebuild.
+     */
+    private val clientSource: (java.io.File) -> OkHttpClient?
 ) {
 
     enum class State { IDLE, CONNECTING, CONNECTED, STOPPED }
@@ -184,7 +204,15 @@ class CrushConnection(
 
             var sawStream = false
             try {
-                val call = client.newCall(request)
+                // Per-attempt transport (S0/F03+F11): resolve the socket NOW.
+                // Null means the file is absent - a connect would be ENOENT
+                // against a pinned factory - so fail as one honest attempt
+                // (carrying the scrubbed path) and let the backoff ladder
+                // retry until the engine binds the file again.
+                val transport = clientSource(socketFile) ?: throw IOException(
+                    "events: socket not present yet: ${scrubbedPath(socketFile.absolutePath)}"
+                )
+                val call = transport.newCall(request)
                 inFlight.set(call)
                 call.execute().use { response ->
                     if (!response.isSuccessful) {
@@ -348,10 +376,14 @@ class CrushConnection(
         return CrushEvent(type = pType, change = cType, body = body)
     }
 
-    private companion object {
-        const val TAG = "CrushConnection"
-        const val DATA_PREFIX = "data:"
-        const val INITIAL_BACKOFF_MS = 250
-        const val MAX_BACKOFF_MS = 10_000L
+    companion object {
+        private const val TAG = "CrushConnection"
+        private const val DATA_PREFIX = "data:"
+        private const val INITIAL_BACKOFF_MS = 250
+        private const val MAX_BACKOFF_MS = 10_000L
+
+        /** Log hygiene shared with CrushEngine: app-private prefix abbreviation. */
+        internal fun scrubbedPath(path: String): String =
+            path.replace("/data/user/0/", "<datadir>/")
     }
 }

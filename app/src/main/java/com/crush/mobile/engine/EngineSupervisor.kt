@@ -53,7 +53,15 @@ class EngineSupervisor(
      * Nullable so existing construction sites still compile; without it the
      * supervisor simply skips dynamic tuning and keeps the static profile.
      */
-    private val appContext: android.content.Context? = null
+    private val appContext: android.content.Context? = null,
+    /**
+     * The engine instance key HEALTH PROBES address (S0/F03). The socket path
+     * is per instance (`filesDir/crush-<key>.sock`); the shipped health probe
+     * derived the single-arg legacy path for EVERY supervisor, so a keyed
+     * instance was declared healthy-or-not by whatever happened to serve the
+     * legacy socket - including our own stop-on-switch lifecycle.
+     */
+    private val instanceKey: String = ""
 ) {
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Stopped)
@@ -477,7 +485,7 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
      * sentinel now and must never be probed).
      */
     private fun healthSocketFile(): File? =
-        appContext?.let { EngineSockets.socketPath(it) }
+        appContext?.let { EngineSockets.socketPath(it, instanceKey) }
 
     /**
      * Health probe over the Unix domain socket (see [EngineSockets]).

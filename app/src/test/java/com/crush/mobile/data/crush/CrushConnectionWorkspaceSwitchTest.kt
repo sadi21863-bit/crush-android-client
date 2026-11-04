@@ -54,7 +54,11 @@ class CrushConnectionWorkspaceSwitchTest {
             port = server.port,
             router = router,
             gson = Gson(),
-            client = client
+            // Transport resolved per attempt (S0/F03): the tests run over
+            // plain TCP, so the supplier ignores the (dummy) socket file and
+            // hands out the fixed client exactly as the old construction did.
+            socketFile = java.io.File("/tmp/dummy-events.sock"),
+            clientSource = { client }
         )
     }
 

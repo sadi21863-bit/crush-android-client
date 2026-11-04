@@ -59,6 +59,8 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
 
 /**
  * Converts one persisted engine message into its history-replay row, or null.
@@ -502,7 +504,7 @@ class ChatViewModel(
 
     /** Engine port the current connection is bound to; a change means a restart. */
     @Volatile
-    private var connectionPort: Int? = null
+    private var connectionIdentity: String? = null
     private var workspaces: WorkspaceManager? = null
     private var port: Int? = null
 
@@ -1171,21 +1173,47 @@ class ChatViewModel(
     private fun attachEventStream(ws: String?, clientId: String) {
         if (ws.isNullOrBlank()) return
         val p = port ?: return
+        // THE IDENTITY (S0/F03): a connection belongs to a SOCKET FILE, not to a
+        // port. Every engine reports the sentinel port 1, so the old
+        // `p == connectionPort` guard was always true and an instance switch
+        // within one ViewModel lifetime REUSED the previous instance's
+        // connection. Two measured failure shapes follow: (a) the reused socket
+        // serves the WRONG engine, whose workspace router 404s every keyed id;
+        // (b) after stop-on-switch the old engine's socket file was unlinked,
+        // so the pinned factory connected into ENOENT forever while call-time
+        // REST kept succeeding - the turn completed, the banner lied. Rebuild
+        // whenever the CURRENTLY BOUND instance's socket file differs.
+        val socketFile = EngineSockets.socketPath(context, instanceKey)
+        val identity = socketFile.absolutePath
         val conn = eventConnection
-        if (conn != null && p == connectionPort) {
+        if (conn != null && identity == connectionIdentity) {
             conn.ensureAttached(ws, clientId)
             return
         }
-        // Port changed means the engine restarted; the old connection is dead.
+        AppLog.i(
+            TAG,
+            "event transport identity change -> ${CrushConnection.scrubbedPath(identity)}; rebuilding connection"
+        )
+        // Socket identity changed; the old connection may hold a reader on the
+        // previous file. Stop it and close its router before replacing both.
         runCatching { conn?.stop() }
         runCatching { eventRouter.close() }
         val router = CrushEventRouter()
-        val fresh = CrushConnection(p, router, gson, crushApi(p).streamClient)
+        // SSE timeouts live on the base client (readTimeout 0 = no idle limit,
+        // the same shape CrushApi's stream client used); the supplier lets the
+        // transport resolve the socket file PER ATTEMPT (S0/F03+F11).
+        val sseBase = OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+        val fresh = CrushConnection(p, router, gson, socketFile) { EngineSockets.okClient(it, sseBase) }
         // Assign before attaching so a send racing bootstrap sees a consistent
         // (router, connection) pair.
         eventRouter = router
         eventConnection = fresh
-        connectionPort = p
+        connectionIdentity = identity
         fresh.ensureAttached(ws, clientId)
         AppLog.i(TAG, "long-lived event stream attached to $ws")
     }
@@ -2081,6 +2109,11 @@ class ChatViewModel(
         handle: RunHandle,
         sendEpoch: Int
     ) {
+        // FREEZE THE CAPTURE ROOT (S0/F02): everything this turn diffs -
+        // before-image and after-image alike - belongs to the directory the
+        // run's engine was bound to at start, not to whatever the Projects
+        // surface has active when the turn ENDS.
+        runFileRoot = workspaceRoot()
         // Fresh id per turn, owned by the handle. ChatScreen keys its
         // LazyColumn by message id, and a constant sentinel produced
         // `IllegalArgumentException: Key "streaming" was already used` once
@@ -2184,7 +2217,7 @@ class ChatViewModel(
                     // the agent rewrote a file when it changed one line. Clearing any
                     // stale rows first means a failed turn leaves no phantom diff.
                     workspaceSnapshot = collector.captureBefore(
-                        workspaceRoot(),
+                        runFileRoot ?: workspaceRoot(),
                         workspaceSnapshot
                     )
                     _state.update { it.copy(fileChanges = null) }
@@ -2375,6 +2408,9 @@ class ChatViewModel(
             // Runtime, not persisted: this is what the agent did on THIS turn, so a
             // new session starts empty rather than inheriting a stale diff.
             collectFileChanges()
+            // The capture root belongs to THIS run alone; drop it so the next
+            // send re-freezes against the instance it starts on.
+            runFileRoot = null
 
             // A provider switch that waited for this turn (P1-07) applies now:
             // the turn's events are done being consumed, so rebuilding the
@@ -2385,7 +2421,28 @@ class ChatViewModel(
         }
     }
 
-    private fun workspaceRoot(): File = EnginePaths(context).workspace
+    /**
+     * The diff-capture root for the BOUND instance (S0/F02): the ACTIVE
+     * project's repo directory, or the legacy workspace when no project is
+     * bound. This is the same source [workspacePathFor] feeds the engine cwd
+     * from, so what the engine edits and what we snapshot ALWAYS meet in one
+     * directory. The shipped version returned the legacy workspace
+     * unconditionally, so an imported-folder turn was captured against the
+     * wrong tree and every engine-made file rendered as
+     * "(unreadable, binary, or too large)" while the true folder held them.
+     */
+    private fun workspaceRoot(): File =
+        container.activeProjectRef?.repoDir ?: EnginePaths(context).workspace
+
+    /**
+     * Run-frozen capture root (S0/F02 acceptance): resolved ONCE at
+     * [streamSend] entry. captureBefore and collectFileChanges must measure
+     * THE SAME root even if the user navigates between projects while a turn
+     * is in flight - the engine's tracked-file list belongs to the cwd the
+     * run started on. Cleared in the turn's finally.
+     */
+    @Volatile
+    private var runFileRoot: File? = null
 
     /**
      * Reads the engine's tracked-file list and diffs it against the pre-turn
@@ -2415,7 +2472,7 @@ class ChatViewModel(
         val set = runCatching {
             val api = crushApi(port ?: return@runCatching null)
             val tracked = api.trackedFiles(ws, sid)
-            collector.collect(workspaceRoot(), tracked, snap).copy(sessionId = sid)
+            collector.collect(runFileRoot ?: workspaceRoot(), tracked, snap).copy(sessionId = sid)
         }.getOrNull()
 
         _state.update { it.copy(fileChanges = set) }

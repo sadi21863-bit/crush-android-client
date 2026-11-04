@@ -281,7 +281,8 @@ class AppContainer(context: Context) {
                 engine,
                 containerScope,
                 tuning = resolvedTuning,
-                appContext = appContext
+                appContext = appContext,
+                instanceKey = instanceKey
             ).also { s ->
                 // P1-11 flush for THIS instance's restarts - the same
                 // registration the legacy singleton carries (see its .also

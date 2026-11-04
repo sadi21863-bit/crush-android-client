@@ -281,13 +281,19 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
             text = {
                 Text(
                     if (internal) {
-                        "'%s' is an app-internal project. Removing it also " +
+                        // Parentheses matter: .format must bind to the WHOLE
+                        // concatenated literal, not the last piece - the
+                        // un-parenthesized version measured on device
+                        // 2026-11-04 printed literal placeholders ('%s') in
+                        // the dialog instead of the project name/path.
+                        ("'%s' is an app-internal project. Removing it also " +
                             "DELETES its generated workspace folder %s " +
-                            "permanently.".format(target.label, target.repoDir.absolutePath)
+                            "permanently.")
+                            .format(target.label, target.repoDir.absolutePath)
                     } else {
-                        "Your folder %s and every file in it stay untouched - " +
+                        ("Your folder %s and every file in it stay untouched - " +
                             "this only removes the app's reference. Re-importing " +
-                            "the same folder later starts a fresh project."
+                            "the same folder later starts a fresh project.")
                             .format(target.repoDir.absolutePath)
                     }
                 )

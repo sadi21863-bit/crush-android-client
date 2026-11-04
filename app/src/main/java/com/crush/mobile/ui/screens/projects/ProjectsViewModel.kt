@@ -169,7 +169,13 @@ class ProjectsViewModel(
                     container.forgetProjectEngine(ref.id)
                     store.remove(ref.id)
                     if (isInternal) {
-                        ref.repoDir.deleteRecursively()
+                        // Delete the whole minted SLOT
+                        // (files/projects/<short-uuid>), not just the repo dir
+                        // inside it: the first build deleted ref.repoDir and
+                        // left the empty wrapper behind (measured on device
+                        // 2026-11-04). The slot is app-owned, invisible to the
+                        // user's file manager, and its key can never recur.
+                        ref.repoDir.parentFile?.deleteRecursively()
                     }
                     File(appContext.filesDir, "crush-$key").deleteRecursively()
                     Unit

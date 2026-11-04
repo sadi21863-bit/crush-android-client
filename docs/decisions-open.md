@@ -298,6 +298,37 @@ implementation NOT started, awaiting the user's explicit go.**
   never a silent wipe (item 9 above already reserved "delete chats" as a
   separate future feature; the legacy row itself stays permanent).
 
+**Review fold-in, later 2026-11-04:** an independent connected-GitHub
+review CONFIRMED Q1–Q4 as sound product choices and corrected only the Q2
+enforcement mechanism (engine-side tool denial must be PROVEN before Chat
+ships labeled tool-free — S1 blocks that label). Full details:
+plan doc §5.1/§7. The broad All-Files-Access import flow split out to
+item 11.
+
+## 11. Import storage-access strategy (All Files Access vs narrow SAF)
+
+**Status: OPEN — not needed while the app is beta-installed via adb;
+REQUIRED before any store listing (Google Play policy). Raised by the
+independent review (F05).**
+
+Today's import flow asks for All Files Access (MANAGE_EXTERNAL_STORAGE)
+before the SAF tree picker, then decodes the picked `primary:` document ID
+back into a `/storage/emulated/0/<folder>` POSIX path — the picker serves
+as a path selector, not a narrow storage grant. Understood, accepted
+consequences while in beta: access far broader than the selected project,
+and a store-distribution blocker unless justified (a developer-tool
+category may qualify, but requires policy review and a narrow alternative
+offered).
+
+**The decision:** (A) keep direct POSIX access with a carefully explained
+All Files Access grant, positioning the app as a specialized developer
+tool, or (B) move to narrow persistent SAF grants for project folders plus
+a managed sync/mirror for the engine's POSIX cwd — without claiming a
+mirror exists before it ships. Nothing in mode-split v1 depends on this;
+whichever is chosen also absorbs the F08 access-state surface
+(Ready / NeedsPermission / Missing / UnsupportedProvider, rechecked at
+project-open).
+
 ## Tree-verification pass 2026-10-31
 
 - Every citation re-checked and accurate: lint flags at

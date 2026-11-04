@@ -74,11 +74,19 @@ via re-fetch):
 - the changes rail counted `0 files changed +0 -0` and classified both
   written files `(unreadable, binary, or too large)`.
 
-Root cause not yet diagnosed; the working hypothesis is that the events
-socket path (or its mount/state-dir shape) resolves differently for a keyed
-instance than for the legacy singleton — to be pinned with a socket-path
-trace before any fix. This is ADR-0001 §7's predicted per-binding
-event-routing debt landing. Queued as the first item of the next cycle.
+Root-cause candidates CONFIRMED in source 2026-11-04 by the independent
+connected-GitHub review, pinned at `b8aa505`: (a) the changes-rail half is
+`ChatViewModel.workspaceRoot()` unconditionally returning the legacy
+`EnginePaths(context).workspace` (:2388) for pre/post-turn capture — the app
+edits the imported folder but diffs the legacy root, which is exactly why
+external files read as "(unreadable, binary, or too large)"; (b) the
+transport half is port-only connection reuse (`UDS_PORT_SENTINEL = 1` for
+every engine + the `p == connectionPort` guard) — an unchanged number cannot
+prove the socket file stayed the same. Both are S0's fix targets; the
+events-socket ENOENT itself still needs the device socket-path trace before
+repair. This is ADR-0001 §7's predicted per-binding event-routing debt
+landing; full fold-in ledger in
+[`chat-code-modes-plan-2026-11-04.md`](chat-code-modes-plan-2026-11-04.md) §7.
 
 ### Import-removal first-use defects — BOTH FIXED (2026-11-04)
 

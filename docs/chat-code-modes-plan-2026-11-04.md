@@ -1,7 +1,8 @@
 # Chat / Code modes — initial research and planning (2026-11-04)
 
-Status: PLAN with user decisions RECORDED (2026-11-04, §5) — no code written,
-implementation awaits the user's explicit go. This distills the roadmap's
+Status: PLAN with user decisions RECORDED (§5) and the independent review
+FOLDED IN (§7, user-approved "fold fully") — no code written, implementation
+awaits the user's explicit go. This distills the roadmap's
 Chat/Code phases ([`crush-plan-2026-11-02.md`](crush-plan-2026-11-02.md) §6, §7,
 P4/P5/P6, §21) against what the app actually has on device today (2026-11-04,
 import-only decision landed in `5ef70f5` + `4a59b68`), and lays out slices,
@@ -153,8 +154,9 @@ catalogue, key storage and pricing drawer obviously do not fork per mode.
 
 | Slice | Content | Gate/proof |
 |---|---|---|
-| S0 | Events-socket per-instance fix + changes-rail external-file support (already top of queue; unblocks keyed instances generally) | drive: imported-folder turn completes with no false banner; rail shows +N -N for notes.md/todo.md |
-| S1 | **Engine capability probe** (no product code): enumerate engine agents; test per-agent tool config; test a session opened with restricted agent + no-yolo; test tool-denial behavior. All evidence through the app, ids safe | probe log + `capabilities.md` update |
+| S0 | Events-socket per-instance fix + changes-rail external-file support (top of queue; unblocks keyed instances generally). Review fold-in: fix targets confirmed in source — replace the hard-coded legacy `workspaceRoot()` with the frozen project binding (F02) and make event-connection identity (instanceKey, socketPath, bootEpoch, workspaceId) instead of the port-only guard (F03); ENOENT root still device-pinned first | drive: imported-folder turn completes with no false banner; rail shows exact +N -N hunks for notes.md/todo.md; A→B→A switch delivers session-specific events |
+| S1 | **Engine capability probe** (no product code): enumerate engine agents; test per-agent tool config; test a session opened with restricted agent + no-yolo; test tool-denial behavior. All evidence through the app, ids safe. **Blocks the tool-free Chat label** (F01) | probe log + `capabilities.md` update |
+| S1b | **Imported-folder config trust probe + policy** (F04, review-added): device-probe whether the pinned engine loads project-local `crushrc`/hooks from the imported cwd; harmless-sentinel test; add an imported/trusted distinction only if the engine demonstrably loads project config | sentinel drive: imported folder with sentinel hook performs NO execution before a visible trust decision |
 | S2 | **Product decisions** — RESOLVED 2026-11-04 (Q1-Q4 answered, see §5) | decisions-open.md item 10 + plan §5 |
 | S3 | Mode model: `AgentMode` enum, per-session storage, engine-instance routing (legacy / project key / chat key), run-in-flight guard reuse | JVM unit tests + gate |
 | S4 | UI: New-chat mode choice, sheet sections, header badge; enforcement wiring (auto-deny policy layer with the proven ASK plumbing) | drive: MODE-01 injection attempt denied; MODE-06 regression (Code ASK intact) |
@@ -197,13 +199,17 @@ as item 10. Neither S0 nor S1/S3/S4/S5 start until the user's explicit go.
 
 ### 5.1 What the decisions change in the slices
 
-- **S1 stays but is re-scoped**: v1 enforces deny-all app-side on the proven
-  ASK plumbing, so the engine probe no longer BLOCKS v1 — it informs the
-  deferred items (engine agent seating hardening, read-only allowlist,
-  transfer-to-Code action).
-- **v1 execution order** (on the user's go): S0 socket defect → S3 mode
-  model (deny-all chat policy) → S4 UI (creation choice + groupings + badge
-  + deny message) → S5 acceptance vs MODE-01/06/07.
+- **S1 BLOCKS the tool-free Chat label** — REVISED 2026-11-04 on the review
+  fold-in (F01): app-side ASK auto-deny reacts only to approval events a
+  tool request already emitted; it cannot prove no other tool ran. Set
+  engine-side/token-boundary denial must be PROVEN (tool enumeration + real
+  traces on the pinned engine) before Chat ships labeled "tool-free";
+  app-side auto-deny STAYS as defense-in-depth. Code-mode slices (S3/S4)
+  do not depend on S1.
+- **v1 execution order** (on the user's go): S0 transport identity +
+  imported-root diff fix → S1 probe + S1b imported-config trust (the two
+  security proofs) → S3 mode model → S4 UI → S5 acceptance vs
+  MODE-01/06/07 plus the review's A-matrix additions (§7).
 - **Explicitly NOT v1** (backlog): tabs restructure, in-session toggle/upgrade,
   read-only allowlist, interactive transfer-to-Code, Settings default toggle,
   legacy-history clear/retire (only if the user later opts in).
@@ -222,3 +228,48 @@ as item 10. Neither S0 nor S1/S3/S4/S5 start until the user's explicit go.
 - Lock/credential rule (§6 last bullet) is already honored: nothing about
   mode decryption or engine start changes the app-lock contract (MODE-21
   regression on the drive).
+
+---
+
+## 7. Independent review fold-in (2026-11-04, user-approved "fold fully")
+
+Input: `Crush_Review.pdf` (2026-11-04) — an independent connected-GitHub
+source review pinned at `b8aa505`. Its five verifiable source claims were
+re-verified in our tree the same day and ALL held: F02 hard-coded
+`workspaceRoot()` (`ChatViewModel.kt:2388`; used :2187/:2418); F03
+`UDS_PORT_SENTINEL = 1` + port-only reuse guard (`ChatViewModel.kt:1175`);
+F01 `resolvePermission` reaction-only approval model; F06 single
+`projectRuntime` slot (`AppContainer.kt:157`); F11 `okClient() ?: plain`
+fallback (`CrushApi.kt:101`). The review honestly marks its own limits: no
+compile/device tests, ENOENT root cause unproven, F04 = threat hypothesis
+pending device proof.
+
+**Confirmed unchanged from the review:** the Q1–Q4 product choices (only
+Q2's enforcement MECHANISM corrected — §5.1 revised); the user's
+smart-transfer idea as scenario A17; S0-first ordering and the deferral of
+tabs/toggles/automation; session-mode as durable Room metadata.
+
+**Adopted as plan changes:** S1 blocking for the tool-free Chat label;
+new slice S1b (F04 imported-config trust probe/policy); execution order
+S0 → S1+S1b → S3 → S4 → S5; the review's Gate 0–9 sequence maps onto our
+slices (G1≈S0, G2≈S1b, G3≈S1, G4≈S3, G5≈S4; G6 Code-Review surface and G7
+runtime-resource work are backlog post-v1; G8 ≈ P6 handoff; G9 ≈ Termux,
+unchanged P7).
+
+**Backlog additions (recorded, not v1):** F06 managed runtime map with
+run ref-counts and a max-active-engines budget; F07 canonical `repo_dir`
+identity + unique index; F08 access states rechecked at project-open;
+F09 crash-atomic deletion journal; F10 snapshot-coverage honesty
+("not measured" ≠ "no changes"); F11 fail-closed UDS transport; F12
+gradual RunCoordinator extraction out of the 2.8k-line ChatViewModel
+(shapes S3 without a rewrite). F05 storage strategy → decisions-open
+item 11.
+
+**New acceptance rows adopted** (beyond the MODE matrix): A05 no execution
+from imported config before an explicit trust decision; A07
+duplicate/aliased import = one canonical row; A10 crash-during-removal
+reconciliation never touches user files; A13 snapshot coverage limits
+stated, never an unqualified "clean"; A14 missing socket fails closed with
+no TCP fallback or credential spill; A17 Chat→Code transfer shows the
+target project and inherits no Build policy; A20 a run keeps its frozen
+provider through a mid-run change.

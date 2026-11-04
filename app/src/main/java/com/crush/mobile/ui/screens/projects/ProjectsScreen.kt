@@ -24,8 +24,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -34,7 +34,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,7 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,12 +55,13 @@ import com.crush.mobile.project.FolderUriDecoder
 import com.crush.mobile.project.ProjectRef
 
 /**
- * The Projects surface (P3 slice 1): the project registry's in-app reader.
- * Lists projects (the legacy workspace migrates in on first entry), creates
- * new ones with an app-private canonical cwd. Deliberately NOT clickable into
- * a chat yet — per the accepted ADR, a project's session isolation lives on
- * its OWN engine instance, and that binding is slice 2. Saying so in the UI
- * (see the footer note) is part of honesty-in-UI, not an excuse.
+ * The Projects surface (P3 slices 1–3): the project registry's in-app
+ * reader. Lists projects (the legacy workspace migrates in on first entry),
+ * and — per the 2026-11-04 decision — creates them ONLY by importing an
+ * existing user-visible folder (the desktop-app model); the former
+ * "New project" minted-internal-repo path is gone, and rows carry a
+ * type-honest Remove affordance. Opening binds the chat to the row's OWN
+ * engine instance (slice 2).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,8 +70,11 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
     val container = (context.applicationContext as CrushMobileApp).container
     val vm: ProjectsViewModel = viewModel(factory = ProjectsViewModel.Factory(context, container))
     val s by vm.state.collectAsStateWithLifecycle()
-    var draftLabel by remember { mutableStateOf("") }
     var importError by remember { mutableStateOf<String?>(null) }
+    // The row a Remove tap came from, held while the confirmation dialog
+    // explains what removal will (and will not) delete; null = no pending
+    // confirmation.
+    var pendingRemove by remember { mutableStateOf<ProjectRef?>(null) }
 
     // "Import folder as project" (user feature, 2026-11-04) - three launchers,
     // composed: the SAF folder picker, the storage-permission request that
@@ -172,20 +174,13 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(onClick = vm::showCreateDialog, enabled = !s.busy) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("New project")
-                }
-                Button(onClick = importClick, enabled = !s.busy) {
-                    Icon(Icons.Filled.FolderOpen, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Import folder")
-                }
+            // Creation is import-only (2026-11-04 decision): one button,
+            // full width. Rows minted by the removed "New project" path can
+            // still be removed individually via their row affordance.
+            Button(onClick = importClick, enabled = !s.busy, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.FolderOpen, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("Import folder")
             }
             importError?.let { err ->
                 Text(
@@ -235,10 +230,14 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
                         // legacy workspace row binds "" - the legacy workspace
                         // keeps its history on the unkeyed engine (the ADR's
                         // additive-migration invariant), it must never be
-                        // re-instanced onto a fresh engine child.
+                        // re-instanced onto a fresh engine child. It likewise
+                        // never gets a Remove affordance: it hosts every
+                        // existing chat, and the entry migration would
+                        // re-create its row anyway.
                         val legacyPath = java.io.File(
                             context.filesDir, "workspace"
                         ).absolutePath
+                        val removable = project.repoDir.absolutePath != legacyPath
                         ProjectRow(
                             project,
                             onOpen = {
@@ -247,7 +246,10 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
                                     else -> container.setActiveProject(project)
                                 }
                                 onOpenProject()
-                            }
+                            },
+                            onRemove = if (removable) {
+                                { pendingRemove = project }
+                            } else null
                         )
                     }
                 }
@@ -264,46 +266,53 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
         }
     }
 
-    if (s.showCreate) {
+    // Removal confirmation (2026-11-04): the wording is type-honest so the
+    // destructive case can never surprise the user - an imported folder's
+    // confirmation says the folder is NOT touched; an app-minted internal
+    // project's confirms that its hidden workspace tree is deleted.
+    pendingRemove?.let { target ->
+        val internalRoot = java.io.File(
+            context.filesDir, "projects"
+        ).absolutePath + java.io.File.separator
+        val internal = target.repoDir.absolutePath.startsWith(internalRoot)
         AlertDialog(
-            onDismissRequest = vm::dismissCreateDialog,
-            title = { Text("New project") },
+            onDismissRequest = { pendingRemove = null },
+            title = { Text("Remove project") },
             text = {
-                Column {
-                    Text(
-                        "A private directory is created for this project's files; " +
-                            "its chat sessions live on their own engine instance.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = draftLabel,
-                        onValueChange = { draftLabel = it },
-                        label = { Text("Name") },
-                        singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            imeAction = ImeAction.Done
-                        )
-                    )
-                }
+                Text(
+                    if (internal) {
+                        "'%s' is an app-internal project. Removing it also " +
+                            "DELETES its generated workspace folder %s " +
+                            "permanently.".format(target.label, target.repoDir.absolutePath)
+                    } else {
+                        "Your folder %s and every file in it stay untouched - " +
+                            "this only removes the app's reference. Re-importing " +
+                            "the same folder later starts a fresh project."
+                            .format(target.repoDir.absolutePath)
+                    }
+                )
             },
             confirmButton = {
                 TextButton(
-                    onClick = { vm.createProject(draftLabel); draftLabel = "" },
-                    enabled = draftLabel.isNotBlank() && !s.busy
-                ) { Text("Create") }
+                    onClick = { vm.removeProject(target); pendingRemove = null },
+                    enabled = !s.busy
+                ) { Text("Remove") }
             },
             dismissButton = {
-                TextButton(onClick = vm::dismissCreateDialog) { Text("Cancel") }
+                TextButton(onClick = { pendingRemove = null }) { Text("Cancel") }
             }
         )
     }
 }
 
+/**
+ * One registry row. [onRemove] is null for the legacy row (no Remove
+ * affordance - it hosts the app's existing history and the entry migration
+ * would resurrect it anyway).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProjectRow(project: ProjectRef, onOpen: () -> Unit) {
+private fun ProjectRow(project: ProjectRef, onOpen: () -> Unit, onRemove: (() -> Unit)? = null) {
     Card(onClick = onOpen, Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -315,8 +324,17 @@ private fun ProjectRow(project: ProjectRef, onOpen: () -> Unit) {
                 Spacer(Modifier.width(10.dp))
                 Text(
                     project.label,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
                 )
+                if (onRemove != null) {
+                    IconButton(onClick = onRemove) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = "Remove ${project.label}"
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(6.dp))
             Text(

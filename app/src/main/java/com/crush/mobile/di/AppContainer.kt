@@ -224,6 +224,35 @@ class AppContainer(context: Context) {
     }
 
     /**
+     * Projects-surface removal support (2026-11-04 import-only decision,
+     * user): the engine-side half of dropping a project row. What it means
+     * for ENGINES only - row/filesystem deletion lives in the store/VM:
+     *
+     * - If the row IS the active project's row, this is exactly a switch to
+     *   the legacy workspace and reuses [setActiveProject]'s switch contract
+     *   unchanged (stop the outgoing engine unless a run is in flight on
+     *   it; never stop legacy).
+     * - For a background row, its engine instance (if ever booted) is
+     *   stopped outright under the same no-run-in-flight rule; a run in
+     *   flight simply skips the stop and the instance rides its linger -
+     *   the VM refuses the whole removal while that flag is set anyway.
+     */
+    fun forgetProjectEngine(id: java.util.UUID) {
+        val key = instanceKeyFor(id)
+        if (activeProjectRef?.id == id) {
+            setActiveProject(null)
+            return
+        }
+        if (engineRunInFlightFor != key) {
+            com.crush.mobile.util.AppLog.i(
+                "Lifecycle",
+                "stopping project engine for instance '$key' (project removed)"
+            )
+            synchronized(runtimeLock) { runtimeFor(key).supervisor.stop() }
+        }
+    }
+
+    /**
      * The engine state of WHATEVER instance the chat layer is bound to, in one
      * flow. Lazily started so the legacy supervisor's construction (and its
      * tuning collector) keeps today's timing: on first chat render, not at

@@ -24,4 +24,7 @@ interface ProjectDao {
 
     @Query("SELECT * FROM projects WHERE repo_dir = :path LIMIT 1")
     suspend fun byPath(path: String): ProjectEntity?
+
+    @Query("DELETE FROM projects WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

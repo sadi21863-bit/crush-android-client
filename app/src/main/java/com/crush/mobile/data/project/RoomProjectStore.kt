@@ -50,6 +50,18 @@ class RoomProjectStore(
     suspend fun byPath(path: String): ProjectRef? = dao.byPath(path)?.toRef()
 
     /**
+     * Drops the ROW only - the plan §8 remove-from-list vs delete-local-copy
+     * distinction, resolved per row TYPE by the caller (see
+     * ProjectsViewModel.removeProject): an imported (external) folder is
+     * USER DATA and never touched by a removal, period; an app-minted
+     * internal repo is app-owned hidden data and is deleted together with
+     * its row by the same caller that owns that lifecycle decision.
+     */
+    suspend fun remove(id: UUID) {
+        dao.deleteById(id.toString())
+    }
+
+    /**
      * The ADR's additive-migration invariant, as a named operation: the
      * legacy workspace (`filesDir/workspace`, [WorkspaceManager]-era) is
      * representable as a project row without touching its history. Idempotent

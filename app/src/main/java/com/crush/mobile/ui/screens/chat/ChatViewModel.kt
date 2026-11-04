@@ -438,7 +438,10 @@ class ChatViewModel(
 
     /** Drops [handle] as the active run if it still is one; safe either way. */
     private fun abandonRun(handle: RunHandle) {
-        if (activeRun === handle) activeRun = null
+        if (activeRun === handle) {
+            activeRun = null
+            container.reportRunInFlight(instanceKey, false)
+        }
     }
 
     /**
@@ -648,7 +651,6 @@ class ChatViewModel(
         val containerRef = container.activeProjectRef
         val key = if (containerRef == null) "" else container.instanceKeyFor(containerRef.id)
         if (key == instanceKey) return
-        val oldKey = instanceKey
         instanceKey = key
         // An instance switch invalidates every engine-derived handle: the
         // new engine owns its own workspace/session id space (the same reset
@@ -658,22 +660,13 @@ class ChatViewModel(
         wsId = null
         sessionId = null
         workspaces = null
-        // Stop the OUTGOING PROJECT engine on the switch (ADR-0001 lifecycle
-        // polish, 2026-11-04): each project engine child holds its own ~60MB
-        // Go runtime, and the default linger would let it idle for an hour on
-        // the phone for nothing. The engine holds only rebuildable state (the
-        // same ADR invariant that makes restarts cheap), and the registry rows
-        // survive - reopening the project reboots the engine in seconds.
-        // Deliberately NOT stopped when a turn is in flight: the known
-        // switch-away edge keeps that run alive engine-side, and killing the
-        // child would cancel it mid-work. Such an instance simply rides its
-        // own idle linger (nothing re-fires this stop later) - the normal
-        // one-hour case. The LEGACY engine ("") is also never stopped here -
-        // it is the host of the app's own history and pre-dates this feature.
-        if (oldKey.isNotBlank() && activeRun == null) {
-            AppLog.i(TAG, "stopping project engine for instance '$oldKey' (no run in flight)")
-            container.runtimeFor(oldKey).supervisor.stop()
-        }
+        // Run-in-flight reporting moved WITH the stop to the container
+        // (reportRunInFlight + setActiveProject, 2026-11-04): the ViewModel
+        // is scoped to the nav back-stack entry, so its knowledge of the
+        // outgoing key cannot be trusted to survive a projects<->chat round
+        // trip - measured on device: the stop branch never fired from here,
+        // and the project engine outlived the switch. This method keeps the
+        // re-targeting only.
         _state.update {
             it.copy(
                 phase = if (containerRef == null) "switching to the workspace..."
@@ -1947,6 +1940,9 @@ class ChatViewModel(
         // Stop can never race a half-initialised run (audit P1-05).
         val handle = RunHandle(turnId = UUID.randomUUID().toString())
         activeRun = handle
+        // Give the container the in-flight signal while THIS instance runs
+        // (the run-in-flight guard for the container-owned stop on switch).
+        container.reportRunInFlight(instanceKey, true)
 
         // LAZY + record-then-start: a main-dispatcher launch{} runs its body
         // eagerly up to the first suspension, so a Stop landing during the

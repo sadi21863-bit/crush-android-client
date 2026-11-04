@@ -173,10 +173,54 @@ class AppContainer(context: Context) {
     /** Stable id -> instance-key derivation; "" stays reserved for legacy. */
     fun instanceKeyFor(id: java.util.UUID): String = "p" + id.toString().substring(0, 8)
 
+    /**
+     * Whether an AGENT RUN is in flight on some engine instance, and on
+     * which one. Reported by the chat ViewModel around every turn (send()
+     * start, abandonRun on the exit paths) because ONLY the ViewModel can
+     * see `activeRun` - the container cannot. The chat ViewModel is scoped
+     * to the nav back-stack entry; a projects->chat round trip can recreate
+     * it (measured on device, 2026-11-04 09:27-09:30), so this signal must
+     * live in something that outlives every entry: this container.
+     */
+    @Volatile
+    var engineRunInFlightFor: String? = null
+        private set
+
+    /** ViewModel seam for the in-flight marker; clear is key-guarded so a
+     *  mid-run instance switch leaves the OLD key flagged (its run rides
+     *  its own linger) instead of erasing a different key's signal. */
+    fun reportRunInFlight(instanceKey: String, inFlight: Boolean) {
+        if (inFlight) engineRunInFlightFor = instanceKey
+        else if (engineRunInFlightFor == instanceKey) engineRunInFlightFor = null
+    }
+
     /** Projects-surface entry point: null opens the legacy workspace. */
     fun setActiveProject(ref: com.crush.mobile.project.ProjectRef?) {
+        val oldKey = _activeInstanceKey.value
+        val newKey = if (ref == null) "" else instanceKeyFor(ref.id)
         activeProjectRef = ref
-        _activeInstanceKey.value = if (ref == null) "" else instanceKeyFor(ref.id)
+        if (newKey == oldKey) return
+        _activeInstanceKey.value = newKey
+        // Stop the OUTGOING PROJECT engine on the switch (ADR-0001 lifecycle
+        // polish, 2026-11-04). This lives HERE and NOT in the chat
+        // ViewModel's bindProject: the ViewModel is scoped to the nav
+        // back-stack entry, so a projects->chat round trip can recreate it
+        // and the outgoing instance key dies with the old entry (measured
+        // on device: the legacy-forward bootstrap ran, and the project
+        // engine child was still alive because the fresh VM early-returned
+        // on its default "" key). The container outlives every entry.
+        //
+        // Run-in-flight guard: a turn in flight is never killed mid-work -
+        // that instance rides its own idle linger instead. The LEGACY engine
+        // ("") is never stopped here: it hosts the app's own history,
+        // survives every switch, and pre-dates per-instance engines.
+        if (oldKey.isNotBlank() && engineRunInFlightFor != oldKey) {
+            com.crush.mobile.util.AppLog.i(
+                "Lifecycle",
+                "stopping project engine for instance '$oldKey' (no run in flight)"
+            )
+            synchronized(runtimeLock) { runtimeFor(oldKey).supervisor.stop() }
+        }
     }
 
     /**

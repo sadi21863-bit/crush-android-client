@@ -295,8 +295,9 @@ proven as of 2026-11-02 (`bb76e49`), graded **C / not started**:
    binary, or too large)".
    PRODUCT DECISION (user, 2026-11-04): Projects are created ONLY via
    Import folder (the desktop-app model) — the "New project" internal-
-   repo path is removed in code this cycle (compile
-   green, on-device verification pending; its minted rows under
+   repo path is removed + verified on device the same
+   evening (the drive caught two first-use defects, both fixed in the
+   slot-fix batch — see capabilities.md; its minted rows under
    filesDir/projects/<uuid>/repo are invisible to the user's file
    manager), and a REMOVE-from-list action is added per row with
    type-honest semantics: an imported folder is user DATA (only the

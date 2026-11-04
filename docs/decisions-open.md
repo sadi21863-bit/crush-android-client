@@ -261,8 +261,11 @@ Implementation (2026-11-04 cycle): `ProjectDao.deleteById` →
 `RoomProjectStore.remove` (row-only) → `ProjectsViewModel.removeProject`
 (legacy guard + run-in-flight guard + ordered IO) → `ProjectsScreen`
 (single full-width Import button; per-row Remove icon with a type-honest
-confirmation dialog). Compile-green; on-device verification pending the
-four-task gate.
+confirmation dialog). Verified on device the same evening: the import-only UI, per-row removal with the
+legitimate engine-stop lines, and the imported folder byte-intact on the cancel
+path — the drive itself caught two first-use defects (literal `%s` in the dialog,
+empty minted-slot wrapper left behind) which are fixed in the same-day slot-fix
+batch (see capabilities.md).
 
 No open residue. One follow-up noted for the backlog: clearing legacy chat
 history is a separate future feature ("delete chats"), NOT a project

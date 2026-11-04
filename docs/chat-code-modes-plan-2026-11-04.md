@@ -1,6 +1,7 @@
 # Chat / Code modes — initial research and planning (2026-11-04)
 
-Status: RESEARCH + PLAN ONLY. No code written. This distills the roadmap's
+Status: PLAN with user decisions RECORDED (2026-11-04, §5) — no code written,
+implementation awaits the user's explicit go. This distills the roadmap's
 Chat/Code phases ([`crush-plan-2026-11-02.md`](crush-plan-2026-11-02.md) §6, §7,
 P4/P5/P6, §21) against what the app actually has on device today (2026-11-04,
 import-only decision landed in `5ef70f5` + `4a59b68`), and lays out slices,
@@ -120,8 +121,9 @@ Layered, each layer independently provable:
    package or repo-modifying tool request inside a Chat session is
    **auto-DENIED immediately** (not parked against PROMPT_WAIT_MS) and
    surfaces as a chat-mode message ("Chat can't write files — use a Code
-   project"). Allow-listed safe read-only tools, if any, are an explicit
-   user decision (open question Q2).
+   project"). Allow-listed safe read-only tools are DECIDED-OUT of v1
+   (§5, Q2 = deny-all in v1); they remain a deliberate later option only
+   with S1 probe evidence.
 3. **Prompt reinforcement**: chat sessions ride the chat-appropriate system
    prompt/model slots (still provider-driven, no hardcoded ids).
 4. **UI conservatism**: chat screen hides code affordances (model chip
@@ -138,7 +140,9 @@ tracked separately from the legacy row's code-ish history) and the New-chat
 flow gains a mode choice at creation (chip on the composer or a cast sheet);
 the header badge shows the mode. Projects screen stays the Code entry today.
 Full tab restructure (bottom Chat/Code tabs as the plan's screen spec
-implies) is a bigger UI move — open question Q1 decides scope for v1.
+implies) and any in-session toggle are BACKLOGGED selectively (§5,
+Q1 = choose-at-creation for v1); the toggle's honest place is the
+Chat→Code promotion/handoff seam (roadmap §9, P6).
 
 Model/provider keys stay SHARED across modes (P5 item 3): the model
 catalogue, key storage and pricing drawer obviously do not fork per mode.
@@ -151,7 +155,7 @@ catalogue, key storage and pricing drawer obviously do not fork per mode.
 |---|---|---|
 | S0 | Events-socket per-instance fix + changes-rail external-file support (already top of queue; unblocks keyed instances generally) | drive: imported-folder turn completes with no false banner; rail shows +N -N for notes.md/todo.md |
 | S1 | **Engine capability probe** (no product code): enumerate engine agents; test per-agent tool config; test a session opened with restricted agent + no-yolo; test tool-denial behavior. All evidence through the app, ids safe | probe log + `capabilities.md` update |
-| S2 | **Product decisions from the user** (Q1-Q4 below) | decisions-out entry, plan doc updated |
+| S2 | **Product decisions** — RESOLVED 2026-11-04 (Q1-Q4 answered, see §5) | decisions-open.md item 10 + plan §5 |
 | S3 | Mode model: `AgentMode` enum, per-session storage, engine-instance routing (legacy / project key / chat key), run-in-flight guard reuse | JVM unit tests + gate |
 | S4 | UI: New-chat mode choice, sheet sections, header badge; enforcement wiring (auto-deny policy layer with the proven ASK plumbing) | drive: MODE-01 injection attempt denied; MODE-06 regression (Code ASK intact) |
 | S5 | Acceptance run vs §21 matrix rows 01/06/07 + docs: capabilities.md, BASELINE, this plan updated to MEASURED | gates green + docs commit |
@@ -161,20 +165,48 @@ top-of-queue defect; Termux L1 lands after P5 per the dependency graph.
 
 ---
 
-## 5. Open questions for the user (blocking S2, not S1)
+## 5. Decisions recorded (2026-11-04, user-answered) — implementation NOT started
 
-1. **Navigation shape for v1** — (a) mode chosen when starting a new chat,
-   sheet groups Chats vs project sessions (smallest honest slice);
-   (b) full two-tab Chat/Code restructure; (c) in-sheet toggle.
-2. **Chat tool allowlist v1** — (a) deny ALL tools (pure conversation,
-   trivially provable, zero file access); (b) also allow safe read-only
-   tools chosen deliberately (plan allows it; needs S1 probe first).
-   Recommendation: (a) for the first slice.
-3. **Default mode for new chats** — Chat or remember-last? Recommendation:
-   no global setting yet; Chat default is safer.
-4. **Where old legacy-pool sessions count** — they remain attached to the
-   legacy row (not re-parented to "Chats"); only NEW chat sessions live in
-   the chat pool. Confirm.
+Answers arrived while the user runs their own research; recorded here
+SEPARATELY from the research above and in [`decisions-open.md`](decisions-open.md)
+as item 10. Neither S0 nor S1/S3/S4/S5 start until the user's explicit go.
+
+- **Q1 navigation → (a) choose-at-creation.** Mode is picked in the
+  new-session flow; Chats group separately from project sessions. The user
+  wants (b) two-tab restructure and (c) in-session toggle used "in some
+  useful places" — BACKLOGGED selectively, not v1. Honest mapping: (c)'s
+  useful place is the Chat→Code promotion/handoff seam (roadmap §9, P6) —
+  an explicit, disclosed in-session "move this to Code" upgrade, deferred
+  to that phase; (b) is a navigation rebuild for a later polish pass.
+- **Q2 Chat tool policy → (a) deny ALL tools in v1** (pure conversation).
+  Deferred, in expected order: (i) the "smart transfer" flow the user asked
+  for — when a write/shell request is auto-denied in Chat, the denial itself
+  already rides S4's chat-mode message ("Chat can't write files — take this
+  to a Code project"), and the interactive transfer-to-Code ACTION lands
+  later (naturally the Q1(c)/P6 seam); (ii) read-only allowlist — only after
+  S1's engine probe proves candidate tools strictly read-only.
+- **Q3 default → (a) fixed Chat default** for new sessions. A Settings
+  choice (option c) is backlogged, not v1.
+- **Q4 legacy history → (a) leave untouched** — recorded on the user's
+  delegation ("wipe-and-restart OR your choice"), standing until their final
+  confirmation at go-time. Rationale: deleting real history buys only a
+  prettier list; a deliberate, fully-disclosed "clear legacy history" action
+  can be built later if a fresh start is truly wanted — never a silent wipe
+  (precedent: decisions-open item 9 already reserved "delete chats" as a
+  SEPARATE future feature, with the legacy row itself permanent).
+
+### 5.1 What the decisions change in the slices
+
+- **S1 stays but is re-scoped**: v1 enforces deny-all app-side on the proven
+  ASK plumbing, so the engine probe no longer BLOCKS v1 — it informs the
+  deferred items (engine agent seating hardening, read-only allowlist,
+  transfer-to-Code action).
+- **v1 execution order** (on the user's go): S0 socket defect → S3 mode
+  model (deny-all chat policy) → S4 UI (creation choice + groupings + badge
+  + deny message) → S5 acceptance vs MODE-01/06/07.
+- **Explicitly NOT v1** (backlog): tabs restructure, in-session toggle/upgrade,
+  read-only allowlist, interactive transfer-to-Code, Settings default toggle,
+  legacy-history clear/retire (only if the user later opts in).
 
 ---
 

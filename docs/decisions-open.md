@@ -271,6 +271,33 @@ No open residue. One follow-up noted for the backlog: clearing legacy chat
 history is a separate future feature ("delete chats"), NOT a project
 delete — the legacy row itself stays.
 
+## 10. Chat/Code modes — navigation, tool policy, default mode, legacy history
+
+**Status: DECIDED 2026-11-04 (user) — folded into
+[`chat-code-modes-plan-2026-11-04.md`](chat-code-modes-plan-2026-11-04.md) §5;
+implementation NOT started, awaiting the user's explicit go.**
+
+- **Navigation (Q1) → choose-at-creation:** mode picked in the new-session
+  flow; Chats grouped separately from project sessions. Two-tab restructure
+  (b) and in-session toggle (c) held as SELECTIVE backlog, not v1; (c)'s
+  natural place is the Chat→Code handoff seam (roadmap §9 / P6).
+- **Chat tool policy (Q2) → deny ALL tools in v1** (pure conversation).
+  Backlog in expected order: "smart transfer" — a denied write/shell request
+  in Chat surfaces a chat-mode message pointing at Code mode (denial message
+  rides S4); interactive transfer-to-Code action later (the Q1(c)/P6 seam);
+  read-only allowlist only after the S1 engine probe proves tools strictly
+  read-only.
+- **Default mode (Q3) → fixed Chat default** for new sessions; a Settings
+  option is backlog, not v1.
+- **Legacy history (Q4) → leave untouched.** User explicitly offered
+  "wipe all + fresh start OR your choice" — the recorded standing
+  recommendation is KEEP (history is real data; a prettier list is not worth
+  the loss), adopted on the user's delegation and subject to their final
+  confirmation at go-time. A deliberate, fully-disclosed "clear legacy
+  history" action can be built later if a fresh start is truly wanted —
+  never a silent wipe (item 9 above already reserved "delete chats" as a
+  separate future feature; the legacy row itself stays permanent).
+
 ## Tree-verification pass 2026-10-31
 
 - Every citation re-checked and accurate: lint flags at

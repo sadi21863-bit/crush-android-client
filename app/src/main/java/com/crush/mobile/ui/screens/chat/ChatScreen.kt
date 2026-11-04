@@ -178,7 +178,8 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenProjects: () -> Unit, isLocked:
                             maxLines = 1
                         )
                         Text(
-                            s.phase,
+                            if (activeInstanceKey == com.crush.mobile.engine.EnginePaths.CHAT_INSTANCE_KEY)
+                                "Chat - no tools - ${s.phase}" else s.phase,
                             style = MaterialTheme.typography.labelSmall,
                             color = if (s.engineReady) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant
@@ -193,8 +194,8 @@ fun ChatScreen(onOpenSettings: () -> Unit, onOpenProjects: () -> Unit, isLocked:
                     }
                 },
                 actions = {
-                    IconButton(onClick = { vm.newThread() }) {
-                        Icon(Icons.Default.Add, contentDescription = "New chat")
+                    IconButton(onClick = { vm.startChatSession() }) {
+                        Icon(Icons.Default.Add, contentDescription = "New chat (conversation-only)")
                     }
                     // Model picker. Only models Zen actually serves are listed.
                     TextButton(onClick = { showModels = true; vm.loadModels() }) {
@@ -440,9 +441,12 @@ bottomBar = {
             sessions = s.sessions,
             activeId = s.activeSessionId,
             loading = s.sessionsLoading,
+            surfaceLabel = vm.surfaceLabel.collectAsState().value,
             onPick = { vm.openSession(it); showSessions = false },
             onDelete = { vm.deleteSession(it) },
-            onNew = { vm.newThread(); showSessions = false },
+            // Q1(a): "+ New chat" is the CHAT choice at creation - the dedicated
+            // conversation instance (deny-all tools); Code starts at Projects.
+            onNew = { vm.startChatSession(); showSessions = false },
             onSettings = { showSessions = false; onOpenSettings() },
             onProjects = { showSessions = false; onOpenProjects() },
             onDismiss = { showSessions = false }
@@ -1014,6 +1018,7 @@ private fun SessionSheet(
     sessions: List<Session>,
     activeId: String?,
     loading: Boolean,
+    surfaceLabel: String,
     onPick: (String) -> Unit,
     onDelete: (String) -> Unit,
     onNew: () -> Unit,
@@ -1087,7 +1092,16 @@ private fun SessionSheet(
                     Text("Projects")
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+            // S4: the sheet is scoped to the CURRENT surface's pool (the engine
+            // owns session storage per instance), so say WHICH surface the
+            // list below belongs to instead of implying a global inbox.
+            Text(
+                surfaceLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
 
             if (loading && sessions.isEmpty()) {
                 Text(

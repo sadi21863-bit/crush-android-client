@@ -76,6 +76,14 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
     // confirmation.
     var pendingRemove by remember { mutableStateOf<ProjectRef?>(null) }
 
+    // S4/F04 (acceptance A05): an imported folder MAY carry a project-root
+    // `crushrc`, which the embedded engine EXECUTES AS BASH on every
+    // workspace attach (S1b measured: twice per cycle, with the app's full
+    // permissions). Import therefore implicitly includes arbitrary shell
+    // execution unless the user consents. The gate is DELIBERATE: show it at
+    // open, tell the user WHAT and WHY, and refuse to bind silently.
+    var pendingCrushrcTrust by remember { mutableStateOf<ProjectRef?>(null) }
+
     // "Import folder as project" (user feature, 2026-11-04) - three launchers,
     // composed: the SAF folder picker, the storage-permission request that
     // guards it on API <= Q (this build's minimum), and the All-Files-Access
@@ -243,9 +251,23 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
                             onOpen = {
                                 when (project.repoDir.absolutePath) {
                                     legacyPath -> container.setActiveProject(null)
-                                    else -> container.setActiveProject(project)
+                                    else -> {
+                                        // F04 gate: no silent binding of a
+                                        // folder that ships executable config.
+                                        if (java.io.File(project.repoDir, "crushrc")
+                                                .isFile
+                                        ) {
+                                            pendingCrushrcTrust = project
+                                        } else {
+                                            container.setActiveProject(project)
+                                        }
+                                    }
                                 }
-                                onOpenProject()
+                                if (project.repoDir.absolutePath == legacyPath ||
+                                    !java.io.File(project.repoDir, "crushrc").isFile
+                                ) {
+                                    onOpenProject()
+                                }
                             },
                             onRemove = if (removable) {
                                 { pendingRemove = project }
@@ -306,6 +328,37 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
             },
             dismissButton = {
                 TextButton(onClick = { pendingRemove = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // F04 trust gate: open a crushrc-bearing folder ONLY after an explicit,
+    // informed yes. Cancel = do not bind, no engine touched.
+    pendingCrushrcTrust?.let { target ->
+        AlertDialog(
+            onDismissRequest = { pendingCrushrcTrust = null },
+            title = { Text("This folder carries a crushrc") },
+            text = {
+                Text(
+                    ("\"%s\" contains a project-root crushrc. The embedded " +
+                        "engine RUNS that file as a Bash script (twice per " +
+                        "attach) with this app's permissions, upstream, " +
+                        "without telling you. Opening this project will " +
+                        "run it.\n\n" +
+                        "If you did not write it, treat it as hostile code " +
+                        "and cancel.")
+                        .format(target.label)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    container.setActiveProject(target)
+                    pendingCrushrcTrust = null
+                    onOpenProject()
+                }) { Text("Run it and open") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingCrushrcTrust = null }) { Text("Cancel") }
             }
         )
     }

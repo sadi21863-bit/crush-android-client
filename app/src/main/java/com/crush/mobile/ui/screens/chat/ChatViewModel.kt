@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -404,6 +405,24 @@ class ChatViewModel(
 
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
+
+    /**
+     * S4: the sheet's surface label - what pool the CURRENT binding hosts
+     * ("Chats - conversation only" / "Project - <label>" / "Workspace
+     * (legacy)"). Derived from the container's binding, never stored
+     * separately: the binding is the single authority (S3).
+     */
+    val surfaceLabel: StateFlow<String> = container.activeBinding.map { binding ->
+        when (binding) {
+            is AppContainer.EngineBinding.ChatPool -> "Chats - conversation only"
+            is AppContainer.EngineBinding.Project -> "Project - ${binding.ref.label}"
+            is AppContainer.EngineBinding.Legacy -> "Workspace (legacy)"
+        }
+    }.stateIn(
+        viewModelScope,
+        kotlinx.coroutines.flow.SharingStarted.Eagerly,
+        "Workspace (legacy)"
+    )
 
     /**
      * The turn currently claimed by send(), or null when none is in flight.
@@ -1715,6 +1734,21 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * S4: the session surface's "+ New chat" button = a CHAT-pool session
+     * (Q1(a) choose-at-creation; the chat choice is the Chat default, Q3).
+     * Binds the dedicated conversation instance first - its switch contract
+     * stops the outgoing engine unless a run is in flight - then mints a
+     * fresh session there. newThread falls back to bootstrap when the pool's
+     * WorkspaceManager is not handed out yet, so either path lands a real
+     * chat-pool session.
+     */
+    fun startChatSession() {
+        container.setActiveChatPool()
+        bindProject()
+        newThread()
+    }
+
     /** Starts a fresh thread, leaving history intact and reachable. */
     fun newThread() {
         val mgr = workspaces ?: run { bootstrap(); return }
@@ -2679,8 +2713,42 @@ class ChatViewModel(
                             CrushEvent.PayloadType.PERMISSION_REQUEST -> {
                                 val req = gson.fromJson(ev.body, PermissionRequest::class.java)
                                 if (req.id.isNotBlank()) {
-                                    AppLog.i(TAG, "permission requested: ${req.toolName} (id=${req.id.take(8)}); pendingPermission SET for run $runId")
-                                    _state.update { it.copy(pendingPermission = req) }
+                                    if (instanceKey == EnginePaths.CHAT_INSTANCE_KEY) {
+                                        // S4 DEFENSE LAYER (Q2): Chat is
+                                        // conversation-only. The spawn-time
+                                        // disabled_tools list hides the built-ins
+                                        // (S1-verified), so a grant request here can
+                                        // only come from a surface that list cannot
+                                        // see (e.g. an MCP server name). Auto-DENY -
+                                        // we NEVER park an approval dialog on a
+                                        // chat session - and say WHY in the
+                                        // transcript: the take-this-to-Code
+                                        // affordance the user asked for at
+                                        // decision time.
+                                        AppLog.i(
+                                            TAG,
+                                            "chat deny-all: ${req.toolName} auto-denied on the pool"
+                                        )
+                                        _state.update { st ->
+                                            st.copy(
+                                                pendingPermission = req,
+                                                messages = st.messages + ChatMessage(
+                                                    id = UUID.randomUUID().toString(),
+                                                    role = "assistant",
+                                                    text = "Chat is conversation-only, so \"" +
+                                                        req.toolName + "\" was blocked. " +
+                                                        "Open a Code project and run this there."
+                                                )
+                                            )
+                                        }
+                                        resolvePermission(allow = false)
+                                    } else {
+                                        AppLog.i(
+                                            TAG,
+                                            "permission requested: ${req.toolName} (id=${req.id.take(8)}); pendingPermission SET for run $runId"
+                                        )
+                                        _state.update { it.copy(pendingPermission = req) }
+                                    }
                                 } else {
                                     AppLog.w(TAG, "permission request with BLANK id dropped; pendingPermission NOT set")
                                 }

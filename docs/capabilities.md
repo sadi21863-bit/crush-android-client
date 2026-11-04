@@ -58,7 +58,7 @@ These are the real gaps, ordered by how much they matter for a coding agent.
 
 Open issues that are implemented-but-wrong, distinct from the gaps above.
 
-### Per-instance events socket never connects on imported-folder engines — TOP OF FIX QUEUE (2026-11-04)
+### Per-instance events socket + imported-root diff — BOTH FIXED (349bad3, verified on device 2026-11-05)
 
 On the imported-folder instance (`p536fa26e`, real cwd
 `/storage/emulated/0/Test project folder`) the per-instance events socket
@@ -82,11 +82,43 @@ edits the imported folder but diffs the legacy root, which is exactly why
 external files read as "(unreadable, binary, or too large)"; (b) the
 transport half is port-only connection reuse (`UDS_PORT_SENTINEL = 1` for
 every engine + the `p == connectionPort` guard) — an unchanged number cannot
-prove the socket file stayed the same. Both are S0's fix targets; the
-events-socket ENOENT itself still needs the device socket-path trace before
-repair. This is ADR-0001 §7's predicted per-binding event-routing debt
-landing; full fold-in ledger in
+prove the socket file stayed the same. Device diagnosis the same evening
+completed the chain: a clean first-open attach CONNECTED (defect is
+sequencing-dependent, not unconditional), and the full failure shape is a
+connection REUSED across an instance switch within one ViewModel — serving
+the wrong engine one direction, or retrying ENOENT forever against the
+UNLINKED socket file (Go's UnixListener unlinks on close) of an engine the
+stop-on-switch fix had stopped, while call-time REST kept succeeding.
+Full fold-in ledger in
 [`chat-code-modes-plan-2026-11-04.md`](chat-code-modes-plan-2026-11-04.md) §7.
+
+**FIXED in `349bad3` (2026-11-05 evening) and verified end-to-end on device
+`bbf8ca69`**: connection identity is now the SOCKET FILE (rebuilt whenever the
+bound instance's path differs), the transport is resolved PER ATTEMPT (missing
+socket = one honest logged attempt `socket not present yet: <scrubbed path>`,
+a respawned socket is followed by retry, no silent plain-TCP fallback), the
+supervisor health probe addresses its own instance's socket, and
+capture/collect use a PER-RUN FROZEN root from the active project binding.
+Acceptance evidence, build `349bad3`: fresh keyed attach connected in 35 ms;
+one ASK-approved writing turn on the imported folder completed with its real
+terminal text — **no false banner**; rail truth `2 files changed +2 -0`,
+per-file `todo.md +1 -0` / `notes.md +1 -0`, `0 unreadable`, with the expanded
+unified hunk (`@@ 2,4 +2,4 @@`, green `+ - [ ] S0 verified`) rendered on
+screen; files byte-verified via adb (`S0 turn check` / `- [ ] S0 verified`);
+A→B→A switching produced `stopping project engine` + transport identity
+change to `crush.sock` + connected (legacy), then engine respawn + reconnect
+on `crush-p536fa26e.sock` with the honest capped retry ladder during the
+engine-down window and ZERO app-PID ENOENT (the one trace ENOENT was MIUI
+system noise, PID 18108). CI green on `349bad3` (gate + MODE-25).
+
+**Residual, non-blocking, suspected for the post-v1 hardening (review Gate 7
+shape):** (1) a stale ViewModel's connection survives navigation
+(projects↔chat round trip keeps the old entry's reader alive) and retries
+honestly with capped backoff until reclaim — same family as the runtime-map
+backlog item, needs the VM/connection registry; (2) the engine respawn after
+stop-on-switch took ~55–60 s from re-bind to `exec` (00:05:18 bind → 00:06:14
+spawn) — supervisor start latency after a manual stop deserves its own probe
+before the next release.
 
 ### Import-removal first-use defects — BOTH FIXED (2026-11-04)
 

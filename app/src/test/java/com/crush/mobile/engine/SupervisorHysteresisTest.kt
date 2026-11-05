@@ -166,4 +166,101 @@ class SupervisorHysteresisTest {
             EngineSupervisor.wedgeBudgetExhausted(EngineSupervisor.MAX_WEDGE_RESTARTS)
         )
     }
+
+    // ---------------------------------------------------------------------
+    // STARTING watchdog (design memo §2.2, 2026-11-05): the bound-but-
+    // unconfirmed Starting wedge. Same principle as the START-budget block
+    // above: the predicate is a pure companion function on EngineSupervisor,
+    // replayed here without spawning an engine. The wedgeRestarts argument is
+    // the SHARED P1-25SUP counter; the watchdog must never reset it.
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun `watchdog keeps waiting just under the threshold`() {
+        // A healthy boot measured 4-58s and the engine's own readiness
+        // deadline is 60s; 89_999ms is still inside a legit boot envelope
+        // (deadline + probe slack), so the watchdog must not act yet.
+        assertEquals(
+            "an attempt below the starting-watchdog threshold is normal starting",
+            StartWatchdogDecision.KeepWaiting,
+            EngineSupervisor.startingWatchdogShouldRestart(
+                elapsedMs = EngineSupervisor.STARTING_WATCHDOG_MS - 1,
+                probeOk = true,
+                wedgeRestarts = 0
+            )
+        )
+    }
+
+    @Test
+    fun `watchdog fires exactly at the threshold with a bound child`() {
+        assertEquals(
+            "a bound child past 90s of Starting is the wedge shape",
+            StartWatchdogDecision.Restart,
+            EngineSupervisor.startingWatchdogShouldRestart(
+                elapsedMs = EngineSupervisor.STARTING_WATCHDOG_MS,
+                probeOk = true,
+                wedgeRestarts = 0
+            )
+        )
+    }
+
+    @Test
+    fun `a failing or missing socket is never a wedge`() {
+        // Memo predicate, fail-closed: "a bound-but-frozen Starting for >90s
+        // is a wedge, a missing socket is normal starting." No elapsed time
+        // converts an unbound child into a restart decision.
+        assertEquals(
+            StartWatchdogDecision.KeepWaiting,
+            EngineSupervisor.startingWatchdogShouldRestart(
+                elapsedMs = 600_000L,
+                probeOk = false,
+                wedgeRestarts = 0
+            )
+        )
+    }
+
+    @Test
+    fun `the first wedged episode restarts and a second one is terminal`() {
+        // Memo §2.2: ONE bounded restart; a SECOND consecutive wedged episode
+        // writes the terminal honest failure instead of churning again.
+        assertEquals(
+            StartWatchdogDecision.Restart,
+            EngineSupervisor.startingWatchdogShouldRestart(
+                elapsedMs = 120_000L, probeOk = true, wedgeRestarts = 0
+            )
+        )
+        assertEquals(
+            StartWatchdogDecision.GiveUp,
+            EngineSupervisor.startingWatchdogShouldRestart(
+                elapsedMs = 120_000L, probeOk = true, wedgeRestarts = 1
+            )
+        )
+    }
+
+    @Test
+    fun `the watchdog give-up respects the shared wedge budget and never resets it`() {
+        // wedgeRestarts is shared with the unhealthy-path budget: counts at or
+        // past the cap give up regardless of how the count got there, and no
+        // input to the pure predicate can resurrect a spent budget - there is
+        // no writer side effect, so `wedgeRestarts` monotonically de-escalates
+        // the decision while the loop keeps ownership of resets.
+        for (spent in 1..(EngineSupervisor.MAX_WEDGE_RESTARTS + 2)) {
+            assertEquals(
+                "wedge count $spent is spent; the watchdog must not restart again",
+                StartWatchdogDecision.GiveUp,
+                EngineSupervisor.startingWatchdogShouldRestart(
+                    elapsedMs = 120_000L, probeOk = true, wedgeRestarts = spent
+                )
+            )
+        }
+    }
+
+    @Test
+    fun `the watchdog threshold stays above the bounded readiness window`() {
+        // Pinned number: 90s = the engine's 60s readiness deadline plus probe
+        // grace (memo §2.2 chose it deliberately). If this ever shrinks below
+        // the ladder's worst legit boot, slow devices get false wedge
+        // restarts; if it grows past the wedge shape, detection is pointless.
+        assertEquals(90_000L, EngineSupervisor.STARTING_WATCHDOG_MS)
+    }
 }

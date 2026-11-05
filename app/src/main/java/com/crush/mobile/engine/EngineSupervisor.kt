@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
@@ -200,6 +201,16 @@ class EngineSupervisor(
     }
 
     private suspend fun supervise() {
+        // Veto ownership (design memo §1 interlock, 2026-11-05): point the
+        // engine's maySpawn checkbox at the supervisor's wanted flag BEFORE
+        // the first start attempt, so a stop() that arrives while an attempt
+        // is in flight is honoured at the atomic birth section inside
+        // CrushEngine.start() - no child is born under a revoked want, and a
+        // child born under a still-current want is always reachable by
+        // stopBlocking. The engine's own default (true) preserves today's
+        // behaviour for any start without this install. restart() re-enters
+        // this same setup, so the deliberate-restart path is covered too.
+        engine.maySpawn = { isWanted() }
         var attempt = 0
         // Wedge tracking (P1-25SUP): how many restarts in a row happened
         // WITHOUT the engine ever staying Running for MIN_HEALTHY_RUN_MS.
@@ -220,11 +231,132 @@ class EngineSupervisor(
             attempt++
             _state.value = EngineState.Starting(attempt)
             val attemptStart = System.currentTimeMillis()
+            // Monotonic companion for the starting watchdog (§2.2): judged on
+            // elapsedRealtime so a doze-freeze counts as elapsed time instead
+            // of hiding from the wedge detection on a wall-clock pair.
+            val attemptStartMono = android.os.SystemClock.elapsedRealtime()
             com.crush.mobile.util.AppLog.d(
                 TAG, "[$instanceKey] starting attempt $attempt"
             )
 
-            when (val result = engine.start()) {
+            // STARTING WATCHDOG (design memo §2.2, 2026-11-05): bound the
+            // attempt PHASE itself. Healthy boots measured 4-58s and the
+            // engine's own readiness deadline is 60s, so anything still
+            // Starting at 90s is not a slow boot - the start call is either
+            // wedged after the child bound its socket or suspended past every
+            // deadline the engine checks. withTimeoutOrNull cancels the
+            // attempt (cancellation is safe since the interlock: the engine
+            // assigns `process` atomically with the birth, so stopBlocking
+            // below always reaches whatever was born) and the loop's own
+            // probe seam - the same monitorUntilUnhealthy transport, no new
+            // threads - decides bound-but-unconfirmed wedge vs normal
+            // starting. A healthy <90s boot passes through untouched.
+            val result = withTimeoutOrNull(STARTING_WATCHDOG_MS) { engine.start() }
+            if (result == null) {
+                // Probe BEFORE any teardown: EngineSockets reports file-absent
+                // as "not up yet", so only a BOUND child can fabricate a wedge
+                // here (memo: "a missing socket is normal starting"). Same
+                // degeneracy as monitorUntilUnhealthy: a supervisor built
+                // without a context reads probeOk=true (none exist today;
+                // AppContainer always passes one).
+                val probeOk = probeVersion(healthSocketFile())
+                engine.stopBlocking()
+                val elapsedMs = android.os.SystemClock.elapsedRealtime() - attemptStartMono
+                when (startingWatchdogShouldRestart(elapsedMs, probeOk, wedgeRestarts)) {
+                    StartWatchdogDecision.Restart -> {
+                        wedgeRestarts++
+                        // Memo §2.2 wedge line, once per wedged episode; the
+                        // shared P1-25SUP budget governs how many more this
+                        // shape may incur before the give-up below.
+                        Log.w(
+                            TAG,
+                            "starting watchdog: child bound ${elapsedMs}ms without " +
+                                "the app confirming readiness; one bounded restart"
+                        )
+                        com.crush.mobile.util.AppLog.w(
+                            TAG,
+                            "[$instanceKey] starting watchdog: child bound ${elapsedMs}ms " +
+                                "without the app confirming readiness; one bounded restart"
+                        )
+                        delay(RESTART_DELAY_MS)
+                    }
+
+                    StartWatchdogDecision.GiveUp -> {
+                        wedgeRestarts++
+                        Log.e(
+                            TAG,
+                            "starting watchdog: bound-but-unconfirmed wedge episode " +
+                                "repeated; giving up (wedge restarts this run: $wedgeRestarts)"
+                        )
+                        com.crush.mobile.util.AppLog.e(
+                            TAG,
+                            "[$instanceKey] starting watchdog: a bound socket never reached a " +
+                                "confirmed ready state; giving up after $attempt attempts " +
+                                "(wedge restarts this run: $wedgeRestarts)"
+                        )
+                        // The terminal shape the start-budget path already
+                        // produces: one honest Failed(willRetry=false) and the
+                        // loop RETURNS; recovery needs an explicit user-driven
+                        // start()/rebind. stopBlocking above already removed
+                        // the bound child.
+                        _state.value = EngineState.Failed(
+                            reason = "Engine bound its socket but the app never confirmed readiness",
+                            detail = "starting watchdog: ${wedgeRestarts} bound-but-unconfirmed " +
+                                "Starting episodes in a row (last attempt ran ${elapsedMs}ms)",
+                            willRetry = false
+                        )
+                        return
+                    }
+
+                    StartWatchdogDecision.KeepWaiting -> {
+                        // Not a wedge - but this attempt was already cancelled
+                        // by the watchdog, so "waiting" can only mean: tear
+                        // down whatever was half-bound (done above) and retry
+                        // WITHIN the START budget. Nothing here resets
+                        // attempt; startRetryGivesUp remains the sole give-up
+                        // law, exactly as for Failed results.
+                        if (startRetryGivesUp(attempt, failureWantsRetry = true)) {
+                            Log.e(
+                                TAG,
+                                "startup failed permanently after $attempt attempts " +
+                                    "(budget $MAX_START_ATTEMPTS): no engine state returned " +
+                                    "within the starting watchdog window"
+                            )
+                            com.crush.mobile.util.AppLog.e(
+                                TAG,
+                                "[$instanceKey] startup failed permanently after " +
+                                    "$attempt attempts (budget $MAX_START_ATTEMPTS): " +
+                                    "no engine state returned within the starting " +
+                                    "watchdog window"
+                            )
+                            _state.value = EngineState.Failed(
+                                reason = "Engine did not report any state within the " +
+                                    "starting watchdog window",
+                                detail = "$attempt consecutive attempts produced no terminal " +
+                                    "state within ${STARTING_WATCHDOG_MS / 1000}s each",
+                                willRetry = false
+                            )
+                            return
+                        }
+                        Log.w(
+                            TAG,
+                            "starting watchdog: attempt not bound after ${elapsedMs}ms; " +
+                                "budgeted retry (attempt=$attempt)"
+                        )
+                        com.crush.mobile.util.AppLog.w(
+                            TAG,
+                            "[$instanceKey] starting watchdog: attempt ran ${elapsedMs}ms with " +
+                                "the socket still not bound; retrying within the start " +
+                                "budget (attempt=$attempt)"
+                        )
+                        delay(backoffMs(attempt))
+                    }
+                }
+                // The attempt is settled; next loop turn increments attempt.
+                continue
+            }
+
+            when (result) {
                 is EngineState.Running -> {
                     com.crush.mobile.util.AppLog.i(
                         TAG,
@@ -645,5 +777,68 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
          */
         internal fun wedgeBudgetExhausted(consecutiveShortRuns: Int): Boolean =
             consecutiveShortRuns >= MAX_WEDGE_RESTARTS
+
+        /**
+         * Starting-watchdog threshold (design memo §2.2, 2026-11-05): an
+         * attempt still in Starting past this deadline, WITH the child's own
+         * socket answering, is a bound-but-unconfirmed wedge. 90s is
+         * deliberately above the bounded 60s readiness window in
+         * CrushEngine.start plus probe grace, so every healthy boot (measured
+         * 4-58s, worst ladder leg 60s + backoff) stays untripped and only a
+         * wedged or frozen-first attempt can cross it.
+         */
+        const val STARTING_WATCHDOG_MS = 90_000L
+
+        /**
+         * The pure STARTING-watchdog rule (§2.2), split out for the same
+         * reason as [startRetryGivesUp] / [wedgeBudgetExhausted]: the loop's
+         * contract is only pinnable in a test. Pure on its arguments - it has
+         * NO writer side effects, so it can never reset the attempt or the
+         * wedge count it is handed; the supervise loop owns all mutation.
+         *
+         * Order of laws:
+         * 1. below the threshold, or the child's socket not answering
+         *    (probeOk=false, which by the probe seam's contract includes
+         *    "no transport configured") -> KeepWaiting: a missing socket is
+         *    normal starting, never a wedge;
+         * 2. the EXISTING wedge budget still binds: a count already at the
+         *    cap (earlier boot churn in this run) gives up outright;
+         * 3. the FIRST wedged Starting episode of this churn run gets ONE
+         *    bounded restart; the SECOND consecutive one is terminal
+         *    (memo §2.2: Failed(willRetry=false) and return - the shape the
+         *    start budget path already yields).
+         */
+        internal fun startingWatchdogShouldRestart(
+            elapsedMs: Long,
+            probeOk: Boolean,
+            wedgeRestarts: Int
+        ): StartWatchdogDecision {
+            if (elapsedMs < STARTING_WATCHDOG_MS || !probeOk) {
+                return StartWatchdogDecision.KeepWaiting
+            }
+            if (wedgeBudgetExhausted(wedgeRestarts)) {
+                return StartWatchdogDecision.GiveUp
+            }
+            return if (wedgeRestarts == 0) StartWatchdogDecision.Restart
+            else StartWatchdogDecision.GiveUp
+        }
     }
+}
+
+/**
+ * What the starting watchdog tells the supervise loop to do when an attempt
+ * outlived [EngineSupervisor.STARTING_WATCHDOG_MS] (design memo §2.2,
+ * 2026-11-05). Named so the decision is greppable and pinnable without a
+ * process; only [EngineSupervisor]'s companion function returns it.
+ */
+internal enum class StartWatchdogDecision {
+
+    /** Child socket not bound / not answering: normal starting, not a wedge. */
+    KeepWaiting,
+
+    /** First wedged episode of this churn run: one bounded restart. */
+    Restart,
+
+    /** Terminal honest failure (Failed(willRetry=false)); the loop returns. */
+    GiveUp,
 }

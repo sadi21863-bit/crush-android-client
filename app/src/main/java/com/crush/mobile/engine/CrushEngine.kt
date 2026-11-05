@@ -105,6 +105,24 @@ class CrushEngine(
      */
     private val startLock = Mutex()
 
+    /**
+     * The supervisor-owned MAY-SPAWN checkbox (design memo §1 interlock,
+     * 2026-11-05). [start]'s birth section consults it as the FINAL pre-spawn
+     * decision, inside the same monitor `stopBlocking()` synchronizes on, so a
+     * stop that races an in-flight start is honoured before any child exists
+     * instead of racing its birth.
+     *
+     * The default is literally `true`: until EngineSupervisor installs
+     * `{ isWanted() }` in its supervise() setup (it does, before its first
+     * start attempt), this changes NOTHING - every existing start call keeps
+     * its current shape. Only the supervisor ever writes this field; a
+     * veto is fail-closed (see [spawnVetoed]) and reported as
+     * [EngineState.Stopped] so the supervise loop exits on its own
+     * not-wanted condition.
+     */
+    @Volatile
+    internal var maySpawn: () -> Boolean = { true }
+
     private val logBuffer = StringBuilder()
 
     val binaryPath: String get() = paths.binary.absolutePath
@@ -161,6 +179,13 @@ class CrushEngine(
      *
      * Re-entrant: if an engine is already running, returns the current state
      * instead of spawning a second engine.
+     *
+     * Spawn veto (design memo §1 interlock): the final pre-spawn decision
+     * consults [maySpawn] inside the same monitor `stopBlocking()` takes, so
+     * the veto verdict, the child's birth and the `process` assignment are one
+     * atomic step; a stop racing an in-flight start can no longer observe
+     * "no process" while a child is otherwise reachable. A vetoed call returns
+     * [EngineState.Stopped] and spawns nothing.
      *
      * Transport: the spawn uses `-H unix://<socketPath>`; there is NO TCP port
      * and none is ever computed. [EngineState.Running.port] carries
@@ -249,46 +274,92 @@ class CrushEngine(
                 "-H", "unix://${socketFile.absolutePath}",
                 "-D", paths.dataDir.absolutePath
             )
-            Log.i(TAG, "exec: ${cmd.joinToString(" ") { redactAppPriv(it) }}")
-
+            // Wall/monotonic pair for the S5 §2.1 classification (2026-11-05):
+            // the measured 55-60s spawn gap is either a device doze-freeze
+            // (wall clock jumps, monotonic does not) or the attempt ladder;
+            // the success line below prints BOTH so the gap gets classified
+            // instead of guessed. Captured at attempt start, just ahead of the
+            // birth section.
             val started = System.currentTimeMillis()
-            val proc = try {
-                ProcessBuilder(cmd).apply {
-                    environment().putAll(paths.env())
-                    // Route ALL engine egress through the loopback bridge: the
-                    // engine's Go http honours these vars (stdlib
-                    // ProxyFromEnvironment), so it never resolves a hostname
-                    // itself and never depends on the broken Android DNS
-                    // fallback. NO_PROXY keeps loopback targets out of the
-                    // bridge so nothing can loop into itself. The bridge only
-                    // relays: TLS stays end-to-end engine<->provider.
-                    if (egressBridge.port > 0) {
-                        val proxyUrl = "http://127.0.0.1:${egressBridge.port}"
-                        with(environment()) {
-                            this["HTTPS_PROXY"] = proxyUrl
-                            this["https_proxy"] = proxyUrl
-                            this["HTTP_PROXY"] = proxyUrl
-                            this["http_proxy"] = proxyUrl
-                            this["NO_PROXY"] = "127.0.0.1,localhost,::1"
-                            this["no_proxy"] = "127.0.0.1,localhost,::1"
-                        }
-                    }
-                    redirectErrorStream(true)
-                }.start()
-            } catch (e: IOException) {
-                Log.e(TAG, "exec failed", e)
-                return@withContext EngineState.Failed(
-                    reason = "Could not launch engine",
-                    detail = "${e.javaClass.simpleName}: ${e.message}",
-                    willRetry = false
-                )
-            }
+            val startedMono = android.os.SystemClock.elapsedRealtime()
 
-            process = proc
+            // BIRTH-OR-NEVER interlock (design memo §1, 2026-11-05). The MAY-
+            // SPAWN verdict, the child's birth and the `process` assignment
+            // share ONE critical section with stopBlocking()'s snapshot - the
+            // same monitor, deliberately NOT shared with [startLock] (UI-tap
+            // stop stays deadlock-free; only this brief section blocks it). A
+            // racing stop can therefore only observe: (a) no child yet -> the
+            // veto keeps it that way, or (b) process already assigned -> the
+            // same section's snapshot reaches it and kills it. The measured
+            // F06 window (child alive between ProcessBuilder.start() and the
+            // assignment while stopBlocking snapshots null) is closed by
+            // construction. The injector/policy single-writer pre-spawn work
+            // above is untouched; the veto sits AFTER it, under the monitor.
+            val proc: Process = synchronized(this) {
+                // MAY-SPAWN: the supervisor's checkbox, evaluated at the last
+                // moment (default true = current behaviour until the
+                // supervisor installs `{ isWanted() }`). On a veto there is no
+                // child to destroy and nothing else to undo except the bridge
+                // started above - mirroring exactly what the cancel path
+                // already cleans up - and the honest outcome is the state the
+                // supervise loop exits on by itself when not wanted.
+                if (spawnVetoed(maySpawn)) {
+                    Log.w(TAG, "spawn vetoed by the supervisor: no engine child will be born")
+                    com.crush.mobile.util.AppLog.w(
+                        TAG,
+                        "[$instanceKey] spawn vetoed before birth (stop superseded the " +
+                            "pending start); no engine child will be born"
+                    )
+                    runCatching { egressBridge.stop() }
+                    return@withContext EngineState.Stopped
+                }
+                Log.i(TAG, "exec: ${cmd.joinToString(" ") { redactAppPriv(it) }}")
+                try {
+                    ProcessBuilder(cmd).apply {
+                        environment().putAll(paths.env())
+                        // Route ALL engine egress through the loopback bridge: the
+                        // engine's Go http honours these vars (stdlib
+                        // ProxyFromEnvironment), so it never resolves a hostname
+                        // itself and never depends on the broken Android DNS
+                        // fallback. NO_PROXY keeps loopback targets out of the
+                        // bridge so nothing can loop into itself. The bridge only
+                        // relays: TLS stays end-to-end engine<->provider.
+                        if (egressBridge.port > 0) {
+                            val proxyUrl = "http://127.0.0.1:${egressBridge.port}"
+                            with(environment()) {
+                                this["HTTPS_PROXY"] = proxyUrl
+                                this["https_proxy"] = proxyUrl
+                                this["HTTP_PROXY"] = proxyUrl
+                                this["http_proxy"] = proxyUrl
+                                this["NO_PROXY"] = "127.0.0.1,localhost,::1"
+                                this["no_proxy"] = "127.0.0.1,localhost,::1"
+                            }
+                        }
+                        redirectErrorStream(true)
+                    }.start().also { process = it }
+                } catch (e: IOException) {
+                    Log.e(TAG, "exec failed", e)
+                    return@withContext EngineState.Failed(
+                        reason = "Could not launch engine",
+                        detail = "${e.javaClass.simpleName}: ${e.message}",
+                        willRetry = false
+                    )
+                }
+            }
             drainOutput(proc)
 
             val deadline = System.currentTimeMillis() + timeoutMs
-            while (System.currentTimeMillis() < deadline) {
+            // PROBE-BEFORE-DEADLINE (design memo §2, doze-vs-ladder fix,
+            // 2026-11-05). The old order checked the wall-clock deadline
+            // FIRST, so a counted doze-freeze turned the first post-freeze
+            // iteration into an instant deadline bust: a child that bound
+            // its socket DURING the freeze was destroyed as "not healthy
+            // within 60s" instead of reported Running. Each iteration now
+            // runs isAlive -> probe -> deadline, so the freeze case converts
+            // into either an honest success or a legitimate retry, and a
+            // child that is genuinely neither alive nor bound still falls
+            // through to exactly the same timeout outcome below.
+            while (true) {
                 if (!proc.isAlive) {
                     val code = runCatching { proc.exitValue() }.getOrDefault(-1)
                     Log.e(TAG, "engine exited early code=$code")
@@ -314,12 +385,26 @@ class CrushEngine(
                 // null while the socket file does not exist or nothing is
                 // listening behind it - the same "engine not up yet" signal
                 // the old TCP probe gave - and never throws, so the loop needs
-                // no try/catch. Same 250ms cadence and deadline as before.
+                // no try/catch. Same 250ms cadence and deadline as before; the
+                // probe answers BEFORE the deadline check now, which only
+                // widens the outcome set by "bound in time despite a wall-
+                // clock jump" (the doze case) and by at most one probe's
+                // worth of trailing slack past the deadline.
                 if (EngineSockets.probe(socketFile, "/v1/version") != null) {
                     val version = probeVersion(socketFile)
                     if (version != null) {
                         cachedVersion = version
                         val pid = readPid(proc)
+                        // S5 instrumentation (memo §2.1): wall AND monotonic
+                        // elapsed since attempt start. wall >> monotonic at
+                        // bind = the device doze-froze between spawn and bind;
+                        // both stretched together = a genuinely long boot.
+                        Log.i(
+                            TAG,
+                            "engine socket bound and 2xx after " +
+                                "${System.currentTimeMillis() - started}ms " +
+                                "(monotonic ${android.os.SystemClock.elapsedRealtime() - startedMono}ms)"
+                        )
                         Log.i(TAG, "engine ready pid=$pid version=$version")
                         return@withContext EngineState.Running(
                             pid = pid,
@@ -328,6 +413,10 @@ class CrushEngine(
                             bootMs = System.currentTimeMillis() - started
                         )
                     }
+                }
+                // Deadline honored AFTER the probe (see the loop comment).
+                if (System.currentTimeMillis() >= deadline) {
+                    break
                 }
                 delay(250)
             }
@@ -449,3 +538,23 @@ private fun readPid(proc: Process): Int = runCatching {
         const val MAX_LOG_CHARS = 8_000
     }
 }
+
+/**
+ * The MAY-SPAWN birth-gate decision (design memo §1 interlock, 2026-11-05),
+ * evaluated inside [CrushEngine.start]'s synchronized birth section as the
+ * FINAL pre-spawn check.
+ *
+ * Pure, top-level and IDEMPOTENTLY fail-closed, like [pidFromReflective]
+ * living outside the class for the same reason: a checkbox implementation that
+ * throws must veto the birth, never crash the start call and never let an
+ * orphan child past a half-checked gate ("a child survives its own stop"). The
+ * lambda must involve no suspension and no lock other than the ones it uses by
+ * contract (the supervisor's `{ isWanted() }` reads its `wanted` flag under
+ * the supervisor's own sync, which no path takes while holding this monitor in
+ * reverse order).
+ */
+internal fun spawnVetoed(maySpawn: () -> Boolean): Boolean =
+    // fail-CLOSED means: evaluation either says Allowed or the gate VETOES -
+    // a throwing checkbox must veto (read the KDoc above: never let a child
+    // be born on an unknown verdict), a wanted-vote allows the birth.
+    runCatching { maySpawn() }.getOrDefault(false).not()

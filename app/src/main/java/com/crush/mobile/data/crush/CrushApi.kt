@@ -54,6 +54,39 @@ sealed interface DeleteOutcome {
     data class Failed(val reason: String) : DeleteOutcome
 }
 
+/**
+ * How a REST request can actually leave this process (S-04 / P1-6, 2026-11-05).
+ *
+ * This used to be implicit: `buildStreamClient()` built a UDS client when the
+ * socket file happened to exist and otherwise SILENTLY handed back a plain TCP
+ * client (`okClient(...) ?: plain`), so the transport a request took depended on
+ * a boot-order accident. The referenced finding is that the shape can leak the
+ * provider key into a non-private channel in unlucky builds.
+ *
+ * The events transport got honest per-attempt resolution in 349bad3; this is
+ * the REST-side equivalent. There is deliberately NO fallback case reachable
+ * from a socket-path construction: absent means [Unavailable], never plain.
+ */
+sealed interface RestTransport {
+    /** Bound to the engine's unix socket file: app-private, kernel-permission gated. */
+    data class Uds(val client: OkHttpClient, val socketPath: String) : RestTransport
+
+    /**
+     * The requested socket file is not on disk yet. The reason is already
+     * scrubbed and carries the same wording CrushConnection uses for events so
+     * app.log greps identically across both transports.
+     */
+    data class Unavailable(val reason: String) : RestTransport
+
+    /**
+     * TEST-ONLY plain TCP: selected exclusively by the [CrushApi] construction
+     * with an explicit [CrushApi.baseUrlOverride] (MockWebServer on the JVM and
+     * the override-based spike shapes). To keep the test affordance explicit,
+     * the only producer is [CrushApi.plainClientForTests].
+     */
+    data class TcpForTests(val client: OkHttpClient) : RestTransport
+}
+
 class CrushApi(
     @Volatile var port: Int,
     private val gson: Gson = Gson(),
@@ -68,46 +101,157 @@ class CrushApi(
      * Unix-socket transport: pass [EngineSockets.socketPath] here once the
      * engine is spawned with `-H unix://<path>` instead of binding TCP. All
      * URLs still read `http://127.0.0.1:<port>/...` - the FactoryArg socket
-     * factory matches the host and ignores the port, so nothing else changes.
-     * Non-null but the file not yet on disk means the factory client cannot be
-     * built: calls then fail with connect refused until callers recreate
-     * CrushApi (the receipts flow rebinds when the engine boundary informs),
-     * and readiness itself is EngineSockets.probe's job.
+     * factory matches the host and ignores the port, so nothing else changes,
+     * and the port itself is only a sentinel (CrushEngine.UDS_PORT_SENTINEL).
+     *
+     * Non-null while the file is NOT YET on disk (bootorder: bindEngine starts
+     * bootstrap as soon as the supervisor reports Running, and the child binds
+     * the socket a moment later): there is now NO fallback client. Every call
+     * resolves the transport at call time and, while absent, fails with
+     * `rest: socket not present yet: <scrubbed>` - the same honest per-call
+     * contract 349bad3 gave the events stream - which the existing engine
+     * boundary re-triggers re-run the ladder on without any caller change.
      */
     private val socketPath: File? = null
 ) {
 
     /**
+     * S-04 / P1-6 (2026-11-05): refuse the BARE production construction shape at
+     * instantiation time, not by convention.
+     *
+     * Every production caller passes [socketPath]; every test caller passes
+     * [baseUrlOverride] (MockWebServer) or [socketPath]. A construction with
+     * NEITHER used to be exactly the shape that silently produced a plain-TCP
+     * client, so a socket path forgotten at a future call site would look
+     * healthy until an unlucky build - the accept-surface regression the
+     * finding calls out. Making the bare shape an error keeps the test-only TCP
+     * affordance explicit rather than ambient.
+     */
+    init {
+        if (socketPath == null && baseUrlOverride == null) {
+            throw IllegalStateException(
+                "CrushApi needs socketPath (or an explicit baseUrlOverride for tests): " +
+                    "the engine runs unauthenticated, so production must never dial plain TCP (S-04)"
+            )
+        }
+    }
+
+    /**
      * A dedicated client for streaming: no read timeout, because Crush sends no
      * heartbeat and an idle workspace legitimately produces zero bytes.
+     *
+     * S-04 / P1-6 (2026-11-05): resolves PER CALL, like CrushConnection resolves
+     * PER ATTEMPT after 349bad3. The previous buildStreamClient() pinned a
+     * client at construction and silently fell back to plain TCP when the
+     * socket file was absent (`okClient(...) ?: plain`) - an unauthenticated
+     * control plane that can lose the provider key leaking into a non-private
+     * channel. Now a socket path that is not on disk yet yields no client at
+     * all: the property access throws `rest: socket not present yet: <scrubbed>`;
+     * the recipient is an IOException exactly like the connect-refused it used
+     * to mask, so every existing caller ladder keeps working with no code
+     * change. Once the file is bound the same access heals on any later call,
+     * without recreating CrushApi - the timing window (bindEngine fires
+     * bootstrap the instant the supervisor reports Running, while the engine
+     * binds the socket a moment later) is closed by the engine-boundary
+     * re-triggers that already rerun bootstrap on state changes and user sends.
      */
-    val streamClient: OkHttpClient = buildStreamClient()
+    val streamClient: OkHttpClient
+        get() = when (val transport = resolveTransportNow()) {
+            is RestTransport.Uds -> transport.client
+            is RestTransport.TcpForTests -> transport.client
+            is RestTransport.Unavailable -> throw IOException("rest: ${transport.reason}")
+        }
 
-    private fun buildStreamClient(): OkHttpClient {
-        val plain = OkHttpClient.Builder()
+    /**
+     * Streaming-shaped prototype the UDS client and, explicitly for tests, the
+     * plain client are both built from. Kept byte-for-byte from the pre-S-04
+     * fallback builder so a migration of transport never smuggles in a timeout
+     * change.
+     */
+    private val streamPrototype: OkHttpClient by lazy {
+        OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
-        // socketPath == null keeps the plain TCP client verbatim (tests use
-        // baseUrlOverride against this shape). socketPath set but absent gives
-        // okClient() == null, which falls back to plain: it fails fast on
-        // connect rather than crashing on a missing factory, and once the
-        // socket exists callers recreate CrushApi to be bound. Reading it
-        // through EngineSockets also guarantees that object's init has run
-        // before any FactoryArg is constructed, so the 127.0.0.1 URL host is
-        // recognised.
-        return if (socketPath != null) EngineSockets.okClient(socketPath, plain) ?: plain
-        else plain
     }
 
-    private val client: OkHttpClient = streamClient.newBuilder()
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    /**
+     * Built once per [CrushApi] and reused: the factory pins the PATH, not the
+     * file handle, so a socket deleted and rebound at the same path (Go unlinks
+     * on close, then the child rebinds during restart) is followed by the very
+     * same client - matching what CrushConnection already established for the
+     * events transport. The cache is only served while the file still exists:
+     * once it is unlinked again (engine down), calls report the honest
+     * "socket not present yet" wording instead of a raw ENOENT, keeping one
+     * grep line for every transport-absent phase. Never a fallback.
+     */
+    @Volatile
+    private var udsClientCache: OkHttpClient? = null
+
+    private val testTcpClient: OkHttpClient by lazy { plainClientForTests() }
+
+    private val testTcpSelect: RestTransport.TcpForTests by lazy {
+        RestTransport.TcpForTests(testTcpClient)
+    }
+
+    /**
+     * The transport as of RIGHT NOW. Performs no network work and never blocks:
+     * resolving is an existence check against the socket file. Internal so the
+     * transport contract is observable by tests without issuing a request.
+     */
+    internal fun resolveTransportNow(): RestTransport {
+        // The elvis-return is intentional and LOAD-BEARING: null socketPath has
+        // no honest UDS transport to offer, and returning the test-TCP selector
+        // here is the ONLY route plain TCP can ever be selected from.
+        val path = socketPath ?: return testTcpSelect
+        udsClientCache?.takeIf { path.exists() }?.let {
+            return RestTransport.Uds(it, path.absolutePath)
+        }
+        // Reading through EngineSockets (not a bare factory) preserves the
+        // guarantee that object's init has run before any FactoryArg is
+        // constructed, so the 127.0.0.1 URL host is recognised. Null while the
+        // file is absent is EngineSockets' own documented contract.
+        val built = EngineSockets.okClient(path, streamPrototype)
+        return if (built != null) {
+            udsClientCache = built
+            RestTransport.Uds(built, path.absolutePath)
+        } else {
+            RestTransport.Unavailable(
+                "socket not present yet: ${CrushConnection.scrubbedPath(path.absolutePath)}"
+            )
+        }
+    }
+
+    private val client: OkHttpClient
+        get() = streamClient.newBuilder()
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
 
 private val json = "application/json".toMediaType()
-    private val base get() = baseUrlOverride ?: "http://127.0.0.1:$port"
+    /**
+     * internal visibility is test-facade only (S-04, 2026-11-05): the URL shape
+     * is pinned by test (`http://127.0.0.1:<port>`, never a tcp:// scheme, the
+     * port being the UDS sentinel that carries no meaning in socket mode).
+     */
+    internal val base get() = baseUrlOverride ?: "http://127.0.0.1:$port"
+
+    /**
+     * TEST-ONLY; production never dials TCP (S-04 / P1-6, 2026-11-05).
+     *
+     * The pure-socket production construction has no path to a plain client at
+     * all: resolveTransportNow() can return Uds or Unavailable and nothing else,
+     * and this helper is reached solely from the override-marked test
+     * construction (TcpForTests, see above) and from test code. Marked
+     * internal for test reachability, in the spirit of normalizeApiKey: the
+     * affordance must stay explicit and greppable rather than ambient.
+     *
+     * Returns the streaming-shaped client byte-identical to the one the deleted
+     * fallback builder used to keep, so MockWebServer-based tests see the same
+     * timeouts as before the fallback was removed.
+     */
+    internal fun plainClientForTests(): OkHttpClient = streamPrototype
 
     // ------------------------------------------------------------- system
 

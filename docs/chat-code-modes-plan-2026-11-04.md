@@ -51,6 +51,35 @@ on device), the shipped capability state in
 - **P7 (Termux L1) depends on P3 + P5** — the user's queue order
   (modes before Termux L1) matches the plan's dependency graph.
 
+#### S3 implementation note (2026-11-05, built and gated, device verification pending)
+
+S3 was built as the **mode model = the engine-instance binding**, not a
+per-session stored field: a session's mode is DERIVED from the instance its
+pool lives on (a chat-pool session IS a chat session), which keeps the
+engine's own pools as the storage of record and avoids a Room migration for
+v1. The review's §5 table wanted a session-mode Room table; the derivation
+shape satisfies the same requirement (mode is durable per pool, the engine
+owns transcripts) at smaller surface. Recorded honestly:
+`EngineBinding { Legacy, ChatPool, Project(ref) }` in AppContainer is the
+single binding authority (`setActiveProject`/`setActiveChatPool` → shared
+stop-on-switch contract), the ViewModel routes via
+`container.activeBinding`, the chat pool is a real keyed engine instance
+(`EnginePaths.CHAT_INSTANCE_KEY = "chat"` → `filesDir/crush-chat`,
+`crush-chat.sock`), the S1-verified `injectChatToolPolicy` runs at
+CrushEngine spawn for that instance only, and ` effectivePermissionMode`
+pins ASK there forever (yolo belt-and-braces, S1's engine-side hiding being
+the actual boundary).
+
+Implementation consequence for verification: the chat pool is reachable
+ONLY through S4's mode picker, so the S3 mechanism verifies ON the S4
+drive — one install, one device session covering pool denial on a real
+engine turn (the tool-free label's final proof) plus the Code-mode ASK
+regression. S4 next, unblocked by this slice's mechanism.
+
+Deferred here, moved explicitly: the S5 A11/A12 row (process-death restore
+to the last mode) needs a persisted last-engine-binding in DataStore —
+recorded for the S4/S5 batch, not silently dropped.
+
 ---
 
 ## 2. What exists today (measured state)
@@ -158,9 +187,9 @@ catalogue, key storage and pricing drawer obviously do not fork per mode.
 | S1 | **Engine capability probe** — DONE 2026-11-05: mechanism PROVEN on the pinned engine (`options.disabled_tools` hides tools from the agent; persisted by the engine's own config store; per-instance scope) — see capabilities.md S1/S1b. **Blocks the tool-free Chat label** (F01) — label now UNBLOCKED pending S3 wiring | probe log + `capabilities.md` S1/S1b |
 | S1b | **Imported-folder config trust probe + policy** — PROBED 2026-11-05: the pinned engine EXECUTES project-root `crushrc` as bash on every workspace attach (twice per cycle, app's full UID, no consent gate); `.crush.json`/`.crush/crush.json` did not execute in the paths probed. S3/S4 must add the import-time trust/quarantine gate (F04/A05) | sentinel drive: imported folder with sentinel hook performs NO execution before a visible trust decision |
 | S2 | **Product decisions** — RESOLVED 2026-11-04 (Q1-Q4 answered, see §5) | decisions-open.md item 10 + plan §5 |
-| S3 | Mode model: `AgentMode` enum, per-session storage, engine-instance routing (legacy / project key / chat key), run-in-flight guard reuse | JVM unit tests + gate |
-| S4 | UI: New-chat mode choice, sheet sections, header badge; enforcement wiring (auto-deny policy layer with the proven ASK plumbing) | drive: MODE-01 injection attempt denied; MODE-06 regression (Code ASK intact) |
-| S5 | Acceptance run vs §21 matrix rows 01/06/07 + docs: capabilities.md, BASELINE, this plan updated to MEASURED | gates green + docs commit |
+| S3 | Mode model — BUILT 2026-11-05: `EngineBinding { Legacy, ChatPool, Project }` (mode = binding semantic, derived from the instance pool; see the S3 implementation note in Sequencing), dedicated chat-pool engine (`filesDir/crush-chat`), spawn-time `injectChatToolPolicy` (S1-mechanism, injector idempotency + malformed-file safety tested), chat-yolo lock. Verification rides the S4 drive (pool reachable only through S4's picker) | 6 new injector tests + gate |
+| S4 | UI: New-chat mode choice, sheet sections, header badge; enforcement wiring (auto-deny policy layer with the proven ASK plumbing) | drive: MODE-01 injection attempt denied (deny-all holds, binary-verified config); self-test on import + legacy switch — MEASURED 2026-11-05. MODE-06 split honest: Code tools alive MEASURED; the ASK gate is engine-policy-scoped (asks for writes, auto-allows shell) — see capabilities.md S5 drive + S6-residual |
+| S5 | Acceptance run vs §21 matrix rows 01/06/07 + docs: capabilities.md, BASELINE, this plan updated to MEASURED | **MEASURED 2026-11-05** on `8eb0477`: A05 (consent gate — marker appears exactly on "Run it and open"), A11/A12 (DataStore token `proj:<full-uuid>` → `chat`; cold boot logged `restoring last binding: chat pool` then `[chat] supervise loop start`; badge + chat-pool session + chat model on restore), F04 dialog live with two-pass crushrc-as-config refinement; honest residuals recorded (shell not ask-gated by engine default; warm-rebind transcript staleness). Doc commit + pushed CI green stands from part 1 |
 
 Slices stay parallel-safe with the current backlog order: S0 is the existing
 top-of-queue defect; Termux L1 lands after P5 per the dependency graph.
@@ -265,11 +294,13 @@ gradual RunCoordinator extraction out of the 2.8k-line ChatViewModel
 (shapes S3 without a rewrite). F05 storage strategy → decisions-open
 item 11.
 
-**New acceptance rows adopted** (beyond the MODE matrix): A05 no execution
-from imported config before an explicit trust decision; A07
-duplicate/aliased import = one canonical row; A10 crash-during-removal
-reconciliation never touches user files; A13 snapshot coverage limits
-stated, never an unqualified "clean"; A14 missing socket fails closed with
-no TCP fallback or credential spill; A17 Chat→Code transfer shows the
-target project and inherits no Build policy; A20 a run keeps its frozen
+**New acceptance rows adopted** (beyond the MODE matrix): A05 — no execution
+from imported config before an explicit trust decision — **MEASURED 2026-11-05,
+see capabilities.md S5 drive** (sentinel appears exactly on the consent tap;
+crushrc refined to engine-config channel, twice-per-attach load confirmed in
+the engine log). Still open: A07 duplicate/aliased import = one canonical row;
+A10 crash-during-removal reconciliation never touches user files; A13 snapshot
+coverage limits stated, never an unqualified "clean"; A14 missing socket fails
+closed with no TCP fallback or credential spill; A17 Chat→Code transfer shows
+the target project and inherits no Build policy; A20 a run keeps its frozen
 provider through a mid-run change.

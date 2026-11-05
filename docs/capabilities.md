@@ -176,6 +176,82 @@ before the next release.
   entirely while app.log persists — diagnostics-only quirk, noted for
   future drives (troubleshoot through run-as files/app.log first).
 
+### S5 acceptance drive — MEASURED 2026-11-05 evening (device `bbf8ca69`, build `8eb0477`)
+
+Both halves of the sentinel drive landed end-to-end, entirely through the
+app + adb.
+
+**F04/A05 consent-before-execution — PROVEN.** Sentinel = a destructive-
+marker hook (`crushrc`, 83 bytes, content `date +%s > "...marker"`; pushed
+at 08:34 because adb-shell quote mangling broke inline writes). Phase A
+timeline: 16:47 cold boot — the cold boot produced NO restore line anywhere
+in app.log (virgin-token honesty — instrumentation live instead: `[]
+supervise loop start`); sheet showed the honest "Workspace (legacy)" label;
+Projects → row tap → folder listed crushrc + notes.md + todo.md, NO marker;
+the F04 dialog rendered live with full disclosure ("RUNS that file as a
+Bash script (twice per attach)"). The marker (`.crushrc-ran.marker`, 11
+bytes) appeared at 16:54 EXACTLY on the "Run it and open" consent,
+coincident with app.log `starting supervisor for instance 'p536fa26e'` at
+16:54:27. Nothing executed across ~7 minutes of taps before the decision.
+Cancel-vs-run map: cancel is unbound-and-inert by construction
+(`pendingCrushrcTrust = null` only); the consent path calls the SAME
+`setActiveProject` a plain open uses — no privilege bypass. Post-drive
+sentinel cleanup (18:34): folder back to notes.md + todo.md only.
+
+**crushrc = engine config, not just auto-bash (refined S1b understanding).**
+The engine's own log shows `internal/shellconfig.LoadShellConfig`
+LOADING the project-root crushrc on every attach — twice (12:52:06Z +
+12:52:10Z for one attach), matching S1b's twice-per-cycle execution
+measurement. A marker-only file is inert ("Shell config produced no
+config"), but the binary carries shell-config permission knobs
+("Permissions denied in shell config"), so a well-formed crushrc CAN alter
+session behavior. The consent gate is load-bearing; the marker proves
+execution, the engine log proves the config channel.
+
+**Code pool: tools are alive (MODE-06 half A) — but the default policy
+does NOT ask before shell (new residual).** In the project pool, bash
+executed and returned real output twice: `ls -la` (16:58) and — the
+decisive probe — a NEVER-EXECUTED-before `date` (17:01), each auto-called
+by the model with NO permission card. Wintree of confounds ruled out:
+permissionMode=ASK was logged at bind (`permissionMode=ASK
+providerId=opencode-go`, 16:54:29); `createWorkspace(yolo=false)` +
+`skipPermissions(id,false)` were both sent with no failure warns; the
+engine state DB has NO workspaces table and NO permission/yolo columns
+(schema + byte-grep checked — permission state is purely in-memory, so
+nothing from pre-reinstall processes could have leaked); the F04 consent
+path was re-read line-by-line (clean). Evidence the ASK pipeline itself
+WORKS: the engine DB carries the historical todo.md WRITE denial records
+(card shown, user denied, model retried then reported denial honestly) —
+so permission_request fires for file-write tools. Conclusion: pinned
+v0.99.0's default tool policy auto-allows shell, asks for writes; this is
+why the project transcript shows bash/fetch/agentic_fetch auto-running
+from its own history. The binary contains the fix surface ("error parsing
+config for policy %q", "no supported policies found in config",
+"--enabled-tools") — arming ask-per-shell in Code pools (or making it
+an explicit, disclosed posture) is recorded as the first S6-candidate
+backlog item.
+
+**A11/A12 last-binding restore — PROVEN.** Token journey read from
+DataStore directly: after the project bind, `last_engine_binding` =
+`proj:536fa26e-c2f1-4a51-a89e-9d5abb24d3d8` — the FULL uuid persisted, the
+lossy `p<first8>`-key shape avoided by construction. "New chat" via the
+sheet (18:36) flipped the token to `chat` and the header badge to
+"Chat - no tools - engine stopped" (chat pool's own model slot,
+deepseek-v4.1-flash, distinct from the project pool's haiku). Force-stop,
+then cold boot: app.log `18:37:45.441 I/Lifecycle: restoring last binding:
+chat pool` — immediately followed by `[chat] supervise loop start` — and
+the UI landed the chat pool's own last session ("Delete Documents", whose
+transcript is itself the deny-list evidence: "bash tool isn't available",
+"crush_info shows bash in the disabled tools list") with the badge
+"Chat - no tools - ready". One-shot restore, pre-UI, correct pool.
+
+**Honest residual, non-blocking:** after the warm New-chat switch on the
+same process, the message list still displayed the PREVIOUS pool's
+transcript while the header already showed the chat badge (the rebinding
+pool's session cannot load until its engine starts). A cold restart
+resolves it correctly. Whether the swap should blank the transcript first
+is UX polish, noted only.
+
 ### Import-removal first-use defects — BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

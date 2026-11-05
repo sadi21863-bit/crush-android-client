@@ -252,6 +252,33 @@ pool's session cannot load until its engine starts). A cold restart
 resolves it correctly. Whether the swap should blank the transcript first
 is UX polish, noted only.
 
+**Wedge caught LIVE while awake — shape 2: alive loop, alive child, lost
+delivery (2026-11-05 18:58–19:10, build `8eb0477`).** The planned
+spawn-latency probe (chat→Test folder rebind) became a wedge capture:
+`[chat] stop() requested` 18:58:15.345 clean (exactly TWO libcrush
+children remained after — legacy + project — NO F06 orphan under the new
+interlock-era behavior); `[p536fa26e] start()` → `starting attempt 1` →
+**`engine Running after 3952ms`** at 18:58:19.481 — yet `bindEngine`
+delivered nothing beyond its two `Stopped` emissions (18:58:15.524/530),
+and the UI stayed pinned "New chat / engine stopped" (no pool label, no
+model, sheet showed "No chats yet") for ~12 minutes WHILE the child and
+socket were healthy. Re-tapping the project row at 19:10:14 re-drove the
+binding: a FRESH subscription was instantly served the still-cached
+`Running` (14.796), bootstrap completed in ~3 s (haiku re-seat, 63-msg
+session resume, event-stream attach, tool-shape replay) — full recovery by
+re-subscribe. Classification: the supervisor's StateFlow held the correct
+value the entire time; the DELIVERY to collector(s) failed — distinct from
+the overnight shape (dead loop + orphan child, design doc §0 shape 1).
+Corollary: a supervisor-internal probe watchdog CANNOT see shape 2 (the
+supervisor is healthy); coverage belongs to the container-level
+registry/reclaim design (`design-runtime-registry-2026-11-05.md` §3:
+fresh-subscribe-always-served + collector census). No tap-level or
+product-code fix was made live — the wedge state was driven only to
+recovery, evidence untouched. Active-drive spawn numbers: chat restore
+spawn 2772 ms, project spawn 3952 ms — the 55–60 s residual did NOT
+reproduce while awake (it was a post-manual-stop overnight shape; the
+wall-vs-monotonic doze hypothesis stays the lead).
+
 ### Import-removal first-use defects — BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

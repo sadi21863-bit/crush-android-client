@@ -1,5 +1,21 @@
 # Chat / Code modes — initial research and planning (2026-11-04)
 
+> **Superseded in part (2026-11-05, verified to `1d229de`, HEAD):**
+> the status paragraph below was true on 2026-11-04 only and is kept for
+> chronology. S0–S5 have since shipped with on-device evidence as of
+> `1d229de`: S0 socket+diff fixes built `349bad3` and verified live
+> (`1c4c28c`), S1/S1b probe
+> docs, S3 built (`93c4dc8`), S4 mode UI + drives (`4058588`, `22fbe28`,
+> `1bf7101`), S5 with **A05/A11/A12 measured** (`8eb0477`), **A06
+> measured** (per `9dcfa0b`), and the Gate-7 wedge phase 1 landed in
+> `1d229de` — consolidated in [`capabilities.md`](capabilities.md) and
+> [`CRUSH-MOBILE-STATUS-AND-DECISIONS.md`](CRUSH-MOBILE-STATUS-AND-DECISIONS.md).
+> Per the owner's accepted 2026-11-05 pack, the **Gate-0 (trust + chat +
+> REST: S-01 fail-open, S-02 restore-trust, S-04 REST fallback) and
+> Gate-1 (E2/E4/E5/E6) priorities supersede this file's historical
+> S0→S5 slice ordering (§4) and the §5 "implementation NOT started"
+> framing**, which is retained only for record.
+
 Status: PLAN with user decisions RECORDED (§5) and the independent review
 FOLDED IN (§7, user-approved "fold fully") — no code written, implementation
 awaits the user's explicit go. This distills the roadmap's

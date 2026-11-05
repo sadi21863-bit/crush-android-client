@@ -336,6 +336,61 @@ logged):
   model-neutral; disambiguation folded into the registry/wedge
   work, not blocking.
 
+### Owner-pack security gaps source-confirmed in code — 2026-11-05 evening (HEAD `1d229de`)
+
+The owner's builder-context pack + independent audit (both pinned at
+`9dcfa0b`) surfaced the three findings below, NEW relative to the S1b/F04
+entries above. All three code locations were re-read and confirmed in this
+tree on 2026-11-05 (read-only verification; line numbers as read at
+`1d229de`) — source-confirmed by owner pack + audit, code-confirmed in
+repo today. The fixes are owned by the Gate-0 batches tracked in
+[CRUSH-MOBILE-STATUS-AND-DECISIONS.md](CRUSH-MOBILE-STATUS-AND-DECISIONS.md).
+
+**S-01 (pack P0-2) — chat tool-policy injection is FAIL-OPEN.**
+`CrushEngine.kt:253-257` (the start() pre-spawn window) wraps the chat
+pool's `EngineConfigInjector.injectChatToolPolicy(paths.globalData)` in
+`runCatching { ... }.onFailure { Log.w(TAG, "chat tool policy injection
+skipped: ${it.message}") }` and spawns unconditionally. An injector
+failure therefore starts the chat engine with built-in tools VISIBLE
+while the surface labels it "Chat - no tools" — the S1-proven hide
+mechanism exists, but the spawn path carries no fail-closed guarantee
+(the `1d229de` interlock covers veto-at-spawn, not injector success).
+Pack-derived device acceptance: break the chat instance's config store
+and verify the engine FAILS to start (never a tools-exposed spawn), with
+the deny list re-confirmed from inside (crush_info-style introspection)
+on the next healthy start.
+
+**S-02 (pack P0-1) — last-binding restore bypasses the crushrc trust
+dialog.** `AppContainer.kt:334-359`: `restoreLastBinding()` resolves the
+saved project token and calls `applyBinding(EngineBinding.Project(ref))`
+DIRECTLY (line 358). The F04/A05 consent gate lives only in the
+interactive ProjectsScreen path (`ProjectsScreen.kt:337-361`,
+`pendingCrushrcTrust`), so a cold-boot restore onto an imported folder
+that carries — or against which an attacker planted — a project-root
+crushrc executes that file with NO trust decision (S1b-measured: bash,
+twice per attach, the app's full UID). Both restore entries share the
+gap: the container's init launch (`AppContainer.kt:367`) and the chat VM
+bootstrap call (`ChatViewModel.kt:835`). Pack-derived device acceptance
+(pack matrix row **A03, restore-with-changed-crushrc**): drop a sentinel
+crushrc against the last-bound project while the app is dead; cold boot
+must render the SAME F04 dialog and execute NOTHING before consent.
+Fix QUEUED NEXT (Gate-0), behind the S-01/S-04 batches.
+
+**S-04 (pack P1-6; review lineage F11) — REST keeps the silent plain-TCP
+fallback.** `CrushApi.kt:101` (stream client, lines 86-103, which also
+feeds `client` at line 105): `return if (socketPath != null)
+EngineSockets.okClient(socketPath, plain) ?: plain` — a configured
+socketPath that is absent AT CONSTRUCTION TIME silently falls back to
+the plain `127.0.0.1` TCP client, i.e. the pre-2026-10-18 unisolated
+transport recorded in [p1-attack-surface.md](p1-attack-surface.md)
+§4/§8. The events path already fails closed (per-attempt supplier, no
+`?: plain` — `349bad3`); the REST construction path is the remaining
+leaf. Fix IN FLIGHT by another batch (A-28, REST TCP-fallback removal) —
+recorded here so no other drive re-marks it as open-unknown.
+Pack-derived device acceptance: with the socket path configured and the
+socket file removed, REST attempts must fail closed with the honest
+scrubbed-path log and ZERO plain-TCP connects.
+
 ### Import-removal first-use defects — BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

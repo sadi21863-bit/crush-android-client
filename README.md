@@ -1,6 +1,6 @@
 # Crush Android
 
-A native Android chat client that runs a **hidden local [Crush](https://github.com/charmbracelet/crush) agent** on-device and streams replies over loopback HTTP/SSE.
+A native Android chat client that runs a **hidden local [Crush](https://github.com/charmbracelet/crush) agent** on-device and streams replies over an **app-private Unix-domain socket** (one long-lived SSE stream; never loopback HTTP/TCP — see [Security](#security)).
 
 The Crush engine (a Go binary) ships inside the APK and is `exec()`d at app start. It talks to **OpenCode Zen** for inference. Everything — Compose UI, engine lifecycle, SSE client — lives in this repo.
 
@@ -11,6 +11,11 @@ Compose UI  →  app-private Unix-domain socket  →  libcrush.so (bundled Go bi
 Crush ships for macOS, Linux, Windows and BSD. **Android is not one of those platforms** — this repository is an independent client for the bundled engine, not an official Charm project.
 
 ## Status
+
+> **Last verified:** `1d229de` (2026-11-05). The table predates the
+> Chat/Code mode split; mode work, the S5 acceptance drive and the gate
+> roadmap live in [docs/capabilities.md](docs/capabilities.md) and
+> [docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md).
 
 Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / API 29):
 
@@ -96,7 +101,12 @@ isolation: loopback is shared by every app on the device. See
 
 **4. `/v1/health` returns an empty body.** Use `/v1/version` as the readiness probe.
 
-**5. The port is ephemeral and changes every boot.** Never hardcode it.
+**5. The engine binds one Unix-domain socket path per instance — never a TCP port.**
+Since the 2026-10-18 `unix://` promotion there is no port: each engine
+instance binds its own app-private socket (`crush.sock` for the legacy
+pool, `crush-chat.sock` for the chat pool, `crush-<key>.sock` for keyed
+projects). Never hardcode an absolute path — it is install- and
+device-dependent and can differ across engine versions.
 
 **6. Message updates are republished whole, not as deltas.** Replace text; never append.
 
@@ -450,6 +460,8 @@ Bring-up facts (measured 2026-11-01, first green recorded 2026-11-02):
 | Document | Contents |
 |---|---|
 | [`docs/capabilities.md`](docs/capabilities.md) | What works vs. what does not, per feature |
+| [`docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md`](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md) | Where the work stands now: commit chain, gate roadmap, agreed decisions, risk register |
+| [`docs/chat-code-modes-plan-2026-11-04.md`](docs/chat-code-modes-plan-2026-11-04.md) | Chat/Code mode split: decisions, shipped slices, verification matrix |
 | [`docs/toolchain.md`](docs/toolchain.md) | Versions, AGP 10 contingency, backup plan |
 | [`docs/project-analysis.md`](docs/project-analysis.md) | Architecture, known defects, capability plan |
 | [`docs/p1-attack-surface.md`](docs/p1-attack-surface.md) | The mapped sibling-app surface and the UDS mitigation evidence |

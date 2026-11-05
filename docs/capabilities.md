@@ -208,28 +208,47 @@ config"), but the binary carries shell-config permission knobs
 session behavior. The consent gate is load-bearing; the marker proves
 execution, the engine log proves the config channel.
 
-**Code pool: tools are alive (MODE-06 half A) — but the default policy
-does NOT ask before shell (new residual).** In the project pool, bash
-executed and returned real output twice: `ls -la` (16:58) and — the
-decisive probe — a NEVER-EXECUTED-before `date` (17:01), each auto-called
-by the model with NO permission card. Wintree of confounds ruled out:
+**Code pool: tools are alive (MODE-06 half A) — no-card runs RESOLVED in
+upstream source (not an app defect, and not a default-policy question).**
+In the project pool, bash executed and returned real output twice: `ls
+-la` (16:58) and — the decisive probe — a NEVER-EXECUTED-before `date`
+(17:01), each auto-called by the model with NO permission card, while
 permissionMode=ASK was logged at bind (`permissionMode=ASK
-providerId=opencode-go`, 16:54:29); `createWorkspace(yolo=false)` +
-`skipPermissions(id,false)` were both sent with no failure warns; the
-engine state DB has NO workspaces table and NO permission/yolo columns
-(schema + byte-grep checked — permission state is purely in-memory, so
-nothing from pre-reinstall processes could have leaked); the F04 consent
-path was re-read line-by-line (clean). Evidence the ASK pipeline itself
-WORKS: the engine DB carries the historical todo.md WRITE denial records
-(card shown, user denied, model retried then reported denial honestly) —
-so permission_request fires for file-write tools. Conclusion: pinned
-v0.99.0's default tool policy auto-allows shell, asks for writes; this is
-why the project transcript shows bash/fetch/agentic_fetch auto-running
-from its own history. The binary contains the fix surface ("error parsing
-config for policy %q", "no supported policies found in config",
-"--enabled-tools") — arming ask-per-shell in Code pools (or making it
-an explicit, disclosed posture) is recorded as the first S6-candidate
-backlog item.
+providerId=opencode-go`, 16:54:29), `createWorkspace(yolo=false)` +
+`skipPermissions(id,false)` were both sent with no failure warns, and the
+engine state DB has no persisted permission state (schema + byte-grep
+checked). Pinned in the upstream source at our exact tag
+(`v0.99.0/internal/agent/tools/bash.go` + `safe.go`, fetched 2026-11-05):
+the bash tool has a SAFE-READ-ONLY BYPASS above the permission system — a
+lowercased PREFIX match against a fixed `safeCommands` list (cal, date,
+df, du, echo, env, free, groups, hostname, id, **kill**, **killall**, ls,
+nice, nohup, printenv, ps, pwd, set, time, timeout, top, type, uname,
+unset, uptime, whatis, whereis, which, whoami + git read-only sub
+commands), SKIPPED when the command contains chaining metacharacters
+(`;|&&$(` backtick). Safe-and-unchained commands run with
+`permissions.Request` NEVER CONSULTED — no prompt, no event, nothing for
+our card to show. `ls` and `date` are both on the list: both probes were
+running INSIDE the designed bypass. Everything else still consults the
+permission service under our ASK settings (`yolo=false` → prompts), and a
+separate banned-command blocklist (curl, wget, nc, scp, ssh, sudo, su,
+apt/yum/pacman-style package managers, systemctl/mount/fdisk, ...) is
+REFUSED OUTRIGHT, never prompted. Evidence of the ask pipeline working
+stands: the historical todo.md WRITE denial records in the engine DB, and
+`write.go` consults the permission service (its permission test exists
+upstream). CORRECTED CONCLUSION for MODE-06 half B: the ASK gate is intact
+for consequential commands by design; read-only introspection is exempt;
+the correct card probe is a NON-safe command (e.g. `mkdir`) — TODO for the
+next drive. Sharp edge worth an upstream flag candidate: `kill`/`killall`
+inside the safe list means an agent can silently stop processes (in an
+embed, the engine child and host app share a UID). The S6 ask-per-shell
+config question dissolves against this source (upstream's JSON knob is
+allow/deny only — `permissions.allowed_tools`, `options.disabled_tools` —
+with no ask-per-shell switch; the native posture + honest UI copy is the
+answer; see s6-ask-shell-recon-2026-11-05.md §7 corrected). The 2026-11-05
+`nightly` range hardens exactly this area (parsed-command approval, chain
+judged by parts, session approvals scoped to what was approved, server
+reporting its enforced mode) — recorded as merge-advisory for future pin
+bumps.
 
 **A11/A12 last-binding restore — PROVEN.** Token journey read from
 DataStore directly: after the project bind, `last_engine_binding` =

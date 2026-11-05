@@ -186,3 +186,44 @@ backstop for surfaces the list cannot preempt (MCP names).
   fresh `date`) is the ready-made acceptance regression: both must now
   produce an ASK card, deny → honest refusal (MODE-06 completed as
   originally premised).
+
+## 8. RESOLVED the same day (2026-11-05, upstream docs + pinned source) — supersedes the §7 schema question
+
+The "SCHEMA NOT PINNED" blocker above is closed; §7 above stays as the
+point-in-time record. Findings, pinned in upstream's own docs
+(`docs/config/README.md`, `docs/config/FUTURE.md`) and our exact tag
+`v0.99.0` source (`internal/agent/tools/bash.go` + `safe.go`,
+`internal/permission/permission.go`):
+
+1. **The config layer is allow/deny only** — legacy JSON
+   `permissions.allowed_tools` (what `permissions allow` writes; schema
+   verified at `schema.json#/Permissions`) and `options.disabled_tools`
+   (what `permissions deny` writes, the S1-proven hide mechanism). There
+   is NO ask-per-shell switch in either format; "prompted" is the default
+   for a tool absent from both lists (`docs/config/FUTURE.md` three-state
+   table).
+2. **Bash sits ABOVE the generic permission service** in v0.99.0:
+   a safe-read-only PREFIX bypass (`lowercased command starts with any
+   `safeCommands` entry; bypass disabled when the command contains
+   chaining metacharacters `;|&&$( \`) means `date`/`ls` never consult
+   `permissions.Request` at all — the S5 no-card runs were INSIDE the
+   designed bypass. Non-safe commands consult the service and prompt
+   under our `yolo=false`; the separate banned-command blocklist
+   (curl/wget/nc/scp/ssh/sudo/package managers/systemctl/mount/...) is
+   refused outright, never prompted.
+3. **S6 scope dissolved.** App-side ask-for-shell config injection is
+   unnecessary and has no upstream knob to target. The native posture —
+   read-only introspection auto-runs, writes and non-read-only commands
+   prompt through our existing ASK card, dangerous network/admin commands
+   hard-refuse — satisfies MODE-06's spirit (tools alive + ASK intact for
+   consequential actions). The renamed acceptance fixtures: `mkdir` = the
+   card-must-appear probe (non-safe), `date`/`ls` stay the no-card
+   control (safe-list correct), banned refusal check = e.g. blocked
+   `wget` attempt honest refusal.
+4. **Upstream-notable:** `kill`/`killall` are inside `safeCommands` — an
+   agent can silently stop processes without asking; in an embed the
+   engine child shares the host app's UID. Flag candidate for the
+   upstream batch (the 2026-11-05 `nightly` hardens matching/parsing
+   around this — d3b8997, f7179d1, 15c37e3, fd40067, 95d807a; the rolling
+   nightly prerelease is upstream's watch channel, pin-stays discipline
+   unchanged).

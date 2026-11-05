@@ -10,9 +10,11 @@ import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.CrushEngine
+import com.crush.mobile.engine.EngineInstanceRegistry
 import com.crush.mobile.engine.EnginePaths
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.engine.EngineSupervisor
+import com.crush.mobile.data.crush.ConnectionRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -155,8 +157,39 @@ class AppContainer(context: Context) {
         val supervisor: EngineSupervisor,
     )
 
-    private var projectRuntime: EngineRuntime? = null
-    private val runtimeLock = Any()
+    /**
+     * §1 of the Gate-7 design memo (2026-11-05): the single
+     * `projectRuntime: EngineRuntime?` slot it replaces was a silent
+     * eviction hazard - a projects->chat round trip could leave
+     * `runtimeFor(oldKey)` constructing a whole fresh engine pair just to
+     * stop it. The registry holds ONE runtime object per non-legacy key,
+     * forever: idempotent construction, never-evict, stop-only (registry
+     * stop is lookup-or-noop), and the non-legacy liveness budget gate (at
+     * most two keys with live children - chat + one project).
+     *
+     * The generic here is deliberately [EngineRuntime]: the registry file
+     * stays engine-layer-pure, and the wiring (liveness reads are
+     * volatility-only; stop is the supervisor's synchronous, bounded stop)
+     * is pinned by lambdas so no engine-package import of di exists.
+     */
+    private val engineRegistry = EngineInstanceRegistry<EngineRuntime>(
+        legacyKey = "",
+        livenessOf = { rt ->
+            EngineInstanceRegistry.Liveness(rt.engine.isAlive(), rt.supervisor.state.value)
+        },
+        stopRuntime = { rt -> rt.supervisor.stop() },
+    )
+
+    /**
+     * §3 of the Gate-7 design memo (2026-11-05): owner-of-record for the
+     * long-lived workspace event connections, keyed by instanceKey. The chat
+     * ViewModel registers every connection it builds (with a process-unique
+     * observer epoch), the binding setters below revoke the OUTGOING key's
+     * registration with the same guard the engine stop applies, and a stale
+     * VM consults [ConnectionRegistry.isSuperseded] before its reader would
+     * re-enter the reconnect ladder.
+     */
+    val connectionRegistry = ConnectionRegistry()
 
     /**
      * S3: WHICH surface the chat layer is bound to. The derived
@@ -215,10 +248,19 @@ class AppContainer(context: Context) {
 
     /** ViewModel seam for the in-flight marker; clear is key-guarded so a
      *  mid-run instance switch leaves the OLD key flagged (its run rides
-     *  its own linger) instead of erasing a different key's signal. */
+     *  its own linger) instead of erasing a different key's signal.
+     *
+     *  §3 (2026-11-05): the key-guarded clear is ALSO the flush point for a
+     *  connection revocation deferred earlier by the stop-on-switch guard -
+     *  when that guard skipped because a run was in flight, the registered
+     *  connection's stop runs here the moment the turn ends. The key guard
+     *  is the SAME expression, so a foreign key's flush can never fire. */
     fun reportRunInFlight(instanceKey: String, inFlight: Boolean) {
         if (inFlight) engineRunInFlightFor = instanceKey
-        else if (engineRunInFlightFor == instanceKey) engineRunInFlightFor = null
+        else if (engineRunInFlightFor == instanceKey) {
+            engineRunInFlightFor = null
+            connectionRegistry.flushDeferredRevocation(instanceKey)
+        }
     }
 
     /** Projects-surface entry point: null opens the legacy workspace. */
@@ -366,7 +408,23 @@ class AppContainer(context: Context) {
                 "Lifecycle",
                 "stopping project engine for instance '$oldKey' (no run in flight)"
             )
-            synchronized(runtimeLock) { runtimeFor(oldKey).supervisor.stop() }
+            // §1 registry stop (2026-11-05): lookup-or-stop, never a fresh
+            // construction of the outgoing pair (the memo's slot-eviction
+            // kill). Same synchronous, bounded supervisor stop; the
+            // serialization grain is now the registry's per-key lock.
+            engineRegistry.stop(oldKey, "instance switched away")
+        }
+        // §3 connection reclaim (2026-11-05): the OUTGOING key's registered
+        // event connection goes with the switch, guarded by the SAME rules
+        // the engine stop applies - legacy never revokes, and a run in
+        // flight defers the revocation to reportRunInFlight(key,false) so a
+        // turn's stream is not cut. The defer/read chain rides the same
+        // engineRunInFlightFor flag the engine stop reads, so the two guards
+        // can never disagree about an instance being abandoned.
+        if (oldKey.isNotBlank()) {
+            connectionRegistry.revoke(oldKey, "instance switched away") {
+                engineRunInFlightFor == oldKey
+            }
         }
     }
 
@@ -395,7 +453,17 @@ class AppContainer(context: Context) {
                 "Lifecycle",
                 "stopping project engine for instance '$key' (project removed)"
             )
-            synchronized(runtimeLock) { runtimeFor(key).supervisor.stop() }
+            // §1 lookup-or-NOOP (2026-11-05): a row that was never opened
+            // has NO registered runtime, and today's runtimeFor(key) built a
+            // throwaway engine pair just to stop it - the design memo's
+            // flagged corner. The registry's stop is a lookup: unregistered
+            // key, nothing to stop, nothing constructed.
+            engineRegistry.stop(key, "project removed")
+        }
+        // §3: the row's event connection reclaim carries the SAME guard -
+        // a run in flight defers it to reportRunInFlight(key,false).
+        connectionRegistry.revoke(key, "project removed") {
+            engineRunInFlightFor == key
         }
     }
 
@@ -420,27 +488,51 @@ class AppContainer(context: Context) {
         if (instanceKey.isBlank()) {
             return EngineRuntime("", crushEngine, engineSupervisor)
         }
-        synchronized(runtimeLock) {
-            projectRuntime?.takeIf { it.instanceKey == instanceKey }?.let { return it }
-            val resolvedTuning = TuningPolicy.resolve(deviceProfile, TuningPolicy.Overrides())
-            val engine = CrushEngine(appContext, instanceKey, resolvedTuning.engineIdleTimeoutSec)
-            val supervisor = EngineSupervisor(
-                engine,
-                containerScope,
-                tuning = resolvedTuning,
-                appContext = appContext,
-                instanceKey = instanceKey
-            ).also { s ->
-                // P1-11 flush for THIS instance's restarts - the same
-                // registration the legacy singleton carries (see its .also
-                // block above for why the whole generation counter exists).
-                s.onEngineStart { WorkspaceManager.onEngineRestarted() }
-            }
-            val runtime = EngineRuntime(instanceKey, engine, supervisor)
-            projectRuntime = runtime
-            return runtime
-        }
+        // §1 registry (2026-11-05): per-key idempotency + never-evict live
+        // here; construction happens at most once per key per process, under
+        // the registry's lock (the same serialization the old
+        // `synchronized(runtimeLock)` gave the single slot).
+        return engineRegistry.runtimeFor(instanceKey) { buildKeyedRuntime(instanceKey) }
     }
+
+    /**
+     * The keyed construction, exactly the old [runtimeFor] body. [build]
+     * for the registry runs under its lock, so it must stay synchronous
+     * and fast: tuning resolve, engine object, supervisor, flush hook.
+     */
+    private fun buildKeyedRuntime(instanceKey: String): EngineRuntime {
+        val resolvedTuning = TuningPolicy.resolve(deviceProfile, TuningPolicy.Overrides())
+        val engine = CrushEngine(appContext, instanceKey, resolvedTuning.engineIdleTimeoutSec)
+        val supervisor = EngineSupervisor(
+            engine,
+            containerScope,
+            tuning = resolvedTuning,
+            appContext = appContext,
+            instanceKey = instanceKey
+        ).also { s ->
+            // P1-11 flush for THIS instance's restarts - the same
+            // registration the legacy singleton carries (see its .also
+            // block above for why the whole generation counter exists).
+            // §1 (2026-11-05): the registry's RUNNING grain rides the SAME
+            // hook - a successful new run marks the key, exactly once per
+            // start, without a second observer loop anywhere.
+            s.onEngineStart {
+                WorkspaceManager.onEngineRestarted()
+                engineRegistry.recordRunning(instanceKey)
+            }
+        }
+        return EngineRuntime(instanceKey, engine, supervisor)
+    }
+
+    /**
+     * §1 liveness-budget gate (2026-11-05): returns the fail-closed refusal
+     * reason, or null when the start may proceed. The chat layer consults
+     * this BEFORE every supervisor.start() and surfaces a refusal to the
+     * user the same shape an EngineState.Failed gets ("engine failed: ..."),
+     * because the state flow itself is supervisor-owned and deliberately
+     * not writable from container side.
+     */
+    fun requestEngineStart(instanceKey: String): String? = engineRegistry.requestStart(instanceKey)
 
     private val _keyAvailable = MutableStateFlow(0)
 
@@ -468,8 +560,12 @@ class AppContainer(context: Context) {
     private fun applyTuning(t: TuningPolicy.Resolved) {
         supervisorInstance?.tuning = t
         crushEngine.setIdleTimeoutSec(t.engineIdleTimeoutSec)
-        // Per-project runtimes (slice 2): same rules, same sources of truth.
-        projectRuntime?.let { rt ->
+        // Per-instance runtimes - since §1 (2026-11-05) the fan-out is the
+        // REGISTRY's every registered key, not a single slot: same rules,
+        // same sources of truth, and a STOPPED-but-registered instance must
+        // not lose settings (its next spawn bakes the idle linger, so a
+        // missed fan-out there would resurrect an old timeout).
+        engineRegistry.forEachRuntime { rt ->
             rt.supervisor.tuning = t
             rt.engine.setIdleTimeoutSec(t.engineIdleTimeoutSec)
         }

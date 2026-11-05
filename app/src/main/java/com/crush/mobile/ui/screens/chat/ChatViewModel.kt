@@ -389,6 +389,19 @@ class ChatViewModel(
      * must target the bound instance, never hard-code the legacy singleton.
      */
     fun startEngine() {
+        // Gate-7 §1 liveness budget (2026-11-05): at most TWO non-legacy
+        // instances with live children (chat + one project). The refusal is
+        // fail-closed with a named reason; surface it EXACTLY in the shape
+        // bindEngine gives an EngineState.Failed ("engine failed: ...",
+        // engineReady=false) - the state flow itself lives inside each
+        // key's supervisor and is deliberately not writable from here.
+        container.requestEngineStart(instanceKey)?.let { refusal ->
+            AppLog.w(TAG, "engine start refused for instance '$instanceKey': $refusal")
+            _state.update {
+                it.copy(phase = "engine failed: $refusal", engineReady = false)
+            }
+            return
+        }
         engineSupervisorFor.start()
     }
 
@@ -524,6 +537,25 @@ class ChatViewModel(
     /** Engine port the current connection is bound to; a change means a restart. */
     @Volatile
     private var connectionIdentity: String? = null
+
+    /**
+     * Process-unique observer epoch of THIS VM (Gate-7 §3, 2026-11-05).
+     * Handed out ONCE from the container's connection registry. Unlike the
+     * per-view epochs above ([sessionViewEpoch], [modelSelection]) it must be
+     * unique ACROSS ViewModels, because the registry compares it against
+     * other VMs' registrations for the same instance key: same epoch means
+     * "the same reader", a different epoch means "a newer VM owns the key".
+     */
+    private val connectionOwnerEpoch: Long = container.connectionRegistry.nextOwnerEpoch()
+
+    /**
+     * Set once when the registry says this VM's connection was superseded for
+     * its key (Gate-7 §3 reclaim). A stale VM logs ONE line and gives up
+     * observing permanently - its back-stack entry is gone and it must never
+     * disturb (or resurrect a ladder against) the live reader.
+     */
+    @Volatile
+    private var reclaimedBySupersession: Boolean = false
     private var workspaces: WorkspaceManager? = null
     private var port: Int? = null
 
@@ -1238,6 +1270,24 @@ class ChatViewModel(
      * id differs.
      */
     private fun attachEventStream(ws: String?, clientId: String) {
+        // Gate-7 §3 reclaim (2026-11-05): the stale-VM check FIRST, before
+        // anything else this method would do. If this VM's registration has
+        // lost its key (round trips through the Projects surface create
+        // overlapping chat entries), this reader must NOT re-enter the
+        // reconnect ladder - the container's revoke or a newer VM's
+        // attach already owns the key. Stop, log once, observe never again.
+        if (reclaimedBySupersession) return
+        if (container.connectionRegistry.isSuperseded(connectionOwnerEpoch, eventConnection)) {
+            reclaimedBySupersession = true
+            AppLog.i(
+                TAG,
+                "event connection superseded for instance '$instanceKey'; stale observer retires, " +
+                    "no reconnect retries"
+            )
+            runCatching { eventConnection?.stop() }
+            runCatching { eventRouter.close() }
+            return
+        }
         if (ws.isNullOrBlank()) return
         val p = port ?: return
         // THE IDENTITY (S0/F03): a connection belongs to a SOCKET FILE, not to a
@@ -1281,6 +1331,20 @@ class ChatViewModel(
         eventRouter = router
         eventConnection = fresh
         connectionIdentity = identity
+        // Gate-7 §3 registration (2026-11-05): this VM owns the live reader
+        // for its instance key from this moment. Registering supersedes any
+        // OTHER VM's registration for the same key - the legacy "" key
+        // included - the same deferral rule the container's stop-on-switch
+        // guard applies: while a run is in flight on the key, the superseded
+        // reader's stop pins and completes off reportRunInFlight(key,false).
+        // Register BEFORE ensureAttached so a reader that starts breathing
+        // here can never be the unregistered one.
+        container.connectionRegistry.attach(
+            instanceKey,
+            fresh,
+            connectionOwnerEpoch,
+            runInFlightOnKey = { container.engineRunInFlightFor == instanceKey }
+        )
         fresh.ensureAttached(ws, clientId)
         AppLog.i(TAG, "long-lived event stream attached to $ws")
     }
@@ -1335,6 +1399,14 @@ class ChatViewModel(
     }
 
     override fun onCleared() {
+        // Gate-7 §3 (2026-11-05): drop this VM's registry record FIRST, and
+        // ONLY if it is still ours - a newer VM's registration for the same
+        // key must not be killed by an old entry's cleanup (revoke-only-if-
+        // own). The direct stop below remains this VM's own teardown and
+        // runs regardless of what the registry holds.
+        container.connectionRegistry.revokeIfOwn(
+            instanceKey, connectionOwnerEpoch, "chat entry cleared"
+        )
         runCatching { eventConnection?.stop() }
         runCatching { eventRouter.close() }
     }

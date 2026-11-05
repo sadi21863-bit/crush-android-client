@@ -2,6 +2,7 @@ package com.crush.mobile.engine
 
 import android.content.Context
 import android.util.Log
+import com.crush.mobile.data.crush.EngineConfigInjector.ChatPolicyResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -249,12 +250,70 @@ class CrushEngine(
             // built-in tool hidden via options.disabled_tools. Same pre-spawn
             // window as the catalogue override above - the engine parses its
             // config ONCE per process, so anything later cannot reach it.
+            //
+            // S-01/P0-2 fail-closed gate (2026-11-05): the injector now returns
+            // a typed outcome and VERIFIES the policy by reading the file back
+            // from disk; this gate consults that verdict BEFORE exec. Every old
+            // failure shape (malformed file, unusable state dir, failed write,
+            // readback disagreement) used to degrade to "log and continue" -
+            // Chat would exec a coding-capable engine with possibly NO deny
+            // list at all. Now a failure refuses the spawn with an honest
+            // EngineState.Failed (Chat must never start as a coding-capable
+            // engine on policy failure - accepted product decision, pack 05
+            // item A); the supervisor's retry budget/backoff bounds the retries
+            // (willRetry = true) and the UI shows the honest failure. Non-chat
+            // pools are UNCHANGED: they do not inject. The verdict mapping is
+            // the pure [chatPolicyGate] below so it is unit-testable without
+            // Android APIs; the reasons are content-free by construction
+            // (counts only, never file text - the file holds the raw key).
             if (instanceKey == EnginePaths.CHAT_INSTANCE_KEY) {
-                runCatching {
-                    com.crush.mobile.data.crush.EngineConfigInjector.injectChatToolPolicy(
-                        paths.globalData
-                    )
-                }.onFailure { Log.w(TAG, "chat tool policy injection skipped: ${it.message}") }
+                // Fail-CLOSED end to end (mirrors [spawnVetoed]'s throw-veto
+                // stance below): the injector is contracted to never throw,
+                // but an evaluation that TOSSES anyway must refuse the birth -
+                // never crash start() and never let a child past a half-checked
+                // gate. The synthetic failure reason is content-free like the
+                // injector's own.
+                val verdict = chatPolicyGate(
+                    runCatching {
+                        com.crush.mobile.data.crush.EngineConfigInjector.injectChatToolPolicy(
+                            paths.globalData
+                        )
+                    }.getOrElse {
+                        ChatPolicyResult.PolicyFailure(
+                            "chat tool policy injection skipped: ${it.javaClass.simpleName}"
+                        )
+                    }
+                )
+                when (verdict) {
+                    is ChatPolicyDecision.Proceed -> {
+                        // Policy confirmed on disk; exec continues below
+                        // unchanged - and the idempotent re-injection keeps
+                        // every supervisor restart attempt byte-stable.
+                    }
+                    is ChatPolicyDecision.FailFast -> {
+                        // S5-style honest pair (Log + AppLog), reason is
+                        // content-free by construction.
+                        Log.w(TAG, "chat tool policy failed: ${verdict.reason} - refusing to spawn")
+                        com.crush.mobile.util.AppLog.w(
+                            TAG,
+                            "[$instanceKey] chat tool policy failed before exec " +
+                                "(${verdict.reason}); no engine child will be born"
+                        )
+                        // Mirror the phase-1 veto cleanup: pre-exec here there
+                        // is no child to destroy and nothing else to undo
+                        // except a bridge left up from an earlier supervise
+                        // attempt (stopping a not-started bridge is a no-op).
+                        runCatching { egressBridge.stop() }
+                        return@withContext EngineState.Failed(
+                            reason = "Chat tool policy could not be installed (${verdict.reason})",
+                            detail = verdict.reason,
+                            // The supervisor's budget/backoff law applies: a
+                            // retry re-runs the injector (idempotent,
+                            // readback-verified) before any exec.
+                            willRetry = true
+                        )
+                    }
+                }
             }
 
             // START THE EGRESS BRIDGE BEFORE SPAWNING: the child env below
@@ -558,3 +617,35 @@ internal fun spawnVetoed(maySpawn: () -> Boolean): Boolean =
     // a throwing checkbox must veto (read the KDoc above: never let a child
     // be born on an unknown verdict), a wanted-vote allows the birth.
     runCatching { maySpawn() }.getOrDefault(false).not()
+
+/**
+ * The CHAT pool's tool-policy spawn gate (S-01/P0-2, 2026-11-05), evaluated
+ * pre-exec inside [CrushEngine.start] strictly BEFORE the birth section: the
+ * two readback-verified outcomes ([ChatPolicyResult.PolicyInstalled],
+ * [ChatPolicyResult.AlreadyVerified]) allow the exec, a
+ * [ChatPolicyResult.PolicyFailure] refuses it - Chat never spawns as a
+ * coding-capable engine on policy failure (accepted product decision, pack 05
+ * item A). Non-chat pools never reach this gate: they inject no policy.
+ *
+ * Pure, top-level and EXHAUSTIVE, like [spawnVetoed]/[pidFromReflective]
+ * living outside the class for the same testability reason: the `when` is over
+ * a sealed type with NO else branch, so the compiler fails a build that adds a
+ * policy outcome without a verdict. The failure reason travels verbatim into
+ * [EngineState.Failed] and the instance-key-prefixed AppLog line, which is safe
+ * only because the injector's reasons are content-free by construction
+ * (failure class names and counts, never file text - the config file holds the
+ * raw provider key).
+ */
+internal sealed interface ChatPolicyDecision {
+    /** Policy confirmed on disk: the chat pool may exec (the unchanged path). */
+    data object Proceed : ChatPolicyDecision
+
+    /** Fail-closed: no child is born; the caller reports the honest failure. */
+    data class FailFast(val reason: String) : ChatPolicyDecision
+}
+
+internal fun chatPolicyGate(result: ChatPolicyResult): ChatPolicyDecision = when (result) {
+    is ChatPolicyResult.PolicyInstalled -> ChatPolicyDecision.Proceed
+    is ChatPolicyResult.AlreadyVerified -> ChatPolicyDecision.Proceed
+    is ChatPolicyResult.PolicyFailure -> ChatPolicyDecision.FailFast(result.reason)
+}

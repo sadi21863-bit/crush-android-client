@@ -190,6 +190,47 @@ object EngineConfigInjector {
     }
 
     /**
+     * Typed outcome of [injectChatToolPolicy] (S-01/P0-2, 2026-11-05). The old
+     * boolean SyncResult degraded EVERY failure shape (malformed file,
+     * unusable dir, failed write) to "unchanged, carry on" - and the spawn
+     * call site ignored even that, so Chat exec'd a coding-capable engine
+     * with possibly NO deny list at all. The sealed shape makes the caller's
+     * choices explicit and compiler-checked; [CrushEngine]'s chat gate refuses
+     * to spawn on a failure (Chat cannot start as a coding-capable engine on
+     * policy failure - accepted product decision, pack 05 item A).
+     */
+    sealed class ChatPolicyResult {
+        /** A write landed AND the readback confirmed every required id on disk. */
+        data class PolicyInstalled(
+            val changed: Boolean,
+            val tools: List<String>
+        ) : ChatPolicyResult()
+
+        /** Bytes were already canonical AND a fresh readback confirmed them. */
+        data class AlreadyVerified(val tools: List<String>) : ChatPolicyResult()
+
+        /**
+         * Fail-CLOSED. [reason] is content-free BY CONSTRUCTION - failure
+         * class names and counts only, never file text: this file can hold
+         * the raw provider API key (class KDoc) and the reason can reach
+         * logs and badges.
+         */
+        data class PolicyFailure(val reason: String) : ChatPolicyResult()
+    }
+
+    /** Per-outcome verdict of the pure readback verifier; content-free (see its KDoc). */
+    internal sealed interface ChatPolicyReadback {
+        /** Every required id is present in the on-disk `options.disabled_tools`. */
+        data object Verified : ChatPolicyReadback
+
+        /** The file parsed but does not cover the policy; [missing] is a count only. */
+        data class ShortList(val missing: Int) : ChatPolicyReadback
+
+        /** Not a JSON object / half-parsed / unreadable; [cause] is a class name only. */
+        data class Unparsable(val cause: String) : ChatPolicyReadback
+    }
+
+    /**
      * S3 (2026-11-05, S1 device probe): the CHAT pool's tool policy.
      *
      * The chat pool runs CONVERSATION-ONLY: every built-in tool the upstream
@@ -205,18 +246,36 @@ object EngineConfigInjector {
      * Caller contract: the ONLY legal window is before an engine process is
      * up (the same rule as [syncProviderModels]; the call site in
      * CrushEngine.start() is pre-exec). Idempotent: writing the same list
-     * twice leaves bytes unchanged. Malformed files are reported unchanged,
-     * never rewritten (a half-parse rewrite could delete the engine's stored
-     * key - the same rule [syncProviderModels] runs under).
+     * twice leaves bytes unchanged and reports
+     * [ChatPolicyResult.AlreadyVerified]. Malformed files are reported as a
+     * failure, never rewritten (a half-parse rewrite could delete the
+     * engine's stored key - the same rule [syncProviderModels] runs under;
+     * S-01/P0-2 now FAILS the call where the old code silently passed it).
      *
-     * @return SyncResult(changed, tools)
+     * S-01/P0-2 (2026-11-05): VERIFIED-BY-READBACK. Success is claimed only
+     * after the file is re-read from disk and confirmed to contain every
+     * [CHAT_DISABLED_TOOLS] id - and NO harder claim than that: honouring the
+     * list at the engine boundary is what the S1 device probe proved, not
+     * this function. A write whose readback disagrees is a failure.
+     *
+     * KEY-PROTECTION RULE: no AppLog/Log call exists in this object and none
+     * may be added - [ChatPolicyResult.PolicyFailure.reason] carries only
+     * failure class names and counts (never file text, never parsed ids,
+     * never paths). The engine layer may log the outcome and counts.
+     *
+     * @return the typed outcome. Never throws.
      */
-    fun injectChatToolPolicy(globalDataDir: File): SyncResult {
+    fun injectChatToolPolicy(globalDataDir: File): ChatPolicyResult {
         val file = File(globalDataDir, "crush.json")
         if (!globalDataDir.isDirectory && !globalDataDir.mkdirs()) {
-            return SyncResult(false, emptyList())
+            // Fail-CLOSED (S-01/P0-2): the old code returned SyncResult(false)
+            // here and the spawn call site ignored it, so an unusable state
+            // dir silently passed a pool whose deny list could not exist.
+            return ChatPolicyResult.PolicyFailure(
+                "chat state dir unavailable (mkdirs failed); no policy installed"
+            )
         }
-        val root: JsonObject = runCatching {
+        val mergedRoot: JsonObject? = runCatching {
             val parsed = if (file.isFile) JsonParser.parseString(file.readText()) else JsonObject()
             val obj = parsed.asJsonObject
             val options = obj.getAsJsonObject("options") ?: JsonObject().also { obj.add("options", it) }
@@ -235,23 +294,129 @@ object EngineConfigInjector {
             val before = if (options.has("disabled_tools"))
                 options.get("disabled_tools").toString() else null
             if (before == merged.toString()) {
-                return SyncResult(false, CHAT_DISABLED_TOOLS)
+                // Byte-stable: the on-disk list already carries the policy in
+                // canonical form. Nothing is written here; the outcome below
+                // is decided by a fresh READBACK from disk (2026-11-05), never
+                // by trusting this parse alone.
+                null
+            } else {
+                options.add("disabled_tools", merged)
+                obj
             }
-            options.add("disabled_tools", merged)
-            obj
-        }.getOrElse { return SyncResult(false, emptyList()) }
+        }.getOrElse {
+            // S1 constraint kept: a malformed or half-parsed file is
+            // reported, NEVER rewritten (a rewrite could delete the engine's
+            // stored key). A wrong-shaped existing member (e.g.
+            // "options": null) throws out of the tree walk the same way and
+            // fails closed too. The reason carries only the failure class -
+            // never file content (key-protection rule above).
+            return ChatPolicyResult.PolicyFailure(
+                "crush.json malformed in the chat state dir " +
+                    "(${it.javaClass.simpleName}); never rewritten"
+            )
+        }
 
-        runCatching {
+        if (mergedRoot == null) {
+            // Second-call path: bytes already canonical. Verify fresh from
+            // disk anyway - AlreadyVerified is claimed from the file the
+            // ENGINE will read, not from this parse.
+            return when (val back = readbackChatPolicy(file)) {
+                is ChatPolicyReadback.Verified ->
+                    ChatPolicyResult.AlreadyVerified(tools = CHAT_DISABLED_TOOLS)
+                is ChatPolicyReadback.ShortList ->
+                    ChatPolicyResult.PolicyFailure(
+                        "policy not verified on disk: ${back.missing} of " +
+                            "${CHAT_DISABLED_TOOLS.size} deny ids missing"
+                    )
+                is ChatPolicyReadback.Unparsable ->
+                    ChatPolicyResult.PolicyFailure(
+                        "policy readback unparsable (${back.cause})"
+                    )
+            }
+        }
+
+        val wrote = runCatching {
             val tmp = File(globalDataDir, "crush.json.tmp")
-            tmp.writeText(root.toString())
+            tmp.writeText(mergedRoot.toString())
             if (!tmp.renameTo(file)) {
                 // rename across the same dir cannot fail for a real path, but
                 // on FAT/emulated storage it has; fall back to copy semantics.
-                file.writeText(root.toString())
+                file.writeText(mergedRoot.toString())
                 tmp.delete()
             }
-        }.onFailure { return SyncResult(false, emptyList()) }
-        return SyncResult(true, CHAT_DISABLED_TOOLS)
+        }
+        if (wrote.isFailure) {
+            // Fail-CLOSED (S-01/P0-2): a failed write no longer degrades to a
+            // pass-through result; the class name is the only detail logged
+            // anywhere (key-protection rule above).
+            return ChatPolicyResult.PolicyFailure(
+                "policy write failed (${wrote.exceptionOrNull()?.javaClass?.simpleName})"
+            )
+        }
+
+        // VERIFIED-BY-READBACK (S-01/P0-2, 2026-11-05): success is claimed
+        // only after the file is re-read from disk and every required deny id
+        // is confirmed present in it.
+        return when (val back = readbackChatPolicy(file)) {
+            is ChatPolicyReadback.Verified ->
+                ChatPolicyResult.PolicyInstalled(changed = true, tools = CHAT_DISABLED_TOOLS)
+            is ChatPolicyReadback.ShortList ->
+                ChatPolicyResult.PolicyFailure(
+                    "readback after write disagrees: ${back.missing} of " +
+                        "${CHAT_DISABLED_TOOLS.size} deny ids missing"
+                )
+            is ChatPolicyReadback.Unparsable ->
+                ChatPolicyResult.PolicyFailure(
+                    "readback after write unparsable (${back.cause})"
+                )
+        }
+    }
+
+    /**
+     * Wraps the file read for the post-write/second-call verification: any
+     * I/O surprise is an unparsable-and-failed readback, never an exception
+     * out of the injector.
+     */
+    private fun readbackChatPolicy(file: File): ChatPolicyReadback = runCatching {
+        verifyChatPolicyOnDisk(file.readText(), CHAT_DISABLED_TOOLS)
+    }.getOrElse {
+        ChatPolicyReadback.Unparsable(it.javaClass.simpleName)
+    }
+
+    /**
+     * The readback seam for [injectChatToolPolicy]'s verify-after-write step,
+     * pure over the on-disk TEXT so tests drive it directly (S-01/P0-2,
+     * 2026-11-05) - faking a real post-write mismatch without a Context needs
+     * an OS race the injector refuses to model.
+     *
+     * Contract, and NO harder claim than the requirement: the text must parse
+     * to a JSON object whose `options.disabled_tools` contains EVERY id in
+     * [required]. Extra ids, id order and byte shape are NOT checked - the
+     * engine-side honouring of the list is what the S1 device probe proved.
+     *
+     * Content-freedom: the outcome never carries file text, parsed ids or
+     * absolute paths, because this file can also hold the raw provider API
+     * key (class KDoc) and the outcome can reach logs and badges.
+     */
+    internal fun verifyChatPolicyOnDisk(
+        fileText: String,
+        required: List<String>
+    ): ChatPolicyReadback {
+        val options: JsonObject? = runCatching {
+            JsonParser.parseString(fileText).asJsonObject.getAsJsonObject("options")
+        }.getOrElse { return ChatPolicyReadback.Unparsable(it.javaClass.simpleName) }
+        val present: Set<String> = runCatching {
+            options?.getAsJsonArray("disabled_tools")
+        }.getOrElse { return ChatPolicyReadback.Unparsable(it.javaClass.simpleName) }
+            ?.filter { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+            ?.map { it.asString }
+            ?.toSet()
+            // No list to verify against counts as every id missing: absence
+            // of coverage is a failure, never an implicit pass.
+            ?: return ChatPolicyReadback.ShortList(missing = required.size)
+        val missing = required.count { it !in present }
+        return if (missing == 0) ChatPolicyReadback.Verified
+        else ChatPolicyReadback.ShortList(missing)
     }
 
     /**

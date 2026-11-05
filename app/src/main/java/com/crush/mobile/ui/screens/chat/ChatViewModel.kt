@@ -628,6 +628,14 @@ class ChatViewModel(
     private fun engineReadyNow(): Boolean = _state.value.engineReady && wsId != null
 
     fun bindEngine(engineState: EngineState) {
+        // S5 wedge instrumentation (2026-11-05): the two overnight hangs showed
+        // a HEALTHY child with a UI pinned on "engine stopped", and system
+        // logcat was proven lossy for our process lines - so every bind goes
+        // to the persistent app.log too, making the supervisor<->UI state
+        // pair reconstructible after a sleep.
+        com.crush.mobile.util.AppLog.d(
+            TAG, "bindEngine state=$engineState instance=$instanceKey"
+        )
         val p = (engineState as? EngineState.Running)?.port
         if (p == null) {
             // Flow.update, not read-modify-write (analysis §4 P2 on races):
@@ -780,6 +788,29 @@ class ChatViewModel(
 
     private suspend fun doBootstrap() {
         _state.update { it.copy(phase = "connecting to agent", engineReady = false, recoverable = false) }
+        // S5/A11+A12 (2026-11-05): resolve the RESTORED binding before any
+        // instance-derived path (workspacePathFor, engineStateDirFor, the
+        // supervisor handle) is read. The container's own cold-start launch
+        // usually finished long before; this await closes the race where the
+        // VM's first boot starts faster than that DataStore read. Also the
+        // boot's own profile-of-truth sync (same principle as the persisted
+        // provider read below): configure the binding the CONTAINER holds,
+        // never a stale ViewModel key. The command style mirrors
+        // bindEngine's replacement reset - handles nulled, engine_state
+        // observed once - because bindProject()'s normal path deliberately
+        // parks on port=null and waits for the next state emission, which
+        // would end THIS boot without opening anything.
+        runCatching { container.restoreLastBinding() }
+        val boundKey = container.activeInstanceKey.value
+        if (boundKey != instanceKey) {
+            AppLog.i(TAG, "bootstrap adopting the container's binding '$boundKey' (was '$instanceKey')")
+            instanceKey = boundKey
+            port = null
+            wsId = null
+            sessionId = null
+            workspaces = null
+            bindEngine(container.runtimeFor(boundKey).supervisor.state.value)
+        }
         val p = port ?: return
         val api = crushApi(p)
         val mgr = WorkspaceManager(api)

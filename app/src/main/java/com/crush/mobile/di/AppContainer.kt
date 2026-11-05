@@ -236,6 +236,95 @@ class AppContainer(context: Context) {
      */
     fun setActiveChatPool() = applyBinding(EngineBinding.ChatPool)
 
+    /**
+     * A11/A12 (2026-11-05) binding tokens, persisted once per binding change
+     * and read once per process at cold start. SELF-DESCRIBING on purpose:
+     * the derived instance key for a project is `p<first8-uuid>` - LOSSY - so
+     * the stored token carries the FULL row uuid and the restore re-resolves
+     * the row from the project store. A token naming a row that was removed
+     * restores to the honest default (legacy stays bound) rather than
+     * reconstructing an engine underneath a deleted directory.
+     */
+    companion object {
+        const val TOKEN_LEGACY = "legacy"
+        const val TOKEN_CHAT = "chat"
+        private const val TOKEN_PROJECT_PREFIX = "proj:"
+
+        /** The persisted form of a binding. Never null - legacy has a token. */
+        fun bindingToToken(binding: EngineBinding): String = when (binding) {
+            is EngineBinding.Legacy -> TOKEN_LEGACY
+            is EngineBinding.ChatPool -> TOKEN_CHAT
+            is EngineBinding.Project -> "$TOKEN_PROJECT_PREFIX${binding.ref.id}"
+        }
+
+        /**
+         * The full project uuid inside a project token, or null for legacy /
+         * chat / malformed tokens (nulls are the caller's signal that no row
+         * lookup is needed - and illegal uuid bytes fail-safe to null via the
+         * runCatching, never throwing).
+         */
+        fun tokenToProjectId(token: String): java.util.UUID? =
+            if (token.startsWith(TOKEN_PROJECT_PREFIX))
+                runCatching {
+                    java.util.UUID.fromString(token.removePrefix(TOKEN_PROJECT_PREFIX))
+                }.getOrNull()
+            else null
+    }
+
+    /**
+     * One-shot-per-process restore of the last engine binding (A11/A12,
+     * measured gap: an overnight cold boot landed the user back on the LEGACY
+     * pool's session even though they had last used the chat pool). Called by
+     * (1) the container's own cold-start launch, and (2) awaited again at the
+     * top of the chat ViewModel's bootstrap so a boot that races the first
+     * call still configures the RESTORED surface.
+     *
+     * Ordered decisions, each fail-safe:
+     * - A user action during the restore window WINS: a binding that is
+     *   already off the default is never overwritten by a restore.
+     * - "" / "legacy" / unparseable tokens mean the legacy default - the
+     *   state the process is already in, nothing to change.
+     * - A project token whose row is gone (removed while the app was dead)
+     *   logs honestly and stays on the legacy workspace.
+     */
+    private var bindingRestored = false
+
+    suspend fun restoreLastBinding() {
+        if (bindingRestored) return
+        bindingRestored = true
+        if (_activeInstanceKey.value != "") return
+        val token = runCatching { settingsRepository.readLastBinding() }.getOrDefault("")
+        if (token.isEmpty() || token == TOKEN_LEGACY) return
+        if (token == TOKEN_CHAT) {
+            com.crush.mobile.util.AppLog.i("Lifecycle", "restoring last binding: chat pool")
+            applyBinding(EngineBinding.ChatPool)
+            return
+        }
+        val ref = tokenToProjectId(token)?.let { pid ->
+            runCatching { projectStore.byId(pid) }.getOrNull()
+        }
+        if (ref == null) {
+            com.crush.mobile.util.AppLog.w(
+                "Lifecycle",
+                "restoring last binding: saved row for '$token' is gone; legacy stays bound"
+            )
+            return
+        }
+        com.crush.mobile.util.AppLog.i(
+            "Lifecycle", "restoring last binding: project '${ref.label}'"
+        )
+        applyBinding(EngineBinding.Project(ref))
+    }
+
+    init {
+        // A11/A12: prime the restore ahead of composition. The chat layer's
+        // LaunchedEffect(activeInstanceKey) re-drives bindProject on ANY later
+        // emission, so a restore landing a frame or two late still rebinds -
+        // but bootstraps that read the binding should not have to wait for
+        // frame timing.
+        containerScope.launch { runCatching { restoreLastBinding() } }
+    }
+
     private fun applyBinding(binding: EngineBinding) {
         val oldKey = _activeInstanceKey.value
         activeProjectRef = (binding as? EngineBinding.Project)?.ref
@@ -243,6 +332,20 @@ class AppContainer(context: Context) {
         val newKey = keyFor(binding)
         if (newKey == oldKey) return
         _activeInstanceKey.value = newKey
+        // A11/A12: make the binding change durable the same moment it lands.
+        // Fire-and-forget: the launch queue on the container's main-immediate
+        // scope serialises behind the user taps that caused it, and DataStore
+        // serialises edits behind THAT - so the last persisted token is the
+        // last binding, at every realistic tap rate.
+        val lastBindingToken = bindingToToken(binding)
+        containerScope.launch {
+            runCatching { settingsRepository.saveLastBinding(lastBindingToken) }
+                .onFailure {
+                    com.crush.mobile.util.AppLog.w(
+                        "Lifecycle", "last-binding persist failed: ${it.message}"
+                    )
+                }
+        }
         // Stop the OUTGOING non-legacy engine on the switch (ADR-0001
         // lifecycle polish, 2026-11-04). This lives HERE and NOT in the chat
         // ViewModel's bindProject: the ViewModel is scoped to the nav

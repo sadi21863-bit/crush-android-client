@@ -148,6 +148,7 @@ class EngineSupervisor(
 
     fun start() {
         synchronized(sync) {
+            com.crush.mobile.util.AppLog.i(TAG, "[$instanceKey] start() activeJob=${supervisorJob?.isActive}")
             if (supervisorJob?.isActive == true) return
             wanted = true
             supervisorJob = scope.launch { supervise() }
@@ -156,6 +157,7 @@ class EngineSupervisor(
 
     fun stop() {
         synchronized(sync) {
+            com.crush.mobile.util.AppLog.i(TAG, "[$instanceKey] stop() requested")
             wanted = false
             supervisorJob?.cancel()
             supervisorJob = null
@@ -206,12 +208,29 @@ class EngineSupervisor(
         // restart loop at backoff pace forever.
         var wedgeRestarts = 0
         var runningSince = 0L
+        // S5 wedge instrumentation (2026-11-05): the two overnight hangs ended
+        // with the UI pinned on "engine stopped" while the CHILD process and
+        // its socket were alive and fresh - meaning the loop never reached an
+        // attempt or exited long before. System logcat was proven lossy for
+        // our process lines, so every transition below ALSO goes to the
+        // persistent app.log; the tag prefix keeps the two sinks greppable
+        // apart.
+        com.crush.mobile.util.AppLog.i(TAG, "[$instanceKey] supervise loop start")
         while (currentCoroutineContext().isActive && isWanted()) {
             attempt++
             _state.value = EngineState.Starting(attempt)
+            val attemptStart = System.currentTimeMillis()
+            com.crush.mobile.util.AppLog.d(
+                TAG, "[$instanceKey] starting attempt $attempt"
+            )
 
             when (val result = engine.start()) {
                 is EngineState.Running -> {
+                    com.crush.mobile.util.AppLog.i(
+                        TAG,
+                        "[$instanceKey] engine Running after " +
+                            "${System.currentTimeMillis() - attemptStart}ms"
+                    )
                     attempt = 0
                     wedgeRestarts = 0
                     runningSince = System.currentTimeMillis()
@@ -223,9 +242,17 @@ class EngineSupervisor(
                     // binds (see EngineSockets); result.port is a sentinel in
                     // UDS mode and is NOT used here.
                     val shouldRestart = monitorUntilUnhealthy(healthSocketFile())
-                    if (!shouldRestart) return
+                    if (!shouldRestart) {
+                        com.crush.mobile.util.AppLog.i(
+                            TAG, "[$instanceKey] supervision ended (not wanted)"
+                        )
+                        return
+                    }
 
                     Log.i(TAG, "engine unhealthy; restarting")
+                    com.crush.mobile.util.AppLog.w(
+                        TAG, "[$instanceKey] engine unhealthy; restarting"
+                    )
                     // Wedge cap: a run that never lasted MIN_HEALTHY_RUN_MS is
                     // a boot-phase failure, not a regression under load. After
                     // MAX_WEDGE_RESTARTS of them in a row, give up - the user
@@ -241,6 +268,11 @@ class EngineSupervisor(
                                 TAG,
                                 "engine wedged $wedgeRestarts times in a row without ever " +
                                     "staying Running ${MIN_HEALTHY_RUN_MS / 1000}s; giving up"
+                            )
+                            com.crush.mobile.util.AppLog.e(TAG,
+                                "[$instanceKey] engine wedged $wedgeRestarts times in a row " +
+                                    "without ever staying Running " +
+                                    "${MIN_HEALTHY_RUN_MS / 1000}s; giving up"
                             )
                             engine.stopBlocking()
                             _state.value = EngineState.Failed(
@@ -259,6 +291,12 @@ class EngineSupervisor(
                 }
 
                 is EngineState.Failed -> {
+                    com.crush.mobile.util.AppLog.w(
+                        TAG,
+                        "[$instanceKey] start Failed (retryable=${result.willRetry}) after " +
+                            "${System.currentTimeMillis() - attemptStart}ms, attempt=$attempt: " +
+                            result.reason
+                    )
                     // P1-10: a cold boot on a slow device can legitimately
                     // exceed the engine's 60s readiness window, and CrushEngine
                     // now classifies both that timeout and an early exit as
@@ -274,6 +312,10 @@ class EngineSupervisor(
                             "startup failed permanently after $attempt attempts " +
                                 "(budget $MAX_START_ATTEMPTS): ${result.reason}"
                         )
+                        com.crush.mobile.util.AppLog.e(TAG,
+                            "[$instanceKey] startup failed permanently after $attempt attempts " +
+                                "(budget $MAX_START_ATTEMPTS): ${result.reason}"
+                        )
                         // Report through the same state the caller would have
                         // seen; only the retry promise flips, so the UI shows
                         // a terminal error instead of an eternal spinner.
@@ -287,6 +329,9 @@ class EngineSupervisor(
                 EngineState.Stopped, is EngineState.Starting -> Unit
             }
         }
+        com.crush.mobile.util.AppLog.i(
+            TAG, "[$instanceKey] supervise loop exit (wanted=${isWanted()})"
+        )
     }
 
 /**

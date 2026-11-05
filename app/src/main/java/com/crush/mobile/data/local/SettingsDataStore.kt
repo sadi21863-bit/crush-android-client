@@ -11,6 +11,7 @@ import com.crush.mobile.domain.provider.Providers
 import com.crush.mobile.domain.model.PermissionMode
 import com.crush.mobile.domain.model.TuningPolicy
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -42,6 +43,17 @@ class SettingsDataStore(context: Context, private val keySession: KeySession) {
         private val TEMPERATURE = stringPreferencesKey("temperature")
         private val PROVIDER_ID = stringPreferencesKey("provider_id")
         private val PERMISSION_MODE = stringPreferencesKey("permission_mode")
+
+        /**
+         * A11/A12 (2026-11-05): WHICH engine binding the app last let the user
+         * use - "legacy" / "chat" / "proj:<uuid>" (see AppContainer for the
+         * token contract ONLY; the DataStore stores the raw string). Not a
+         * secret and not a preference with UI: it exists so a cold boot can
+         * land the user back on the pool they last used instead of silently
+         * drifting to the legacy workspace - the gap measured live when an
+         * overnight restore lost the chat-pool binding.
+         */
+        private val LAST_BINDING = stringPreferencesKey("last_engine_binding")
 
         // Tuning overrides. Stored as empty string == "no override", which keeps
         // the AUTO vs MANUAL distinction the settings UI depends on.
@@ -179,4 +191,18 @@ class SettingsDataStore(context: Context, private val keySession: KeySession) {
     suspend fun saveTemperature(temp: Double) {
         context.dataStore.edit { prefs -> prefs[TEMPERATURE] = temp.toString() }
     }
+
+    /** Persists the last engine-binding token for the next cold boot. */
+    suspend fun saveLastBinding(token: String) {
+        context.dataStore.edit { prefs -> prefs[LAST_BINDING] = token }
+    }
+
+    /**
+     * Reads the persisted binding token. Absent/corrupt reads fail SAFE to ""
+     * (the legacy default), never throwing - a broken preferences file must
+     * not be able to stop the app from booting at all.
+     */
+    suspend fun readLastBinding(): String =
+        runCatching { context.dataStore.data.first()[LAST_BINDING] }.getOrDefault("")
+            .orEmpty()
 }

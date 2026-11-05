@@ -32,6 +32,16 @@ suspend fun clearApiKey(providerId: String) = dataStore.clearApiKey(providerId)
     suspend fun saveTemperature(temp: Double) = dataStore.saveTemperature(temp)
 
     /**
+     * A11/A12: the last engine-binding token ("legacy" / "chat" /
+     * "proj:<uuid>"), written by AppContainer.applyBinding on every binding
+     * change and read once per process at cold start. Repository passthrough
+     * only - the token contract lives in AppContainer.
+     */
+    suspend fun saveLastBinding(token: String) = dataStore.saveLastBinding(token)
+
+    suspend fun readLastBinding(): String = dataStore.readLastBinding()
+
+    /**
      * Persists how the agent's tool calls are authorised.
      *
      * Was already implemented in SettingsDataStore and called from nowhere, so

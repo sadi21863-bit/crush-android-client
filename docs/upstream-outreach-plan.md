@@ -530,3 +530,161 @@ future-work mentions only). Do not fabricate tags, URLs, or maintainer quotes.
       unmeasured).
 - [ ] Links limited to charmbracelet/crush pages, the Termux RUN_COMMAND
       wiki, the llama.cpp Android doc, and this repository.
+
+---
+
+## Candidate 4 (new, second watch) — bash tool waved `kill`/`killall` through with no approval, and wrapper arguments escaped both checks (v0.99.0); fixed on upstream main one day after our pin
+
+**Numbering note.** Not the "(e) Rank 4" row above: a second-watch
+candidate (added 2026-11-05, source-verified at pinned refs); files behind
+Rank 1 per the sequencing note. The hardening is already merged on main,
+so this files in **discussion-first** form (the #4107 precedent) as a
+confirm-the-floor + release/docs ask — never as a vulnerability report.
+
+**Upstream-issue title (draft, neutral):**
+
+> Bash tool's no-prompt allow-list approved `kill`/`killall` and wrapper
+> arguments like `timeout 600 rm -rf …` in v0.99.0 — blast radius in an
+> embedding host whose engine child shares the host process's OS UID
+
+**What the source shows (Grade A — public code at pinned refs, verified
+2026-11-05).** `internal/agent/tools/safe.go@v0.99.0` puts `"kill"`
+(line 21) and `"killall"` (line 22) inside `safeCommands`, beside
+`"nice"`, `"nohup"`, `"timeout"`, `"top"`. The guard in
+`internal/agent/tools/bash.go@v0.99.0` lowercases the whole command and
+prefix-matches the **first word**; a match skips the permission service:
+
+```go
+isSafeReadOnly := false
+cmdLower := strings.ToLower(params.Command)
+if !containsCommandChaining(params.Command) {
+    for _, safe := range safeCommands {
+        if strings.HasPrefix(cmdLower, safe) {
+            if len(cmdLower) == len(safe) || cmdLower[len(safe)] == ' ' || cmdLower[len(safe)] == '-' {
+                isSafeReadOnly = true
+                break
+            }
+        }
+    }
+}
+…
+if !isSafeReadOnly {
+    p, err := permissions.Request(…)  // bypassed entirely on a match
+```
+
+Read against that exact code: `kill -9 <pid>` / `killall -9 <name>` never
+reach `permissions.Request`; and only the first word is seen, so wrapper
+arguments are invisible — `timeout 600 rm -rf <scratch dir>` reads as
+prefix "timeout" + space → treated read-only → no prompt → the wrapped
+`rm` runs. Chaining (`;`, `|`, `&&`, `$(`, `` ` `` in
+`containsCommandChaining`) disarms the bypass and forces the prompt. The
+runtime list `bannedCommands` (bash.go@v0.99.0, wired via `blockFuncs()` →
+`shell.CommandsBlocker`, enforced per dispatch by `blockHandler` in
+run.go@v0.99.0, matching only `args[0]`) refuses curl/wget/w3m-class
+tools, ssh/scp/telnet/nc, doas/su/sudo, and package managers (apk, apt,
+apt-get, dnf, dpkg, pacman, pkg, rpm, yum, zypper, …) outright — but never
+`kill`, `killall`, `rm`, `timeout`, or `nohup`; a banned tool named
+*inside* wrapper arguments is inspected by neither layer.
+
+**Why an embedding host should care (the host twist).** The kernel allows
+signaling any process of the same UID (SELinux domain permitting). Rank 2's
+socket boundary isolates against *other* UIDs; it does not change that the
+engine child inherits the **host's** UID — so the auto-safe list lets the
+agent terminate, with no approval event rendered, the host app's own UI
+process, the engine's parallel-session shells and jobs — anything sharing
+the UID. A desktop permission model never had to price that: the victims
+belong to the *host*.
+
+**Minimal repro (pure engine; TUI and serve mode identical — the safe list
+lives in the shared bash tool, not the UI):**
+
+1. Start the engine alone (TUI or server/host mode), default permissions —
+   no sysadmin/yolo mode, no allow-list entries.
+2. Plant a signal target outside the session (`sleep 900` from the
+   operator); note its PID.
+3. Have the agent run `kill <pid>` then `killall -9 sleep`: no permission
+   request frame/card is raised, the target vanishes from `ps`, while a
+   control command (`touch <scratch>/a`) in the same session DOES raise
+   the ask — the delta is the allow-list entry itself.
+4. Wrapper variant: `timeout 600 rm -rf <scratch-only path>` and
+   `nohup touch <scratch>/probe` — no ask card; the effects happen.
+
+**Observed vs expected.** Observed = the code path above (Grade A for the
+mechanism; on-device steps 3–4 are D-grade, not yet measured). Expected, by
+upstream's own later-stated membership bar — no auto-safe entry may "write
+to the filesystem, mutate repository or system state, execute another
+program, or reach the network" — process-signaling commands do not
+qualify.
+
+**Secondary note — `top`/`timeout`/`nohup` judged from the code.** `top`
+is read-only as the engine uses it (piped, non-interactive) and is
+retained in BOTH v0.99.0 and main (`{argv: []string{"top"},
+allowOperands: true}`) — no state-mutation class found, nothing to ask.
+The honest split for the other two: **OBSERVED-in-v0.99.0** — the
+prefix-only matcher approves the wrapper word and the wrapped argument
+executes, invisible to the args[0]-only block list. **FIXED-in-main** —
+`d3b8997` peels wrappers (`env`, `nohup`, `nice`, `timeout`) and
+re-checks the inner argv; its denied-test table names the shapes
+verbatim ("timeout 5 rm -rf /tmp/pwned", "nohup curl
+https://evil.example"); main also moved `nohup`/`env`/`eval`/`xargs` into
+`defaultBlockedCommands` ("Indirect execution").
+
+**Fix range already merged — nothing here is re-proposed (Grade A; live
+compare v0.99.0 (e38655a)…main (0f3d0d3): 91 commits, snapshot
+2026-11-05).** Committed 2026-10-30 — a day after v0.99.0's publish
+(2026-10-29), a day before our pin promotion (2026-11-01), so the bundled
+engine carries the pre-fix tool:
+[`d3b8997`](https://github.com/charmbracelet/crush/commit/d3b899755b559db323a69adcfbdd6a6a70cc07dc)
+"decide auto-approval from the parsed command" (AST analysis, fails
+closed; its comment: "Deliberately absent: … kill, killall: signal
+arbitrary processes…"),
+[`f7179d1`](https://github.com/charmbracelet/crush/commit/f7179d1624643b84fb350528c85d86407541ac6e)
+"judge a chain by its parts",
+[`15c37e3`](https://github.com/charmbracelet/crush/commit/15c37e355ff087de191efc6d3135ffd8fe4d334f)
+"unreadable command waiving neighbors". As of 2026-11-05 only the rolling
+`nightly` prerelease (built from main) carries the range — **no tagged
+release after v0.99.0 exists yet**.
+
+**Confirms / NEW.** Do not lead with what upstream already knows — their
+merged tests enumerate the prefix matcher's weaknesses and the kill/killall
+removal is their own choice. NEW here: (i) the same-UID blast-radius
+framing above; (ii) the pin floor — a checksummed embedder pinned to
+v0.99.0 has no reachable *tagged* fixed release to bump to until a tag
+carries the range.
+
+**Ask (discussion tier, once Ranks 1–2 are in motion).**
+
+1. Name the first *tagged* release carrying `d3b8997…15c37e3`, or accept a
+   release-notes line marking it as the embedder floor.
+2. One permissions-docs paragraph: process-signaling commands are never
+   auto-safe, and the safe-list semantics changed shape (string-prefix →
+   AST + wrapper peeling) for hosts that tuned approval UX to the old
+   behavior.
+3. If signaling is ever reintroduced for agents (stopping a just-spawned
+   dev server is a genuine need), route it through the prompted permission
+   tier or a self-scoped purpose-built tool — never the prefix allow-list.
+   (A scan + second factor for non-self signaling targets stays C-grade,
+   offered only as a question.)
+
+**Owe before filing.**
+
+- [ ] Device-measure steps 3–4 on the pinned v0.99.0 engine (D → B): the
+      absent permission frame for `kill`/`killall`, the present card for
+      the `touch` control, wrapper variants on scratch paths only; record
+      which exec path (Go coreutils vs toybox) ran.
+- [ ] Record the first fixed tagged release (fetch-only; none as of
+      2026-11-05) before recommending any bump; re-verify the main
+      snapshot refs on filing day.
+- [ ] Device inventory of same-UID processes (host UI, engine, session
+      shells) so the blast radius comes from the ledger, not theory.
+- [ ] Standing rules: neutral title without any app name; links limited to
+      charmbracelet/crush pages and this repository; no secrets.
+
+- **Likely crush area:** the bash tool's allow/block lists + permission
+  service; release notes and permissions docs.
+- **PR-shaped artifact:** DOC — the discussion post; no upstream change
+  requested beyond the release/docs note.
+- **Marker:** DOC-only, verification watch. **Grade A** for every source
+  fact above (pinned refs, verified 2026-11-05); **D** for the on-device
+  kill/wrapper behaviors until measured; **C** for the second-factor
+  idea.

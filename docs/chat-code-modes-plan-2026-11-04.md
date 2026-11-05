@@ -41,6 +41,13 @@ on device), the shipped capability state in
 - Acceptance rows already partially proven by the import-folder drive:
   multi-file edit (MODE-07 pre-context: `notes.md`+`todo.md` wrote two real
   files), ASK approval (MODE-06 measured 2026-10-29), SAF import (MODE-10).
+  MODE-06 folded forward 2026-11-05: half A (Code tools alive) measured in
+  the S5 drive; the S6 ask-per-shell premise dissolved — the no-card runs
+  are the engine's v0.99.0 SAFE-READ-ONLY prefix bypass above the permission
+  service (resolved in upstream source, see
+  [`s6-ask-shell-recon-2026-11-05.md`](s6-ask-shell-recon-2026-11-05.md) §8),
+  so half B's card probe was renamed to the non-safe command `mkdir`
+  (drive PENDING for the next device session).
   Remaining Code-mode gaps are the changes rail on external files and a true
   Review/revert surface.
 
@@ -188,11 +195,17 @@ catalogue, key storage and pricing drawer obviously do not fork per mode.
 | S1b | **Imported-folder config trust probe + policy** — PROBED 2026-11-05: the pinned engine EXECUTES project-root `crushrc` as bash on every workspace attach (twice per cycle, app's full UID, no consent gate); `.crush.json`/`.crush/crush.json` did not execute in the paths probed. S3/S4 must add the import-time trust/quarantine gate (F04/A05) | sentinel drive: imported folder with sentinel hook performs NO execution before a visible trust decision |
 | S2 | **Product decisions** — RESOLVED 2026-11-04 (Q1-Q4 answered, see §5) | decisions-open.md item 10 + plan §5 |
 | S3 | Mode model — BUILT 2026-11-05: `EngineBinding { Legacy, ChatPool, Project }` (mode = binding semantic, derived from the instance pool; see the S3 implementation note in Sequencing), dedicated chat-pool engine (`filesDir/crush-chat`), spawn-time `injectChatToolPolicy` (S1-mechanism, injector idempotency + malformed-file safety tested), chat-yolo lock. Verification rides the S4 drive (pool reachable only through S4's picker) | 6 new injector tests + gate |
-| S4 | UI: New-chat mode choice, sheet sections, header badge; enforcement wiring (auto-deny policy layer with the proven ASK plumbing) | drive: MODE-01 injection attempt denied (deny-all holds, binary-verified config); self-test on import + legacy switch — MEASURED 2026-11-05. MODE-06 split honest: Code tools alive MEASURED; the ASK gate is engine-policy-scoped (asks for writes, auto-allows shell) — see capabilities.md S5 drive + S6-residual |
+| S4 | UI: New-chat mode choice, sheet sections, header badge; enforcement wiring (auto-deny policy layer with the proven ASK plumbing) | drive: MODE-01 injection attempt denied (deny-all holds, binary-verified config); self-test on import + legacy switch — MEASURED 2026-11-05. MODE-06 split honest: Code tools alive MEASURED; the ASK gate is engine-policy-scoped (asks for writes, auto-allows shell) — RESOLVED 2026-11-05 in upstream source (not an app defect): no-card runs live inside the engine's designed SAFE-READ-ONLY prefix bypass above the permission service; S6 ask-per-shell config injection DISSOLVED (upstream knob is allow/deny only — see capabilities.md S5 drive + [`s6-ask-shell-recon-2026-11-05.md`](s6-ask-shell-recon-2026-11-05.md) §8); the card probe renamed to the non-safe command `mkdir` — drive PENDING for the next device session |
 | S5 | Acceptance run vs §21 matrix rows 01/06/07 + docs: capabilities.md, BASELINE, this plan updated to MEASURED | **MEASURED 2026-11-05** on `8eb0477`: A05 (consent gate — marker appears exactly on "Run it and open"), A11/A12 (DataStore token `proj:<full-uuid>` → `chat`; cold boot logged `restoring last binding: chat pool` then `[chat] supervise loop start`; badge + chat-pool session + chat model on restore), F04 dialog live with two-pass crushrc-as-config refinement; honest residuals recorded (shell not ask-gated by engine default; warm-rebind transcript staleness). Doc commit + pushed CI green stands from part 1 |
 
 Slices stay parallel-safe with the current backlog order: S0 is the existing
 top-of-queue defect; Termux L1 lands after P5 per the dependency graph.
+Sequencing aligned 2026-11-05: there is no S6 arming step to schedule
+(ask-per-shell injection dissolved, resolved in upstream source — recon §8);
+the wedge-fix vehicle is the Gate-7 registry batch
+([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)),
+IMPLEMENTED in phases — phase 1 engine-layer interlock + starting-watchdog
+(in flight this evening), phase 2 container registry + §3 reclaim (queued).
 
 ---
 
@@ -282,7 +295,9 @@ tabs/toggles/automation; session-mode as durable Room metadata.
 new slice S1b (F04 imported-config trust probe/policy); execution order
 S0 → S1+S1b → S3 → S4 → S5; the review's Gate 0–9 sequence maps onto our
 slices (G1≈S0, G2≈S1b, G3≈S1, G4≈S3, G5≈S4; G6 Code-Review surface and G7
-runtime-resource work are backlog post-v1; G8 ≈ P6 handoff; G9 ≈ Termux,
+runtime-resource work are backlog post-v1 (G7 adapted 2026-11-05: its
+registry batch is now the in-implementation wedge-fix vehicle — see the
+Sequencing note); G8 ≈ P6 handoff; G9 ≈ Termux,
 unchanged P7).
 
 **Backlog additions (recorded, not v1):** F06 managed runtime map with
@@ -292,13 +307,21 @@ F09 crash-atomic deletion journal; F10 snapshot-coverage honesty
 ("not measured" ≠ "no changes"); F11 fail-closed UDS transport; F12
 gradual RunCoordinator extraction out of the 2.8k-line ChatViewModel
 (shapes S3 without a rewrite). F05 storage strategy → decisions-open
-item 11.
+item 11. New 2026-11-05: wedge shape 2 delivery-loss (container-level) —
+phase 2 of the registry design; the supervisor starting-watchdog covers
+only shape 1 ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md) §3).
 
 **New acceptance rows adopted** (beyond the MODE matrix): A05 — no execution
 from imported config before an explicit trust decision — **MEASURED 2026-11-05,
 see capabilities.md S5 drive** (sentinel appears exactly on the consent tap;
 crushrc refined to engine-config channel, twice-per-attach load confirmed in
-the engine log). Still open: A07 duplicate/aliased import = one canonical row;
+the engine log). Still open: A06 — adopted 2026-11-05 as the renamed MODE-06
+completion probe (its ask-per-shell premise dissolved, resolved in upstream
+source, see [`s6-ask-shell-recon-2026-11-05.md`](s6-ask-shell-recon-2026-11-05.md)
+§8): the card-must-appear fixture is a NON-safe command — `mkdir` → card →
+deny → honest refusal — with `date`/`ls` the no-card safe-list control and
+banned `wget` the outright-refusal control; drive PENDING for the next
+device session. A07 duplicate/aliased import = one canonical row;
 A10 crash-during-removal reconciliation never touches user files; A13 snapshot
 coverage limits stated, never an unqualified "clean"; A14 missing socket fails
 closed with no TCP fallback or credential spill; A17 Chat→Code transfer shows

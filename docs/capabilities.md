@@ -298,6 +298,44 @@ spawn 2772 ms, project spawn 3952 ms — the 55–60 s residual did NOT
 reproduce while awake (it was a post-manual-stop overnight shape; the
 wall-vs-monotonic doze hypothesis stays the lead).
 
+**A06 acceptance drive — the renamed card fixture — MEASURED 2026-11-05
+evening (19:54–20:00 IST) on the recovered surface.** Prompt "Run mkdir
+probe7 with the bash tool" in the project pool (engine v0.99.0, ASK
+logged):
+- **The card fired for a NON-safe command, exactly as the source fixes
+  it:** app.log `permission requested: bash (id=9f7fe0fc);
+  pendingPermission SET for run…` at 19:54:50.719; the card rendered
+  "Allow this action? / bash / Execute command: mkdir probe7 && ls -ld
+  probe7" with the full folder path and the honest bounds footer.
+  DOUBLE-CONFIRMATION of the upstream reading: the model chained
+  `&& ls -ld probe7` onto its mkdir — `containsCommandChaining` catches
+  `&&`, so the safe-list shortcut was correctly DISABLED and the
+  permission service consulted (an unchained `mkdir` alone would also be
+  non-safe; the chain made the card's necessity visible on BOTH
+  mechanisms).
+- **Deny honored end-to-end:** Deny → `prompt CLOSED (grant ok; …
+  cleared)` 19:59:15 → `file changes: +0 -0 across 0 file(s), 0
+  unreadable` — NOTHING executed; folder listing unchanged after.
+- **Honest residual (minor, UX):** the denied turn ended with the app's
+  failure banner "This reply failed — no reply received / Retry" instead
+  of a model-narrated refusal (the run's final response produced no text
+  after the denied tool call). Security-neutral (the banner is honest;
+  nothing ran); candidate micro-fix: a canned "You denied this action"
+  note when a denied tool call ends a turn with no final text.
+- **Allow path (user-driven, second identical probe at 20:00:11):** the
+  re-sent prompt raised the SAME card (id=456e6d09), closed 2.3 s later
+  via Allow, execution proceeded, final text confirmed "probe7 created."
+  — the card is the arbiter in both directions.
+- probe7 was cleaned from the folder afterwards (listing verified back
+  to notes.md + todo.md only).
+- Honest open observation: the header model slot read
+  `deepseek-v4.1-flash` on this surface although the 19:10 bootstrap had
+  pinned `model[large] = claude-haiku-5-5` (no process restart, no model
+  action between — same pid, same two children, only heartbeats).
+  UI-state read inconsistency only; the permission flow is
+  model-neutral; disambiguation folded into the registry/wedge
+  work, not blocking.
+
 ### Import-removal first-use defects — BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

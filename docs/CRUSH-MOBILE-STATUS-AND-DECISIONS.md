@@ -27,6 +27,8 @@ Last verified: HEAD `f5d24dc` (2026-11-05/06 night).
 | `3a3a233` | **S-02 CLOSED IN CODE — Gate-0's last blocker:** central ProjectTrustService (SHA-256 fingerprint consent, gate-before-bind on EVERY path incl. restoreLastBinding, Room v1→v2 additive trust columns, root-level F04 prompt behind an open lock gate, row-tombstone-is-consent-clear) + 13 verdict/roundtrip tests | ✅ completed-success; **A03 device drive PASSED same day** (capabilities §Gate-0 closures) |
 | (this docs row) | **GATE 0 DEVICE-CLOSED** fold: A03 restore-trust drive measured (blocked-restore pair, zero execution pre-consent, marker-on-consent, `p536fa26e` rebind); + the incremental-dex launch-crash saga with its operational rule (clean-rebuild first) | — |
 | (docs row 2, same day) | **E6/E5 device stress drive measured:** E6 PASS across 5 switches A<->B (stop-on-switch chains, fresh children 3141->3951->4912, children <=2 at every instant, per-instance socket rebuilds, zero stale retries/crashes, pid stable; two-row limitation: budget ceiling not exercisable) — **E5 NAV DEFECT measured+reproduced:** back ping-pongs Projects<->chat, exit impossible, code anchor `NavGraph.kt:64-66` (re-push stacking); engine-safe boot repeats only | — |
+| `f516d1f` (2026-11-06) | **E5 nav fix:** Projects.onOpenProject navigates(Chat) with `popUpTo(chat, inclusive)` — replaces the stack back to a single chat entry instead of re-pushing; device re-verified same session (D1-D8: back-from-chat exits on both paths, row-open binds + stop-on-switch intact) | ❌ completed-failure — the pre-hardening socket-identity flake (capabilities §E5-fix+flake row); the E5 code itself rides every later green run |
+| `526b3a6` (2026-11-07) | **S-04 socket-identity test hardened:** subscribe-before-attach (`CoroutineStart.UNDISPATCHED`) removes the publish-vs-subscribe window; budget 15s→30s (test pins identity+shape, not wall clock); no prod change — full diagnosis in capabilities; this is also the chain that gh-verifies E5 | ✅ completed-success (gh-verified 2026-11-07, run 42309481087, 3m45s) |
 
 **GATE 0 = CLOSED on both halves.** Code: `7ec34ed` (S-01), `3a3a233`
 (S-02), `f5d24dc` (S-04), wording-honesty in S-03's ledger row. Device:
@@ -34,9 +36,11 @@ A03 restore-trust drive PASSED 2026-11-06. Residuals ride the E6 stress
 pass: 4 JVM-only A03 variants (cancel / changed-crushrc / noConfig-flip
 / real-install migration), REST boot-window row, S-01 Failed-badge row.
 
-Branch state truth: HEAD/main/origin-main = this docs commit (parent
-`3a3a233`); `f5d24dc` and the pack-referenced `1d229de`/`00964da` stay
-reachable for the pack's SHA references.
+Branch state truth (2026-11-07): HEAD/main/origin-main = `526b3a6`
+(test hardening) ← `f516d1f` (E5 nav fix) ← `053ccb5` (Gate-1 fold,
+docs) ← code rows above. Pack-archaeology note (unchanged): `f5d24dc`
+and the pack-referenced `1d229de`/`00964da` stay reachable for the
+owner pack's SHA references.
 
 ## 2. Capability ledger
 
@@ -71,11 +75,17 @@ Owner-pack references below are the pack/audit finding IDs
   consent gate lives only in the interactive `ProjectsScreen.kt:337-361`
   path. A cold restore onto an imported folder carrying a project-root
   crushrc executes it (S1b-measured bash, twice per attach) with NO
-  consent. Code-confirmed today (2026-11-05). **Fix queued next.**
-  Device acceptance: pack matrix row **A03 (restore-with-changed-crushrc)**
-  — sentinel crushrc dropped against the last-bound project while the app
+  consent. Code-confirmed today (2026-11-05). **FIXED IN CODE**
+  (`3a3a233`, Gate-0's last blocker): central ProjectTrustService
+  (SHA-256 fingerprint consent, gate-before-bind on EVERY path incl.
+  restoreLastBinding, Room v1→v2 additive trust columns, root-level F04
+  prompt behind an open lock gate, row-tombstone-is-consent-clear) +
+  13 verdict/roundtrip tests. Device acceptance: pack matrix row
+  **A03 (restore-with-changed-crushrc)** — sentinel crushrc dropped against the last-bound project while the app
   is dead; cold boot must show the SAME F04 dialog and execute NOTHING
-  before consent.
+  before consent. **A03 device drive PASSED 2026-11-06** (capabilities
+  §Gate-0 closures: blocked-restore pair, zero execution pre-consent,
+  marker-on-consent, `p536fa26e` rebind).
 - **S-03 — upstream safe-list waves `kill`/`killall` and wrapper args
   through without approval (v0.99.0).** Upstream candidate **4** in
   [`upstream-outreach-plan.md`](upstream-outreach-plan.md)
@@ -125,7 +135,7 @@ mirrored locally with their full reasoning in the plan doc
 | Gate | Content | STATUS (2026-11-05, at `1d229de`) |
 |---|---|---|
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **PARTIAL** — S-01 landed (`7ec34ed`) + S-04 landed (`f5d24dc`); **S-02 (restore trust) still OPEN, next batch** |
-| 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav DEFECT measured+reproduced on device** (ping-pong, exit impossible; `NavGraph.kt:64-66` anchor; engine-safe) — nav fix batch queued | partial |
+| 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | QUEUED |
 | 3 | Frontend v2 | **BLOCKED per pack until Gates 0+1 land** |
 | 4 | handoff (Chat→Code P6-style seam) | QUEUED |

@@ -539,6 +539,74 @@ root behavior: finish the task), plus the optional
 wasteful-reboot-on-nav-restore dedup. Upstream filing: none (in-app ux,
 no upstream overlap).
 
+### E5 nav fix SHIPPED + device-verified; S-04 flake diagnosed & hardened (2026-11-07)
+
+**E5 back-nav fix: `f516d1f` (parent `053ccb5`) - gh-verified via CI green
+through `526b3a6`.** The fix replaces the measured stacking behavior:
+`onOpenProject` navigates to Chat with `popUpTo(Chat) { inclusive }` +
+`launchSingleTop` - the stack is REPLACED back to a single chat entry
+instead of pushing a new chat entry on top of Projects. Fresh-entry
+rebootstrap semantics unchanged (each row open still re-binds that row's
+engine, same per-hop shape the E6 drive measured). Device re-verification
+after reinstall with data kept (one lock-gate unlock):
+- D1/D2 drawer -> Projects -> back -> chat: clean cycles intact.
+- D3 back from the chat root EXITS the task (launcher focus; this was
+  the infinite ping-pong before).
+- D5 Test-row open: fresh project child `29947`, 2 children, per-project
+  socket rebuild (`crush-p536fa26e.sock`), history restored from the
+  project session.
+- D6 back from the project chat EXITS.
+- D7 Legacy-row open: full designed stop-on-switch chain for the project
+  child, children 2->1, socket identity back to `crush.sock`.
+- D8 back from the chat root again EXITS.
+Zero crash-buffer entries throughout; app left in the designed
+legacy-chat resting state. Out of scope: the optional dedup of the
+wasteful legacy re-boot on nav restore (measured before the fix; the
+new navigate shape still re-bootstraps by design) - stays an optional
+follow-up, not a defect.
+
+**S-04 socket-identity drain test: HARDENED for runner load (`526b3a6`);
+"random flake" was not accepted as an explanation until understood.**
+Measured on the two failures:
+- First CI failure in a 40-run history (39 green, same suite, same test,
+  2026-11-03..11-06), plus two repeats on the same day: the local full
+  gate (31m30s, 2-core Windows box mid-release-compile) and CI
+  `42280949224` (gate 3m09s, 2-vCPU hosted runner).
+- The CI per-test report pins the failure shape: test duration 15.026s
+  with the collector parked in `StateFlowImpl.collect` the whole window -
+  CONNECTED was never visible to it. A StateFlow cannot lose a published
+  value to a parked collector, so either CONNECTED never happened, or it
+  happened before the collector landed, the state moved away, and never
+  returned.
+- Ladder arithmetic: the honest-fail ladder's sleeps for six consecutive
+  failed attempts sum 250+500+1000+2000+4000+8000 = 15.75s - deeper than
+  the old 15s `withTimeout` in ONE failure run; the entire assertion
+  window can be consumed by a single sustained slow path although the
+  test's happy path is ~300ms.
+- A second named window: the collector used to subscribe AFTER
+  `ensureAttached` started the reader thread (~250ms to CONNECTED), so a
+  pre-subscription publish was possible; the read of the leaked value
+  relied on the state STAYING CONNECTED - true for the KEEP_OPEN stream
+  in the common case, but never a guarantee worth making load-bearing.
+- Hardening in `526b3a6`: (1) subscribe BEFORE attach - the collector is
+  created with `CoroutineStart.UNDISPATCHED` (body runs inline until its
+  first suspension) and only then does `ensureAttached` launch the
+  reader, making the publish-vs-subscribe interleaving irrelevant;
+  (2) budget 15s -> 30s - the test pins transport identity and honest
+  attempt shape, not wall clock; wrong-shape recovery still surfaces as
+  the timeout, never as a wrong pass. Both changes carry their rationale
+  in code comments.
+- No prod defect found (search was real, not ceremonial): the
+  `clientSource` probe has exactly one call site per attempt
+  (`CrushConnection.kt:212`), CONNECTED is set only after a successful
+  response, the ladder mirrors Crush's own client shape, and weeks of
+  device evidence (every measured bind 2.7-2.9s, no 15s-class stalls in
+  any drive) show no prod-side stall; prod also has no 15s deadline
+  wrapped around connection.
+- Verdict after hardening: isolation green (1m48s-2m11s), full local
+  gate GREEN, CI `42309481087` GREEN 3m45s (562 tests) - first CI pass
+  of this suite with the hardening, riding the E5-fix chain.
+
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

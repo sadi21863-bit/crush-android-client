@@ -456,7 +456,90 @@ dcba1093d3d1d41758f9170458190a903f5ef5837bc47c9c7d9e84599af3e147; the
 recorded fingerprint matches, so future binds of this folder stay
 unblocked (no further prompts from THIS sentinel).
 
-### Import-removal first-use defects — BOTH FIXED (2026-11-04)
+### Gate-1 device stress drive — E6 warm-switch + E5 back-nav, 2026-11-06 evening (device `bbf8ca69`, clean-rebuilt `app-debug`, same session's app pid `3053` throughout)
+
+**E6 warm-switch stress: PASS (within the two-row limitation below).**
+Rows available on the Projects surface: exactly two - `Legacy workspace`
+(shared pool) and `Test project folder` (own instance `p536fa26e`), so
+A<->B was exercised across 5 measured switches (A->B, B->A, A->B, B->A,
+A->B; screenshot-verified anchors, `e6-03`..`e6-07`).
+
+Per-hop, all designed behaviors held:
+1. **Stop-on-switch**: every A->B hop logged the full designed chain -
+   `I/Lifecycle: stopping project engine for instance 'p536fa26e' (no
+   run in flight)` -> `EngineSupervisor stop() requested` ->
+   `EngineProxy: bridge stop` -> `CrushConnection: connection stopped` -
+   and the child process actually vanished (ps: 2 -> 1 children).
+2. **Fresh-subscribe recovery**: every B->A hop spawned a NEW child
+   (pids 3141 -> 3951 -> 4912) for the SAME instance key, re-Running in
+   2.7-2.9 s, and the project chat restored its OWN history (the full
+   GitHub-trending transcript) on the fresh bind.
+3. **Child budget**: counts alternated 2 <-> 1 exactly as designed;
+   never >2; app pid 3053 stable all drive; zero crash-buffer entries.
+4. **Per-instance transports are honest**: legacy binds use
+   `crush.sock`, project binds `crush-p536fa26e.sock`; each bind logs
+   `event transport identity change -> ...; rebuilding connection` and
+   rebuilds the long-lived stream rather than reusing a dead one
+   (boot-window healing observed live, consistent with the S-04 row
+   above). Lens: `ensureAgentReady` + `resuming session` meshes per hop.
+5. **No stale retries, no reclaim warnings** anywhere in app.log across
+   the whole switching storm.
+
+Limitation recorded: with only one non-legacy project row, the
+registry's 2-non-legacy-children budget ceiling is NOT exercisable on
+device (JVM-covered only). Needs a second imported project row in a
+future drive.
+
+**E5 back-nav: DEFECT MEASURED AND REPRODUCED (engine-safe, nav-broken).**
+Repro sequence: drawer -> Projects -> back (returns to chat, twice
+clean) -> back again from chat. From there the system back key does NOT
+exit the app - it ping-pongs deterministically between the Projects
+surface and the chat surface; 5+ consecutive back presses, all
+re-surfacing alternates, zero exits (measured `b2`/`b3`/`b4`/`b5`
+screenshots inside one tight command, plus the initial exit-leg probe).
+Android-level back stack stayed `sz=1` single-Activity throughout ->
+app-internal Compose nav state, not platform stacking; no
+`enableOnBackInvokedCallback` in the manifest (classic onBackPressed
+path).
+
+Code anchor: `ui/navigation/NavGraph.kt:64-66` - Projects' `onOpenProject`
+calls `navController.navigate(Screen.Chat.route) { launchSingleTop = true
+}`, which from stack `[chat, Projects]` PUSHES a new chat entry
+(`[chat, Projects, chat]`) instead of popping back to the existing chat -
+each row tap stacks one more Projects-underneath layer, so backs keep
+finding another alternate surface. Remaining mechanism gap: the
+bare-root `[chat]` -> Projects reversal is not yet pinned (no
+restoreState/saveState machinery exists; candidates: MIUI back-key
+delivery framing or an unpinned NavHost pop-back behavior) - to be
+closed in the fix batch.
+
+Engine interplay during the ping-pong (all SAFE): every chat
+re-exposure re-bootstraps ONLY the last-bound legacy instance - log
+shows `bindEngine Running`, `ensureAgentReady` (claude-haiku-5-5),
+`resuming session 52095506 (0 msgs)`, connection rebuilt on
+`crush.sock`; NO project child spawn, child count stable at 1, no
+retries - a wasteful re-boot on nav restore (side-effect repetition),
+not a registry/reclaim defect.
+
+Boot-window cosmetics that self-heal (screenshot pair `b2` vs `b4`):
+the back-exposed chat first shows retained composition from the
+PREVIOUS binding - title "GitHub Trending" + the project transcript
+with a `connecting to agent` badge and the model slot momentarily at
+the probed default (`claude-haiku-5-5`) - then swaps to the real
+legacy state (`ready`, empty transcript, correct title) when the boot
+completes ~5 s. Honest mid-boot display; separate cosmetic note: the
+slot shows the session-synced model only after full boot, so the
+pre-sync default reading is expected, not the model-slot anomaly
+(which is RESOLVED; see the A03 section).
+
+Queued from this drive (code batches, no docs-only impact): E5 nav fix
+(`onOpenProject` should popBackStack to the existing chat entry and
+re-bind in place instead of re-pushing; also decide back-from-chat-at-
+root behavior: finish the task), plus the optional
+wasteful-reboot-on-nav-restore dedup. Upstream filing: none (in-app ux,
+no upstream overlap).
+
+### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**
 

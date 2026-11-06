@@ -26,6 +26,7 @@ Last verified: HEAD `f5d24dc` (2026-11-05/06 night).
 | `f5d24dc` | **S-04 CLOSED IN CODE:** REST transport fail-closed (per-call resolution, no plain-TCP fallback, honest boot-window wording) | ✅ completed-success |
 | `3a3a233` | **S-02 CLOSED IN CODE — Gate-0's last blocker:** central ProjectTrustService (SHA-256 fingerprint consent, gate-before-bind on EVERY path incl. restoreLastBinding, Room v1→v2 additive trust columns, root-level F04 prompt behind an open lock gate, row-tombstone-is-consent-clear) + 13 verdict/roundtrip tests | ✅ completed-success; **A03 device drive PASSED same day** (capabilities §Gate-0 closures) |
 | (this docs row) | **GATE 0 DEVICE-CLOSED** fold: A03 restore-trust drive measured (blocked-restore pair, zero execution pre-consent, marker-on-consent, `p536fa26e` rebind); + the incremental-dex launch-crash saga with its operational rule (clean-rebuild first) | — |
+| (docs row 2, same day) | **E6/E5 device stress drive measured:** E6 PASS across 5 switches A<->B (stop-on-switch chains, fresh children 3141->3951->4912, children <=2 at every instant, per-instance socket rebuilds, zero stale retries/crashes, pid stable; two-row limitation: budget ceiling not exercisable) — **E5 NAV DEFECT measured+reproduced:** back ping-pongs Projects<->chat, exit impossible, code anchor `NavGraph.kt:64-66` (re-push stacking); engine-safe boot repeats only | — |
 
 **GATE 0 = CLOSED on both halves.** Code: `7ec34ed` (S-01), `3a3a233`
 (S-02), `f5d24dc` (S-04), wording-honesty in S-03's ledger row. Device:
@@ -124,7 +125,7 @@ mirrored locally with their full reasoning in the plan doc
 | Gate | Content | STATUS (2026-11-05, at `1d229de`) |
 |---|---|---|
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **PARTIAL** — S-01 landed (`7ec34ed`) + S-04 landed (`f5d24dc`); **S-02 (restore trust) still OPEN, next batch** |
-| 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E5/E6 QUEUED** (stale stacked entries/back nav; device stress drive) | partial |
+| 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav DEFECT measured+reproduced on device** (ping-pong, exit impossible; `NavGraph.kt:64-66` anchor; engine-safe) — nav fix batch queued | partial |
 | 2 | Code v1 (Review surface, revert, workspace polish) | QUEUED |
 | 3 | Frontend v2 | **BLOCKED per pack until Gates 0+1 land** |
 | 4 | handoff (Chat→Code P6-style seam) | QUEUED |

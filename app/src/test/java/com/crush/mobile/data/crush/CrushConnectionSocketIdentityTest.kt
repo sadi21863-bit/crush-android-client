@@ -1,6 +1,8 @@
 package com.crush.mobile.data.crush
 
 import com.google.gson.Gson
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -77,16 +79,46 @@ class CrushConnectionSocketIdentityTest {
             // later attempt: the engine respawned and bound the SAME path.
             clientSource = { if (attempts.incrementAndGet() == 1) null else plain }
         )
+        // Subscribe first, then start the reader: the ordering guarantee
+        // lives at the comment inside the runBlocking block below.
         server.enqueue(hangingStream())
-
-        connection.ensureAttached("ws-A", "client-1")
 
         // The first attempt must fail BEFORE reaching the server (no request
         // can exist for it), and the retry must pick up the now-present
         // socket and reach CONNECTED without any caller-side rebuild.
+        //
+        // Subscribe BEFORE attach (hardening 2026-11-07, after this suite's
+        // first CI failure in a 40-run history landed on 2026-11-06, with a
+        // same-day repeat on a different environment). The reader thread is
+        // started inside ensureAttached below and can reach CONNECTED in
+        // ~250ms, so a collector pieced together on the following lines raced
+        // the publisher. A StateFlow leaks a pre-subscription value to a
+        // later first{} only while the state STAYS connected - true for the
+        // KEEP_OPEN stream in the common case, but that stability must not
+        // be load-bearing for this assert. Subscribing first makes the
+        // interleaving irrelevant.
+        //
+        // Budget 30s (was 15s): the honest-fail ladder routes success through
+        // real wall time. Its sleeps for six consecutive failed attempts sum
+        // 250+500+1000+2000+4000+8000 = 15.75s, which is DEEPER than the old
+        // 15s horizon in one failure run, and both observed failures were
+        // full-suite runs on loaded runners (one 2-core, one 2-vCPU CI host)
+        // where the entire window was consumed inside a single sustained
+        // stall. This test pins transport identity and honest attempt shape,
+        // not a wall clock - the asserts below still pin the green path
+        // exactly (>=2 probes, exactly one server request), and a wrong-shape
+        // recovery surfaces as this timeout, not as a wrong pass.
         runBlocking {
-            withTimeout(15_000) {
-                connection.state.first { it == CrushConnection.State.CONNECTED }
+            withTimeout(30_000) {
+                // UNDISPATCHED runs the body inline on this thread until
+                // its first suspension, so the collector IS subscribed
+                // before ensureAttached runs below (a dispatching async
+                // would only queue the body and lose the ordering).
+                val connected = async(start = CoroutineStart.UNDISPATCHED) {
+                    connection.state.first { it == CrushConnection.State.CONNECTED }
+                }
+                connection.ensureAttached("ws-A", "client-1")
+                connected.await()
             }
         }
         assertTrue(

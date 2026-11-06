@@ -328,13 +328,16 @@ logged):
   — the card is the arbiter in both directions.
 - probe7 was cleaned from the folder afterwards (listing verified back
   to notes.md + todo.md only).
-- Honest open observation: the header model slot read
-  `deepseek-v4.1-flash` on this surface although the 19:10 bootstrap had
-  pinned `model[large] = claude-haiku-5-5` (no process restart, no model
-  action between — same pid, same two children, only heartbeats).
-  UI-state read inconsistency only; the permission flow is
-  model-neutral; disambiguation folded into the registry/wedge
-  work, not blocking.
+- RESOLVED BY OWNER CLARIFICATION (2026-11-06): the header model slot
+  reading `deepseek-v4.1-flash` was CORRECT, not a UI-state read
+  inconsistency - the owner switches the model to deepseek-v4.1-flash
+  deliberately and continuously to keep turns cheap (pinned `claude-haiku-5-5`
+  in the bootstrap was never the operative slot value after their switch;
+  the "no model action between" assumption was wrong because the switch
+  was owner-made outside any tracked app event). Engine-side effect
+  confirmed healthy: same pid honored the cheaper model mid-session with
+  no restart. No anomaly remains; disambiguation is removed from the
+  wedge/registry follow-up list (the denied-turn canned note stays).
 
 ### Owner-pack security gaps source-confirmed in code — 2026-11-05 evening (HEAD `1d229de`)
 
@@ -360,6 +363,11 @@ and verify the engine FAILS to start (never a tools-exposed spawn), with
 the deny list re-confirmed from inside (crush_info-style introspection)
 on the next healthy start.
 
+**FIXED IN CODE (7ec34ed, 2026-11-06):** typed verdict +
+verified-by-readback; Chat REFUSES to spawn on any failure shape with an
+honest `Failed(willRetry=true)` badge. Device row (Failed badge + a
+healthy reboot of the pool) queued for the shared device pass.
+
 **S-02 (pack P0-1) — last-binding restore bypasses the crushrc trust
 dialog.** `AppContainer.kt:334-359`: `restoreLastBinding()` resolves the
 saved project token and calls `applyBinding(EngineBinding.Project(ref))`
@@ -371,10 +379,9 @@ crushrc executes that file with NO trust decision (S1b-measured: bash,
 twice per attach, the app's full UID). Both restore entries share the
 gap: the container's init launch (`AppContainer.kt:367`) and the chat VM
 bootstrap call (`ChatViewModel.kt:835`). Pack-derived device acceptance
-(pack matrix row **A03, restore-with-changed-crushrc**): drop a sentinel
-crushrc against the last-bound project while the app is dead; cold boot
-must render the SAME F04 dialog and execute NOTHING before consent.
-Fix QUEUED NEXT (Gate-0), behind the S-01/S-04 batches.
+(crushrc removed since consent (re-verify folder state)'), the pack
+mapping row **A03, restore-with-changed-crushrc** is MEASURED — device
+acceptance below.
 
 **S-04 (pack P1-6; review lineage F11) — REST keeps the silent plain-TCP
 fallback.** `CrushApi.kt:101` (stream client, lines 86-103, which also
@@ -385,11 +392,69 @@ the plain `127.0.0.1` TCP client, i.e. the pre-2026-10-18 unisolated
 transport recorded in [p1-attack-surface.md](p1-attack-surface.md)
 §4/§8. The events path already fails closed (per-attempt supplier, no
 `?: plain` — `349bad3`); the REST construction path is the remaining
-leaf. Fix IN FLIGHT by another batch (A-28, REST TCP-fallback removal) —
-recorded here so no other drive re-marks it as open-unknown.
+leaf. FIXED IN CODE (f5d24dc, 2026-11-06): typed per-call
+`RestTransport` {Uds/Unavailable/TcpForTests}, construction guard against
+the bare shape, per-call resolution heals the boot window on the same
+instance. Device boot-window row queued (open the app after a cold boot;
+verify boot flows complete without plain-TCP fallback - the S-04 JVM
+tests cover the ladder).
 Pack-derived device acceptance: with the socket path configured and the
 socket file removed, REST attempts must fail closed with the honest
 scrubbed-path log and ZERO plain-TCP connects.
+
+### Gate-0 closures — S-02 device acceptance (A03 drive) 2026-11-06 morning (device `bbf8ca69`, sources in clean-rebuilt `app-debug`)
+
+**Context: the morning's launch crash was NOT this code.** The first
+post-commit install crashed before Application init with
+`ClassNotFoundException com.crush.mobile.CrushMobileApp`. Ruled out one
+by one, each with evidence: transfer corruption (installed APK MD5
+identical to local), class missing from the APK (found in its dex
+entries), device runtime (the Nov 3 `r8probe` release-rigored build
+launched fine DURING the same window - pid alive, window focused),
+main-package install state (fresh install dir after `install -r` still
+crashed), forced re-dexopt (`cmd package compile -m everything -f`
+printed Success but the package state stayed `quicken/unknown`). ROOT
+CAUSE: AGP 9's incremental debug dex pipeline, after session-long
+accumulation, emitted a dex set this device could load nothing from; a
+FULL clean rebuild (`:app:clean :app:assembleDebug`, all 38 tasks
+executed, 22m07s) re-emitted a loadable artifact and the identical
+source tree boots. Operational rule now standing: when a fresh install
+of this app CNFEs at Application instantiation on THIS device,
+clean-rebuild first; do not chase device state. Upstream filing
+candidate to be DRAFTED ONLY (generic incremental-dex repro shape, no
+app/device branding; awaits owner go like all filings).
+
+**A03 restore-trust drive** (sentinel crushrc planted while the app was
+dead; consent recorded by the user later the same morning):
+1. Cold boot: `I/Lifecycle: last-binding restore blocked: project
+   consent required (crushrc present, no consent recorded)` - the
+   token-resolved project was NOT bound; the legacy prewarm pool started
+   normally instead (S-01's fail-closed chat machinery untouched).
+2. ZERO execution while blocked: no `.crushrc-ran.marker` from planting
+   through the crash era to unlock - the folder stayed clean.
+3. Consent on the restore prompt ("Run it and open"): marker written at
+   the consent second (mtime + epoch content vs device clock delta 84 s),
+   and app.log shows `starting supervisor for instance 'p536fa26e'` +
+   `supervise loop start` + `Running` - the consent re-bound the project
+   engine exactly as designed.
+4. Post-consent surface: the project chat with its OWN restored history
+   (lists notes.md/todo.md + the fresh marker).
+5. No new residuals. NOTE (2026-11-06 owner clarification): the on-screen
+   model slot showing `deepseek-v4.1-flash` is the owner's deliberate
+   cost-saving model choice, working as designed - the once-recorded
+   "model-slot read anomaly" is fully resolved and must NOT be re-flagged.
+5b. Observation-only (no verdict yet): the project surface title reads
+   the stored session label ("GitHub Trending") rather than the folder
+   name; origin check queued, cosmetic either way.
+
+Device-unexercised variants (JVM-covered only, queued with the E6 stress
+pass): cancel-at-restore (legacy stays bound), changed-crushrc regate,
+noConfig-flip, and migration 1->2 on a real legacy install (JVM test
+covers it with a hand-built v1 DB). Sentinel fixture stays planted:
+crushrc 72 B, sha256
+dcba1093d3d1d41758f9170458190a903f5ef5837bc47c9c7d9e84599af3e147; the
+recorded fingerprint matches, so future binds of this folder stay
+unblocked (no further prompts from THIS sentinel).
 
 ### Import-removal first-use defects — BOTH FIXED (2026-11-04)
 

@@ -24,15 +24,18 @@ Last verified: HEAD `f5d24dc` (2026-11-05/06 night).
 | `d818a9c` | **Gate-7 phase 2 LANDED:** EngineInstanceRegistry (one runtime per key forever, never-evict, budget 2 non-legacy live children, lookup-or-noop stop) + ConnectionRegistry (owner-epoch supersession, defer-while-run-in-flight, revoke-if-own, reclaim predicate) + container/VM wiring + 28 pure tests | — |
 | `7ec34ed` | **S-01 CLOSED IN CODE:** chat tool-policy fail-closed (typed verdict + verified-by-readback; Chat refuses to spawn on any failure shape) | — |
 | `f5d24dc` | **S-04 CLOSED IN CODE:** REST transport fail-closed (per-call resolution, no plain-TCP fallback, honest boot-window wording) | ✅ completed-success |
-| `3a3a233` (now) | **S-02 CLOSED IN CODE — Gate-0's last blocker:** central ProjectTrustService (SHA-256 fingerprint consent, gate-before-bind on EVERY path incl. restoreLastBinding, Room v1→v2 additive trust columns, root-level F04 prompt behind an open lock gate, row-tombstone-is-consent-clear) + 13 verdict/roundtrip tests | local gate GREEN 8m43s, 562 tests; CI pending-at-write |
+| `3a3a233` | **S-02 CLOSED IN CODE — Gate-0's last blocker:** central ProjectTrustService (SHA-256 fingerprint consent, gate-before-bind on EVERY path incl. restoreLastBinding, Room v1→v2 additive trust columns, root-level F04 prompt behind an open lock gate, row-tombstone-is-consent-clear) + 13 verdict/roundtrip tests | ✅ completed-success; **A03 device drive PASSED same day** (capabilities §Gate-0 closures) |
+| (this docs row) | **GATE 0 DEVICE-CLOSED** fold: A03 restore-trust drive measured (blocked-restore pair, zero execution pre-consent, marker-on-consent, `p536fa26e` rebind); + the incremental-dex launch-crash saga with its operational rule (clean-rebuild first) | — |
 
-**GATE 0 = all four blockers closed in code** (`7ec34ed` S-01, `3a3a233` S-02,
-`f5d24dc` S-04, plus wording-honesty copy in S-03's ledger). What remains is
-the DEVICE half: the A03 restore-with-changed-crushrc drive and
-the E6 warm-switch stress, then Gate-0 is device-closed.
+**GATE 0 = CLOSED on both halves.** Code: `7ec34ed` (S-01), `3a3a233`
+(S-02), `f5d24dc` (S-04), wording-honesty in S-03's ledger row. Device:
+A03 restore-trust drive PASSED 2026-11-06. Residuals ride the E6 stress
+pass: 4 JVM-only A03 variants (cancel / changed-crushrc / noConfig-flip
+/ real-install migration), REST boot-window row, S-01 Failed-badge row.
 
-Branch state truth: HEAD/main/origin-main = `f5d24dc`; `1d229de` and the
-amend-sibling `00964da` are kept reachable for the pack's SHA references.
+Branch state truth: HEAD/main/origin-main = this docs commit (parent
+`3a3a233`); `f5d24dc` and the pack-referenced `1d229de`/`00964da` stay
+reachable for the pack's SHA references.
 
 ## 2. Capability ledger
 

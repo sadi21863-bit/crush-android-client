@@ -51,8 +51,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crush.mobile.CrushMobileApp
+import com.crush.mobile.data.project.PendingProjectTrust
 import com.crush.mobile.project.FolderUriDecoder
 import com.crush.mobile.project.ProjectRef
+import com.crush.mobile.ui.CrushrcTrustDialog
+import com.crush.mobile.ui.crushrcTrustNote
 
 /**
  * The Projects surface (P3 slices 1–3): the project registry's in-app
@@ -76,13 +79,17 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
     // confirmation.
     var pendingRemove by remember { mutableStateOf<ProjectRef?>(null) }
 
-    // S4/F04 (acceptance A05): an imported folder MAY carry a project-root
-    // `crushrc`, which the embedded engine EXECUTES AS BASH on every
-    // workspace attach (S1b measured: twice per cycle, with the app's full
-    // permissions). Import therefore implicitly includes arbitrary shell
-    // execution unless the user consents. The gate is DELIBERATE: show it at
-    // open, tell the user WHAT and WHY, and refuse to bind silently.
-    var pendingCrushrcTrust by remember { mutableStateOf<ProjectRef?>(null) }
+    // S4/F04 (acceptance A05) + S-02: an imported folder MAY carry a
+    // project-root `crushrc`, which the embedded engine EXECUTES AS BASH on
+    // every workspace attach (S1b measured: twice per cycle, with the app's
+    // full permissions). Import therefore implicitly includes arbitrary shell
+    // execution unless the user consents. The gate is DELIBERATE and CENTRAL
+    // (ProjectTrustService): the screen holds the row's pending DECISION -
+    // ref + shaped reason - while the service owns the verdicts; the
+    // cold-restore equivalent of this state lives on the container
+    // (`pendingProjectTrust`) but in the same dialog, so the wording can
+    // never fork between the two surfaces.
+    var pendingCrushrcTrust by remember { mutableStateOf<PendingProjectTrust?>(null) }
 
     // "Import folder as project" (user feature, 2026-11-04) - three launchers,
     // composed: the SAF folder picker, the storage-permission request that
@@ -249,24 +256,23 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
                         ProjectRow(
                             project,
                             onOpen = {
-                                when (project.repoDir.absolutePath) {
-                                    legacyPath -> container.setActiveProject(null)
-                                    else -> {
-                                        // F04 gate: no silent binding of a
-                                        // folder that ships executable config.
-                                        if (java.io.File(project.repoDir, "crushrc")
-                                                .isFile
-                                        ) {
-                                            pendingCrushrcTrust = project
-                                        } else {
-                                            container.setActiveProject(project)
-                                        }
+                                when {
+                                    project.repoDir.absolutePath == legacyPath -> {
+                                        container.setActiveProject(null)
+                                        onOpenProject()
                                     }
-                                }
-                                if (project.repoDir.absolutePath == legacyPath ||
-                                    !java.io.File(project.repoDir, "crushrc").isFile
-                                ) {
-                                    onOpenProject()
+                                    else ->
+                                        // S-02: the row tap goes through the
+                                        // central gate BEFORE anything binds.
+                                        // Allow binds + opens; Required parks
+                                        // the decision here for the dialog.
+                                        vm.requestOpenProject(
+                                            ref = project,
+                                            onAllowed = onOpenProject,
+                                            onTrustRequired = { pending ->
+                                                pendingCrushrcTrust = pending
+                                            },
+                                        )
                                 }
                             },
                             onRemove = if (removable) {
@@ -333,33 +339,19 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
     }
 
     // F04 trust gate: open a crushrc-bearing folder ONLY after an explicit,
-    // informed yes. Cancel = do not bind, no engine touched.
+    // informed yes. Cancel = do not bind, no engine touched. The dialog is
+    // the SHARED composable (`CrushrcTrustDialog`) so this surface and the
+    // root-level restore prompt show byte-identical security copy; the
+    // reason note is appended only for the re-approval shapes.
     pendingCrushrcTrust?.let { target ->
-        AlertDialog(
-            onDismissRequest = { pendingCrushrcTrust = null },
-            title = { Text("This folder carries a crushrc") },
-            text = {
-                Text(
-                    ("\"%s\" contains a project-root crushrc. The embedded " +
-                        "engine RUNS that file as a Bash script (twice per " +
-                        "attach) with this app's permissions, upstream, " +
-                        "without telling you. Opening this project will " +
-                        "run it.\n\n" +
-                        "If you did not write it, treat it as hostile code " +
-                        "and cancel.")
-                        .format(target.label)
-                )
+        CrushrcTrustDialog(
+            folderLabel = target.ref.label,
+            reasonNote = crushrcTrustNote(target.kind),
+            onConfirm = {
+                pendingCrushrcTrust = null
+                vm.grantTrustAndOpen(target.ref, onOpen = onOpenProject)
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    container.setActiveProject(target)
-                    pendingCrushrcTrust = null
-                    onOpenProject()
-                }) { Text("Run it and open") }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingCrushrcTrust = null }) { Text("Cancel") }
-            }
+            onDismiss = { pendingCrushrcTrust = null },
         )
     }
 }

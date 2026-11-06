@@ -25,10 +25,11 @@ class RoomProjectStore(
      * file and never competes with (or wipes) the app's real registry.
      */
     dbName: String = "projects.db",
-) : ProjectStore {
+) : ProjectStore, ProjectTrustSource {
 
     private val dao: ProjectDao =
         Room.databaseBuilder(context.applicationContext, ProjectDatabase::class.java, dbName)
+            .addMigrations(ProjectDatabase.MIGRATION_1_2)
             .build()
             .projectDao()
 
@@ -56,6 +57,13 @@ class RoomProjectStore(
      * USER DATA and never touched by a removal, period; an app-minted
      * internal repo is app-owned hidden data and is deleted together with
      * its row by the same caller that owns that lifecycle decision.
+     *
+     * S-02 invariants carried HERE, in the same statement: the row carries
+     * the crushrc trust record (S-02 columns, v1->v2), so deleting the row
+     * deletes the consent - there is no separate trust store to clear and
+     * no two-step ordering between row death and record death. Re-importing
+     * the same folder later mints a fresh row id that starts with NO record,
+     * which is exactly the fresh-consent contract.
      */
     suspend fun remove(id: UUID) {
         dao.deleteById(id.toString())
@@ -75,6 +83,28 @@ class RoomProjectStore(
     suspend fun migrateLegacyWorkspace(legacyDir: File): ProjectRef {
         val path = legacyDir.absolutePath
         return byPath(path) ?: create(label = "Legacy workspace", repoDir = legacyDir)
+    }
+
+    // ----------------------------------------------------------------
+    // ProjectTrustSource (S-02, 2026-11-05): the row-backed half.
+    // ----------------------------------------------------------------
+
+    /**
+     * Existence marker is [ProjectEntity.consentedAtMs]: a row never trusted
+     * has BOTH trust columns null and reads as null (no record); a trusted
+     * no-crushrc row has a stamp with a null fingerprint. A
+     * hypothetically-corrupt row (fingerprint but NO timestamp) also reads
+     * as null - fail-to-no-record, which re-gates, never fail-to-trusted.
+     */
+    override suspend fun trustRecordOf(id: UUID): ProjectTrustRecord? {
+        val row = dao.byId(id.toString()) ?: return null
+        val stamp = row.consentedAtMs ?: return null
+        return ProjectTrustRecord(fingerprint = row.trustFingerprint, consentedAtMs = stamp)
+    }
+
+    /** Single targeted row UPDATE; the columns are null to record no-crushrc trust. */
+    override suspend fun writeTrustRecord(id: UUID, fingerprint: String?, consentedAtMs: Long) {
+        dao.updateTrust(id.toString(), fingerprint, consentedAtMs)
     }
 
     private fun now(): Long = System.currentTimeMillis()

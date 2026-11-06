@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crush.mobile.di.AppContainer
+import com.crush.mobile.data.project.PendingProjectTrust
 import com.crush.mobile.data.project.RoomProjectStore
+import com.crush.mobile.data.project.TrustVerdict
 import com.crush.mobile.project.ProjectRef
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -151,6 +153,13 @@ class ProjectsViewModel(
      * dir (filesDir/crush-<key>) is deleted for both kinds: it is app-owned
      * engine bookkeeping whose key can never recur (row ids are UUIDs), and
      * it must not orphan after the last reference dies.
+     *
+     * S-02 (2026-11-05): the F04 consent state lives ON the project row
+     * itself (RoomProjectStore/ProjectTrustSource), so the tombstone below
+     * IS the trust-record clear - no separate step exists, and the guard
+     * order stays untouched by construction. A removed row's consent cannot
+     * resurrect: re-importing the same folder mints a fresh row id that
+     * starts with NO record, which is exactly the fresh-consent contract.
      */
     fun removeProject(ref: ProjectRef) {
         val legacyPath = File(appContext.filesDir, "workspace").absolutePath
@@ -184,6 +193,94 @@ class ProjectsViewModel(
             } catch (t: Throwable) {
                 _state.value = _state.value.copy(
                     error = t.message ?: "remove failed"
+                )
+            } finally {
+                _state.value = _state.value.copy(busy = false)
+            }
+        }
+    }
+
+    /**
+     * S-02 (2026-11-05): the row-open path through the CENTRAL gate. The
+     * screen calls this for every non-legacy row tap; the placement of the
+     * gate BEFORE any binding/callers-callback is the load-bearing bit (the
+     * restore-equivalent trap was binding first and asking never).
+     *
+     * - Allow → the verified state is re-recorded (noConfig marker for an
+     *   absent crushrc, matched fingerprint otherwise), ONLY THEN the bind,
+     *   then [onAllowed] opens chat.
+     * - Required → NOTHING binds; [onTrustRequired] hands the screen the
+     *   pending decision (ref + shaped reason) and the F04 dialog takes
+     *   over. Consent, when given, flows through [grantTrustAndOpen].
+     * - A trust-state read failure flows to s.error (same channel a failed
+     *   registry read uses) and binds nothing.
+     *
+     * The gate+record+open sequence rides the same busy flag the import and
+     * remove paths use (the reads went async with the gate; an overlapping
+     * double-tap must not fire two verdicts).
+     */
+    fun requestOpenProject(
+        ref: ProjectRef,
+        onAllowed: () -> Unit,
+        onTrustRequired: (PendingProjectTrust) -> Unit,
+    ) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true)
+            try {
+                val verdict = runCatching { container.projectTrust.gate(ref) }
+                    .getOrElse {
+                        _state.value = _state.value.copy(
+                            error = "trust check failed: ${it.message ?: "unreadable consent state"}"
+                        )
+                        return@launch
+                    }
+                when (verdict) {
+                    is TrustVerdict.Allow -> {
+                        runCatching { container.projectTrust.recordConsent(ref) }
+                            .getOrElse {
+                                _state.value = _state.value.copy(
+                                    error = "consent could not be recorded: " +
+                                        (it.message ?: "unknown store failure")
+                                )
+                                return@launch
+                            }
+                        // The screen has taken over (or consumed) this project's
+                        // pending restore prompt, if one existed; leaving it up
+                        // would double-ask the user for the same folder.
+                        container.clearPendingProjectTrust()
+                        container.setActiveProject(ref)
+                        onAllowed()
+                    }
+                    is TrustVerdict.Required -> {
+                        container.clearPendingProjectTrust()
+                        onTrustRequired(PendingProjectTrust(ref, verdict.kind))
+                    }
+                }
+            } finally {
+                _state.value = _state.value.copy(busy = false)
+            }
+        }
+    }
+
+    /**
+     * S-02 consent path from the F04 dialog ("Run it and open"): record
+     * consent for the CURRENT bytes (the service re-hashes at record time,
+     * so an approval can never be persisted for a stale fingerprint), bind,
+     * and only then open chat. A record failure is fail-closed: error in the
+     * screen channel, no bind, no navigation - the user retries with the
+     * dialog gone (the row re-gates at the next tap, nothing lost).
+     */
+    fun grantTrustAndOpen(ref: ProjectRef, onOpen: () -> Unit) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true)
+            try {
+                container.projectTrust.recordConsent(ref)
+                container.clearPendingProjectTrust()
+                container.setActiveProject(ref)
+                onOpen()
+            } catch (t: Throwable) {
+                _state.value = _state.value.copy(
+                    error = t.message ?: "consent could not be recorded"
                 )
             } finally {
                 _state.value = _state.value.copy(busy = false)

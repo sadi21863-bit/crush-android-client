@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
 import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.engine.EngineCompatibility
+import com.crush.mobile.ui.CrushrcTrustDialog
+import com.crush.mobile.ui.crushrcTrustNote
 import com.crush.mobile.ui.navigation.NavGraph
 import com.crush.mobile.ui.screens.lock.LockOverlay
 import com.crush.mobile.ui.AppLockPolicy
@@ -272,6 +274,35 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     container.notifyKeyAvailable()
                                 }
                             )
+                        }
+                        // S-02 (2026-11-05): the root-level host for a BLOCKED
+                        // last-binding restore. LockOverlay's hosting pattern
+                        // exactly - a process-scoped container state flow
+                        // rendered as an app-root dialog rather than a route,
+                        // because the prompt must surface over WHATEVER screen
+                        // a cold boot landed on and must never be lost to a
+                        // back-stack entry's lifetime. Rendered ONLY behind an
+                        // OPEN lock gate: an app that owes the user a
+                        // credential prompt must not also offer "run this
+                        // bash" above its own lock surface; the pending flow
+                        // is not one-shot (nothing is consumed by waiting), so
+                        // the request SURVIVES the locked window and renders
+                        // at unlock. Approve = the container's
+                        // approvePendingProjectTrust (consent recorded for the
+                        // current bytes, then the exact binding the restore
+                        // had wanted); Cancel keeps the legacy default bound -
+                        // the folder stays openable through the Projects gate
+                        // only.
+                        if (gateState.value == AppLockPolicy.Gate.OPEN) {
+                            val pendingTrust by container.pendingProjectTrust.collectAsState()
+                            pendingTrust?.let { pending ->
+                                CrushrcTrustDialog(
+                                    folderLabel = pending.ref.label,
+                                    reasonNote = crushrcTrustNote(pending.kind),
+                                    onConfirm = { container.approvePendingProjectTrust() },
+                                    onDismiss = { container.clearPendingProjectTrust() },
+                                )
+                            }
                         }
                     }
                 }

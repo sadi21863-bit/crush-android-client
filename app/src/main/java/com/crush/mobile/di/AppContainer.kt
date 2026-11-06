@@ -1,11 +1,15 @@
 package com.crush.mobile.di
 
 import android.content.Context
+import android.util.Log
 import com.crush.mobile.data.crush.WorkspaceManager
 import com.crush.mobile.data.local.KeySession
 import com.crush.mobile.data.local.LockState
 import com.crush.mobile.data.local.SettingsDataStore
+import com.crush.mobile.data.project.PendingProjectTrust
+import com.crush.mobile.data.project.ProjectTrustService
 import com.crush.mobile.data.project.RoomProjectStore
+import com.crush.mobile.data.project.TrustVerdict
 import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.TuningPolicy
@@ -76,6 +80,34 @@ class AppContainer(context: Context) {
      * the ADR's slice-2 work and deliberately NOT here yet.
      */
     val projectStore: RoomProjectStore by lazy { RoomProjectStore(appContext) }
+
+    /**
+     * S-02 (2026-11-05): THE pre-bind consent gate for project engine
+     * bindings. Every path that may reach `applyBinding(Project(..))` runs
+     * its gate first - today that is exactly the Projects row tap (via
+     * ProjectsViewModel.requestOpenProject) and [restoreLastBinding]; there
+     * are no deep links or external connectors (2026-11-05), and ANY future
+     * "open a project" entry point (intent handler, connector, restored
+     * documents) must route through [ProjectTrustService.gate] before it
+     * binds - the central trust policy, not a per-screen habit.
+     */
+    val projectTrust: ProjectTrustService by lazy {
+        ProjectTrustService(projectStore)
+    }
+
+    /**
+     * The pending consent decision a BLOCKED restore published. Hosted by
+     * the app root (MainActivity) the same way [LockState] is hosted: a
+     * process-scoped StateFlow at container level, because the prompt must
+     * outlive any screen it happens to appear over. Consumed by
+     * [approvePendingProjectTrust] (record + bind, exactly what the restore
+     * would have done had consent already stood) or
+     * [clearPendingProjectTrust] (the restore stays on the legacy default;
+     * the user can open the folder manually through the gate).
+     */
+    private val _pendingProjectTrust = MutableStateFlow<PendingProjectTrust?>(null)
+    val pendingProjectTrust: StateFlow<PendingProjectTrust?> =
+        _pendingProjectTrust.asStateFlow()
 
     val crushEngine: CrushEngine by lazy {
         CrushEngine(
@@ -263,7 +295,17 @@ class AppContainer(context: Context) {
         }
     }
 
-    /** Projects-surface entry point: null opens the legacy workspace. */
+    /**
+     * Projects-surface entry point: null opens the legacy workspace.
+     * S-02 CENTRAL TRUST NOTE (see [projectTrust]): reaching this with a
+     * non-null ref carries an OBLIGATION upstream - the caller must have
+     * run [projectTrust.gate] and either got an Allow verdict, or have
+     * recorded fresh consent for exactly what is about to be bound. Today's
+     * compliant callers: the Projects row tap
+     * (ProjectsViewModel.requestOpenProject / grantTrustAndOpen) and the
+     * restore prompt's approval. There are no deep links (2026-11-05); a
+     * future one MUST gate first too.
+     */
     fun setActiveProject(ref: com.crush.mobile.project.ProjectRef?) {
         applyBinding(
             if (ref == null) EngineBinding.Legacy else EngineBinding.Project(ref)
@@ -277,6 +319,47 @@ class AppContainer(context: Context) {
      * (see CrushEngine.start()).
      */
     fun setActiveChatPool() = applyBinding(EngineBinding.ChatPool)
+
+    /**
+     * The restore prompt's consent button (S-02): records consent for
+     * whatever bytes the folder carries RIGHT NOW and only then applies the
+     * same binding the restore had wanted - the exact contract the Projects
+     * row consent path follows ("Run it and open"). A record write that
+     * fails is fail-closed: the request stays pending, NOTHING binds, and
+     * the honest pair lands in both log sinks.
+     */
+    fun approvePendingProjectTrust() {
+        val pending = _pendingProjectTrust.value ?: return
+        containerScope.launch {
+            runCatching { projectTrust.recordConsent(pending.ref) }
+                .onSuccess {
+                    // The request is consumed so the dialog host stops
+                    // showing it in the same breath as the bind.
+                    _pendingProjectTrust.value = null
+                    applyBinding(EngineBinding.Project(pending.ref))
+                }
+                .onFailure {
+                    val why = it.message ?: it.javaClass.simpleName
+                    Log.w("Lifecycle", "consent record failed: $why")
+                    com.crush.mobile.util.AppLog.e(
+                        "Lifecycle", "consent record failed: $why", it
+                    )
+                }
+        }
+    }
+
+    /**
+     * Cancel (or any takeover) for a pending restore trust request: the
+     * restore stays on the legacy default and the user can open the folder
+     * manually through the Projects gate. Also used by the Projects surface
+     * when IT takes over a row's trust decision (supersedes the prompt) and
+     * when it records consent (the decision is consumed). Never a security
+     * boundary - it only removes a request; the gate still guards every
+     * open.
+     */
+    fun clearPendingProjectTrust() {
+        _pendingProjectTrust.value = null
+    }
 
     /**
      * A11/A12 (2026-11-05) binding tokens, persisted once per binding change
@@ -328,6 +411,17 @@ class AppContainer(context: Context) {
      *   state the process is already in, nothing to change.
      * - A project token whose row is gone (removed while the app was dead)
      *   logs honestly and stays on the legacy workspace.
+     * - S-02 (2026-11-05): a project token resolves through the crushrc
+     *   trust gate BEFORE any binding. Required → the restore is REFUSED
+     *   (the legacy default stays bound), the honest pair is logged, and a
+     *   [PendingProjectTrust] is published for the root-level F04 prompt;
+     *   the engine provably does not attach the folder until consent. Allow
+     *   → the state is re-recorded (a no-crushrc folder gets the noConfig
+     *   marker so a later-planted crushrc re-gates; a matched fingerprint
+     *   refreshes its stamp) and the restore proceeds exactly as it would
+     *   have pre-S-02. A trust-state READ failure is fail-closed too: legacy
+     *   stays bound and the pair is logged - never "trust check failed, bind
+     *   anyway".
      */
     private var bindingRestored = false
 
@@ -352,10 +446,53 @@ class AppContainer(context: Context) {
             )
             return
         }
-        com.crush.mobile.util.AppLog.i(
-            "Lifecycle", "restoring last binding: project '${ref.label}'"
-        )
-        applyBinding(EngineBinding.Project(ref))
+        // S-02: gate BEFORE any bind decision. `return` inside the getOrElse
+        // is the fail-closed corner (unreadable trust state = never bind).
+        val verdict = runCatching { projectTrust.gate(ref) }
+            .getOrElse { failure ->
+                val why = failure.message ?: failure.javaClass.simpleName
+                Log.w("Lifecycle", "last-binding restore blocked: trust state unreadable ($why)")
+                com.crush.mobile.util.AppLog.w(
+                    "Lifecycle", "last-binding restore blocked: trust state unreadable ($why)",
+                    failure
+                )
+                return
+            }
+        when (verdict) {
+            is TrustVerdict.Allow -> {
+                com.crush.mobile.util.AppLog.i(
+                    "Lifecycle", "restoring last binding: project '${ref.label}'"
+                )
+                // Record BEFORE bind, so the persisted state always says YES
+                // for exactly what is being bound: the noConfig marker for an
+                // absent crushrc, the matched fingerprint's refreshed stamp
+                // otherwise. recordConsent re-hashes the file itself, so the
+                // recorded state can never be a stale caller opinion.
+                val recorded = runCatching { projectTrust.recordConsent(ref) }
+                    .onFailure { failure ->
+                        val why = failure.message ?: failure.javaClass.simpleName
+                        Log.w("Lifecycle", "last-binding restore blocked: consent state unrecordable ($why)")
+                        com.crush.mobile.util.AppLog.w(
+                            "Lifecycle",
+                            "last-binding restore blocked: consent state unrecordable ($why)",
+                            failure
+                        )
+                    }
+                    .isSuccess
+                if (recorded) applyBinding(EngineBinding.Project(ref))
+            }
+            is TrustVerdict.Required -> {
+                // The honest pair (S5 instrumentation style): the same line
+                // into logcat AND app.log, reason shaped per the verdict.
+                val msg =
+                    "last-binding restore blocked: project consent required (${verdict.reason})"
+                Log.i("Lifecycle", msg)
+                com.crush.mobile.util.AppLog.i("Lifecycle", msg)
+                // Do NOT bind. The default legacy state stays exactly where
+                // it is; the root-level F04 prompt takes over the decision.
+                _pendingProjectTrust.value = PendingProjectTrust(ref, verdict.kind)
+            }
+        }
     }
 
     init {

@@ -170,7 +170,10 @@ fun ReviewRoute(onBack: () -> Unit) {
                         card = card,
                         runInFlight = runInFlight,
                         onRevert = { path -> pending = card to path },
-                        onExport = { path -> exportTarget = card.rootPath to path }
+                        onExport = { path ->
+                            exportTarget = card.rootPath to path
+                            exportLauncher.launch(path.substringAfterLast('/'))
+                        }
                     )
                 }
             }

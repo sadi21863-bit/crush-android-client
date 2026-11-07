@@ -781,6 +781,16 @@ __4\. __Provide Git status/branch surface and safe export, avoiding unsupported 
 - Phone user edits two files, reviews each hunk and exports/preserves the result\.
 - Unsafe tool calls require project\-scoped approval\.
 
+**Fold 2026\-11\-07 (device `bbf8ca69`): both proof rows closed.** One
+turn edited notes\.md and created scratch\.md (`+2 -0`); hunks reviewed
+on the Review screen; per\-file revert restored a byte\-identical
+pre\-turn file (`dcb75b2b…`); export proven byte\-exact
+(`831a410d…` parity) after the live\-found export no\-op was fixed in
+`bf5019a`; project\-scoped approval = engine permission cards, allowed
+live (`prompt CLOSED (grant ok)`). Details + refusal/refusal\-surface
+evidence: capabilities §"P4 Gate\-2". The numbered build scope beyond
+the proof rows keeps its original roadmap status\.
+
 Artifacts: Code experience UX, instrumentation, multi\-file demo
 
 ## P5  |  Crush Chat mode with hard tool boundary

@@ -607,6 +607,96 @@ Measured on the two failures:
   gate GREEN, CI `42309481087` GREEN 3m45s (562 tests) - first CI pass
   of this suite with the hardening, riding the E5-fix chain.
 
+### P4 Gate-2: Review/revert+export surface — DEVICE-PROVEN (2026-11-07; export no-op found live, fixed `bf5019a`)
+
+Both P4 proof rows closed on device `bbf8ca69` across two drives the same
+day ("phone user edits two files, reviews each hunk and exports/preserves
+the result" + "unsafe tool calls require project-scoped approval").
+
+**Batch chain, CI green each:** batch 1 `5f14dfc` (run `42320008115`)
+- the record surface: per-turn collector -> `ReviewHistory` runtime store
+  (MAX_CARDS=8), chat footer "N file changed +a -b" with per-file rows +
+  the "Review all turns" rail, review cards newest-first with hunks.
+  Batch 2 `c8dd154` (run `42344434695`, 3m34s) - per-file Revert (confirm
+  dialog; POST-TURN GUARD truth table 25 rows) + Export a copy SAF rows.
+  Fix `bf5019a` (run `42390123731`) - found and closed in drive A below.
+
+**Drive A (midday, session `4161054d` - "GitHub Trending Analysis", Test
+project folder):**
+- Multi-file turn: one prompt produced a notes.md modify AND a scratch.md
+  create in a single turn. Owner allowed the engine edit permission card
+  (12:02:57 `prompt CLOSED (grant ok; id=19790e4d)`); 12:03:10
+  `file changes: +2 -0 across 2 file(s), 0 unreadable`; footer "2 files
+  changed +2 -0". Review card "Turn at 12:01:22 · session 4161054d - Test
+  project folder · 2 file(s) +2 -0"; card time is turn START (the record
+  line lands at turn END). Hunks expanded on screen: scratch.md
+  `@@ 0,1 +1,1 @@` as a new file; notes.md `@@ 4,4 +4,4 @@` with context
+  and the added line.
+- Confirm-dialog copy captured: "Rewrites "notes.md" to the content it
+  had before the turn at 12:01:22. The revert refuses automatically if
+  the file changed after that turn ended."
+- REVERT BYTE-IDENTICAL on disk: notes.md post-turn
+  `49983f10…344952ce9` -> restored `dcb75b2b…afb99bff1f3` = the pre-turn
+  hash captured hours earlier; scratch.md untouched (`baacd8a2…`,
+  42 bytes) - per-path revert left the created file alone.
+- Refusal surface in UI: after the revert the row shows a "Reverted"
+  chip + the persisted note "Done: restored to its pre-turn content" and
+  the Revert button is GONE (on-device semantic of the already-reverted
+  guard; its full truth table stays unit-proven).
+- BUG FOUND LIVE: Export a copy was a SILENT NO-OP - the tap left the
+  screen unchanged, no DocumentsUI, no log (owner reported "the export
+  option doesn't work"). Cause: `onExport` recorded the pending target
+  but nothing ever called `exportLauncher.launch` - the batch-2 reply
+  contract shipped, the launch didn't. Fix `bf5019a`: record + launch in
+  the same callback, suggesting the bare filename (rel path's last
+  segment). Gate GREEN 32m3s (587 tests + both assembles + lintRelease),
+  CI green, reinstalled data-kept.
+
+**Runtime-only honesty demonstrated live:** mid-drive the app process
+restarted (~16:04). Disk truth survived (reverted notes.md + sentinel
+intact), but the Review store came back EMPTY - exactly what the screen
+copy says ("History clears when the app process ends"), so the drive
+re-ran a fresh one-file chain in the new process instead of restoring
+the old card. app.log record lines are per-process too: at fold time a
+grep returns only the current process's lines.
+
+**Drive B (evening, fresh process, same session) - multi-card + export
+parity:** record lines 23:14:43 and 23:16:45 `+0 -0 across 0 file(s)`
+(free-model flake turns ended empty: recorded, but NO CARDS - only
+turns with a diffable change enter the store), then `+1 -0` 23:17:03
+and `+1 -0` 23:18:18 (the append landed twice; the model itself flagged
+"the same line twice (lines 2 and 3)" and, on a one-word follow-up,
+removed the duplicate), then `+0 -1` 23:19:28. Review screen: THREE
+cards newest-first - 23:18:30 (+0 -1) with live "Revert this file"
+("restores what this turn measured"); 23:17:33 and 23:16:48 (+1 -0,
+"Older turn - read-only; only the latest completed turn is revertible").
+
+**EXPORT PARITY (`bf5019a` device-verified):** Review -> Export a copy
+on the newest card -> DocumentsUI PickActivity OPENED
+(`mCurrentFocus=…documentsui.picker.PickActivity`; pre-fix the same tap
+left MainActivity focused); filename PRE-FILLED "scratch.md" (the
+suggested name); Recent -> drawer -> Downloads; SAVE enabled -> wrote
+`/sdcard/Download/scratch.md`, 63 bytes. sha256 of source
+`/storage/emulated/0/Test project folder/scratch.md` =
+`831a410d66ec1804857b1855192ca8cbfb4067c0ff2399bfd851fb2ff540e423` ==
+the downloaded copy, byte for byte - a byte-exact copy AS-ON-DISK-NOW
+(source content: "scratch pad for the wall organizer build." +
+"export drive marker."). The screen then showed the outcome sentence
+"Exported a copy of scratch.md."; the app rode the SAF round-trip
+cleanly (`resume gate=OPEN … verified=true`, away=114s).
+
+Final disk truth after both drives: notes.md still the pre-turn
+restored bytes `dcb75b2b…`; sentinel `crushrc` = `dcba1093…f3e147` with
+`.crushrc-ran.marker` present through BOTH drives. Honest caps still
+standing: the pre-written gone-file sentence for a turn-deleted path
+("file is gone; nothing to export") is unit-proven, not device-fired;
+history is runtime-only by design (restart clears cards; the workspace
+files themselves persist, and revert/export act on them).
+
+Queued at owner direction this same night: the same save pattern for
+CHAT conversation output - code-block Copy + Save-as-file chips,
+app-side only so the Chat deny-all policy (S-01) stays untouched.
+
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

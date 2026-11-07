@@ -558,6 +558,15 @@ private fun Bubble(
                     }
                 }
             }
+            // Completed assistant text gets an always-visible actions row -
+            // copy the whole message, or save it as a .md via the SAF picker.
+            // App-side only (see ChatExport.kt): no tool fires, the engine
+            // never sees this, S-01's deny-all chat policy is untouched.
+            // Hidden while streaming (a save mid-draw is a partial artifact)
+            // and on failed rows (that card's affordance is Retry, not save).
+            if (!isUser && !m.isStreaming && m.error == null && m.text.isNotEmpty()) {
+                MessageActionsRow(m.text)
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ package com.crush.mobile.ui.screens.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,11 +15,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -35,8 +39,11 @@ import androidx.compose.ui.unit.sp
  * An unbounded fence from a runaway or adversarial reply is a layout storm:
  * text measurement grows with the line count and a long fence can pin the
  * streaming UI for seconds per frame. Far above anything a real reply needs.
+ *
+ * internal (not private): the chat-save tests pin the contract that copy and
+ * save-as-file operate on the FULL block, never this display trim.
  */
-private const val CODE_MAX_LINES = 200
+internal const val CODE_MAX_LINES = 200
 
 /**
  * Renders assistant text as Markdown.
@@ -129,6 +136,11 @@ fun MarkdownText(
 @Composable
 private fun CodeBlock(block: MdBlock.Code) {
     val bg = MaterialTheme.colorScheme.surfaceVariant
+    // Copy/save operate on the FULL emitted block (codeBlockContent); the
+    // `lines` below is display-only and may carry the truncation marker.
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val saver = rememberChatTextSaver()
     // take(CODE_MAX_LINES) trims the CONTENT; the appended marker says so,
     // because silently dropped code looks like the code simply ended.
     val lines = if (block.lines.size > CODE_MAX_LINES) {
@@ -142,15 +154,43 @@ private fun CodeBlock(block: MdBlock.Code) {
             .background(bg, RoundedCornerShape(8.dp))
             .padding(10.dp)
     ) {
-        block.lang?.let { lang ->
+        // One header row: the language label shares it with the Copy and
+        // Save-as-file chips, so a block announces what it is AND what you
+        // may do with it in a single row. Buttons, not gestures - the app's
+        // TextButton grammar (Review rows); the label eats leftover width
+        // with a 1-line ellipsis so a pathological fence tag from the model
+        // cannot inflate the row.
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                lang,
+                block.lang ?: "code",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
-            Spacer(Modifier.height(6.dp))
+            TextButton(
+                onClick = {
+                    copyToClipboard(
+                        clipboard, context,
+                        codeBlockContent(block), "Copied code block."
+                    )
+                },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("Copy", style = MaterialTheme.typography.labelSmall)
+            }
+            TextButton(
+                onClick = {
+                    saver(codeSaveName(block.lang), codeBlockContent(block))
+                },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("Save as file", style = MaterialTheme.typography.labelSmall)
+            }
         }
+        Spacer(Modifier.height(6.dp))
         // Horizontal scroll, not wrap: re-flowed code is not the code that was
         // written, and on a narrow phone wrap makes it unreadable.
         //

@@ -16,6 +16,14 @@ sealed class Screen(val route: String) {
     object Models : Screen("models")
     object Diagnostics : Screen("diagnostics")
     object Projects : Screen("projects")
+
+    /**
+     * P4 v1 (2026-11-07): every completed turn's measured changes with the
+     * per-file revert. Pushed PLAINLY on top of chat (no popUpTo): back must
+     * return to the bound conversation, and the underlying chat engine state
+     * must not be torn down by a review detour.
+     */
+    object Review : Screen("review")
 }
 
 @Composable
@@ -51,7 +59,17 @@ fun NavGraph(
             ChatScreen(
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onOpenProjects = { navController.navigate(Screen.Projects.route) },
+                onOpenReview = { navController.navigate(Screen.Review.route) },
                 isLocked = isLocked
+            )
+        }
+
+        // Reachable from the chat sheet (under Projects) and from the chat
+        // rail's "Review all turns" link. Reads the container-scoped history;
+        // holds no engine connection of its own (see ReviewRoute's doc).
+        composable(Screen.Review.route) {
+            com.crush.mobile.ui.screens.review.ReviewRoute(
+                onBack = { navController.popBackStack() }
             )
         }
 

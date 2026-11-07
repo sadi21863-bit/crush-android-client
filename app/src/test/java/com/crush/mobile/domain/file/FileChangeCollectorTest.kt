@@ -310,5 +310,47 @@ class FileChangeCollectorTest {
         assertTrue(caps.contents.values.all { it.length <= 64 })
     }
 
+    // ---- collectFull after-images (P4 v1 revert substrate) ------------------
+
+    @Test
+    fun `collectFull carries the after-images the diff was formed from`() {
+        write("a.kt", "line1\nline2\n")
+        val before = collector.captureBefore(root)
+        write("a.kt", "line1\nchanged\n")
+
+        val result = collector.collectFull(root, listOf("a.kt"), before)
+
+        assertEquals(listOf("a.kt"), result.changes.diffs.map { it.path })
+        assertEquals("line1\nchanged\n", result.afterTexts["a.kt"])
+    }
+
+    @Test
+    fun `a turn-deleted path carries a null after-image which still renders`() {
+        write("gone.kt", "bye\n")
+        val before = collector.captureBefore(root)
+        File(root, "gone.kt").delete()
+
+        val result = collector.collectFull(root, listOf("gone.kt"), before)
+
+        val diff = result.changes.diffs.single()
+        assertTrue(diff.deleted)
+        assertNull(result.afterTexts["gone.kt"])
+        assertEquals(result.changes.diffs.map { it.path }, result.afterTexts.keys.toList())
+    }
+
+    @Test
+    fun `an unchanged tracked file produces neither diff nor after-image`() {
+        // The engine can track a file it touched without changing it. The
+        // revert layer would have had an after-image for a path with no
+        // rendered diff - exactly the mismatch this pairing closed.
+        write("same.kt", "stable\n")
+        val before = collector.captureBefore(root)
+
+        val result = collector.collectFull(root, listOf("same.kt"), before)
+
+        assertTrue(result.changes.diffs.none { it.path == "same.kt" })
+        assertFalse(result.afterTexts.containsKey("same.kt"))
+    }
+
     private fun <T> assertTrue_(msg: String, cond: Boolean) = assertTrue(msg, cond)
 }

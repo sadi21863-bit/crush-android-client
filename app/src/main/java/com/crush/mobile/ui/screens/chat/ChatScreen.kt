@@ -53,7 +53,12 @@ import com.crush.mobile.engine.EngineState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(onOpenSettings: () -> Unit, onOpenProjects: () -> Unit, isLocked: Boolean = false) {
+fun ChatScreen(
+    onOpenSettings: () -> Unit,
+    onOpenProjects: () -> Unit,
+    onOpenReview: () -> Unit,
+    isLocked: Boolean = false
+) {
     val context = LocalContext.current
     val container: AppContainer = (context.applicationContext as CrushMobileApp).container
     val vm: ChatViewModel = viewModel(factory = ChatViewModel.Factory(context, container))
@@ -323,7 +328,13 @@ bottomBar = {
                     if (changes.fileCount > 0 || changes.unreadable.isNotEmpty() ||
                         changes.snapshotUnavailable
                     ) {
-                        item(key = "file-changes") { FileChangesPanel(changes) }
+                        // The rail shows the LATEST turn; every completed turn's
+                        // card (older turns included) and the per-file revert live
+                        // on the Review screen - the rail links to it, it does not
+                        // duplicate it.
+                        item(key = "file-changes") {
+                            FileChangesPanel(changes, onOpenReview = onOpenReview)
+                        }
                     }
                 }
             }
@@ -449,6 +460,7 @@ bottomBar = {
             onNew = { vm.startChatSession(); showSessions = false },
             onSettings = { showSessions = false; onOpenSettings() },
             onProjects = { showSessions = false; onOpenProjects() },
+            onReview = { showSessions = false; onOpenReview() },
             onDismiss = { showSessions = false }
         )
     }
@@ -681,7 +693,7 @@ private fun ToolActivityList(tools: List<ToolActivity>) {
  * dropped file is the same lie as a delete that reported success.
  */
 @Composable
-private fun FileChangesPanel(changes: FileChangeSet) {
+private fun FileChangesPanel(changes: FileChangeSet, onOpenReview: (() -> Unit)? = null) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -714,12 +726,24 @@ private fun FileChangesPanel(changes: FileChangeSet) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+
+        // P4 (2026-11-07): the rail is the latest turn's summary; the Review
+        // surface keeps EVERY completed turn of this process runtime with the
+        // per-file revert. Only linked when there is something to review: a
+        // link that lands on an empty history is a promise the app cannot keep.
+        if (onOpenReview != null && changes.fileCount > 0) {
+            TextButton(onClick = onOpenReview) {
+                Text("Review all turns")
+            }
+        }
     }
 }
 
+// internal: the Review surface (P4 v1) re-renders each diff with this exact
+// row, so "what you review" and "what you revert against" are the same bytes.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FileDiffRow(diff: FileDiff) {
+internal fun FileDiffRow(diff: FileDiff) {
     var expanded by remember(diff.path) { mutableStateOf(false) }
 
     Surface(
@@ -1024,6 +1048,7 @@ private fun SessionSheet(
     onNew: () -> Unit,
     onSettings: () -> Unit,
     onProjects: () -> Unit,
+    onReview: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val now = remember { System.currentTimeMillis() }
@@ -1090,6 +1115,18 @@ private fun SessionSheet(
                     Icon(Icons.Filled.FolderOpen, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Projects")
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Full-width third row: the Review surface (P4 v1). Same
+                // reasoning as Projects - a half-row with project-relative paths
+                // would truncate legibility, and this is the surface where a
+                // mis-tap ends up reverting a file, so the target stays big.
+                OutlinedButton(onClick = onReview, modifier = Modifier.weight(1f)) {
+                    Text("Review changes")
                 }
             }
             Spacer(Modifier.height(8.dp))

@@ -23,38 +23,68 @@ class FileChangeCollector(
         snapshotter.capture(root, previous)
 
     /**
+     * One turn's changes plus the after-images the diff was formed from.
+     *
+     * The Review surface needs the after-images to keep its revert guard
+     * honest ("the file must still read as the turn left it"), and building
+     * them by re-reading the files a second time would measure a different
+     * instant than the diff describes. Both come from ONE read, here.
+     */
+    data class CollectedChanges(
+        val changes: FileChangeSet,
+        /**
+         * Collect-time text per RENDERED diff path, as [readOrNull] saw it:
+         * non-null for a file that existed at collect time, null for a path
+         * the turn deleted. Entries exist only for rendered diffs.
+         */
+        val afterTexts: Map<String, String?>
+    )
+
+    fun collect(
+        workspace: File,
+        tracked: List<String>,
+        before: WorkspaceSnapshotter.Snapshot?
+    ): FileChangeSet = collectFull(workspace, tracked, before).changes
+
+    /**
      * @param workspace the app-private workspace root.
      * @param tracked    paths from the engine's filetracker, relative to
      * [workspace]. Absolute paths that already sit under the workspace are
      * reduced to their relative form; absolute paths from anywhere else are
      * rejected as undiffable (see [normalise]) rather than rendered.
      */
-    fun collect(
+    fun collectFull(
         workspace: File,
         tracked: List<String>,
         before: WorkspaceSnapshotter.Snapshot?
-    ): FileChangeSet {
+    ): CollectedChanges {
         if (before == null) {
             // No pre-turn snapshot means no before-image. Saying so is the honest
             // option: rendering one-sided diffs would blame the agent for changes
             // it never made, which is exactly the class of lie this feature was
             // written to stop.
-            return FileChangeSet(
-                sessionId = null,
-                diffs = emptyList(),
-                unreadable = emptyList(),
-                snapshotUnavailable = true,
-                capturedAtMs = System.currentTimeMillis()
+            return CollectedChanges(
+                FileChangeSet(
+                    sessionId = null,
+                    diffs = emptyList(),
+                    unreadable = emptyList(),
+                    snapshotUnavailable = true,
+                    capturedAtMs = System.currentTimeMillis()
+                ),
+                emptyMap()
             )
         }
 
-        val diffs = ArrayList<FileDiff>()
+        // Internal row so a diff and its after-image are kept or dropped
+        // TOGETHER: leaving an after-image for a diff that was filtered out
+        // would have handed the revert layer a path with no rendered diff -
+        // and a diff for no reason. Identical content (the engine tracked a
+        // file it touched without changing) is the shape that hits this.
+        data class Row(val diff: FileDiff, val after: String?)
+
+        val rows = ArrayList<Row>()
         val unreadable = ArrayList<String>()
 
-        // Normalise FIRST, then dedupe. Deduping the raw strings left "a.kt" and
-        // "./a.kt" as two entries, and the same file rendered twice - once as its
-        // real edit and once as an identical duplicate, which reads to a user as
-        // the agent having made the same change twice.
         // Normalise FIRST, then dedupe. Deduping the raw strings left "a.kt" and
         // "./a.kt" as two entries, and the same file rendered twice - once as its
         // real edit and once as an identical duplicate, which reads to a user as
@@ -95,7 +125,7 @@ class FileChangeCollector(
                     unreadable.add(rawPath)
                     continue
                 }
-                diffs.add(LineDiffer.diff(rel, beforeText, ""))
+                rows.add(Row(LineDiffer.diff(rel, beforeText, ""), null))
                 continue
             }
 
@@ -109,7 +139,7 @@ class FileChangeCollector(
                 if (after == null) {
                     unreadable.add(rawPath)
                 } else {
-                    diffs.add(LineDiffer.diff(rel, "", after))
+                    rows.add(Row(LineDiffer.diff(rel, "", after), after))
                 }
                 continue
             }
@@ -118,16 +148,20 @@ class FileChangeCollector(
             if (after == null) {
                 unreadable.add(rawPath)
             } else {
-                diffs.add(LineDiffer.diff(rel, beforeText, after))
+                rows.add(Row(LineDiffer.diff(rel, beforeText, after), after))
             }
         }
 
-        return FileChangeSet(
-            sessionId = null,
-            diffs = diffs.filter { it.hasChanges },
-            unreadable = unreadable,
-            snapshotUnavailable = false,
-            capturedAtMs = before.capturedAtMs
+        val kept = rows.filter { it.diff.hasChanges }
+        return CollectedChanges(
+            FileChangeSet(
+                sessionId = null,
+                diffs = kept.map { it.diff },
+                unreadable = unreadable,
+                snapshotUnavailable = false,
+                capturedAtMs = before.capturedAtMs
+            ),
+            kept.associate { it.diff.path to it.after }
         )
     }
 

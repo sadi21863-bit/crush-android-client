@@ -6,6 +6,7 @@ import com.crush.mobile.data.crush.WorkspaceManager
 import com.crush.mobile.data.local.KeySession
 import com.crush.mobile.data.local.LockState
 import com.crush.mobile.data.local.SettingsDataStore
+import com.crush.mobile.domain.file.ReviewHistory
 import com.crush.mobile.data.project.PendingProjectTrust
 import com.crush.mobile.data.project.ProjectTrustService
 import com.crush.mobile.data.project.RoomProjectStore
@@ -108,6 +109,18 @@ class AppContainer(context: Context) {
     private val _pendingProjectTrust = MutableStateFlow<PendingProjectTrust?>(null)
     val pendingProjectTrust: StateFlow<PendingProjectTrust?> =
         _pendingProjectTrust.asStateFlow()
+
+    /**
+     * P4 "Review" runtime store (2026-11-07): per-turn measured changes with
+     * per-file revert on the latest completed turn. Process-scoped like the
+     * lock state, because the Review screen must outlive the chat's
+     * back-stack entry it was reached from (every row open replaces that
+     * stack); process memory is also its honest CAP, which the screen says
+     * out loud. ChatViewModel is the only writer (beginTurn at send,
+     * recordTurn in the turn's finally); the Review screen only reads and
+     * reverts through [ReviewHistory]'s own gates.
+     */
+    val reviewHistory: ReviewHistory by lazy { ReviewHistory() }
 
     val crushEngine: CrushEngine by lazy {
         CrushEngine(

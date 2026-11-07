@@ -2268,6 +2268,12 @@ class ChatViewModel(
         // run's engine was bound to at start, not to whatever the Projects
         // surface has active when the turn ENDS.
         runFileRoot = workspaceRoot()
+        // Review history (P4 v1): mark the fly flag and retire every older
+        // card NOW, so the Review surface can refuse mid-run file surgery and
+        // only ever offers the latest completed turn. The flag falls in this
+        // turn's finally, after collectFileChanges saw the workspace settled.
+        turnStartedAtMs = System.currentTimeMillis()
+        container.reviewHistory.beginTurn()
         // Fresh id per turn, owned by the handle. ChatScreen keys its
         // LazyColumn by message id, and a constant sentinel produced
         // `IllegalArgumentException: Key "streaming" was already used` once
@@ -2562,6 +2568,11 @@ class ChatViewModel(
             // Runtime, not persisted: this is what the agent did on THIS turn, so a
             // new session starts empty rather than inheriting a stale diff.
             collectFileChanges()
+            // The Review surface's fly flag is honest about the whole turn:
+            // raised at send, lowered only now, after collect saw the
+            // workspace settle. Revert becomes available with the card in
+            // the same instant.
+            container.reviewHistory.runSettled()
             // The capture root belongs to THIS run alone; drop it so the next
             // send re-freezes against the instance it starts on.
             runFileRoot = null
@@ -2599,6 +2610,14 @@ class ChatViewModel(
     private var runFileRoot: File? = null
 
     /**
+     * When the CURRENT turn's prompt was sent - the Review card's label and
+     * the name of the window its revert covers. Owned by the same lifecycle
+     * as [runFileRoot]: set at streamSend entry, read at collect time.
+     */
+    @Volatile
+    private var turnStartedAtMs: Long = 0L
+
+    /**
      * Reads the engine's tracked-file list and diffs it against the pre-turn
      * snapshot.
      *
@@ -2623,17 +2642,36 @@ class ChatViewModel(
             return
         }
 
-        val set = runCatching {
+        val result = runCatching {
             val api = crushApi(port ?: return@runCatching null)
             val tracked = api.trackedFiles(ws, sid)
-            collector.collect(runFileRoot ?: workspaceRoot(), tracked, snap).copy(sessionId = sid)
+            collector.collectFull(runFileRoot ?: workspaceRoot(), tracked, snap)
         }.getOrNull()
 
+        // The rail keeps its semantics: null is "not measured", an empty set
+        // is "measured, nothing diffable".
+        val set = result?.changes?.copy(sessionId = sid)
         _state.update { it.copy(fileChanges = set) }
         if (set == null) {
             AppLog.w(TAG, "file-change collection failed; not reporting changes")
         } else {
             AppLog.i(TAG, "file changes: ${set.stat()}, ${set.unreadable.size} unreadable")
+        }
+
+        // Retain the turn for the Review surface (P4 v1). BEFORE re-reading
+        // would give the card images a second, later instant; both maps are
+        // keyed per rendered diff path and the card copies them now, ahead of
+        // the NEXT capture that replaces the workspaceSnapshot slot.
+        if (result != null && set != null) {
+            val root = runFileRoot ?: workspaceRoot()
+            container.reviewHistory.recordTurn(
+                sessionId = sid,
+                startedAtMs = turnStartedAtMs,
+                rootPath = root.absolutePath,
+                changes = set,
+                beforeTexts = result.changes.diffs.associate { it.path to snap.before(it.path) },
+                afterTexts = result.afterTexts
+            )
         }
     }
 

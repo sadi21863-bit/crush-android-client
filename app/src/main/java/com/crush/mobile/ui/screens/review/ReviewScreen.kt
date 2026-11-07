@@ -1,5 +1,7 @@
 package com.crush.mobile.ui.screens.review
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
@@ -8,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +37,10 @@ import com.crush.mobile.CrushMobileApp
 import com.crush.mobile.domain.file.RevertNote
 import com.crush.mobile.domain.file.TurnChanges
 import com.crush.mobile.ui.screens.chat.FileDiffRow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -69,6 +73,32 @@ fun ReviewRoute(onBack: () -> Unit) {
     // One pending revert at a time: the confirm dialog addresses one file of
     // one card, and Confirm/Cancel is the whole interaction.
     var pending by remember { mutableStateOf<Pair<TurnChanges, String>?>(null) }
+    // Export state (P4 proof loop): which file is awaiting the SAF picker, and
+    // the last export outcome as one transient sentence. Export is a READ
+    // operation on disk now - byte streams in and out verbatim; it belongs to
+    // the screen, not to the history store, whose notes are reserved for what
+    // the store itself did.
+    var exportTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var exportMessage by remember { mutableStateOf<String?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        val (rootPath, relPath) = exportTarget ?: return@rememberLauncherForActivityResult
+        exportTarget = null
+        if (uri == null) return@rememberLauncherForActivityResult // user cancelled
+        scope.launch(Dispatchers.IO) {
+            val message = runCatching {
+                val src = File(rootPath, relPath)
+                if (!src.isFile) return@runCatching "File is gone; nothing to export."
+                val out = context.contentResolver.openOutputStream(uri)
+                    ?: return@runCatching "Could not open the destination."
+                out.use { sink -> src.inputStream().use { source -> source.copyTo(sink) } }
+                "Exported a copy of ${relPath.substringAfterLast('/')}."
+            }.getOrElse { "Could not export: ${it.message ?: "I/O error"}" }
+            withContext(Dispatchers.Main) { exportMessage = message }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -106,6 +136,15 @@ fun ReviewRoute(onBack: () -> Unit) {
             )
         }
 
+        exportMessage?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+            )
+        }
+
         if (cards.isEmpty()) {
             Spacer(Modifier.height(32.dp))
             Text(
@@ -130,7 +169,8 @@ fun ReviewRoute(onBack: () -> Unit) {
                     TurnCard(
                         card = card,
                         runInFlight = runInFlight,
-                        onRevert = { path -> pending = card to path }
+                        onRevert = { path -> pending = card to path },
+                        onExport = { path -> exportTarget = card.rootPath to path }
                     )
                 }
             }
@@ -168,7 +208,8 @@ fun ReviewRoute(onBack: () -> Unit) {
 private fun TurnCard(
     card: TurnChanges,
     runInFlight: Boolean,
-    onRevert: (String) -> Unit
+    onRevert: (String) -> Unit,
+    onExport: (String) -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -229,6 +270,7 @@ private fun TurnCard(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                 FileDiffRow(diff)
                 RevertRow(card, diff.path, runInFlight, onRevert)
+                ExportRow(diff.path, onExport)
             }
         }
     }
@@ -278,6 +320,25 @@ private fun RevertRow(
             color = if (note?.ok == true) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/**
+ * Export a byte-exact copy of the file AS IT SITS ON DISK NOW (P4 proof:
+ * "reviews each hunk and exports/preserves the result"). Always enabled, even
+ * for a turn-deleted path - the launcher reply delivers the honest "file is
+ * gone; nothing to export" sentence instead of pre-filtering rows.
+ */
+@Composable
+private fun ExportRow(path: String, onExport: (String) -> Unit) {
+    TextButton(
+        onClick = { onExport(path) },
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+    ) {
+        Text(
+            "Export a copy",
+            style = MaterialTheme.typography.labelSmall
         )
     }
 }

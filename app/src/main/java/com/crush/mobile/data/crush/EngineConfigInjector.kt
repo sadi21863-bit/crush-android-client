@@ -420,24 +420,50 @@ object EngineConfigInjector {
     }
 
     /**
-     * Every built-in tool name this engine family documents plus the names
-     * the 2026-11-05 chat-pool drive caught the model actually exercising:
-     * with bash/edit/view hidden, the model fell back to a `question` TOOL
-     * CALL (ask-the-user) trying to get a deletion confirmed - question and
-     * todos and the lsp/diagnostic surfaces belong out of Chat too (they are
-     * tools, Q2 = zero tools; hiding unknown ids is inert, hiding a REAL one
-     * is the security gain). Not enumerated: MCP- and skill-derived names
-     * (user-configurable surfaces, absent from the built-in list) - the
+     * Every built-in tool name the pinned engine family documents, PLUS the
+     * names the 2026-11-05 chat-pool drive caught the model actually
+     * exercising: with bash/edit/view hidden, the model fell back to a
+     * `question` TOOL CALL (ask-the-user) trying to get a deletion
+     * confirmed - question and todos belong out of Chat too (they are
+     * tools, Q2 = zero tools). The engine filters `options.disabled_tools`
+     * by EXACT NAME (upstream `resolveAllowedTools` does a plain
+     * contains-match over `allToolNames()`; a literal "lsp_*" string hides
+     * NOTHING), so every catalogue id must be named here verbatim.
+     *
+     * 2026-11-08 CATALOGUE-PARITY PASS: the pinned v0.99.0 catalogue was
+     * enumerated from the shipped binary itself (strings over
+     * app/src/main/jniLibs/arm64-v8a/libcrush.so) and cross-checked against
+     * upstream `internal/config/config.go#allToolNames()`. The pass closed a
+     * 9-ID GAP the 2026-11-05-era list had:
+     * - lsp_symbols / lsp_definition / lsp_call_hierarchy : LSP reads
+     * - lsp_rename : workspace-wide symbol RENAME (LSP write)
+     * - lsp_replace_symbol : replace/insert/delete a WHOLE SYMBOL by name
+     *   (LSP write)
+     * - crush_info / crush_logs : engine self-introspection; the 2026-11-07
+     *   drive PROVED the model called crush_info in the chat pool and read
+     *   the deny state back through it ("crush_info shows bash in the
+     *   disabled tools list")
+     * - list_mcp_resources / read_mcp_resource : BUILT-IN surfaces for MCP
+     *   resources - the old note below claiming MCP names are "absent from
+     *   the built-in list" was WRONG and is superseded here.
+     * The two inert ids ("task", "diagnostics") stay: hiding an id the
+     * engine does not know is inert, and unknown ids cover forks. The
      * MODE-01 acceptance drive on the real engine is what proves a release.
      */
     val CHAT_DISABLED_TOOLS: List<String> = listOf(
-        "agent", "bash", "job_output", "job_kill", "download",
-        "edit", "multiedit", "lsp_diagnostics", "lsp_references", "lsp_restart",
+        "agent", "bash", "crush_info", "crush_logs", "job_output",
+        "job_kill", "download", "edit", "multiedit",
+        "lsp_call_hierarchy", "lsp_definition", "lsp_diagnostics",
+        "lsp_references", "lsp_rename", "lsp_replace_symbol", "lsp_restart",
+        "lsp_symbols",
         "fetch", "agentic_fetch", "glob", "grep", "ls", "sourcegraph",
         "write", "view",
         // 2026-11-05 chat-pool drive additions (seen exercised or named by
         // the model itself after the first-eight list):
-        "todos", "question", "task", "diagnostics"
+        "todos", "question", "task", "diagnostics",
+        // Built-in MCP-resource surfaces (2026-11-08 parity pass - upstream
+        // allToolNames lists them; previously missing).
+        "list_mcp_resources", "read_mcp_resource",
     )
 
     private fun ModelSpec.toJson(): JsonObject = JsonObject().apply {

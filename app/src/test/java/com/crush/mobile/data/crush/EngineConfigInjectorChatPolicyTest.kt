@@ -250,6 +250,38 @@ class EngineConfigInjectorChatPolicyTest {
         )
     }
 
+    // The FROZEN v0.99.0 built-in catalogue this build pins (2026-11-08
+    // parity pass): enumerated from upstream `internal/config/config.go`
+    // `allToolNames()` (v0.99.0 lineage) and independently confirmed by
+    // strings over the shipped app/src/main/jniLibs/arm64-v8a/libcrush.so.
+    // v0.100.0 GROWS this list (agent_dispatch/agent_send/agent_status/
+    // agent_stop) and changes permission semantics - see the ratchet test.
+    private val ENGINE_V0990_BUILTIN_TOOLS = listOf(
+        "agent", "bash", "crush_info", "crush_logs", "job_output", "job_kill",
+        "download", "edit", "multiedit", "lsp_call_hierarchy", "lsp_definition",
+        "lsp_diagnostics", "lsp_references", "lsp_rename", "lsp_replace_symbol",
+        "lsp_restart", "lsp_symbols", "fetch", "agentic_fetch", "glob", "grep",
+        "ls", "question", "sourcegraph", "todos", "view", "write",
+        "list_mcp_resources", "read_mcp_resource",
+    )
+
+    // RATCHET: when tools/fetch-crush.ps1 moves the engine to a newer
+    // version, FIRST re-diff that version's upstream allToolNames(), extend
+    // BOTH this frozen list and CHAT_DISABLED_TOOLS, THEN bump the version.
+    // This test fails whenever the Chat policy stops covering every id the
+    // pinned engine documents - the S-01 contract is catalogue parity, not
+    // "whatever the last drive happened to catch".
+    @Test
+    fun `the pinned v0990 upstream catalogue is fully denied`() {
+        val missing = ENGINE_V0990_BUILTIN_TOOLS
+            .filterNot(EngineConfigInjector.CHAT_DISABLED_TOOLS::contains)
+        assertTrue(
+            "CHAT_DISABLED_TOOLS is missing ids the pinned v0.99.0 engine " +
+                "documents: $missing",
+            missing.isEmpty()
+        )
+    }
+
     // (spec e) The readback verifier driven DIRECTLY over text - the seam that
     // is faked without a Context. The tamper shape is the pack-05 one: a
     // writer that strips ids out of the list.

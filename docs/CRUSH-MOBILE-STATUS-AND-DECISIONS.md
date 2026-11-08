@@ -36,6 +36,9 @@ surface, CI run 42403223894 green); only docs-only commits collect above it.
 | `fe9e7e8` (2026-11-08) | **Chat output save surface (owner-directed batch):** code-block header Copy + Save-as-file chips (FULL block saved, never the display trim; fence tag = untrusted model output, mapped/sanitized suggestion) + message-level Copy message / Save as Markdown; saver mirrors the device-proven Review export contract; rows hidden while streaming and on failed cards | ✅ completed-success (run 42403223894; device-proven same morning: message save `message-062916.md` 72 bytes byte-exact + toast, code save `code.py` 35 bytes `56cc99b7…` od-verified equal to the displayed block + toast, failed-card guard live; S-01 untouched) |
 | `71aecdb` (2026-11-08) | **Repo-wide current-state docs refresh sweep** (subagent-audited, 27 files: README/provider toolchain/decisions-open/ADR-0001 dated status block/project-analysis correction; evidence folds untouched) | ❌ completed-failure — the KNOWN socket-identity test flake again on a loaded 2-core runner (`CrushConnectionSocketIdentityTest`, same shape as the 526b3a6 chain); the SAME tree plus `a7e6d14` is green (run 42454530745); docs-only, no code content |
 | `a7e6d14` (2026-11-08) | **S-01 CATALOGUE PARITY** (external review confirmed via the shipped binary): deny list 22→**31 ids** (+lsp_rename/lsp_replace_symbol = LSP WRITES, lsp reads family, crush_info/crush_logs, built-in MCP-resource surfaces); exact-name filter semantics pinned; frozen-catalogue RATCHET test blocks outpaced upgrades (v0.100.0 additions named); device: instance config carries all 31 (run-as readback) + ZERO tool_call events across post-fix turns incl. the model's explicit crush_info/lsp_rename attempts — wall holds; **registered new defect: stale agent tool advertisement for long-lived sessions (upstream v0.99.0 agent toolset rebuild; benign under the execution wall; rides the engine-upgrade ladder)**; P5 reopening honored: acceptance runs on this artifact chain | ✅ completed-success (run 42454530745; local gate GREEN 28m12s) |
+| `110766b` (2026-11-08) | **S-02 HARDENING (Finding A)**: trust consent TOCTOU closed — `Allow` carries the gate-observed fingerprint; `confirmAtGate` records ONLY the observed on-disk state; FileAppeared/Changed/Removed-since-gate outcomes write nothing and re-gate (F04/restore wiring); `recordConsent` = the explicit-approval writer only; 7 interleaving tests incl. the two hostile windows | ✅ completed-success (run 42507584055; local gate GREEN 6m41s covering both hardening batches) |
+| `cfeae28` (2026-11-08) | **S-02/R4 HARDENING (Finding B)**: revert-vs-run race closed — one `opGate` Mutex across the entire revert (double-check + IO + card update); turn-record flips share the gate; `runSettled` under `NonCancellable`; `FileReverter.revert` opened clone-only for the tests' latch fake; latch-fake tests pin serialized double-revert honesty + beginTurn-waits-for-IO ordering | ✅ completed-success (run 42507584055) |
+| `f1dc8eb` (2026-11-08) | **P6 HANDOFF BUILD PLAN** (docs-only): file-level batches A-G (Room v3 `handoffs` table on the project-Dao anti-clobber pattern; package model prefill; consent-sheet entry slots named 1:1 to the owner's decision; dispatch via `newSession` + verify-first template gated on decision-4; stat-walk fingerprint; restart-safe trace beside `restoreLastBinding`, never modifying it) — the FIVE §7 owner decisions restated as the build's gate | ✅ completed-success (run 42497875073; docs-only) |
 
 **GATE 0 = CLOSED on both halves.** Code: `7ec34ed` (S-01), `3a3a233`
 (S-02), `f5d24dc` (S-04), wording-honesty in S-03's ledger row. Device:
@@ -43,9 +46,12 @@ A03 restore-trust drive PASSED 2026-11-06. Residuals ride the E6 stress
 pass: 4 JVM-only A03 variants (cancel / changed-crushrc / noConfig-flip
 / real-install migration), REST boot-window row, S-01 Failed-badge row.
 
-Branch state truth (2026-11-08 evening): HEAD/main/origin-main =
-`a7e6d14` (S-01 catalogue parity) ← `71aecdb` (docs refresh sweep;
-CI flake recorded) ← `f78f6c4` (chat save batch fold, docs) ← `fe9e7e8`
+Branch state truth (2026-11-08 evening, after the hardening batches):
+HEAD/main/origin-main = `cfeae28` (revert lock, Finding B) ← `110766b`
+(trust consent race, Finding A) ← `f1dc8eb` (P6 build plan, docs) ←
+`b4306d4` (S-01 parity fold, docs) ← `a7e6d14` (S-01 catalogue parity) ←
+`71aecdb` (docs refresh sweep; CI flake recorded→re-run green) ←
+`f78f6c4` (chat save batch fold, docs) ← `fe9e7e8`
 (chat output save surface) ← `8e0ab08` (P5/P6 prep + research, docs) ←
 `40a6be4` (Gate-2 evidence fold, docs) ← `bf5019a`
 (export launch fix) ← `c8dd154` (Gate-2 batch 2) ← `5f14dfc` (Gate-2

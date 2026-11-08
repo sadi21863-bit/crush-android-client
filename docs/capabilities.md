@@ -818,6 +818,73 @@ will require the ratchet test + a fresh-advertisement probe).
 This parity pass is the security-acceptance artifact the reopened P5
 fold cites.
 
+**P5 ACCEPTANCE FOLD - PROVEN 2026-11-08 (formal closure record):** the
+crush-plan P5 contract ("Crush Chat mode with hard tool boundary") is
+closed on all four numbered items and both proof rows, on the artifact
+chain of 2026-11-05 through 2026-11-08.
+
+Item 1 - MODE-SPECIFIC TOOL/CAPABILITY POLICY ENFORCED BELOW COMPOSE:
+`injectChatToolPolicy` writes `options.disabled_tools` into the chat
+pool's own config BEFORE spawn and VERIFIES by readback
+(EngineConfigInjector), `chatPolicyGate` FAILS CLOSED at
+`CrushEngine.start` - Chat never spawns as a tool-capable instance on
+any failure shape (S-01 `7ec34ed`; device-proven live, the MODE-01
+denial drive 2026-11-05: "run ls via bash" answered with the model's
+plain-language refusal - no ask card, nothing executed). 2026-11-08:
+the deny list grew 22 -> 31 ids by CATALOGUE PARITY (upstream
+`allToolNames()` + strings over the shipped libcrush.so; the WRITE-class
+lsp_rename/lsp_replace_symbol included; the frozen-catalogue RATCHET
+TEST now pins per-version coverage) and the device was re-proven on the
+new wall: the instance config on the device carries all 31 (run-as
+readback of `files/crush-chat/data/crush.json`), and across every
+post-fix turn the engine logged ZERO tool_call events while the model
+was ASKED to call crush_info and lsp_rename (its attempts produced
+nothing - "no code was executed in any verifiable sense"). Registered
+engine-side residual: the stale tool advertisement for long-lived
+agent sessions (upstream v0.99.0) - filed honestly, benign under the
+execution wall, rides the upgrade ladder.
+
+Item 2 - SEPARATE CHAT AND PROJECT-LINKED CODE SESSIONS IN NAVIGATION
+AND STORAGE: the dedicated chat-pool engine instance (`CHAT_INSTANCE_KEY
+= "chat"` - own state dir `filesDir/crush-chat`, own socket
+`crush-chat.sock`, its own session pool, NO project cwd) vs per-project
+engine children under the Gate-1 registry (budget 2 non-legacy,
+stop-on-switch, E6 stress PASSED); navigation honest (sheet
+"Chats - conversation only" vs project rows; E5 back-exit fix).
+
+Item 3 - SHARED KEYS/MODELS, SEPARATE GRANTS: provider keys + model
+slots are global (per-provider vault, ProviderSwitchPolicy), while tool
+grants live in each engine instance's own config - the separation is
+structural at the engine boundary, not a UI promise.
+
+Item 4 - REGRESSION-TEST CHAT PROMPT-INJECTION REQUESTS TO MODIFY
+ARBITRARY FILES: the deny-ALL policy means Chat has nothing to reach
+through; the two policy suites (EngineConfigInjectorChatPolicyTest +
+ChatPolicySpawnGateTest, extended tonight into the 603-test gate with
+the two hostile consent-window cases) pin the boundary; device probes
+proved live denial (the bash/fetch family earlier probes and tonight's
+crush_info/lsp_rename probes).
+
+Proof row (a) - Chat cannot execute shell or write source in the
+default mode: PROVEN (S1 + MODE-01 + tonight's zero-execution drives,
+under forced-ASK framing the global mode cannot weaken). Proof row (b)
+- Chat works when Termux is absent and no Code projects exist: PROVEN
+STRUCTURALLY (no Termux anywhere; the chat pool never touches the
+projects DB; every chat drive this week ran with zero Code sessions -
+tonight included).
+
+Artifacts: the chat screen, the policy layer (inject + readback + gate +
+ratchet), the security test tier - this fold completes the record the
+reopened P5 security acceptance was held for. **P5 IS CLOSED.**
+Residuals (explicitly NOT blockers, queue order preserved per
+decisions-open §10): (1) the engine-side stale tool advertisement
+defect (the v0.100.0 upgrade ladder will re-verify); (2) the
+fresh-session advertisement confirmation on device (pending free-model
+flake, non-security); (3) the "smart transfer" denial message pointing
+at Code mode (small polish batch); (4) a read-only Chat allowlist only
+after an engine probe proves strict read-only (deferred by the owner's
+standing decision).
+
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

@@ -1,15 +1,22 @@
 package com.crush.mobile.domain.file
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * The Review store's gates, as pure state behavior: no Compose, no
@@ -41,15 +48,16 @@ class ReviewHistoryTest {
     fun setUp() {
         root = tmp.newFolder("workspace").canonicalFile
         history = ReviewHistory()
-        history.clear()
+        runBlocking { history.clear() }
     }
 
     private fun record(
+        target: ReviewHistory = history,
         sessionId: String? = "sess-1",
         startedAtMs: Long = 500L,
         rootPath: String = root.absolutePath,
         changes: FileChangeSet = set
-    ): Long? = history.recordTurn(
+    ): Long? = target.recordTurn(
         sessionId = sessionId,
         startedAtMs = startedAtMs,
         rootPath = rootPath,
@@ -91,7 +99,7 @@ class ReviewHistoryTest {
     }
 
     @Test
-    fun `a new turn supersedes the previous card`() {
+    fun `a new turn supersedes the previous card`() = runBlocking {
         val first = record()
         history.runSettled()
         history.beginTurn()
@@ -216,5 +224,108 @@ class ReviewHistoryTest {
         assertTrue(
             (outcome as FileReverter.Outcome.Refused).reason.contains("no longer in the history")
         )
+    }
+
+    // ---- the operation gate: revert vs a beginning run ----------------------
+
+    @Test
+    fun `two concurrent reverts of one path stay serialized and honest`() = runBlocking {
+        File(root, "a.txt").writeText("before")
+        val events = CopyOnWriteArrayList<String>()
+        val gated = ReviewHistory(TracedReverter(events))
+        val id = record(gated)!!
+
+        val first = async(Dispatchers.IO) { gated.revert(id, "a.txt") }
+        val second = async(Dispatchers.IO) { gated.revert(id, "a.txt") }
+        val outcomes = listOf(first.await(), second.await())
+
+        // Serialized: no two file operations ever overlapped, and the loser
+        // got the same honest sentence a sequential second revert returns.
+        assertNoOverlappingIo(events)
+        assertEquals(1, outcomes.filterIsInstance<FileReverter.Outcome.Done>().size)
+        val refused = outcomes.filterIsInstance<FileReverter.Outcome.Refused>()
+        assertEquals(1, refused.size)
+        assertTrue(refused.single().reason.contains("already reverted"))
+
+        // Nothing corrupted: the file was restored once, the card holds one
+        // reverted mark (not doubled) and the loser's note, never two.
+        assertEquals("before", File(root, "a.txt").readText())
+        val card = gated.cards.value.first { it.id == id }
+        assertEquals(1, card.reverted.size)
+        assertTrue(card.reverted.contains("a.txt"))
+        assertEquals(1, card.notes.size)
+        assertEquals(refused.single().reason, card.notes["a.txt"]?.message)
+    }
+
+    @Test
+    fun `a record turn waits for a revert's file operation to finish`() = runBlocking {
+        File(root, "a.txt").writeText("before")
+        val events = CopyOnWriteArrayList<String>()
+        val release = CountDownLatch(1)
+        val gated = ReviewHistory(TracedReverter(events, release))
+        val id = record(gated)!!
+        gated.runSettled()
+
+        val revertOutcome = async(Dispatchers.IO) { gated.revert(id, "a.txt") }
+        awaitEvent(events, "io start")
+        // Finding B's race, at the store's own seam: with the revert's file
+        // work held open mid-flight, a new turn now tries to begin.
+        val beginTurn = async(Dispatchers.IO) { gated.beginTurn(); events.add("begin done") }
+        delay(200)
+        assertFalse("a run began over an in-flight revert", gated.runInFlight.value)
+
+        release.countDown()
+        val outcome = revertOutcome.await()
+        beginTurn.join()
+
+        assertTrue(outcome is FileReverter.Outcome.Done)
+        assertTrue("the landed turn raised the flag", gated.runInFlight.value)
+        assertTrue(
+            "the run began before the revert's IO was over",
+            events.indexOf("io end") < events.indexOf("begin done")
+        )
+        val card = gated.cards.value.first { it.id == id }
+        assertTrue("the revert's done note did not survive the turn", card.notes["a.txt"]?.ok == true)
+        assertTrue("the earlier turn was not superseded by the landed one", card.superseded)
+    }
+
+    /** Awaits (bounded) until the traced reverter announces a marker. */
+    private suspend fun awaitEvent(events: List<String>, marker: String) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (!events.contains(marker) && System.currentTimeMillis() < deadline) delay(10)
+        assertTrue("timed out waiting for \"$marker\"", events.contains(marker))
+    }
+
+    /** No two reverter file-operation windows may ever overlap. */
+    private fun assertNoOverlappingIo(events: List<String>) {
+        var depth = 0
+        for (marker in events) {
+            depth += if (marker == "io start") 1 else -1
+            assertTrue("revert file-operations overlapped: $events", depth in 0..1)
+        }
+        assertEquals("unbalanced io markers: $events", 0, depth)
+    }
+
+    /**
+     * A [FileReverter] that announces its file-operation window (and can hold
+     * it open) so the gate tests above can observe the store's serialization
+     * directly, thread-safely across the real IO pool.
+     */
+    private class TracedReverter(
+        private val events: MutableList<String>,
+        private val release: CountDownLatch = CountDownLatch(0)
+    ) : FileReverter() {
+        override fun revert(
+            root: File,
+            path: String,
+            beforeText: String?,
+            afterText: String?
+        ): FileReverter.Outcome {
+            events.add("io start")
+            release.await(5, TimeUnit.SECONDS)
+            val outcome = super.revert(root, path, beforeText, afterText)
+            events.add("io end")
+            return outcome
+        }
     }
 }

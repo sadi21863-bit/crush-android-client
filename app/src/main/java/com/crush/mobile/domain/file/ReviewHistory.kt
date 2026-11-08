@@ -1,10 +1,13 @@
 package com.crush.mobile.domain.file
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
@@ -39,6 +42,17 @@ import java.util.concurrent.atomic.AtomicLong
  * turn's finally). Both gates are enforced HERE so no caller can bypass them,
  * and the wording describes what actually happened rather than a generic
  * failure.
+ *
+ * THE OPERATION GATE
+ *
+ * Those flags guard WHO may ask, not WHEN the file surgery happens. A turn
+ * beginning while a revert's IO work is in flight could write over the
+ * reverter's read-compare-write mid-restore. One private mutex ([opGate])
+ * serializes the store's own record/revert seam: revert() holds it across
+ * its whole per-file operation (checks, file work, card update), and the
+ * fly-flag flips of [beginTurn]/[runSettled]/[clear] wait on the same gate
+ * for their short in-memory flips. Nothing here blocks an engine process;
+ * a run simply cannot RAISE its flag until no revert owns the moment.
  */
 class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
 
@@ -56,25 +70,43 @@ class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
     private val _runInFlight = MutableStateFlow(false)
     val runInFlight: StateFlow<Boolean> = _runInFlight.asStateFlow()
 
+    /**
+     * The record/revert seam's lock (class doc, THE OPERATION GATE): [revert]
+     * holds it across its whole operation; the fly-flag flips below wait on
+     * the same gate so no turn can begin its record over a revert's file work.
+     */
+    private val opGate = Mutex()
+
     private val nextId = AtomicLong(1)
 
     /**
      * A new turn was sent: the fly flag rises for the whole send/stream/collect
      * window, and every existing card goes read-only. Called by the ViewModel
      * where the capture root freezes; see [ChatViewModel.streamSend].
+     *
+     * The flip waits on [opGate], so a turn cannot begin its record while a
+     * revert's file operation is still in flight.
      */
-    fun beginTurn() {
-        _runInFlight.value = true
-        _cards.update { list -> list.map { if (it.superseded) it else it.copy(superseded = true) } }
+    suspend fun beginTurn() {
+        opGate.withLock {
+            _runInFlight.value = true
+            _cards.update { list -> list.map { if (it.superseded) it else it.copy(superseded = true) } }
+        }
     }
 
     /**
      * The turn is over in every sense (the ViewModel's streamSend finally calls
      * this AFTER collect, so a completed turn is revertible the moment its
      * own card exists).
+     *
+     * The flip is NonCancellable: a finally can run on an already-cancelled
+     * coroutine, and a stuck-up flag would strand the store's gates forever.
+     * It still waits on [opGate] for its brief flip.
      */
-    fun runSettled() {
-        _runInFlight.value = false
+    suspend fun runSettled() {
+        withContext(NonCancellable) {
+            opGate.withLock { _runInFlight.value = false }
+        }
     }
 
     /**
@@ -107,37 +139,45 @@ class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
         return card.id
     }
 
-    /** Clears the history (process death does this naturally; tests do it). */
-    fun clear() {
-        _cards.value = emptyList()
-        _runInFlight.value = false
+    /** Clears the history (process death does this naturally; tests do it).
+     *  The flip takes the same gate, so no in-flight revert is interrupted. */
+    suspend fun clear() {
+        opGate.withLock {
+            _cards.value = emptyList()
+            _runInFlight.value = false
+        }
     }
 
     /**
      * Reverts ONE path of ONE card to that turn's before-image, under both
      * refusal gates and the reverter's own changed-after-the-turn guard.
      *
+     * The WHOLE operation - the checks, the file work and the card update -
+     * holds [opGate] (class doc, THE OPERATION GATE): a turn's flag raise
+     * cannot happen until this body has left the gate, so no engine write of
+     * the next turn can race the reverter's read-compare-write.
+     *
      * The result is written back into the card as a note, so the UI shows the
      * concrete outcome (including a refusal's reason) even after recomposition,
      * instead of a transient snackbar the user's scroll loses.
      */
-    suspend fun revert(cardId: Long, path: String): FileReverter.Outcome {
+    suspend fun revert(cardId: Long, path: String): FileReverter.Outcome = opGate.withLock {
         val refusal = { reason: String ->
             note(cardId, path, FileReverter.Outcome.Refused(reason))
         }
         if (_runInFlight.value) {
-            return refusal("a turn is running; revert while the agent is idle")
+            return@withLock refusal("a turn is running; revert while the agent is idle")
         }
         val card = _cards.value.firstOrNull { it.id == cardId }
-            ?: return refusal("this turn is no longer in the history")
+            ?: return@withLock refusal("this turn is no longer in the history")
         if (card.superseded) {
-            return refusal("older turn; only the latest completed turn is revertible")
+            return@withLock refusal("older turn; only the latest completed turn is revertible")
         }
         if (path !in card.beforeTexts.keys) {
-            return refusal("this path is not part of that turn's changes")
+            return@withLock refusal("this path is not part of that turn's changes")
         }
         if (path in card.reverted) {
-            return refusal("already reverted")
+            return@withLock refusal("already reverted")
         }
         val outcome = withContext(Dispatchers.IO) {
             reverter.revert(
@@ -147,7 +187,7 @@ class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
                 afterText = card.afterTexts[path]
             )
         }
-        return when (outcome) {
+        when (outcome) {
             is FileReverter.Outcome.Done -> {
                 _cards.update { list ->
                     list.map {

@@ -21,8 +21,11 @@ import java.io.File
  * The pre-turn image is the last copy this layer holds. A second revert of the
  * same path is refused by the store, not silently repeated - a blind repeat
  * after a post-revert edit would be identical to ignoring the guarded world.
+ *
+ * `open` is a JVM-test seam only (a traced/slow reverter behind the store's
+ * serialized gate); nothing in the app subclasses it.
  */
-class FileReverter {
+open class FileReverter {
 
     /** What a revert did, or why it didn't. */
     sealed interface Outcome {
@@ -51,8 +54,12 @@ class FileReverter {
      * @param beforeText pre-turn image, or null = the file did not exist before
      *   the turn (creation).
      * @param afterText  collect-time image, or null = the turn deleted the file.
+     *
+     * Open ONLY so the ReviewHistory tests' delaying fake can subclass and
+     * hold the file-operation window (the mutex-ordering fixtures); no
+     * production subclass exists or is planned.
      */
-    fun revert(
+    open fun revert(
         root: File,
         path: String,
         beforeText: String?,

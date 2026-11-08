@@ -5,6 +5,7 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -94,7 +95,14 @@ class ProjectTrustServiceTest {
         val service = serviceWith(FakeTrustSource())
         val ref = refFor(dir)
         service.recordConsent(ref)
-        assertTrue(service.gate(ref) is TrustVerdict.Allow)
+        val verdict = service.gate(ref)
+        assertTrue(verdict is TrustVerdict.Allow)
+        // The Allow now CARRIES the gate's own hash: the record-on-allow
+        // step may persist exactly this state and nothing else.
+        assertEquals(
+            KnownSha.sha256OfHello,
+            (verdict as TrustVerdict.Allow).observedFingerprint
+        )
     }
 
     @Test
@@ -215,5 +223,160 @@ class ProjectTrustServiceTest {
                 bound = true
             }
             assertTrue("a recorded consent must allow the binder through", bound)
+        }
+
+    // ---------------------------------------------------------------------------
+    // Finding A: the gate->record window. The Allow path records through
+    // confirmAtGate(ref, Allow.observedFingerprint), which re-reads the REAL
+    // file once: the interleavings below rewrite/delete/plant that file
+    // between the two calls - no clock tricks, only disk state.
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun `allow-path record refuses bytes that swapped in the gate-record window`() = runBlocking {
+        // Gate sees A, the file becomes B before the record lands: the
+        // Allow's fingerprint is the ONLY persistable content - B must not
+        // ride the Allow's consent in.
+        val dir = tmp.newFolder("k")
+        val file = File(dir, "crushrc")
+        file.writeText("hello")
+        val ref = refFor(dir)
+        val source = FakeTrustSource()
+        val service = serviceWith(source)
+        // The Allow-path scenario needs consent to exist first: a present
+        // crushrc with NO record is the F04 Required path (first contact),
+        // never an Allow. The explicit approval established the consent the
+        // gate now re-confirms and the record step refreshes.
+        service.recordConsent(ref)
+        val verdict = service.gate(ref)
+        assertEquals(
+            KnownSha.sha256OfHello,
+            (verdict as TrustVerdict.Allow).observedFingerprint
+        )
+        file.writeText("world")
+        val outcome = service.confirmAtGate(ref, verdict.observedFingerprint)
+        assertEquals(TrustWriteOutcome.ChangedSinceGate, outcome)
+        // The explicit consent's record write is the only one that ever
+        // happened; the moved state added nothing.
+        assertEquals(1, source.writes)
+        val next = service.gate(ref)
+        assertTrue(next is TrustVerdict.Required)
+        assertEquals(
+            "crushrc changed since consent (fingerprint moved)",
+            (next as TrustVerdict.Required).reason
+        )
+    }
+
+    @Test
+    fun `allow-path record refuses a crushrc that appeared in the gate-record window`() =
+        runBlocking {
+            val dir = tmp.newFolder("l")
+            val ref = refFor(dir)
+            val source = FakeTrustSource()
+            val service = serviceWith(source)
+            val verdict = service.gate(ref) // no file: the no-crushrc Allow
+            assertNull((verdict as TrustVerdict.Allow).observedFingerprint)
+            File(dir, "crushrc").writeText("hello")
+            val outcome = service.confirmAtGate(ref, verdict.observedFingerprint)
+            assertEquals(TrustWriteOutcome.FileAppearedSinceGate, outcome)
+            assertEquals(
+                TrustVerdict.TrustReason.PRESENT_NO_CONSENT,
+                outcome.movedTo
+            )
+            assertTrue("a moved state must not write", source.writes == 0)
+            val next = service.gate(ref)
+            assertTrue(next is TrustVerdict.Required)
+            assertEquals(
+                "crushrc present, no consent recorded",
+                (next as TrustVerdict.Required).reason
+            )
+        }
+
+    @Test
+    fun `allow-path record persists the OBSERVED fingerprint when the folder is unchanged`() =
+        runBlocking {
+            val dir = tmp.newFolder("m")
+            File(dir, "crushrc").writeText("hello")
+            val ref = refFor(dir)
+            val source = FakeTrustSource()
+            val service = serviceWith(source)
+            // Consent exists first (the explicit approval); the gate then
+            // re-confirms byte-identical content and the record step
+            // refreshes EXACTLY the observed state.
+            service.recordConsent(ref)
+            val verdict = service.gate(ref)
+            assertEquals(
+                KnownSha.sha256OfHello,
+                (verdict as TrustVerdict.Allow).observedFingerprint
+            )
+            // Still byte-identical at record time: the allow path STILL
+            // records - but only the observed state, and exactly it.
+            val outcome = service.confirmAtGate(ref, verdict.observedFingerprint)
+            assertEquals(TrustWriteOutcome.UnchangedRecorded, outcome)
+            // One write from the explicit consent, one from the allow-path
+            // refresh (the gate itself never writes).
+            assertEquals(2, source.writes)
+            assertEquals(
+                KnownSha.sha256OfHello,
+                source.trustRecordOf(ref.id)!!.fingerprint
+            )
+            assertTrue(service.gate(ref) is TrustVerdict.Allow)
+        }
+
+    @Test
+    fun `allow-path record with the file still absent persists the noConfig state`() =
+        runBlocking {
+            val dir = tmp.newFolder("n")
+            val ref = refFor(dir)
+            val source = FakeTrustSource()
+            val service = serviceWith(source)
+            val verdict = service.gate(ref)
+            assertNull((verdict as TrustVerdict.Allow).observedFingerprint)
+            val outcome = service.confirmAtGate(ref, verdict.observedFingerprint)
+            assertEquals(TrustWriteOutcome.NoFileStillAbsent, outcome)
+            assertEquals(1, source.writes)
+            assertNull(
+                "the noConfig state is what the record rides",
+                source.trustRecordOf(ref.id)!!.fingerprint
+            )
+        }
+
+    @Test
+    fun `allow-path record refuses a crushrc that vanished in the gate-record window`() =
+        runBlocking {
+            val dir = tmp.newFolder("o")
+            val file = File(dir, "crushrc")
+            file.writeText("hello")
+            val ref = refFor(dir)
+            val source = FakeTrustSource()
+            val service = serviceWith(source)
+            // Consent first (explicit approval); the gate then confirms
+            // byte-identical content - that is the only true Allow path.
+            service.recordConsent(ref)
+            val verdict = service.gate(ref)
+            val observed = (verdict as TrustVerdict.Allow).observedFingerprint
+            file.delete()
+            val outcome = service.confirmAtGate(ref, observed)
+            assertEquals(TrustWriteOutcome.FileRemovedSinceGate, outcome)
+            // The explicit consent's record write is the only one that ever
+            // happened; the moved state added nothing.
+            assertEquals(1, source.writes)
+        }
+
+    @Test
+    fun `a stale caller-carried fingerprint is not persisted by the allow-path record`() =
+        runBlocking {
+            // The window guard decides from the CURRENT read: an observed
+            // hash the folder does not (or never did) carry right now writes
+            // nothing at all - no record, no refresh.
+            val dir = tmp.newFolder("p")
+            File(dir, "crushrc").writeText("world") // B was never gate-observed
+            val ref = refFor(dir)
+            val source = FakeTrustSource()
+            val service = serviceWith(source)
+            val outcome = service.confirmAtGate(ref, KnownSha.sha256OfHello)
+            assertEquals(TrustWriteOutcome.ChangedSinceGate, outcome)
+            assertTrue(source.writes == 0)
+            assertTrue("no record may exist", source.records.isEmpty())
         }
 }

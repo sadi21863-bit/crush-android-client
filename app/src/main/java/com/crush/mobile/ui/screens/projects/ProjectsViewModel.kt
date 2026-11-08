@@ -206,9 +206,11 @@ class ProjectsViewModel(
      * gate BEFORE any binding/callers-callback is the load-bearing bit (the
      * restore-equivalent trap was binding first and asking never).
      *
-     * - Allow → the verified state is re-recorded (noConfig marker for an
-     *   absent crushrc, matched fingerprint otherwise), ONLY THEN the bind,
-     *   then [onAllowed] opens chat.
+     * - Allow → the gate-OBSERVED state is re-recorded, but ONLY if the
+     *   folder still shows exactly what the gate saw: a crushrc that
+     *   appears or changes inside the gate->record window writes nothing
+     *   and the open is treated EXACTLY like Required below. Otherwise,
+     *   ONLY THEN the bind, then [onAllowed] opens chat.
      * - Required → NOTHING binds; [onTrustRequired] hands the screen the
      *   pending decision (ref + shaped reason) and the F04 dialog takes
      *   over. Consent, when given, flows through [grantTrustAndOpen].
@@ -236,20 +238,36 @@ class ProjectsViewModel(
                     }
                 when (verdict) {
                     is TrustVerdict.Allow -> {
-                        runCatching { container.projectTrust.recordConsent(ref) }
-                            .getOrElse {
-                                _state.value = _state.value.copy(
-                                    error = "consent could not be recorded: " +
-                                        (it.message ?: "unknown store failure")
-                                )
-                                return@launch
-                            }
-                        // The screen has taken over (or consumed) this project's
-                        // pending restore prompt, if one existed; leaving it up
-                        // would double-ask the user for the same folder.
-                        container.clearPendingProjectTrust()
-                        container.setActiveProject(ref)
-                        onAllowed()
+                        // Record BEFORE bind, but ONLY the state this Allow
+                        // vouched for: confirmAtGate writes NOTHING when the
+                        // folder moved inside the gate->record window - a
+                        // crushrc that appears or swaps there can never ride
+                        // in on this Allow's consent.
+                        val outcome = runCatching {
+                            container.projectTrust.confirmAtGate(ref, verdict.observedFingerprint)
+                        }.getOrElse {
+                            _state.value = _state.value.copy(
+                                error = "consent could not be recorded: " +
+                                    (it.message ?: "unknown store failure")
+                            )
+                            return@launch
+                        }
+                        val movedTo = outcome.movedTo
+                        if (movedTo == null) {
+                            // The screen has taken over (or consumed) this project's
+                            // pending restore prompt, if one existed; leaving it up
+                            // would double-ask the user for the same folder.
+                            container.clearPendingProjectTrust()
+                            container.setActiveProject(ref)
+                            onAllowed()
+                        } else {
+                            // The folder changed between gate and record:
+                            // NOTHING was persisted, so this open is treated
+                            // EXACTLY like a Required verdict - the F04 dialog
+                            // takes over and the row re-gates at the next tap.
+                            container.clearPendingProjectTrust()
+                            onTrustRequired(PendingProjectTrust(ref, movedTo))
+                        }
                     }
                     is TrustVerdict.Required -> {
                         container.clearPendingProjectTrust()

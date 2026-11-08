@@ -429,10 +429,13 @@ class AppContainer(context: Context) {
      *   (the legacy default stays bound), the honest pair is logged, and a
      *   [PendingProjectTrust] is published for the root-level F04 prompt;
      *   the engine provably does not attach the folder until consent. Allow
-     *   → the state is re-recorded (a no-crushrc folder gets the noConfig
-     *   marker so a later-planted crushrc re-gates; a matched fingerprint
-     *   refreshes its stamp) and the restore proceeds exactly as it would
-     *   have pre-S-02. A trust-state READ failure is fail-closed too: legacy
+     *   → the gate-OBSERVED state is re-recorded via confirmAtGate (a
+     *   no-crushrc folder gets the noConfig marker so a later-planted
+     *   crushrc re-gates; a matched fingerprint refreshes its stamp) - but
+     *   ONLY if the folder still shows exactly that state: a crushrc that
+     *   appears, changes, or vanishes inside the gate->record window writes
+     *   NOTHING, and the restore is wired exactly like the Required verdict
+     *   below. A trust-state READ failure is fail-closed too: legacy
      *   stays bound and the pair is logged - never "trust check failed, bind
      *   anyway".
      */
@@ -477,11 +480,16 @@ class AppContainer(context: Context) {
                     "Lifecycle", "restoring last binding: project '${ref.label}'"
                 )
                 // Record BEFORE bind, so the persisted state always says YES
-                // for exactly what is being bound: the noConfig marker for an
-                // absent crushrc, the matched fingerprint's refreshed stamp
-                // otherwise. recordConsent re-hashes the file itself, so the
-                // recorded state can never be a stale caller opinion.
-                val recorded = runCatching { projectTrust.recordConsent(ref) }
+                // for exactly what is being bound - and only for what THIS
+                // gate observed: the noConfig marker for a still-absent
+                // crushrc, the matched fingerprint's refreshed stamp
+                // otherwise. confirmAtGate re-reads ONCE and writes NOTHING
+                // when the folder moved inside the gate->record window (a
+                // crushrc planted or swapped while the restore ran), so the
+                // recorded state can never be a gate-never-saw surprise.
+                val outcome = runCatching {
+                    projectTrust.confirmAtGate(ref, verdict.observedFingerprint)
+                }
                     .onFailure { failure ->
                         val why = failure.message ?: failure.javaClass.simpleName
                         Log.w("Lifecycle", "last-binding restore blocked: consent state unrecordable ($why)")
@@ -491,8 +499,23 @@ class AppContainer(context: Context) {
                             failure
                         )
                     }
-                    .isSuccess
-                if (recorded) applyBinding(EngineBinding.Project(ref))
+                    .getOrNull()
+                val movedTo = outcome?.movedTo
+                if (outcome != null && movedTo == null) {
+                    // The observed state was persisted: proceed exactly as
+                    // it would have pre-S-02.
+                    applyBinding(EngineBinding.Project(ref))
+                } else if (movedTo != null) {
+                    // The folder moved inside the gate->record window and
+                    // NOTHING was recorded: the open is wired EXACTLY like
+                    // the Required verdict - nothing binds, the honest pair
+                    // lands in both sinks, the F04 prompt takes over.
+                    val msg =
+                        "last-binding restore blocked: project consent required (${movedTo.text})"
+                    Log.i("Lifecycle", msg)
+                    com.crush.mobile.util.AppLog.i("Lifecycle", msg)
+                    _pendingProjectTrust.value = PendingProjectTrust(ref, movedTo)
+                }
             }
             is TrustVerdict.Required -> {
                 // The honest pair (S5 instrumentation style): the same line

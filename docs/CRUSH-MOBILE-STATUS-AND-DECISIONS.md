@@ -32,6 +32,7 @@ Last verified: HEAD `f5d24dc` (2026-11-05/06 night).
 | `5f14dfc` (2026-11-07) | **Gate-2 batch 1 — P4 record surface:** per-turn collector → ReviewHistory runtime store (MAX_CARDS=8) + chat changed-files footer + "Review all turns" rail + review cards with hunks; collector after-image pairing pinned by tests (562→587) | ✅ completed-success (run 42320008115) |
 | `c8dd154` (2026-11-07) | **Gate-2 batch 2 — revert + export rows:** per-file Revert (confirm dialog; POST-TURN GUARD truth table 25 rows; latest-completed-turn gate) + Export a copy (SAF CreateDocument, byte-exact read of disk-now) | ✅ completed-success (run 42344434695, 3m34s) |
 | `bf5019a` (2026-11-07) | **Gate-2 export fix — found live on device:** Export a copy recorded the pending target but never called `exportLauncher.launch` (silent no-op: no DocumentsUI, no log); fix records AND launches in one callback with the bare-filename suggestion | ✅ completed-success (run 42390123731; device-proven byte-exact after fix) |
+| `fe9e7e8` (2026-11-08) | **Chat output save surface (owner-directed batch):** code-block header Copy + Save-as-file chips (FULL block saved, never the display trim; fence tag = untrusted model output, mapped/sanitized suggestion) + message-level Copy message / Save as Markdown; saver mirrors the device-proven Review export contract; rows hidden while streaming and on failed cards | ✅ completed-success (run 42403223894; device-proven same morning: message save `message-062916.md` 72 bytes byte-exact + toast, code save `code.py` 35 bytes `56cc99b7…` od-verified equal to the displayed block + toast, failed-card guard live; S-01 untouched) |
 
 **GATE 0 = CLOSED on both halves.** Code: `7ec34ed` (S-01), `3a3a233`
 (S-02), `f5d24dc` (S-04), wording-honesty in S-03's ledger row. Device:
@@ -39,7 +40,9 @@ A03 restore-trust drive PASSED 2026-11-06. Residuals ride the E6 stress
 pass: 4 JVM-only A03 variants (cancel / changed-crushrc / noConfig-flip
 / real-install migration), REST boot-window row, S-01 Failed-badge row.
 
-Branch state truth (2026-11-07 late): HEAD/main/origin-main = `bf5019a`
+Branch state truth (2026-11-08 morning): HEAD/main/origin-main =
+`fe9e7e8` (chat output save surface) ← `8e0ab08` (P5/P6 prep +
+research, docs) ← `40a6be4` (Gate-2 evidence fold, docs) ← `bf5019a`
 (export launch fix) ← `c8dd154` (Gate-2 batch 2) ← `5f14dfc` (Gate-2
 batch 1) ← `526b3a6` (test hardening) ← `f516d1f` (E5 nav fix) ←
 `053ccb5` (Gate-1 fold, docs) ← code rows above. Pack-archaeology note (unchanged): `f5d24dc`
@@ -140,7 +143,7 @@ mirrored locally with their full reasoning in the plan doc
 |---|---|---|
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **PARTIAL** — S-01 landed (`7ec34ed`) + S-04 landed (`f5d24dc`); **S-02 (restore trust) still OPEN, next batch** |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
-| 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) | ✅ surface proven; residuals queued |
+| 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
 | 3 | Frontend v2 | **BLOCKED per pack until Gates 0+1 land** |
 | 4 | handoff (Chat→Code P6-style seam) | QUEUED |
 | 5 | intelligent UI | QUEUED |

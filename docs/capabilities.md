@@ -697,6 +697,63 @@ Queued at owner direction this same night: the same save pattern for
 CHAT conversation output - code-block Copy + Save-as-file chips,
 app-side only so the Chat deny-all policy (S-01) stays untouched.
 
+**CHAT OUTPUT SAVE SURFACE - DELIVERED AND DEVICE-PROVEN (2026-11-08
+morning, `fe9e7e8`, run 42403223894):** the queued batch shipped and
+verified the same day on device `bbf8ca69`. Code shape (app-side only,
+no engine-policy changes): MarkdownText's CodeBlock header row =
+language label (ellipsis-bounded) + Copy + "Save as file" chips;
+ChatScreen renders "Copy message" + "Save as Markdown" rows under
+completed assistant messages, hidden while streaming and on failed
+cards (verified live BEFORE any success case: the gateway-401 failure
+card showed NO actions row, Retry stayed its affordance).
+`codeBlockContent()` saves the FULL emitted block, never the
+CODE_MAX_LINES display trim (a saved file ending in a truncation marker
+would be a lie). `codeSaveName()` treats the fence tag as untrusted
+model output: 24 known tags mapped (python -> code.py etc.), unknown
+tags sanitized to [a-z0-9_-] capped at 12 chars, missing -> txt; pinned
+by unit tests including separator-smuggling rows. The saver mirrors the
+device-proven Review export contract (CreateDocument; user-cancel
+silent; refused stream/IO failure = one precise sentence; UTF-8 exact
+bytes; Main-thread toast).
+
+Device drive - three renderer instances proved over history replay
+(fresh-install restart -> OpenRouter provider switch -> opencode-go key
+replacement + full process restart, action rows rendered each time):
+
+- Message level on replayed history: "Save as Markdown" ->
+  documentsui.picker.PickActivity OPENED, name PRE-FILLED
+  `message-062916.md` (device-clock HHmmss), Downloads -> SAVE ->
+  `/sdcard/Download/message-062916.md`, 72 bytes, byte-identical to the
+  displayed message's markdown (inline backticks preserved, no trailing
+  newline); toast "Saved message-062916.md." on screen. "Copy message"
+  -> toast "Copied message."
+- Code level on a FRESH turn (deepseek-v4.1-flash; prompt engineered
+  for exactly one fenced python block with two exact marker lines):
+  header rendered `python` label + Copy + Save as file; Copy chip ->
+  toast "Copied code block."; Save as file -> picker with PRE-FILLED
+  `code.py` (the fence-tag->name mapping live) -> SAVE ->
+  `/sdcard/Download/code.py`, 35 bytes, sha256
+  `56cc99b7a7fa4289d2f0e4bf852b9ec4e8d521076795a099dcd3c10e33f21d00`,
+  od-verified content EXACTLY "drive marker one.\ndrive marker two."
+  (no fences, no truncation marker, no trailing newline) - the saved
+  file equals the displayed block.
+
+Boundary honesty through the wave: the python turn's collector measured
+`+0 -0 across 0 file(s)`; the saves wrote ONLY the user-picked SAF
+destinations; app.log carries the turn's one record line and NO record
+lines for the saves themselves (a chat save is not a project file
+change by design - no Review cards); sentinel set intact end-to-end
+(notes.md `dcb75b2b...`, scratch.md `831a410d...`, project-root
+`crushrc` = `dcba1093...f3e147` byte-stable with `.crushrc-ran.marker`
+present and refreshed by the 08:10 engine boot - content `1794105629`,
+a boot epoch; the engine's own config store rewrote
+`files/crush/data/crush.json` at that same boot, `7bedaa84...`). The
+S-01 chat deny-all policy is untouched by this batch - it rides the
+chat pool instance (`files/crush-chat`), injected and verified by
+readback at spawn as always.
+
+This is the Chat-side polish the P5 acceptance fold will cite.
+
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

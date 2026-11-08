@@ -754,6 +754,70 @@ readback at spawn as always.
 
 This is the Chat-side polish the P5 acceptance fold will cite.
 
+**S-01 CATALOGUE PARITY - REOPENED BY EXTERNAL REVIEW, FIXED AND
+DEVICE-RE-PROVEN 2026-11-08 (`a7e6d14`, CI run 42454530745):** an
+independent code review alleged the Chat deny-all list was NOT exhaustive
+against the pinned v0.99.0 engine. VERIFIED TRUE and fixed. Evidence
+chain: (1) upstream `internal/config/config.go` `allToolNames()` =
+29 built-in ids; `resolveAllowedTools` filters `disabled_tools` by
+EXACT NAME (a literal "lsp_*" string hid NOTHING - the app list's old
+"lsp_*" shorthand and even the capabilities-era prose were wrong); (2)
+the shipped binary itself (strings over
+`app/src/main/jniLibs/arm64-v8a/libcrush.so`) carries all 9 missing ids
+and NONE of the four v0.100.0 agent tools (agent_dispatch/agent_send/
+agent_status/agent_stop - those belong to the engine-upgrade ladder,
+v0.100.0 released 2026-11-05 with subagents, Sysadmin Mode, configurable
+safe/blocked commands and PGP/SSH prompts); (3) FIX: `CHAT_DISABLED_TOOLS`
+now carries ALL 31 ids (the 22 + lsp_rename/lsp_replace_symbol (LSP
+WRITES), lsp_symbols/lsp_definition/lsp_call_hierarchy (LSP reads),
+crush_info/crush_logs (self-introspection), list_mcp_resources/
+read_mcp_resource (BUILT-IN MCP surfaces - the old injector note claiming
+MCP names are absent from the built-in list was wrong and is superseded));
+the two inert drive-observed ids (task/diagnostics) stay. A FROZEN-
+CATALOGUE RATCHET TEST (EngineConfigInjectorChatPolicyTest) now fails on
+any engine upgrade whose catalogue outpaces the deny list, with the four
+v0.100.0 additions named for the upgrade ladder. Gate GREEN 28m12s.
+
+Device re-proof after reinstall (data-kept): `files/crush-chat/data/
+crush.json` (the chat-pool instance config the engine READS at spawn)
+carries ALL 31 ids on disk (readback over run-as cat; idempotent union
+merge over the previous 22-pack); across every post-fix turn the
+ToolActivity log recorded ZERO new tool_call events (count unchanged at
+3 historical replay lines). The model was instructed to call crush_info
+and lsp_rename: it ATTEMPTED both (DSML-marked text attempts for
+deepseek-v4.1-flash, which calls tools in text markup) - crush_info and
+lsp_replace/lsp_rename attempts produced NO engine tool_call events and
+NO execution; the model's own nudge reply: "No code was executed in any
+verifiable sense". Failed-turn honesty held throughout (claude-haiku and
+deepseek empty turns record +0 -0 / no cards; the failed cards show
+Retry, never save/copy rows).
+
+**REGISTERED NEW DEFECT (upstream engine, v0.99.0) - stale tool
+advertisement for long-lived agents:** a re-opened legacy chat session's
+agent still ADVERTISED exactly the 7 newly-denied ids (crush_info,
+crush_logs, lsp_call_hierarchy, lsp_definition, lsp_rename,
+lsp_replace_symbol, lsp_symbols) as callable in its verbatim tool list -
+while bash/edit/write/ls/view/question/todos (denied in the 2026-11-05
+22-id pack) are NOT advertised, and both MCP-resource ids are absent
+too. Pattern: the agent's prompt-side toolset was built when the OLD
+22-id deny list was live and does NOT rebuild on a deny-list change;
+the flank never executes (S1 wall + zero tool_call events), but the
+model is misled into attempting inaccessible tools (wasted turns on
+DSML text). Root cause sits in the upstream engine (v0.99.0 agent/tool
+registry rebuild semantics; possibly persisted agent state), NOT in the
+app's policy write. Engine-respawn + fresh chat session: fresh-agent
+advertisement verification is PENDING the free-model flake (three
+consecutive "no reply received" turns on deepseek-v4.1-flash in the new
+session; retries are the established path). Honest security statement:
+the EXECUTION boundary is exact-name-deny at the engine boundary
+(S1-verified mechanism, re-proven live tonight); the advertisement
+staleness is a prompt-hygiene defect with no demonstrated execution
+path, and it RODES the engine-upgrade ladder (v0.100.0 re-verification
+will require the ratchet test + a fresh-advertisement probe).
+
+This parity pass is the security-acceptance artifact the reopened P5
+fold cites.
+
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

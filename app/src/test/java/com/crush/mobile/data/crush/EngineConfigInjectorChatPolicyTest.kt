@@ -250,19 +250,30 @@ class EngineConfigInjectorChatPolicyTest {
         )
     }
 
-    // The FROZEN v0.99.0 built-in catalogue this build pins (2026-11-08
-    // parity pass): enumerated from upstream `internal/config/config.go`
-    // `allToolNames()` (v0.99.0 lineage) and independently confirmed by
-    // strings over the shipped app/src/main/jniLibs/arm64-v8a/libcrush.so.
-    // v0.100.0 GROWS this list (agent_dispatch/agent_send/agent_status/
-    // agent_stop) and changes permission semantics - see the ratchet test.
-    private val ENGINE_V0990_BUILTIN_TOOLS = listOf(
+    // The v0.100.0 built-in catalogue SNAPSHOT (2026-11-09 ladder on branch
+    // engine-v0100-ladder): the 29 ids the v0.99.0 parity pass enumerated
+    // from upstream allToolNames() and strings-confirmed over the shipped
+    // v0.99.0 libcrush.so, PLUS the four sub-agent tools the v0.100.0
+    // release notes document (dispatch commits 965d1a7 + 938fef2).
+    //
+    // NEEDS-STRINGS-CONFIRM: this snapshot is what the 0.100.0 engine SHOULD
+    // document per the release notes - it has NOT been verified by strings
+    // over a v0.100.0 libcrush.so yet. At fetch time (tools/fetch-crush.ps1)
+    // the fresh binary re-confirms every id here and exposes any ADDITIONAL
+    // new ids; those land in BOTH this snapshot and CHAT_DISABLED_TOOLS
+    // before the device gate. ("task"/"diagnostics" are inert extra ids the
+    // deny list also carries; they are not engine-raised built-ins and stay
+    // out of this snapshot.)
+    private val ENGINE_V0100_BUILTIN_TOOLS = listOf(
         "agent", "bash", "crush_info", "crush_logs", "job_output", "job_kill",
         "download", "edit", "multiedit", "lsp_call_hierarchy", "lsp_definition",
         "lsp_diagnostics", "lsp_references", "lsp_rename", "lsp_replace_symbol",
         "lsp_restart", "lsp_symbols", "fetch", "agentic_fetch", "glob", "grep",
         "ls", "question", "sourcegraph", "todos", "view", "write",
         "list_mcp_resources", "read_mcp_resource",
+        // v0.100.0 sub-agent additions (release notes; strings-confirm still
+        // pending - see the NEEDS-STRINGS-CONFIRM note above).
+        "agent_dispatch", "agent_send", "agent_status", "agent_stop",
     )
 
     // RATCHET: when tools/fetch-crush.ps1 moves the engine to a newer
@@ -271,12 +282,19 @@ class EngineConfigInjectorChatPolicyTest {
     // This test fails whenever the Chat policy stops covering every id the
     // pinned engine documents - the S-01 contract is catalogue parity, not
     // "whatever the last drive happened to catch".
+    //
+    // 2026-11-09 LADDER STATE (engine-v0100-ladder): the version knob is
+    // ALREADY at 0.100.0 (ladder step 1) while this ratchet's strings steps
+    // are still pending - the fresh libcrush.so re-diff runs at fetch time
+    // and MUST pass (with any additional new ids merged into BOTH lists)
+    // BEFORE the device gate. Nothing runs on a device from this branch
+    // until that close.
     @Test
-    fun `the pinned v0990 upstream catalogue is fully denied`() {
-        val missing = ENGINE_V0990_BUILTIN_TOOLS
+    fun `the pinned v0100 upstream catalogue is fully denied`() {
+        val missing = ENGINE_V0100_BUILTIN_TOOLS
             .filterNot(EngineConfigInjector.CHAT_DISABLED_TOOLS::contains)
         assertTrue(
-            "CHAT_DISABLED_TOOLS is missing ids the pinned v0.99.0 engine " +
+            "CHAT_DISABLED_TOOLS is missing ids the pinned v0.100.0 engine " +
                 "documents: $missing",
             missing.isEmpty()
         )

@@ -21,7 +21,29 @@ param(
     # instrumented "0.98.2+dirty" build of that upstream release (landed
     # in-tree at d50f26e, 2026-10-29); a fresh-clone fetch reconstitutes the
     # clean upstream 0.98.2 engine - same version, minus the instrumentation.
-    [string]$Version = "0.99.0",
+    #
+    # 2026-11-09 ENGINE-V0100-LADDER (branch engine-v0100-ladder; per
+    # docs/research-crush-v0.100.0-2026-11-08.md section 6): the default
+    # advances to 0.100.0 on THIS branch only - main keeps 0.99.0 until the
+    # owner's go. What this step changes and why:
+    # - No SHA-256 pin is recorded in this script yet for 0.100.0, so the
+    #   expected hash is resolved AT FETCH TIME from the release's own
+    #   checksums.txt (see the FAIL CLOSED block below for what that does and
+    #   does not guarantee; the recorded 2026-11-09 cross-check lives in the
+    #   version pin chain).
+    # - The artifact is the OFFICIAL release tarball
+    #   crush_0.100.0_Android_arm64.tar.gz (research doc section 3) - the
+    #   per-platform GOOS=android/GOARCH=arm64 shape (v0.99.0 shipped the
+    #   identically named asset, so the ladder fetches the official binary
+    #   instead of repackaging any desktop binary). Do not confuse the
+    #   release's "apk" assets with anything Android: they are Alpine
+    #   (Linux) packages.
+    # - The tool catalogue CHANGED (sub-agents grew agent_dispatch/
+    #   agent_send/agent_status/agent_stop): after the fetch, the FRESH
+    #   libcrush.so must be strings-confirmed against CHAT_DISABLED_TOOLS and
+    #   the ratchet snapshot - any further NEW ids found get added to both
+    #   BEFORE the device gate.
+    [string]$Version = "0.100.0",
     # Expected SHA-256 of the release TARBALL, not the extracted binary.
     #
     # WHY THIS EXISTS
@@ -45,7 +67,19 @@ param(
     # (Zero-arg runs of THIS script are where the pin matters; the local
     # tarball was byte-verified against the hash below on 2026-10-17 and the
     # extracted libcrush.so hashes 7bbfb0fe... aa052.)
-    [string]$ExpectedSha256 = $(if ($Version -eq "0.99.0") {
+    [string]$ExpectedSha256 = $(if ($Version -eq "0.100.0") {
+        # ENGINE-V0100-LADDER (2026-11-09): no recorded pin for this version
+        # yet. For an un-pinned run the expected value resolves AT FETCH TIME
+        # from the SIGNED release's checksums.txt (see the FAIL CLOSED block
+        # below); an explicit -ExpectedSha256 still wins for offline runs.
+        #
+        # Recorded for the record (2026-11-09, read from the release's
+        # checksums.txt and cross-checked against the tarball fetched that
+        # same day - both hash to the same digest):
+        #   cdb15f23393c7e334b059a37d2c41a12fcb5f4d02d6e940795b7707e4b0afeaa
+        #   crush_0.100.0_Android_arm64.tar.gz
+        ""
+    } elseif ($Version -eq "0.99.0") {
         # Recorded 2026-10-31 from the SIGNED release's checksums.txt
         # (v0.99.0, published 2026-10-29), asset crush_0.99.0_Android_arm64.tar.gz.
         # This is the engine of record since the 2026-11-01 promotion: the
@@ -72,6 +106,9 @@ $ErrorActionPreference = "Stop"
 $repo = "https://github.com/charmbracelet/crush"
 $asset = "crush_${Version}_Android_arm64.tar.gz"
 $url = "$repo/releases/download/v$Version/$asset"
+# The release's own checksums.txt - the 0.100.0 ladder's verification source
+# when no recorded pin is available for $Version.
+$checksumsUrl = "$repo/releases/download/v$Version/checksums.txt"
 
 $root = Split-Path -Parent $PSScriptRoot
 $destDir = Join-Path $root "app/src/main/jniLibs/arm64-v8a"
@@ -83,7 +120,29 @@ $destFile = Join-Path $destDir "libcrush.so"
 # structure alone, which is the exact gap this parameter exists to close. The
 # alternative - warn and continue - means the one time somebody adds a version
 # casually is the one time the guarantee silently disappears.
-if ($ExpectedSha256 -notmatch '^[0-9a-fA-F]{64}$') {
+#
+# 0.100.0 LADDER EXCEPTION (2026-11-09, branch engine-v0100-ladder): v0.100.0
+# has no recorded pin yet, so for THAT version only - and only when no
+# explicit -ExpectedSha256 was passed - the expected hash is resolved at fetch
+# time from the release's OWN checksums.txt. Honest caveat, in the spirit of
+# the WHY above: both downloads travel the same release channel, so this
+# proves the tarball matches the checksums.txt served NEXT TO IT, not
+# provenance end to end - it is the FLOOR, the exact weakness the recorded
+# pins close. The next rung, after the owner's first verified fetch, is to
+# promote that cross-checked hash into the pin table, where it stops
+# travelling with the binary.
+$verifyViaChecksumsTxt = $false
+
+if ($ExpectedSha256 -match '^[0-9a-fA-F]{64}$') {
+    # A recorded or explicitly passed pin: compared as-is after download
+    # (pre-ladder shape).
+}
+elseif ($Version -eq "0.100.0" -and
+        -not $PSBoundParameters.ContainsKey("ExpectedSha256") -and
+        $ExpectedSha256 -eq "") {
+    $verifyViaChecksumsTxt = $true
+}
+else {
     throw @"
 No SHA-256 pin for Crush $Version.
 
@@ -120,8 +179,45 @@ try {
     # before the checksum, so verifying afterwards would mean a malicious archive
     # had already been unpacked into the temp directory.
     $actual = (Get-FileHash $tarball -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actual -ne $ExpectedSha256.ToLowerInvariant()) {
-        throw @"
+
+    if ($verifyViaChecksumsTxt) {
+        # The 0.100.0 ladder path: the EXACT asset line out of the release's
+        # checksums.txt is the only accepted expected value. Deliberately
+        # strict: the line must be the canonical sha256sum shape (64 hex + a
+        # separator + THIS asset name at line end); a missing or unparseable
+        # line fails closed exactly like a mismatch - nothing here is
+        # verified by absence.
+        $checksumsPath = Join-Path $tmp "checksums.txt"
+        Write-Host "Verifying against the release's checksums.txt ..."
+        Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath -UseBasicParsing
+        $pattern = "^\s*([0-9a-fA-F]{64})\s+\*?" + [regex]::Escape($asset) + "\s*$"
+        $line = Select-String -Path $checksumsPath -Pattern $pattern |
+            Select-Object -First 1
+        if (-not $line) {
+            throw @"
+NO CHECKSUM LINE for $asset in the release's checksums.txt.
+
+Nothing here is verified by absence: without the asset's own line the
+fingerprint contract cannot run, so the download is refused.
+"@
+        }
+        $expected = $line.Matches[0].Groups[1].Value
+        if ($actual -ne $expected.ToLowerInvariant()) {
+            throw @"
+SHA-256 MISMATCH for $asset (against the release's checksums.txt)
+
+  expected $expected
+  actual   $actual
+
+The download does not match the release's own checksums.txt. Delete the temp
+copy and do NOT retry until the cause is understood.
+"@
+        }
+        Write-Host "SHA-256 verified against the release's checksums.txt."
+    }
+    else {
+        if ($actual -ne $ExpectedSha256.ToLowerInvariant()) {
+            throw @"
 SHA-256 MISMATCH for $asset
 
   expected $ExpectedSha256
@@ -130,15 +226,25 @@ SHA-256 MISMATCH for $asset
 The download is not the artifact Charm signed. Delete the temp copy and do NOT
 retry until the cause is understood.
 "@
+        }
+        Write-Host "SHA-256 verified against the pinned release hash."
     }
-    Write-Host "SHA-256 verified against the pinned release hash."
 
     Write-Host "Extracting ..."
+
+    # Inspected 2026-11-09: crush_0.100.0_Android_arm64.tar.gz unpacks to
+    # crush_0.100.0_Android_arm64/{LICENSE.md,README.md,completions/,manpages/,
+    # crush}, so the Android_arm64 directory filter below matches the official
+    # artifact directly (same packed shape the 0.99.0 asset carried). The
+    # fallback only covers a hypothetical future flat single-binary tarball -
+    # the AArch64 PIE checks below keep the fallback exactly as strict.
     tar -xzf $tarball -C $tmp
 
-    $binary = Get-ChildItem -Path $tmp -Filter "crush" -Recurse -File |
+    $crushes = Get-ChildItem -Path $tmp -Filter "crush" -Recurse -File
+    $binary = $crushes |
         Where-Object { $_.DirectoryName -like "*Android_arm64*" } |
         Select-Object -First 1
+    if (-not $binary) { $binary = $crushes | Select-Object -First 1 }
 
     if (-not $binary) { throw "Could not find the crush binary in the extracted archive." }
 
@@ -158,6 +264,13 @@ retry until the cause is understood.
     Write-Host ""
     Write-Host "OK: $destFile"
     Write-Host ("    {0:N1} MB, AArch64 PIE, statically linked" -f ((Get-Item $destFile).Length / 1MB))
+    Write-Host ""
+    Write-Host "v0.100.0 ladder reminder (branch engine-v0100-ladder): BEFORE the"
+    Write-Host "device gate, strings-confirm this fresh libcrush.so's catalogue"
+    Write-Host "(agent_dispatch/agent_send/agent_status/agent_stop must be present;"
+    Write-Host "any further NEW ids land in CHAT_DISABLED_TOOLS + the ratchet"
+    Write-Host "snapshot first). Device rails and the owner go decision are laid out"
+    Write-Host "in docs/research-crush-v0.100.0-2026-11-08.md section 6."
     Write-Host ""
     Write-Host "Verify it on device with: ./gradlew installDebug"
 }

@@ -449,6 +449,14 @@ object EngineConfigInjector {
      * The two inert ids ("task", "diagnostics") stay: hiding an id the
      * engine does not know is inert, and unknown ids cover forks. The
      * MODE-01 acceptance drive on the real engine is what proves a release.
+     *
+     * 2026-11-09 v0.100.0 LADDER (branch engine-v0100-ladder): the four
+     * sub-agent tools below were added AHEAD of the fetch, from the v0.100.0
+     * release notes (sub-agent dispatch, commits 965d1a7 + 938fef2) - NOT
+     * yet strings-confirmed. The ladder's fetch step re-verifies the whole
+     * catalogue over the FRESH libcrush.so; any ADDITIONAL new ids it finds
+     * land here and in EngineConfigInjectorChatPolicyTest's ENGINE_V0100
+     * snapshot BEFORE the device gate.
      */
     val CHAT_DISABLED_TOOLS: List<String> = listOf(
         "agent", "bash", "crush_info", "crush_logs", "job_output",
@@ -464,6 +472,13 @@ object EngineConfigInjector {
         // Built-in MCP-resource surfaces (2026-11-08 parity pass - upstream
         // allToolNames lists them; previously missing).
         "list_mcp_resources", "read_mcp_resource",
+        // v0.100.0 sub-agent lifecycle tools (2026-11-09 ladder, per the
+        // release notes / dispatch commits 965d1a7 + 938fef2): dispatch a
+        // detached sub-agent, message it mid-run, check on it, stop it.
+        // Named BEFORE the branch's first spawn gate; the fetch step's
+        // strings confirmation re-verifies the whole shipped catalogue and
+        // owns any further additions (see the KDoc above).
+        "agent_dispatch", "agent_send", "agent_status", "agent_stop",
     )
 
     private fun ModelSpec.toJson(): JsonObject = JsonObject().apply {

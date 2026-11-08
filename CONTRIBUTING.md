@@ -16,9 +16,17 @@ above.
 
 ## Before you open a pull request
 
+The same four-task gate CI runs on every push
+(`.github/workflows/android-ci.yml`, step "Gate - JVM tests, debug APK,
+androidTest assembly, and release lint"):
+
 ```powershell
-./gradlew :app:testDebugUnitTest     # must be green
+./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintRelease     # must be green
 ```
+
+Local CLI builds must run with `JAVA_HOME` pointed at Android Studio's bundled
+JBR (`C:\Program Files\Android\Android Studio\jbr`); a bare `gradlew` that
+picks up the `$PATH` java fails fast with "Gradle requires JVM 17 or later".
 
 Then, if you have a physical arm64 device attached:
 
@@ -63,7 +71,8 @@ proven and what the limits are.
   (S18 is deliberately opt-in), so "(S16-S21)" (typo "SS21" fixed here) and
   README's range wording are both honest.
 - The five "never" rules re-verified in code: exec from `nativeLibraryDir`
-  via jniLibs + `useLegacyPackaging = true` (`app/build.gradle.kts:181`),
+  via jniLibs + `useLegacyPackaging = true` (`app/build.gradle.kts:210`;
+  anchor re-checked 2026-11-08 — it was :181 when this pass ran),
   UDS-only launch (`-H unix://`), no hardcoded model id
   (`CrushSession.DEFAULT_MODEL = ""`, probing from `ModelChoice`/`ZenModelsApi`),
   and `KeySession.require()`'s documented non-caching contract.

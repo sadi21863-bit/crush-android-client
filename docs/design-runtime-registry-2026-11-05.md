@@ -30,6 +30,50 @@ measured shapes, and the registry/reclaim sections below must cover both:
 
 ## §0 Root-cause pin (file:line)
 
+**Implementation status 2026-11-08 — the memo shipped in both phases; the
+design text and this §0 pin stay as written, as the record of the
+2026-11-05 tree.** Evidence of record: `1d229de` (phase 1: born-or-never
+interlock + readiness reorder + starting watchdog) and `d818a9c` (phase 2:
+engine instance registry + connection supersession/reclaim). The file:line
+anchors below are dated evidence of that tree — the refactor they
+prescribed moved many of them — so the current-state refresh is listed
+here once, not rewritten inline:
+
+- **§1 registry:** `engine/EngineInstanceRegistry.kt` is the container-owned
+  per-key map, wired at `AppContainer.kt:220`; the single
+  `projectRuntime: EngineRuntime?` slot (cited at `:158`) is GONE, and the
+  §4-flagged "throwaway runtime just to stop a background key" corner is
+  the registry's lookup-or-noop `stop`. The liveness budget is
+  `maxLiveNonLegacy = 2` with the fail-closed named refusal; the VM's
+  start path consults it (`AppContainer.requestEngineStart` `:685` →
+  `requestStart`). Laws pinned in `EngineInstanceRegistryTest`
+  (third-live-instance refusal, own-slot reclaim) and
+  `ConnectionRegistryTest`.
+- **§1 interlock:** the spawn veto shares the `stopBlocking()` monitor
+  (`CrushEngine.kt:345–370` for the synchronized birth section, veto seam
+  `spawnVetoed` at `:602–619`; pinned by `CrushEngineSpawnVetoTest`) — so
+  the §0 race pin reads as historical root-cause evidence: that orphan
+  interleave is no longer constructible.
+- **§2 starting watchdog:** `STARTING_WATCHDOG_MS = 90_000` with
+  probe-before-teardown and one bounded restart → the honest terminal
+  `Failed(willRetry=false)`, re-using the wedge budget constants exactly as
+  §4 requires (`EngineSupervisor.kt:242–295`, `MAX_WEDGE_RESTARTS = 5`
+  `:754`, `MIN_HEALTHY_RUN_MS = 60_000` `:763`; pinned in
+  `SupervisorHysteresisTest`).
+- **§3 reclaim:** `data/crush/ConnectionRegistry.kt` (per-key supersession
+  incl. legacy `""`, revoke-only-if-own, stop deferred while a run is in
+  flight on the key) is wired per-VM in the chat layer: the owner-epoch is
+  taken at VM construction (`ChatViewModel.kt:549`), supersession is
+  checked at the rebuild point (`:1280`), registration happens at
+  `:1342`, and `revokeIfOwn` runs from the entry's teardown (`:1407`);
+  pinned by `ConnectionRegistryTest`. §3's `ChatViewModel.kt` block
+  anchors (and §2's) describe that file as it stood on 2026-11-05.
+
+§4's must-not-regress list was honored as designed — its named constants
+(`MIN_HEALTHY_RUN_MS`, `MAX_WEDGE_RESTARTS`, `MAX_START_ATTEMPTS`) are the
+shipped ones, and the remaining "device acceptance (1 each)" rows in the
+test matrix stay the outstanding drive work.
+
 ### Where the chat child survives its `stopping project engine` line (F06, shape 1)
 
 1. `AppContainer.kt:364–370` — `applyBinding` logs

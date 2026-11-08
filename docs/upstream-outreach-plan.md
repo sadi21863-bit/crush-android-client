@@ -6,7 +6,7 @@ pages yet. This file packages up material measured on the device ledger so the
 P12 phase of [crush-plan-2026-11-02.md §25](crush-plan-2026-11-02.md)
 ("Official collaboration and public recognition") can be executed in one pass.
 
-One-line hub pointer (added 2026-11-05): standing status, decisions, gate roadmap and the S-03/candidate-4 blocker chain live in [CRUSH-MOBILE-STATUS-AND-DECISIONS.md](CRUSH-MOBILE-STATUS-AND-DECISIONS.md) (HEAD `1d229de`).
+One-line hub pointer (added 2026-11-05): standing status, decisions, gate roadmap and the S-03/candidate-4 blocker chain live in [CRUSH-MOBILE-STATUS-AND-DECISIONS.md](CRUSH-MOBILE-STATUS-AND-DECISIONS.md) (then-HEAD `1d229de`; the status doc's own header carries the current HEAD).
 
 Source material: [capabilities.md](capabilities.md),
 [external-review-triage.md](external-review-triage.md),

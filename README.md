@@ -2,7 +2,7 @@
 
 A native Android chat client that runs a **hidden local [Crush](https://github.com/charmbracelet/crush) agent** on-device and streams replies over an **app-private Unix-domain socket** (one long-lived SSE stream; never loopback HTTP/TCP — see [Security](#security)).
 
-The Crush engine (a Go binary) ships inside the APK and is `exec()`d at app start. It talks to **OpenCode Zen** for inference. Everything — Compose UI, engine lifecycle, SSE client — lives in this repo.
+The Crush engine (a Go binary) ships inside the APK and is `exec()`d at app start. It talks to the provider the user configures in Settings — thirteen Catwalk-registered ids are offered (see [docs/providers.md](docs/providers.md)) — for inference. Everything — Compose UI, engine lifecycle, SSE client — lives in this repo.
 
 ```
 Compose UI  →  app-private Unix-domain socket  →  libcrush.so (bundled Go binary)  →  OpenCode Zen / other provider
@@ -12,9 +12,11 @@ Crush ships for macOS, Linux, Windows and BSD. **Android is not one of those pla
 
 ## Status
 
-> **Last verified:** `1d229de` (2026-11-05). The table predates the
-> Chat/Code mode split; mode work, the S5 acceptance drive and the gate
-> roadmap live in [docs/capabilities.md](docs/capabilities.md) and
+> **Last verified:** `fe9e7e8` (2026-11-08; CI run 42403223894 green). The newest
+> rows (Review screen, chat save surface, chat tool policy, Projects) came from
+> the 2026-11-07/08 device drives; the full Chat/Code mode work, the S5
+> acceptance drive and the gate roadmap live in
+> [docs/capabilities.md](docs/capabilities.md) and
 > [docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md).
 
 Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / API 29):
@@ -32,6 +34,10 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 | File diffs | ✅ built and JVM-tested — a real edited-file turn rendered on device 2026-10-29 (z6/z7: `diff-created(+1/-0)`, diff-edit routes, `snapKeys=[4 files]`, `0 unreadable` after the `readNBytes` API-33 defect was fixed); a multi-file, real-code-edit turn is still untested |
 | Permission prompts (ask / always / never) | ✅ ask-mode grant verified end-to-end on device 2026-10-29 (z6/z7: ask card rendered, automated Allow-once granted, turn resumed); always / never modes not device-walked |
 | In-app diagnostics + crash reports | ⚠️ implemented — the on-device log path was exercised during the 2026-10-29 D12 pass; the screen/crash-export flow itself is not fully walked |
+| Review screen (revert + export) | ✅ device-proven 2026-11-07 ([capabilities.md](docs/capabilities.md) Gate-2): reverting restores the workspace record, and the "Export a copy" no-op found live in the first drive was fixed same-day (`bf5019a`) |
+| Chat save/copy surface | ✅ device-proven 2026-11-08 (`fe9e7e8`): code-block Copy/Save chips plus per-message "Copy message" / "Save as Markdown" through the SAF `CreateDocument` picker (`ChatExport.kt`) |
+| Chat tool policy (deny all) | ✅ shipped 2026-11-05 (S-01): `EngineConfigInjector.injectChatToolPolicy` writes `options.disabled_tools` and readback-verifies; the `chatPolicyGate` fails closed (`CrushEngine.kt`, pinned by unit tests) |
+| Projects mode (import-only) | ✅ built — an imported folder becomes its own keyed engine instance (`crush-<key>.sock`); the runtime registry caps liveness at two live engines, chat + one project (`AppContainer.kt`, `EngineInstanceRegistry.kt`) |
 
 `minSdk 29` · `targetSdk 36` · `compileSdk 37` · arm64-v8a only
 
@@ -207,7 +213,7 @@ App-side mitigations:
   `run-as` and read `crush.json`, which holds the plaintext key. Only sign and
   share release builds.
 
-**If you received a shared build of this app, rotate your OpenCode Zen key.**
+**If you received a shared build of this app, rotate the provider key(s) you loaded into it.**
 
 ## Known issues
 
@@ -337,9 +343,9 @@ See [`docs/toolchain.md`](docs/toolchain.md) for the contingency plan.
 
 > An external audit flagged the 2.4.10 / 2.4.20 split as a compatibility
 > hazard and suggested matching them. That is worth considering, but the build
-> is green across 213 tests and repeated release builds, so it is a real risk to
-> weigh rather than a demonstrated fault. Aligning to 2.4.20 is the safer change
-> if made deliberately.
+> is green across 594 JVM unit tests and repeated release builds, so it is a
+> real risk to weigh rather than a demonstrated fault. Aligning to 2.4.20 is
+> the safer change if made deliberately.
 
 AGP 9 migration notes that silently broke the `exec()` architecture are in
 [`app/build.gradle.kts`](app/build.gradle.kts).
@@ -365,7 +371,7 @@ binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 455 JVM unit tests (455 @Test methods, grep-counted 2026-10-31)
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 594 JVM unit tests (594 @Test methods across 57 files, grep-counted 2026-11-08)
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -510,7 +516,7 @@ One caveat survives the paperwork: legal review of FSL "Competing Use" is
 still recommended before any commercial distribution of the bundled engine.
 
 Bubble Tea is MIT-licensed. This repository is not affiliated with Charm or
-OpenCode Zen. You supply your own OpenCode Zen API key; it is never committed.
+OpenCode Zen. You supply your own provider API keys; they are never committed.
 
 ## Tree-verification pass 2026-10-31
 
@@ -522,7 +528,8 @@ Spot-checked against the current tree; items not listed above were found accurat
   Instrumentation suite note: this October-31 pass said none existed; the
   suite since landed and runs on device - see the `androidTest` section
   above (8 tests OK, 2026-11-01).
-- `minSdk 29` / `targetSdk 36` / `compileSdk 37` (`app/build.gradle.kts:54/55/40`),
+- `minSdk 29` / `targetSdk 36` / `compileSdk 37` (`app/build.gradle.kts:58/59/44`;
+  anchors re-checked 2026-11-08 — they were 54/55/40 when this pass ran),
   `useLegacyPackaging = true`, `android.builtInKotlin=false`
   (`gradle.properties:42`), Kotlin 2.4.10 / Compose-compiler 2.4.20 / BOM
   2026.09.00, Gradle wrapper 9.8.0 all re-confirmed.
@@ -536,7 +543,8 @@ Spot-checked against the current tree; items not listed above were found accurat
 - D11 commit `9498a67`, baseline commit `4e67aae…` and tag
   `baseline/2026-10-17` verified. `WorkspaceLease`/force-retry still live.
 - Not run this session: any gradle command (forbidden here), so 455 is a
-  structural `@Test` count, not a runner count.
+  structural `@Test` count, not a runner count. (Re-checked 2026-11-08 the same
+  way, still no gradle: the grep count is now **594** across 57 files.)
 
 - Engine of record updated later in the day: the bundled build is now
   **v0.99.0** (promoted 2026-11-01, published 2026-10-29); see the Upstream

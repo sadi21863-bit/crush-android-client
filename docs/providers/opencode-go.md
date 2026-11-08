@@ -3,7 +3,7 @@
 Research date: **2026-10-17**. Sources: official opencode.ai pages/docs, the
 anomalyco/opencode repo, Docker's AI docs, plus **live wire probes** against
 `opencode.ai/inference/go/*` from this machine (marked `probe`). App context:
-Crush Mobile (Crush 0.97.1 engine at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29, OpenAI-compatible chat completions).
+Crush Mobile (Crush 0.97.1 engine at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29 — the bundle is **v0.99.0** since the 2026-11-01 promotion, OpenAI-compatible chat completions).
 
 ## 2026-10-31 addendum: the Console rename + how Go is reachable from OTHER clients
 
@@ -42,10 +42,13 @@ flow, `github.com/login/device`, plus `/config/refresh-oauth`), but there
 is no Console/Go OAuth surface to implement against.
 
 Consequences for the registry: a single `modelsBase` cannot honestly serve
-both list and probe vs chat for this family (list base ≠ chat base), so
-`opencode-go.modelsBase` stays **null** in `Providers.kt` with the finding
-recorded there, until `ZenModelsApi` grows a list/chat split verified with a
-real Console/Go key. And the free-model wall quoted in the Console doc
+both list and probe vs chat for this family (list base ≠ chat base). That
+finding is now RESOLVED in `Providers.kt`: the 2026-11-01 promotion shipped
+the list/chat split — `opencode-go` carries `modelsListBase =
+https://opencode.ai/inference/go/v1` plus a `chatBases` list
+(`/inference/go/openai/v1`, then `/inference/openai/v1` as fallback) instead
+of a null `modelsBase`, device-proven by the 2026-11-02 in-app turn below.
+And the free-model wall quoted in the Console doc
 stands: **"Free-tier chat models require OpenCode; use paid models or Go
 from other clients"** — a Go subscription (or a funded Console balance) is
 the official route for a third-party client to use what was free.

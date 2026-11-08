@@ -12,6 +12,49 @@ and persistence), §22 (minimum engineering contracts), §23 (first implementati
 sprint, hard stop). Grounded in the current tree as of 2026-11-02; every code
 citation below was read against that tree.**
 
+> **Status update (2026-11-08) — where the code actually is now** (code HEAD
+> `fe9e7e8`; docs-only commits ride above it). §1/§2 below were written against
+> the 2026-11-02 tree, and their line anchors and claims are preserved as that
+> date's reading — NOT as current facts. The decision chain of §3 has since
+> landed essentially as designed; every anchor in THIS block was verified in
+> the tree on 2026-11-08:
+>
+> - **Projects exist as durable Room rows** — `projects` table, schema v2
+>   ([ProjectDatabase.kt:17](../app/src/main/java/com/crush/mobile/data/project/ProjectDatabase.kt))
+> + [`ProjectEntity.kt:30–42`](../app/src/main/java/com/crush/mobile/data/project/ProjectEntity.kt).
+>   The rows carry the additive v2 trust columns
+>   `trust_fingerprint`/`consented_at_ms` (`3a3a233`, landed 2026-11-06;
+>   [ProjectTrustService.kt:23–25](../app/src/main/java/com/crush/mobile/data/project/ProjectTrustService.kt)),
+>   so §1's "there is no app-side row … for a project" no longer holds.
+> - **Trust gates EVERY bind path** (§2's S-02 gap closed, `3a3a233`): the cold
+>   `restoreLastBinding` resolves through `ProjectTrustService.gate` and
+>   refuses fail-closed on unreadable trust state
+>   ([AppContainer.kt:441–473](../app/src/main/java/com/crush/mobile/di/AppContainer.kt)).
+> - **The §6 fallback is the shipped runtime**, not a contingency: one engine
+>   instance per binding with a never-evict registry ([EngineInstanceRegistry.kt:42](../app/src/main/java/com/crush/mobile/engine/EngineInstanceRegistry.kt),
+>   wired at [AppContainer.kt:220–223](../app/src/main/java/com/crush/mobile/di/AppContainer.kt)),
+>   and the E5 nav defect measured post-ADR is fixed — `onOpenProject` replaces
+>   the stack back to a single chat entry ([NavGraph.kt:91–95](../app/src/main/java/com/crush/mobile/ui/navigation/NavGraph.kt),
+>   `f516d1f`).
+> - **The 2026-11-04 decision held**: Projects are created ONLY via import;
+>   the legacy workspace row is permanent (see the 2026-11-04 update's
+>   import-arc paragraph above and §5's own 2026-11-04 note).
+> - **The §4 "Becomes" column shipped in its designed shape**: the Review
+>   surface is the runtime-only review store — per-turn cards capped at
+>   MAX_CARDS=8 ([ReviewHistory.kt:47](../app/src/main/java/com/crush/mobile/domain/file/ReviewHistory.kt))
+>   with per-file Revert + SAF "Export a copy" (`5f14dfc`/`c8dd154`/`bf5019a`,
+>   device-proven 2026-11-07, capabilities §P4 Gate-2); chat is a separate
+>   engine instance dir (`files/crush-chat`,
+>   [EnginePaths.kt:114](../app/src/main/java/com/crush/mobile/engine/EnginePaths.kt))
+>   whose deny-all tool policy is injected and FAIL-CLOSED at spawn
+>   ([CrushEngine.kt:276–278](../app/src/main/java/com/crush/mobile/engine/CrushEngine.kt),
+>   `7ec34ed`). Provider keys never entered project space (I7 held).
+>
+> (2026-11-08 note, one sentence: the restoration/consent model survived the
+> recorded reinstall-with-data-kept device cycles — capabilities §E5 nav fix
+> + §P4 Gate-2, 2026-11-07; §5's own "Rollback property" (item 6, the
+> pre-upgrade-APK downgrade) stays designed-but-unexercised.)
+
 > **2026-11-03 MEASURED UPDATE — both integration proofs ran on device and
 > PASS ("OK (2 tests)", `am instrument`, device `bbf8ca69`):
 > `TwoProjectAttachTest` (single-engine workspace attach facts + the

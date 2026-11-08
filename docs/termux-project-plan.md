@@ -16,6 +16,17 @@
 >    2026-10-23). The §2 facts about Crush itself (Go/Bubble Tea lineage,
 >    upstream Android/arm64-only release policy) are unchanged.
 
+**Re-check 2026-11-08 — still PLAN ONLY, still not started, still nothing
+in the app depends on it (no Termux code exists in the tree).** One
+identity fact above has drifted again: the bundled engine is no longer
+0.98.2 — the engine of record was promoted to **upstream clean v0.99.0 on
+2026-11-01** (checksums-verified fetch pin replacing the instrumented
+`0.98.2+dirty` build; BASELINE-NOV.md §4). The §2 `"go_version":"go1.27.1"`
+read holds for the v0.99.0 packaging too: a binary-string check 2026-11-08
+against `app/src/main/jniLibs/arm64-v8a/libcrush.so` finds `v0.99.0`
+alongside `go1.27.1` in the Go buildinfo, and no `0.98.x` string at all
+(the same tell BASELINE-NOV.md §4 used to separate 0.99.0 from 0.98.2).
+
 ---
 
 ## 1. Why this exists

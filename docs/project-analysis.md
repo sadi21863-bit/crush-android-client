@@ -8,6 +8,22 @@ Architecture, the defects that shaped it, and what is left.
 > [`capabilities.md`](capabilities.md), which carries the verified/unverified
 > split per feature.
 
+> **2026-11-08 correction — the current-state claims below have moved again.**
+> Dated findings (the D1–D14 ledger, dated verdicts, per-row dates) stand as
+> written; this note covers only the bare present-tense rows: the test row is
+> now **594** JVM unit tests, all green at `f78f6c4` (CI run 42403223894 at
+> `fe9e7e8`); "**no instrumentation suite**" / gap 6 is closed —
+> `app/src/androidTest` ships `MainActivityLockFlowTest`, `MainActivitySmokeTest`,
+> `TwoProjectAttachTest`, `TwoEngineInstancesPerProjectTest`,
+> `ProjectStoreRoomPersistenceTest` (device-verified 2026-11-01; CI compiles
+> `:app:assembleDebugAndroidTest`); the "multi-file real-code turn still
+> untested" row (scorecard, §6 gap 1, §9 item 3) is closed by the device proof
+> recorded in crush-plan §P4 (fold 2026-11-07, two files edited per turn); and
+> gap 5 "Multi-project — one app-private workspace" no longer holds — projects
+> are Room-backed (`data/project/ProjectEntity.kt:30`, `ProjectDatabase.kt:17`,
+> schema v2) with one engine instance per project (`di/AppContainer.kt:250`)
+> and an import-only Projects surface. Live status lives in `capabilities.md`.
+
 ## 1. Scorecard
 
 | Area | State |

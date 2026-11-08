@@ -67,6 +67,14 @@ build-config-only batch (`isMinifyEnabled = true` for release + the
 > device and run one end-to-end UDS turn - the reflected code has to prove
 > itself at runtime before this reads done-done. The debug artifact stays
 > unminified and the device stays on the latest debug build.
+>
+> **That remaining verification closed 2026-11-02** (first recorded in
+> BASELINE-NOV.md §5/§6): the signed, minified `r8probe` release
+> (`initWith(release)` - minify + proguard rules + release signing) ran a
+> real turn end to end on device (fresh onboarding → provider
+> re-selection → completed streaming turn 20:07, "Reply with exactly: OK"
+> → `OK`), so the signed minified APK installed + one end-to-end run is
+> done. The runtime-proven artifact size: **28.92 MB**.
 
 Current state (both deliberate, both commented in [`app/build.gradle.kts`](../app/build.gradle.kts)):
 
@@ -77,6 +85,15 @@ Current state (both deliberate, both commented in [`app/build.gradle.kts`](../ap
   code defect; disabling it was the defusal.
 - R8/minify stays off (line 92–94 rationale: minify + a Go binary in `jniLibs`
   adds risk for no size win on a 92MB payload dominated by the engine).
+
+**2026-11-08 correction to the "current state" above:** both bullets are
+history now, not current state. Lint was re-enabled at the AGP defaults the
+same day (`5325d68`, the enablement batch above; the two defusal overrides
+are deleted, the comment lives at `app/build.gradle.kts:187–198`), and
+R8/minify landed as the build-config-only batch allowed here — `37c93cb`,
+`isMinifyEnabled = true` + `proguard-rules.pro` at `app/build.gradle.kts:107`
+(73.2 → 28.8 MB measured; the signed `r8probe` buildType carries the
+runtime proof closed 2026-11-02, BASELINE-NOV.md §5).
 
 **The decision:** triage the lint crash (AGP version pitch, or a lint-only
 isolate) and then choose: re-enable lint, and either enable minify or confirm
@@ -138,6 +155,17 @@ only the keystore + `keystore/credentials.properties` are missing.
 on the reference device. Until this happens the README's "debug builds are
 not shareable" rule means the app still cannot be handed to anyone.
 
+**2026-11-08: SHIPPED.** The credential work happened and the signed
+release exists: `keystore/opencode-release.jks` +
+`keystore/credentials.properties` are on disk (gitignored; present by
+2026-11-02, which the signed release-rigored runs required), the build
+reads the four properties with a loud partial-file failure
+(`app/build.gradle.kts:36–130`), and the **runtime proof is on device** —
+the signed minified `r8probe` artifact completed a real streaming turn
+2026-11-02 20:07 (BASELINE-NOV.md §5/§6; the "R8 minified release:
+runtime unproven" row in external-review-triage.md closed same day). The
+"cannot be handed to anyone" blocker therefore no longer stands.
+
 ## 3. Rotate/delete the plaintext test key file at repo root
 
 **Status: OPEN — key is live, file re-confirmed present 2026-10-31.**
@@ -167,6 +195,23 @@ lose the other (lost-update, `EngineConfigInjector.kt:134–167`). Any fix is a
 single-writer/ownership design decision (e.g. keys injected over the socket
 only, engine as sole writer of `crush.json`), which is why it is deferred
 rather than patched.
+
+**2026-11-08: designed AND landed.** The pending design doc was authored the
+same day ([key-path-single-writer-design.md](key-path-single-writer-design.md),
+"designed 2026-10-31"), and the implementable half A shipped in `5b1b222`:
+the injector's only legal write window is "engine down" —
+`syncProviderModels` takes an explicit `engineRunning` window param and an
+out-of-window request logs and writes nothing — with `CrushEngine.start()`
+pinning every call pre-exec (`data/crush/EngineConfigInjector.kt:132–149`),
+plus the supervisor `restart(reason)` seam (`engine/EngineSupervisor.kt:185`).
+The key half matches the chosen direction exactly: the app no longer
+writes the provider key to `crush.json` at all — keys ride the socket at
+handshake (`api.setProviderKey` in `CrushSession.runChain`,
+`data/crush/CrushSession.kt:153`) — so the only app-side key writer named
+at the bug's origin is gone; only catalogue merges and the chat tool
+policy touch the file from the app side, both inside the pre-exec window.
+The engine persists the runtime key it is handed (upstream-owned; the :134–167
+anchor above is a dated record of the app-side path that moved).
 
 ## 5. No-lockscreen fail-open: confirm or block a store release
 
@@ -305,6 +350,35 @@ ships labeled tool-free — S1 blocks that label). Full details:
 plan doc §5.1/§7. The broad All-Files-Access import flow split out to
 item 11.
 
+**2026-11-08: SHIPPED — all four answers are built and measured.** The mode
+split rides the engine-instance binding (`EngineBinding { Legacy, ChatPool,
+Project }`, `AppContainer.kt:247–250`), so provider keys/model slots stayed
+GLOBAL while tool grants live per engine instance, exactly as planned:
+- **Q1(a)** choose-at-creation shipped — the session sheet's "New chat"
+  button starts the dedicated conversation engine (`vm.startChatSession()`,
+  `ChatScreen.kt:1105–1109`, wired at `:458–460`), and the sheet names the
+  CURRENT pool honestly instead of implying a global inbox:
+  "Chats - conversation only" / "Project - <label>" / "Workspace (legacy)"
+  (`ChatViewModel.kt:422–433`, rendered `ChatScreen.kt:1145–1150`). Tabs
+  restructure and the in-session toggle stay backlogged as decided.
+- **Q2** deny-ALL shipped and PROVEN at the engine boundary: the chat pool's
+  policy is injected pre-exec and verified by disk readback
+  (`injectChatToolPolicy`, `data/crush/EngineConfigInjector.kt:268`, S-01
+  verify-after-write), and `CrushEngine`'s `chatPolicyGate` REFUSES to spawn
+  the chat instance without it (fail-closed, `CrushEngine.kt:269–311`, pure
+  verdict `:647`). Denial held on device (MODE-01 drive 2026-11-05: attempted
+  `rm -rf` executed nothing) via the S1-proven `options.disabled_tools`
+  mechanism, per-instance. The app-side auto-deny layer stays as
+  defense-in-depth (`ChatViewModel.kt:2863–2871`).
+- **Q3** fixed Chat default shipped (new sessions choose the chat pool;
+  the last binding restores across restarts, `AppContainer.kt:441`).
+- **Q4** legacy history untouched, as decided.
+
+The "implementation NOT started, awaiting the user's explicit go" framing
+above (and §5 of
+[chat-code-modes-plan-2026-11-04.md](chat-code-modes-plan-2026-11-04.md))
+is superseded by that plan's 2026-11-08 addendum.
+
 ## 11. Import storage-access strategy (All Files Access vs narrow SAF)
 
 **Status: OPEN — not needed while the app is beta-installed via adb;
@@ -344,6 +418,12 @@ project-open).
   companion with the awaited-server-cancel path — item 8's description
   matches the code.
 - Items 4/5/6/7 remain open as written; no tree change observed.
+
+**2026-11-08 standing correction to the items-1–3 claim above:** item 1's
+remaining R8 device verification closed 2026-11-02 (signed `r8probe` turn on
+device, BASELINE-NOV.md §5) and item 2 shipped (keystore + signed release,
+see item 2 above). Item 3 is still open: the plaintext test-key file was
+re-confirmed present at the repo root today, still gitignored.
 
 
 ## Adopted 2026-10-31 (user: "I will go with that")

@@ -118,3 +118,12 @@ now newer than this note:
   and was **closed by upstream on 2026-10-21** with no token-auth mechanism
   landed — the per-port Bearer fallback described here remains the plan if
   UDS transport is ever withdrawn.
+
+**Re-check 2026-11-08.** The engine in the bundle has since been promoted
+again: upstream clean **v0.99.0** is the engine of record (2026-11-01,
+checksums-verified fetch pin; BASELINE-NOV.md §4). Nothing in this
+document's security posture changed with it: there is still no
+engine-side authentication at the HTTP layer, the transport boundary is
+still the app-private UDS socket file (`-H unix://<socketPath>`,
+`engine/CrushEngine.kt:333`, no TCP listener), and the gate module remains
+unbuilt — the fallback design stays unclaimed.

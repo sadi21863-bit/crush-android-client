@@ -2,7 +2,7 @@
 
 - Researched: **2026-10-17** (all facts checked this date)
 - Base: `https://api.openai.com/v1`
-- App context: Crush Mobile 0.97.1 at research time / the bundled engine (**v0.98.2+dirty** since `d50f26e`, 2026-10-29) calling **OpenAI-compatible Chat Completions** with `stream: true` + tool calls.
+- App context: Crush Mobile 0.97.1 at research time / the bundled engine (**v0.98.2+dirty** since `d50f26e`, 2026-10-29 — the bundle is **v0.99.0** since the 2026-11-01 promotion) calling **OpenAI-compatible Chat Completions** with `stream: true` + tool calls.
 - Sources policy: official only (`developers.openai.com`, `platform.openai.com`, `help.openai.com`, `openai.com`). Community links used ONLY as secondary/discovery. `UNVERIFIED` = claim not confirmable on an official page.
 - Doc convention that worked well: every docs page has a Markdown version — append `.md` to the URL.
 

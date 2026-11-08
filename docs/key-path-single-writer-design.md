@@ -88,3 +88,33 @@ because the engine persists whatever it is handed.
 - `ConfigWriteCrashSafetyTest` — the injector's write-rename order keeps a
   torn write from ever being the file the engine reads (existing behavior,
   now pinned).
+
+---
+
+**Implementation status 2026-11-08.** Half A shipped in `5b1b222`, in a
+shape §3.A permits but does not name literally: instead of a typed
+`ConfigWriteRefused` thrown by a supervisor-injected injector, the injector
+takes an explicit `engineRunning` window parameter — an out-of-window
+request logs and writes NOTHING (the next pre-exec call applies it) — and
+`CrushEngine.start()` pins every injector call inside the pre-spawn region
+(`data/crush/EngineConfigInjector.kt:132–149`). The `restart(reason)` seam
+exists (`engine/EngineSupervisor.kt:185`). And the key story landed at the
+end-state §3.B wanted, without an upstream round-trip: the app never writes
+the provider key to `crush.json` at all — keys ride the socket at handshake
+(`api.setProviderKey` inside `CrushSession.runChain`,
+`data/crush/CrushSession.kt:153`) — so the app-side key writer §1 pinned
+(`EngineConfigInjector`, its write-path window
+:134–167 as of 2026-10-31; the file has always lived at
+`data/crush/EngineConfigInjector.kt`) is gone. The only engine-home writes left in the
+app are model-catalogue merges and the chat tool policy, both pre-exec.
+W2's residual residency stands where the design says it will: the engine
+still persists the runtime key it is handed into `crush.json` (upstream
+behavior; the §3.B upstream ask remains the recorded long pole). The §5
+test names above are the design's, not the tree's — the shipped contract is
+pinned in `EngineConfigInjectorTest` (sibling-field preservation incl. the
+key, idempotency, half-parsable-file-don't-truncate, plus the
+`engineRunning` refusal window) and the spawn-window ordering by the
+`CrushEngine`/supervisor suites; no test named
+`InjectorRefusesWhileAliveTest`, `ProviderSwitchRestartsEngineTest` or
+`ConfigWriteCrashSafetyTest` exists (provider switch coalescing lives in
+`ProviderSwitchPolicy` + `ProviderSwitchPolicyTest`).

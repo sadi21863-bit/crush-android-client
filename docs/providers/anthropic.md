@@ -1,6 +1,6 @@
 # Provider research: Anthropic API (Catwalk id: `anthropic`)
 
-**Date of research: 2026-10-17.** Written for **Crush Mobile** (Crush 0.97.1 engine at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29,
+**Date of research: 2026-10-17.** Written for **Crush Mobile** (Crush 0.97.1 engine at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29 — the bundle is **v0.99.0** since the 2026-11-01 promotion,
 OpenAI-compatible chat completions with streaming + tool calls).
 
 Convention: every claim carries `(source: URL)`. Claims without a source URL are marked **UNVERIFIED**.

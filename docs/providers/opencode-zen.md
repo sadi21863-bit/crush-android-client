@@ -1,6 +1,6 @@
 # OpenCode Zen — provider deep-dive (checked 2026-10-17)
 
-App context: Crush Mobile embeds Crush 0.97.1 (at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29) and calls Zen via OpenAI-compatible
+App context: Crush Mobile embeds Crush 0.97.1 (at research time; the app bundles **v0.98.2+dirty** since `d50f26e`, 2026-10-29 — the bundle is **v0.99.0** since the 2026-11-01 promotion) and calls Zen via OpenAI-compatible
 chat completions (streaming + tool calls). A free tester previously saw 33×402 on
 paid models and 403 on ten `*-free` models. Last provider research: 2026-10-02 era.
 

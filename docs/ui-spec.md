@@ -171,11 +171,19 @@ The P0/P1/P2 sections above are preserved as design rationale (per the
   enter-send as an IME-action toggle card (`a02d882`, this was never on the
   original list).
 - Still open against the tree: #4 pinned user message, #8 follow mode +
-  jump-to-bottom FAB (no follow/FAB code found), item 6's "context window
-  and cost per 1M" detail (ModelSheet shows name + id only), and item 11's
-  friendly empty state — `EmptyState` still renders the bare centered phase
-  word (`ChatScreen.kt:437`). What DID ship from item 11 is the error half:
+  jump-to-bottom FAB (no follow/FAB code found; re-checked 2026-11-08),
+  item 6's "context window and cost per 1M" detail (ModelSheet shows name
+  + id only), and item 11's friendly empty state — `EmptyState` still
+  renders the bare centered phase word (`ChatScreen.kt:481`, re-derived
+  via grep; was `437`). What DID ship from item 11 is the error half:
   the D13 failed-turn card `0dca731` (inline, actionable, Retry).
 - "Several icon buttons lack content descriptions" — re-checked: recent
   audit waves added human phrases + `Role.Button` on tool rows and the
   model "FREE" chip is now a labelled non-interactive Text (`fb5e6dc`).
+- New since that pass, recorded 2026-11-08: the chat output save surface
+  shipped (`fe9e7e8`) — completed assistant bubbles carry Copy message +
+  Save as Markdown (`ChatScreen.kt:567–568`, `ui/screens/chat/ChatExport.kt`)
+  and every code block renders a header row of language label + Copy +
+  "Save as file" chips (`MarkdownText.kt:157–190`, full-block save, never
+  the display trim). This is outside this spec's P0–P2 list (an
+  owner-directed polish batch); no spec item is implied by it.

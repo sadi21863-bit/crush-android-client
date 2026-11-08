@@ -43,7 +43,7 @@ These are the real gaps, ordered by how much they matter for a coding agent.
 
 | Gap | Impact |
 |---|---|
-| **File diffs** | Built and JVM-tested (snapshot → tracked files → diff → render), and the collector endpoint is verified running on device. 2026-11-04: the FIRST real edit turn was measured (imported-folder project: `notes.md` + `todo.md` written into `/storage/emulated/0/Test project folder`) — but the changes rail failed to display it: it counted `0 files changed +0 -0` and listed both files `(unreadable, binary, or too large)`. That external-file event routing is the known defect below; the diff render is still unexercised by end-to-end data |
+| **File diffs** | Built and JVM-tested (snapshot → tracked files → diff → render), and the collector endpoint is verified running on device. 2026-11-04: the FIRST real edit turn was measured (imported-folder project: `notes.md` + `todo.md` written into `/storage/emulated/0/Test project folder`) — but the changes rail failed to display it: it counted `0 files changed +0 -0` and listed both files `(unreadable, binary, or too large)`. That external-file event routing is the known defect below; the diff render was still unexercised by end-to-end data then — *superseded: the `349bad3` drive (2026-11-05) measured this same rail at `2 files changed +2 -0` with the expanded unified hunk rendered on screen, and the P4 Gate-2 drives (2026-11-07) re-proved on-screen hunks + byte-identical Revert on it (see the FIXED and P4 sections below)* |
 | **Tool-call timeline** | Tool activity is a per-message summary, not a live view of what the agent is doing turn by turn |
 | **Per-turn cost display** | Cost is parsed and shown in the drawer only |
 | **Multi-provider** | Plumbing in, 13 ids offered. **Verified end to end: `opencode-zen`, `openrouter`, `opencode-go`** — including Go's PAID lanes, all three measured 2026-11-02 evening: `deepseek-v4.1-flash` + `glm-5.3-flash` turns (21:55) and `deepseek-v4-pro` turn ("Reply with exactly: OK" → `OK`, 22:14), after ~1h paid-lane provision lag post-subscription (the 402s were allowance provisioning, never a client defect — see [providers/opencode-go.md](providers/opencode-go.md)). `hyper` real-key verified to its $0 ceiling (23 live models all `402 authentic-but-unfunded`, `badKey=false`; a completed turn awaits funded credits). `groq` probe-verified but parked. See [providers.md](providers.md) |
@@ -1000,10 +1000,13 @@ All verified on-device against Crush v0.97.1→v0.98.1, not read from docs.
 ## Testing posture
 
 - **455 JVM unit tests** in 39 files (2026-10-31 count; 401 "all passing" was
-  the 2026-10-20 statement — the suite has grown since, not run through this
-  count here).
+  the 2026-10-20 statement — the suite has grown since). **Current verified
+  count: 594, all passing (2026-11-08** — `@Test` grep under
+  `app/src/test/java` at code HEAD `fe9e7e8`; that commit's local gate ran 594
+  tests + both assembles + lintRelease).
 - **Six** `MockWebServer`-backed test files (2026-10-31 count; two as of
-  2026-10-20) assert on real HTTP order and on requests
+  2026-10-20; **eight** as of 2026-11-08) assert on real HTTP order and on
+  requests
   actually reaching the server — the latter exists because a method that throws
   before the call produces a *passing-looking* no-op, which is exactly how
   `deleteSession` failed silently for so long.

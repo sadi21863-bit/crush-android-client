@@ -7,7 +7,8 @@ pointers — it never copies long sections; each claim links the ledger
 that owns it. Facts that moved after the pack's pin are restated here
 from the repo's own records, with what was re-verified live marked.
 
-Last verified: HEAD `f5d24dc` (2026-11-05/06 night).
+Last verified: code HEAD `fe9e7e8` (2026-11-08 — the chat output save
+surface, CI run 42403223894 green); only docs-only commits collect above it.
 
 ---
 
@@ -141,10 +142,10 @@ mirrored locally with their full reasoning in the plan doc
 
 | Gate | Content | STATUS (2026-11-05, at `1d229de`) |
 |---|---|---|
-| 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **PARTIAL** — S-01 landed (`7ec34ed`) + S-04 landed (`f5d24dc`); **S-02 (restore trust) still OPEN, next batch** |
+| 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **BLOCKED per pack until Gates 0+1 land** |
+| 3 | Frontend v2 | pack's **BLOCKED condition is lifted** — Gates 0+1 are closed (2026-11-06/07); not started beyond that (2026-11-08 refresh) |
 | 4 | handoff (Chat→Code P6-style seam) | QUEUED |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |

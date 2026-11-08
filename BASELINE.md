@@ -144,8 +144,10 @@ only re-checked that its claims are true statements about that state:
 - Tag `baseline/2026-10-17` and commit `4e67aae608ada9778a0f48f94d7a5e2f7f39911a`
   both resolve; `git log -1 4e67aae` = "Finish-error parsing: nested-object
   details…", consistent with the freeze date.
-- `app/build.gradle.kts:54` still points at `minSdk = 29` (targetSdk 36 at :55,
-  compileSdk 37 at :40); toolchain rows (JBR 25.0.3 not re-hashed, Gradle 9.8.0,
+- `app/build.gradle.kts:58` still points at `minSdk = 29` (targetSdk 36 at :59,
+  compileSdk 37 at :44; line numbers re-checked 2026-11-08 — they were
+  :54/:55/:40 when this pass ran); toolchain rows (JBR 25.0.3 not re-hashed,
+  Gradle 9.8.0,
   AGP 9.4.1, Kotlin 2.4.10, Compose compiler 2.4.20, BOM 2026.09.00) all match
   the current build files and wrapper.
 - NOT re-run (gradle/adb forbidden this session): the 386-test runner count and

@@ -40,7 +40,7 @@ Its pre-fork segment carries:
 
 | Component | License | Source |
 |---|---|---|
-| AndroidX Compose, Material3, lifecycle, navigation, activity, fragment | Apache-2.0 | androidx packages on Google Maven |
+| AndroidX Compose, Material3, lifecycle, navigation, activity, fragment, core-ktx, DataStore (`androidx.datastore:datastore-preferences:1.2.1`), Room (`androidx.room:room-runtime` / `room-ktx` 2.8.5 — the KSP `room-compiler` is build-time only and ships nowhere) | Apache-2.0 | androidx packages on Google Maven |
 | OkHttp + OkHttp-SSE 5.x | Apache-2.0 | https://github.com/square/okhttp |
 | junixsocket (AF_UNIX transport, vendored native .so) | Apache-2.0 | https://github.com/kohlschutter/junixsocket |
 | Gson 2.x | Apache-2.0 | https://github.com/google/gson |
@@ -48,7 +48,9 @@ Its pre-fork segment carries:
 
 AndroidX and the Kotlin libraries above are redistributed as dex; the Apache
 2.0 texts are included upstream and referenced here. Test-only dependencies
-(Robolectric, MockWebServer, JUnit) are not shipped in the APK and are listed
+(Robolectric, MockWebServer, JUnit 4, kotlinx-coroutines-test, and the
+androidx.test / Compose-UI-test instrumented-test stack declared under
+`androidTestImplementation`) are not shipped in the APK and are listed
 in app/build.gradle.kts.
 
 ## Trademarks

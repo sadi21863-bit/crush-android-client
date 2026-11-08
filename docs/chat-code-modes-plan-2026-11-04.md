@@ -15,6 +15,36 @@
 > Gate-1 (E2/E4/E5/E6) priorities supersede this file's historical
 > S0→S5 slice ordering (§4) and the §5 "implementation NOT started"
 > framing**, which is retained only for record.
+>
+> **Addendum 2026-11-08 (state refresh only; no decision text touched):**
+> the §1 sentence "Remaining Code-mode gaps are the changes rail on
+> external files and a true Review/revert surface" has since closed —
+> the Gate-2 review/revert+export surface SHIPPED and was device-proven
+> 2026-11-07 (`5f14dfc`/`c8dd154`, export-no-op fix `bf5019a`):
+> per-turn change collector → ReviewHistory runtime store (MAX_CARDS = 8,
+> process-memory only — the screen's header line says "Per-turn file
+> changes recorded while the app runs. History clears when the app
+> process ends", `domain/file/ReviewHistory.kt:47` +
+> `ui/screens/review/ReviewScreen.kt:121–128`), per-file
+> Revert with the confirm dialog and honest refusal surfaces, and the SAF
+> "Export a
+> copy" with byte-exact parity proven on device
+> (`ui/screens/review/ReviewScreen.kt`). §7's "G6 ... backlog post-v1"
+> reads accordingly: G6 is no longer backlog. P5's wrap also landed the
+> owner-directed chat output save batch `fe9e7e8`
+> (`ui/screens/chat/ChatExport.kt`: copy/whole-message save +
+> per-code-block Copy/Save-as-file chips) — app-side polish only, no new
+> engine capability, S-01 deny-all untouched. And the A06 `mkdir` card
+> probe that §4/§7 still describe as "drive PENDING" was MEASURED that
+> same 2026-11-05 evening (card fired for the non-safe chained command,
+> deny honored +0 -0, nothing executed — capabilities.md "A06 acceptance
+> drive"), so the renamed MODE-06 completion probe is done; the honest
+> residual (denied turn slides to the no-reply failure banner instead of
+> a narrated refusal) is recorded in that drive entry. P6 handoff prep
+> is authored in
+> [design-handoff-p5-p6-2026-11-08.md](design-handoff-p5-p6-2026-11-08.md),
+> with five owner decisions listed there and nothing proceeding without
+> them.
 
 Status: PLAN with user decisions RECORDED (§5) and the independent review
 FOLDED IN (§7, user-approved "fold fully") — no code written, implementation

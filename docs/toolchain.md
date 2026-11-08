@@ -2,11 +2,21 @@
 
 ## Current state (verified on device, 2026-10-02)
 
-*Re-verified against the build files on **2026-10-31**: every version in this
-table is unchanged (wrapper 9.8.0; AGP 9.4.1, Kotlin 2.4.10 and Compose plugin
-2.4.20 in the root `build.gradle.kts`; bytecode 17 in `app/build.gradle.kts`;
-`build-install.bat` still documents JBR 25.0.3). R8/minify stays off and lint
-stays disabled by decision in `app/build.gradle.kts`.*
+*Re-verified against the build files on **2026-10-31** and again
+**2026-11-08**: every version in this table is unchanged (wrapper 9.8.0;
+AGP 9.4.1, Kotlin 2.4.10 and Compose plugin 2.4.20 in the root
+`build.gradle.kts`; bytecode 17 in `app/build.gradle.kts`;
+`build-install.bat` still documents JBR 25.0.3). The two deliberate-OFF
+settings the 2026-10-31 pass reported are no longer current: lint is
+re-enabled at the AGP defaults (the `checkReleaseBuilds=false` /
+`abortOnError=false` defusal overrides were deleted in `5325d68` and
+`lintRelease` is green in the gate), and R8/minify is ON for release —
+`isMinifyEnabled = true` + `proguard-rules.pro` (`app/build.gradle.kts:107`),
+landed `37c93cb` (release APK 73.2 → 28.8 MB measured; the signed
+`r8probe` buildType carries the on-device runtime proof closed
+2026-11-02, BASELINE-NOV.md §5). The `android.builtInKotlin=false` /
+`android.newDsl=false` opt-outs below are still in place
+(`gradle.properties:42/47`).*
 
 | Component | Version | Notes |
 |---|---|---|
@@ -33,7 +43,8 @@ that Kotlin's own guidance treats them as sharing one version reference. That is
 a reasonable de-risking step, but it is a **change to be made deliberately**, not
 a bug to be fixed: the build was green across 401 unit tests and repeated signed
 release builds on AGP 9.4.1 / Gradle 9.8 with the split in place. (The suite has
-grown since: 455 `@Test` methods in 39 files as of 2026-10-31.) If aligning,
+grown since: 455 `@Test` methods in 39 files as of 2026-10-31, 594 in
+57 files as of 2026-11-08.) If aligning,
 change both to 2.4.20 in one commit and re-run the full suite.
 
 ## The AGP 10 problem

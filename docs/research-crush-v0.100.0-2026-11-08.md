@@ -51,19 +51,28 @@ v0.100.0: 67 artifacts.
   (`2000857`), title generation can't outlive its run (`280ea89`),
   truncated/provider-stopped responses surfaced (`9345eef`).
 
-## 3. THE ANDROID BUILD — verified true
+## 3. THE ANDROID BUILD — verified true (correction applied 2026-11-09)
 
-`v0.100.0` ships **`crush_0.100.0_Android_arm64.tar.gz`** (+ sbom) — an
-official `GOOS=android / GOARCH=arm64` artifact, plus full per-platform
-flows (Linux/macOS/FreeBSD/NetBSD/OpenBSD tar.gz, Windows zips, deb/rpm,
-and **Alpine `apk` packages — NOT Android**; naming trap worth recording).
- checksums + sigstore (`checksums.txt`, `checksums.txt.sigstore.json`,
-packslip.sigstore.json) ride the release. IMPACT for us: the upgrade
-ladder can take the OFFICIAL android arm64 artifact into
-`app/src/main/jniLibs/arm64-v8a/libcrush.so` (with checksum verification
-the same way the CURRENT fetch path veries) rather than repackaging a
-desktop binary. `tools/fetch-crush.ps1` (pinned `Version = 0.99.0`) is the
-single knob.
+The ladder branch consumed this fact FIRST, so the record must be exact:
+**the official Android artifact is NOT new in v0.100.0** — v0.99.0 already
+shipped the identically structured `crush_0.99.0_Android_arm64.tar.gz`
+(+ sbom), and THIS repo's fetch path was recorded against it. What
+v0.100.0 adds is new CONTENT (subagents, Sysadmin Mode, the four agent
+tools), not a new artifact shape. The branch's script comment states the
+verified why, and the v0.100.0 asset was independently cross-checked:
+`crush_0.100.0_Android_arm64.tar.gz` byte-hash equals its checksums.txt
+line (`cdb15f23393c7e334b059a37d2c41a12fcb5f4d02d6e940795b7707e4b0afeaa`),
+unpacks to `crush_0.100.0_Android_arm64/{LICENSE,README,completions,
+manpages,crush}`, and the binary is an AArch64 PIE (e_type=3, e_machine=
+183, ~94.8 MB). The full per-platform flow rides the release (deb/rpm/
+Windows zips/BSD/netbsd/openbsd + **Alpine `apk` packages — NOT Android**;
+naming trap worth recording). checksums + sigstore (`checksums.txt`,
+`checksums.txt.sigstore.json`, packslip.sigstore.json) ride the release.
+IMPACT for us: the ladder takes the OFFICIAL android arm64 artifact into
+`app/src/main/jniLibs/arm64-v8a/libcrush.so` with checksum verification —
+`tools/fetch-crush.ps1` on the `engine-v0100-ladder` branch is already
+rebuilt for exactly this (Version 0.100.0; strict checksum parse BEFORE
+extraction; `-ExpectedSha256` still wins).
 
 ## 4. Upcoming updates — 19 nightly commits after v0.100.0 (subjects, gh-verified)
 

@@ -111,7 +111,9 @@ internal fun replayRow(m: StreamMessage): ChatMessage? {
  * user can finish sending a turn - send() claims `isStreaming` synchronously,
  * so the window is real. The merge keeps replayed order first (it defines the
  * transcript), and appends any live rows the replay does not contain: the
- * user row and the streaming bubble of the turn that beat the history.
+ * user row, the streaming bubble, and - when the auto-deny (S4/P5) already
+ * fired mid-turn - the turn's transfer-note system row, which the engine
+ * replay can never contain because it is render-only view state.
  * Pure so the shape stays pinned by a test.
  */
 internal fun mergeReplay(
@@ -141,6 +143,77 @@ internal fun liveRowsForOpenSession(
     onScreen: List<ChatMessage>
 ): List<ChatMessage> =
     if (currentlyViewedSession == targetSession && runInFlight) onScreen else emptyList()
+
+/**
+ * The S-4 "smart transfer" denial note (decisions-open §10 P5).
+ *
+ * When a Chat (conversation-only, S-4 auto-deny) turn visibly attempts a
+ * capability the chat pool denies, ONE small honest hint is attached to the
+ * turn: a `role = "system"` row the transcript renders as a centered
+ * bodySmall line - NOT the formerly-fabricated assistant paragraph (which
+ * read as model speech and even picked up the copy/save affordances), NOT an
+ * error card, and never a scroll trigger beyond the transcript's own
+ * near-bottom-only autoscroll.
+ *
+ * PERSISTENCE - RENDER-ONLY, ephemeral per-session view state. The note is
+ * appended to the view model's message list only; the engine transcript never
+ * holds it (the engine already records the denied permission itself), so
+ * [replayRow] - which rebuilds a reopened session from engine records - can
+ * never emit one, and a note recorded today disappears when the session's
+ * history is re-fetched (its only survival path is [liveRowsForOpenSession]
+ * carrying it within an in-flight run, where [mergeReplay]'s id dedupe keeps
+ * it there exactly once).
+ *
+ * DEDUPE PER TURN: the note id is derived from the RUNNING TURN's id, so a
+ * second deny inside the same turn (the model retrying another tool after
+ * the first was denied) collapses onto the row already on screen - one hint
+ * per turn, not one per attempt. Idempotent re-render comes free from the
+ * same id, on screen and through [mergeReplay].
+ *
+ * ENGINE-SIDE REJECTED TOOLS - NOT WIRED, and why: a tool call the ENGINE
+ * itself rejects (rather than merely failing) has no clean typed signal on
+ * this app's stream. CrushEvent tool_call parts carry only the `finished`
+ * boolean plus non-typed `state`/`error` strings (ToolActivity.kt, wire
+ * evidence pinned there); they map to ToolState.FAILED, which
+ * indistinguishably covers every runtime failure (a bash exit code, a
+ * missing file), so keying the hint on it would mislabel healthy failed
+ * calls as "take this to Code". Parsing the model's own English for
+ * "not available" was ruled out for this batch (dishonest guesswork) - a v2
+ * idea only if a typed unavailable/denied signal ever appears on the wire.
+ *
+ * Wording variants considered (§10 asks for polish plus honesty; 1 picked):
+ *  1. "write" - enclosed in straight quotes in the line - is off in Chat; a
+ *     project (Code mode) session can run this. (names the attempted
+ *     capability; the fallback is the generic form when the request name is
+ *     blank)
+ *  2. "Crush tools stay off in Chat - this capability lives in a project
+ *     (Code mode) session." (generic; ignores WHICH tool was attempted)
+ *  3. "Chat can't run tools - a project (Code mode) session can do this."
+ *     (bluntest; "can't" understates that the pool is off by design)
+ */
+internal fun turnDenialNote(turnId: String, toolName: String): ChatMessage =
+    ChatMessage(
+        id = "s4-deny-$turnId",
+        role = "system",
+        text = denialNoteText(toolName)
+    )
+
+/** The note's one-line text; sees the tool name only when it is known. */
+internal fun denialNoteText(toolName: String): String =
+    if (toolName.isBlank()) {
+        "Crush tools are off in Chat - a project (Code mode) session can run this."
+    } else {
+        "\"$toolName\" is off in Chat - a project (Code mode) session can run this."
+    }
+
+/**
+ * Appends [note] unless a note for the same turn is already in [messages],
+ * or the turn raised no denial at all ([note] null): a list is returned
+ * unchanged in both cases, so the caller never re-prints and a quiet turn
+ * stays quiet.
+ */
+internal fun appendDenialNote(messages: List<ChatMessage>, note: ChatMessage?): List<ChatMessage> =
+    if (note == null || messages.any { it.id == note.id }) messages else messages + note
 
 /**
  * [Immutable] is an ASSERTION, not a derivation (analysis §4 P0-1): without it
@@ -2873,12 +2946,15 @@ class ChatViewModel(
                                         _state.update { st ->
                                             st.copy(
                                                 pendingPermission = req,
-                                                messages = st.messages + ChatMessage(
-                                                    id = UUID.randomUUID().toString(),
-                                                    role = "assistant",
-                                                    text = "Chat is conversation-only, so \"" +
-                                                        req.toolName + "\" was blocked. " +
-                                                        "Open a Code project and run this there."
+                                                // P5 (§10): the small transfer hint -
+                                                // one system line per turn, not a
+                                                // fabricated assistant paragraph.
+                                                // See [turnDenialNote] for the
+                                                // render-only persistence and the
+                                                // engine-signal finding.
+                                                messages = appendDenialNote(
+                                                    st.messages,
+                                                    turnDenialNote(handle.turnId, req.toolName)
                                                 )
                                             )
                                         }

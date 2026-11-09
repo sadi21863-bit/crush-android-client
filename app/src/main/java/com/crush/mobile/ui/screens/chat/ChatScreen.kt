@@ -41,6 +41,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -503,6 +504,30 @@ private fun Bubble(
     retryEnabled: Boolean = false,
     onRetry: () -> Unit = {}
 ) {
+    // S-4 transfer note (decisions-open §10 P5): the app's own honest hint
+    // that the capability the turn attempted belongs to a project (Code
+    // mode) session. A deliberately SMALL surface - one centered bodySmall
+    // onSurfaceVariant line the note text carries - so it reads as the
+    // transcript's own margin note, not as an error card or as model speech
+    // (the system role also keeps it out of the copy/save and retry paths
+    // below). Polite live region per the file's a11y rule: the app DID deny
+    // a tool mid-turn, so the plain phrase is announced once wherever the
+    // reader is, without moving focus; the transcript's near-bottom-only
+    // autoscroll is what keeps the line from yanking the user's scroll.
+    // App-side only, ephemeral per-session view state - see [turnDenialNote]
+    // for the persistence story and dedupe guarantee.
+    if (m.role == "system") {
+        Text(
+            m.text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { liveRegion = LiveRegionMode.Polite }
+        )
+        return
+    }
     val isUser = m.role == "user"
     Column(
         modifier = Modifier.fillMaxWidth(),

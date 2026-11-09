@@ -37,6 +37,7 @@ surfaced on a phone.
 | In-app diagnostics | Device/ABI/engine status, archived crash, log tail, copy/share report |
 | Settings | Key replace/delete, permission mode, diagnostics entry point |
 | Prewarm | Eager engine start when enabled; lazy on first keystroke otherwise |
+| Handoff resume path (P6 Batch D) | RESUME sheet surface for an approved-but-undispatched row dispatches on the existing approval; explicit discard writes ABANDONED (DISPATCHED traces refuse it); no-alias replace; Open in Code jump; F04 dialog rewired in; gate green (`20e8347`), device drive pending |
 
 ## Not implemented
 
@@ -1004,6 +1005,50 @@ runner vs ask-card bash; a 72 B `.crushrc` probe residue from
 Evidence: consent-sheet and drive screenshots, `app.log` lines, the
 pulled Room db+WAL rows; the device sdcard probe files (`dc_glob_*`,
 `dc_pull_*`) were removed after capture.
+
+**P6 BATCH D BUILD (2026-11-09, `20e8347`; the post-approval surface
+Batch C's comments deferred to "Batch D's piece") — code-side COMPLETE,
+device drive pending:** one consenting sheet now serves three modes over
+Batch A's guarded status machine. DRAFT is Batch C unchanged (cancel
+stays silent, cancel-never-inserted untouched). RESUME surfaces a
+resumable APPROVED row (the failed/never-started dispatch case the Batch
+A guarantee protected): the approved summary is READ-ONLY - what the
+user approved is what dispatches, immutably - and Confirm (relabeled
+Dispatch) stamps `markDispatched` ON the existing approval, the original
+`userApprovedAt` riding the first turn verbatim; `markApproved` is
+single-shot and stays untouched. The explicit "Discard this handoff"
+runs the guarded abandon (DRAFT/APPROVED only) and leaves every other
+column intact - the approval stamp survives as the record; a DISPATCHED
+trace offers no discard (the DAO refuses it; it is the proof-row-(b)
+object). The no-alias replace (plan :416): a destination change abandons
+the approved row and the SAME Confirm approves a fresh draft - with the
+ordering hazard found and fixed in-review: the new destination's
+gate+record completes BEFORE the abandon, so the F04 dialog's re-call
+repeats only read-only steps (a first-cut abandon-first would have
+dead-ended the user mid-consent; the reorder is the honest fix). The F04
+dialog itself is now the handoff path's consent verdict: Required /
+moved-inside-window publish to a screen-local `CrushrcTrustDialog` (the
+Projects row-tap pattern) whose Allow re-calls the same entry and finds
+Allow - the second gate runs the identical code path. And the
+DISPATCHED surface's "Open in Code" re-opens the target Code session:
+the dispatch's bind choreography extracted ONCE (`bindCodeForHandoff` -
+the settle beat and the liveness budget gate included) and then
+`openSession`, the session drawer's own epoch-guarded route with history
+replay; the COLD-BOOT extension beside `restoreLastBinding` stays batch
+G (the plan's division, unchanged). The sheet-open gains the trace
+classification read (`HandoffDao.rowsForSource`, newest first): newest
+DISPATCHED = jump surface, newest APPROVED = resume surface, else the
+untouched draft, else the fresh prefill - an ABANDONED head re-taps into
+an honest fresh handoff. Gate: local run verified per-XML (660 tests, 0
+failures, 0 errors - 653 + the 7 new rows: discard-abandons-approved
+with the stamp survival + re-entry refusal, discard-refused-on-
+dispatched byte-identical trace, rowsForSource newest-first ordering,
+the no-alias replace DAO path, resume-stamp-keeps-original-approval,
+mode classification + slot exclusivity, the resume decision helper);
+CI run 42653529569 GREEN 2m42s. HONESTY (recorded in the commit too):
+the first local gate's client survived a host restart as a detached job
+and completed the work; the observed re-run verified 90 tasks
+UP-TO-DATE and the suite verdict was taken per-XML.
 
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 

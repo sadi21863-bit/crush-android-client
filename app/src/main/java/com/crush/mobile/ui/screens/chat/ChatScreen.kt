@@ -171,6 +171,12 @@ fun ChatScreen(
     LaunchedEffect(s.stopNotice) {
         s.stopNotice?.let { snackbarHostState.showSnackbar(it) }
     }
+    // The handoff flow's honest one-liners (P6 Batch C): consent refusals,
+    // dispatch failures that leave the row APPROVED and resumable, and the
+    // same failure surface a delete or a stop uses.
+    LaunchedEffect(s.handoffNotice) {
+        s.handoffNotice?.let { snackbarHostState.showSnackbar(it) }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -312,7 +318,11 @@ bottomBar = {
                                 vm.setInput(t)
                                 vm.send()
                             }
-                        }
+                        },
+                        // P6 Batch C entry chip: the tapped bubble's index drives
+                        // the sheet's prefill prefix (handoffSheetFor), keeping
+                        // Batch B's prefill the only summary wording source.
+                        onUsePlan = { vm.openHandoffSheet(idx) }
                     )
                 }
 
@@ -476,6 +486,28 @@ bottomBar = {
             onDismiss = { showModels = false }
         )
     }
+
+    // P6 Batch C: the Chat->Code handoff consent sheet. The selection and the
+    // edited summary are hoisted HERE (the chip/tap lifecycle is view state),
+    // keyed on the sheet instance so every fresh open starts from its own
+    // prefill and its own no-project default. Confirm carries both back as
+    // parameters - the ViewModel can only express a Confirm as a fresh
+    // package seal, which is the composable-contract face of the no-alias
+    // rule (plan :416).
+    s.handoffSheet?.let { sheet ->
+        var selectedDestination by remember(sheet) { mutableStateOf<String?>(null) }
+        var summaryDraft by remember(sheet) { mutableStateOf(sheet.initialSummary) }
+        HandoffConsentSheet(
+            sheet = sheet,
+            projects = s.handoffProjects,
+            selectedDestination = selectedDestination,
+            summary = summaryDraft,
+            onSummary = { summaryDraft = it },
+            onSelect = { selectedDestination = it },
+            onConfirm = { vm.confirmHandoff(summaryDraft, selectedDestination) },
+            onDismiss = { vm.closeHandoffSheet() }
+        )
+    }
 }
 
 @Composable
@@ -502,7 +534,12 @@ private fun Bubble(
     // prompt available to re-send; drives the card's Retry affordance.
     retryText: String? = null,
     retryEnabled: Boolean = false,
-    onRetry: () -> Unit = {}
+    onRetry: () -> Unit = {},
+    // P6 Batch C: non-null turns on the "Use this plan in Code" chip in the
+    // completed-assistant actions row. The sheet's prefill re-selects THIS
+    // bubble's text through Batch B's prefill contract (the tapped index
+    // prefixes the transcript), so the chip's gate and Copy's stay one gate.
+    onUsePlan: (() -> Unit)? = null
 ) {
     // S-4 transfer note (decisions-open §10 P5): the app's own honest hint
     // that the capability the turn attempted belongs to a project (Code
@@ -584,13 +621,17 @@ private fun Bubble(
                 }
             }
             // Completed assistant text gets an always-visible actions row -
-            // copy the whole message, or save it as a .md via the SAF picker.
-            // App-side only (see ChatExport.kt): no tool fires, the engine
-            // never sees this, S-01's deny-all chat policy is untouched.
+            // copy the whole message, save it as a .md via the SAF picker,
+            // or hand the plan into a Code project (P6 Batch C). App-side
+            // only (see ChatExport.kt): no tool fires, the engine never
+            // sees this, S-01's deny-all chat policy is untouched.
             // Hidden while streaming (a save mid-draw is a partial artifact)
             // and on failed rows (that card's affordance is Retry, not save).
-            if (!isUser && !m.isStreaming && m.error == null && m.text.isNotEmpty()) {
-                MessageActionsRow(m.text)
+            // The gate is ONE expression - handoffEntryVisible, extracted
+            // verbatim from this line - so the handoff chip provably rides
+            // the Copy/Save gate's conjunction rather than a lookalike.
+            if (handoffEntryVisible(m)) {
+                MessageActionsRow(m.text, onUsePlanInCode = onUsePlan)
             }
         }
     }

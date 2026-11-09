@@ -173,15 +173,28 @@ internal fun copyToClipboard(
 }
 
 /**
- * The whole-message row under a completed assistant bubble: "Copy message"
- * and "Save as Markdown". Buttons, not gestures: long-press surfaces hide
- * from new users on a phone, and the Review screen's TextButton grammar is
- * what the app already reads. Rendered only for completed assistant text -
- * a streaming bubble saves half-drawn content and a failed turn's recovery
- * affordance is Retry, not save.
+ * The whole-message row under a completed assistant bubble: "Copy message",
+ * "Save as Markdown", and - P6 Batch C - "Use this plan in Code". Buttons,
+ * not gestures: long-press surfaces hide from new users on a phone, and the
+ * Review screen's TextButton grammar is what the app already reads.
+ * Rendered only for completed assistant text - a streaming bubble saves
+ * half-drawn content and a failed turn's recovery affordance is Retry, not
+ * save.
  */
 @Composable
-internal fun MessageActionsRow(text: String) {
+internal fun MessageActionsRow(
+    text: String,
+    /**
+     * P6 Batch C (plan c1): when the caller offers the handoff entry, a
+     * third chip - "Use this plan in Code" - opens the consent sheet with
+     * [text] as the summary draft; null keeps the row exactly as it was.
+     * The chip renders inside THIS row, so it carries the
+     * completed-assistant gate by construction - [handoffEntryVisible] is
+     * that gate extracted verbatim as the named predicate the call site
+     * composes.
+     */
+    onUsePlanInCode: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val saver = rememberChatTextSaver()
@@ -199,6 +212,14 @@ internal fun MessageActionsRow(text: String) {
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
         ) {
             Text("Save as Markdown", style = MaterialTheme.typography.labelSmall)
+        }
+        onUsePlanInCode?.let { usePlan ->
+            TextButton(
+                onClick = usePlan,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("Use this plan in Code", style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
 }

@@ -35,11 +35,17 @@ import com.crush.mobile.data.crush.StreamMessage
 import com.crush.mobile.data.crush.WorkspaceLease
 import com.crush.mobile.data.crush.WorkspaceManager
 import com.crush.mobile.data.local.SecureKeyStore
+import com.crush.mobile.data.project.TrustVerdict
 import com.crush.mobile.di.AppContainer
+import com.crush.mobile.domain.handoff.HandoffPackage
+import com.crush.mobile.domain.handoff.HandoffPackageDraft
+import com.crush.mobile.domain.handoff.RedactionVerdict
+import com.crush.mobile.domain.handoff.firstPrompt
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.EnginePaths
 import com.crush.mobile.engine.EngineSockets
 import com.crush.mobile.engine.EngineState
+import com.crush.mobile.project.ProjectRef
 import com.crush.mobile.util.AppLog
 import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.CancellationException
@@ -385,7 +391,35 @@ val selectedModel: String = "",
      * id is the engine's vocabulary - `opencode` does not exist and 500s - so it
      * is never assembled from a provider's public name.
      */
-    val providerId: String = Providers.DEFAULT.id
+    val providerId: String = Providers.DEFAULT.id,
+
+    // ------------------------------------------------------------------
+    // P6 Batch C - the Chat->Code handoff consent surface.
+    // ------------------------------------------------------------------
+
+    /**
+     * Non-null while the consent sheet is open. Carries the Batch B prefill
+     * product (the summary the composer initialises from plus the source
+     * provenance the first turn renders) and, when present, the untouched
+     * Draft row the current-draft lookup re-opened. The sheet itself holds
+     * no state - see HandoffConsentSheet.
+     */
+    val handoffSheet: HandoffSheetState? = null,
+
+    /**
+     * The destination picker's rows: a read-only view of the Room projects
+     * table (plan Batch D (d1) - the row's stable UUID is the only thing
+     * Confirm ever writes). Loaded when the sheet opens; refreshable.
+     */
+    val handoffProjects: List<ProjectRef> = emptyList(),
+
+    /**
+     * The handoff flow's honest one-liner (consent refusal, a failed
+     * dispatch that leaves the row APPROVED and resumable, unavailable
+     * stores). Shown through the same snackbar channel deleteError and
+     * stopNotice use; null means nothing to say.
+     */
+    val handoffNotice: String? = null
 ) {
     val fileChangesLabel: String? get() {
         val s = fileChanges ?: return null
@@ -2163,6 +2197,417 @@ class ChatViewModel(
         }
     }
 
+    // ==================================================================
+    // P6 Batch C - the Chat->Code handoff (consent sheet + dispatch
+    // route), build plan `build-plan-handoff-p6-2026-11-08` §Batch C/D/E.
+    //
+    // STATE MAPPING (decide-and-document):
+    // - Cancel (silent) maps to "never inserted": the sheet writes no row
+    //   before Confirm, so a pre-approval cancel UNDOES NOTHING - no
+    //   abandon() runs. The plan's Batch D note's explicit post-approval
+    //   cancel (an orientable ABANDONED row via HandoffDao.abandon) is a
+    //   later batch's move on an ALREADY-written row.
+    // - Confirm is the only writer: seal -> insertDraft(DRAFT row, the
+    //   fingerprint column staying NULL until Batch F's stat walk) ->
+    //   markApproved (guarded) -> dispatch. Every guarded miss is an
+    //   honest notice; a dispatch failure leaves the row APPROVED and
+    //   resumable - never a half-claimed DISPATCHED (plan e1).
+    // - The row IS the cross-restart trace (Batch D's G scenario); a
+    //   cold-boot resume route is NOT built in this batch (documented
+    //   deferral: Batch D+ reads the DISPATCHED row and re-opens the
+    //   target session from it).
+    // ==================================================================
+
+    /**
+     * Opens the consent sheet from the "Use this plan in Code" chip under a
+     * completed assistant bubble at [tappedIndex]. [handoffEntryVisible] is
+     * the row's own gate; a tap that no longer matches it (a re-render race)
+     * is quietly ignored rather than opening a sheet for a row the screen
+     * would not offer the entry chip for.
+     */
+    fun openHandoffSheet(tappedIndex: Int) {
+        val s = _state.value
+        if (s.messages.getOrNull(tappedIndex)?.takeIf(::handoffEntryVisible) == null) return
+        val sourceId = s.activeSessionId
+        val active = s.sessions.firstOrNull { it.id == s.activeSessionId }
+        viewModelScope.launch {
+            // ONE state write after both reads: the machine prefill and the
+            // current-draft lookup settle in the same breath, so the composer
+            // never flashes the prefill text before the user's own persisted
+            // draft replaces it.
+            val sheet = handoffSheetFor(
+                messages = _state.value.messages,
+                tappedIndex = tappedIndex,
+                sourceChatId = sourceId,
+                sourceSessionTitle = active?.let(SessionList::label) ?: "New chat",
+                sourceUpdatedAtSec = active?.updatedAt ?: 0L,
+            )
+            // The current-draft lookup (Batch A's latestDraftForSource - the
+            // DAO's own Batch C contract): the user's untouched DRAFT row
+            // beats the machine prefill in the composer, no twin minted.
+            val existing = sourceId?.let { id ->
+                runCatching {
+                    container.projectStore.handoffDao().latestDraftForSource(id)
+                }
+                    .onFailure { AppLog.w(TAG, "handoff current-draft lookup failed: ${it.message}") }
+                    .getOrNull()
+            }?.takeIf(::handoffUsableExistingDraft)
+            _state.update {
+                it.copy(
+                    handoffSheet = existing?.let { sheet.withExisting(it) } ?: sheet,
+                    handoffNotice = null,
+                )
+            }
+            loadHandoffProjects()
+        }
+    }
+
+    /**
+     * Silent cancel: nothing was written, nothing is undone, nothing binds.
+     * No Room row exists to be abandoned (Batch A guarantee) and the trust
+     * gate never ran (nothing attached, plan proof row (a)).
+     */
+    fun closeHandoffSheet() {
+        AppLog.i(TAG, "handoff sheet cancelled; no row was written, nothing bound")
+        _state.update { it.copy(handoffSheet = null) }
+    }
+
+    /** Refreshes the destination picker's rows (the projects table). */
+    fun loadHandoffProjects() {
+        viewModelScope.launch {
+            val rows = runCatching { container.projectStore.list() }
+                .onFailure { AppLog.w(TAG, "handoff project rows read failed: ${it.message}") }
+                .getOrDefault(emptyList())
+            _state.update { it.copy(handoffProjects = rows) }
+        }
+    }
+
+    /**
+     * Confirm: approve the summary into the row, then dispatch the first
+     * turn into the chosen project's Code session. Refusals before any row
+     * write keep the sheet open with an honest notice (the user's edit is
+     * never lost to a refusal); once the row is APPROVED the sheet closes
+     * and the dispatch's own notices ride the snackbar.
+     */
+    fun confirmHandoff(summary: String, destinationId: String?) {
+        val sheet = _state.value.handoffSheet ?: return
+        if (destinationId == null) {
+            // The Confirm gate makes this unreachable on device (a belt, and
+            // the programmatic counterpart of the composable contract).
+            AppLog.w(TAG, "handoff confirm refused: no destination chosen")
+            return
+        }
+        if (_state.value.isStreaming) {
+            AppLog.w(TAG, "handoff confirm refused: a turn is in flight")
+            _state.update {
+                it.copy(handoffNotice = "A turn is running - stop or finish it before handing off.")
+            }
+            return
+        }
+        viewModelScope.launch {
+            val dao = runCatching { container.projectStore.handoffDao() }.getOrElse { failure ->
+                AppLog.e(TAG, "handoff store unavailable: ${failure.javaClass.simpleName}: ${failure.message}")
+                _state.update { it.copy(handoffNotice = "The handoff store is unavailable. Nothing approved.") }
+                return@launch
+            }
+            // The source chat id is the seal's only hard requirement (Batch B:
+            // "a handoff draft seals only with the app's best-known source chat
+            // id"). A completed bubble with no bound session id is a degraded
+            // open whose trace would be a lie - refuse honestly.
+            if (sheet.sourceChatId == null) {
+                AppLog.w(TAG, "handoff confirm refused: no source chat id to trace")
+                _state.update {
+                    it.copy(handoffNotice = "This chat has no session id to trace - the handoff cannot start.")
+                }
+                return@launch
+            }
+            // 1. The destination resolves through the projects TABLE (the
+            // ADR-0001 row id, never a label or path alias - plan Batch D (d1)).
+            val targetUuid = runCatching { java.util.UUID.fromString(destinationId) }.getOrNull()
+            val ref = targetUuid?.let { id ->
+                runCatching { container.projectStore.byId(id) }
+                    .onFailure { AppLog.w(TAG, "handoff project read failed: ${it.message}") }
+                    .getOrNull()
+            }
+            if (ref == null) {
+                AppLog.w(TAG, "handoff confirm: destination row gone ($destinationId)")
+                _state.update {
+                    it.copy(handoffNotice = "That project row no longer exists - pick another destination.")
+                }
+                return@launch
+            }
+            // 2. THE S-02 GATE, before anything writes: a handoff approval is a
+            // plan approval, never folder access (plan :304's gate sentence).
+            // Selection stops at the consent prompt; the F04 dialog rewire is
+            // Batch D's piece - this batch surfaces the verdict language in
+            // place and writes nothing.
+            val verdict = runCatching { container.projectTrust.gate(ref) }.getOrElse { failure ->
+                AppLog.w(TAG, "handoff trust gate failed: ${failure.javaClass.simpleName}: ${failure.message}")
+                _state.update {
+                    it.copy(handoffNotice = "Trust state unreadable - nothing was approved.")
+                }
+                return@launch
+            }
+            if (verdict is TrustVerdict.Required) {
+                AppLog.i(TAG, "handoff blocked: consent required (${verdict.reason})")
+                _state.update {
+                    it.copy(
+                        handoffNotice = "\"${ref.label}\" requires consent before a handoff " +
+                            "can run there: ${verdict.reason}."
+                    )
+                }
+                return@launch
+            }
+            val allow = verdict as TrustVerdict.Allow
+            val record = runCatching {
+                container.projectTrust.confirmAtGate(ref, allow.observedFingerprint)
+            }.getOrElse { failure ->
+                AppLog.w(TAG, "handoff consent record failed: ${failure.javaClass.simpleName}: ${failure.message}")
+                _state.update {
+                    it.copy(handoffNotice = "Consent could not be recorded - nothing was approved.")
+                }
+                return@launch
+            }
+            val movedInsideWindow = record.movedTo
+            if (movedInsideWindow != null) {
+                // Local capture: `record.movedTo` is a custom-getter property,
+                // so the compiler cannot smart-cast it through the null check.
+                AppLog.i(TAG, "handoff blocked: folder moved inside the gate-record window (${movedInsideWindow.text})")
+                _state.update {
+                    it.copy(
+                        handoffNotice = "\"${ref.label}\" changed inside the consent window - re-check it " +
+                            "and approve again (${movedInsideWindow.text})."
+                    )
+                }
+                return@launch
+            }
+            // The same consumption the Projects row-open performs when it takes
+            // a pending restore prompt's decision over.
+            container.clearPendingProjectTrust()
+            // 3. The redaction net runs BEFORE approval (Batch B b4, the
+            // composer's gate): a blocked shape never writes a row and the
+            // verdict never echoes the secret.
+            val providerStamp = handoffProviderStamp(currentProviderId(), _state.value.selectedModel)
+            val edited = sheet.draft.copy(
+                summaryMarkdown = summary,
+                sourceProvider = providerStamp,
+            )
+            when (val net = edited.verifyContent()) {
+                is RedactionVerdict.Blocked -> {
+                    AppLog.w(TAG, "handoff blocked by the redaction net: ${net.patternId}")
+                    _state.update {
+                        it.copy(handoffNotice = "Remove the ${net.patternId} from the summary first - " +
+                            "the net only stops machine-secret shapes: ${net.reason}")
+                    }
+                    return@launch
+                }
+                RedactionVerdict.Green -> Unit
+            }
+            // 4. PERSIST: the DRAFT row (fingerprint column NULL - Batch F's
+            // stat walk is not in this tree yet; the row stores null until then
+            // per the DAO's contract), then the guarded APPROVED stamp. A
+            // re-opened untouched draft is rewritten in place by its OWN id
+            // (the DAO covenant) - a target change NEVER rides an approved row.
+            val approvedAtMs = System.currentTimeMillis()
+            val existingRow = sheet.existingDraft
+            val packageForTurn: HandoffPackage = if (
+                existingRow != null && handoffUsableExistingDraft(existingRow)
+            ) {
+                val rebuilt = existingRow.copy(
+                    summaryMarkdown = summary,
+                    targetProjectId = ref.id.toString(),
+                    sourceProvider = providerStamp,
+                )
+                dao.insertDraft(rebuilt)
+                // The row stores no display provenance (HandoffPackage.from
+                // re-materializes the documented defaults); the turn re-carries
+                // it from the sheet the dispatch was made on.
+                HandoffPackage.from(rebuilt).copy(
+                    sourceChatTitle = sheet.draft.sourceChatTitle,
+                    sourceChatTime = sheet.draft.sourceChatTime,
+                    userApprovedAt = approvedAtMs,
+                )
+            } else {
+                val pkg = edited.toPackage(ref.id.toString())
+                dao.insertDraft(pkg.toEntity(null))
+                pkg.copy(userApprovedAt = approvedAtMs)
+            }
+            val sealedId = packageForTurn.handoffId
+            val approved = runCatching { dao.markApproved(sealedId, approvedAtMs) }
+                .onFailure { AppLog.w(TAG, "handoff approve failed: ${it.message}") }
+                .getOrDefault(0)
+            if (approved != 1) {
+                AppLog.w(TAG, "handoff approve: guarded transition refused for $sealedId")
+                _state.update {
+                    it.copy(handoffNotice = "The draft could not be approved in its current trace state - nothing dispatches.")
+                }
+                return@launch
+            }
+            Log.i(TAG, "handoff $sealedId APPROVED at $approvedAtMs; dispatching to '${ref.label}'")
+            _state.update { it.copy(handoffSheet = null) }
+            // 5. DISPATCH - plan e1/e2: bind through the Projects row-open
+            // route's bind half, mint the fresh Code session via the exact
+            // WorkspaceManager.newSession API, guarded DISPATCHED stamp, then
+            // the FIRST TURN through the same send machinery a bound Code
+            // session uses. A failure above this line leaves the row APPROVED
+            // and resumable (the Batch A guarantee the tests pin at the DAO
+            // sequencing level).
+            val dispatched = dispatchHandoff(packageForTurn, ref, sealedId)
+            if (dispatched == null) {
+                AppLog.i(TAG, "handoff $sealedId dispatch failed; the row stays APPROVED and resumable")
+                _state.update {
+                    it.copy(
+                        handoffNotice = "Handoff dispatch failed - the approved plan stays resumable " +
+                            "from its trace row, and \"${ref.label}\" stayed untouched."
+                    )
+                }
+            } else {
+                Log.i(TAG, "handoff $sealedId DISPATCHED; target session $dispatched")
+            }
+        }
+    }
+
+    /**
+     * The dispatch route (plan Batch E). Every engine mechanic rides an
+     * EXISTING seam - [bindProject], [startEngine] (the registry's budget
+     * gate lives inside requestEngineStart), the [bindEngine] the
+     * composition drives on the engine state flow ([bootstrap] through it),
+     * and the FIRST TURN through [send], the same path a bound Code
+     * session sends through. Nothing here re-implements the re-attach, the
+     * agent healing, or the stream protocol; [firstPrompt] is Batch B's
+     * only wording source.
+     *
+     * Returns the target Code session id once DISPATCHED was stamped;
+     * null on any failure before it - the notice is already on state.
+     */
+    private suspend fun dispatchHandoff(
+        pkg: HandoffPackage,
+        ref: ProjectRef,
+        handoffId: String,
+    ): String? {
+        // The binding half of the Projects row-open route (gate + record ran
+        // at confirm; the row-open's record->bind order is honoured).
+        container.clearPendingProjectTrust()
+        container.setActiveProject(ref)
+        // The same re-target the composition's LaunchedEffect would drive,
+        // done synchronously so the dispatch does not wait for the next
+        // composition frame (the later composition call is the designed no-op).
+        bindProject()
+        val boundKey = instanceKey
+        // Idempotent: a warm project engine re-survives it. The liveness
+        // budget gate ("chat + one project", Gate-7 §1) is enforced inside.
+        startEngine()
+        // The spawn is bounded and idempotent; wait for the target engine to
+        // answer before binding its port - the honest fail state is a notice,
+        // never a half-sent turn.
+        val started = withTimeoutOrNull(HANDOFF_ENGINE_WAIT_MS) {
+            container.runtimeFor(boundKey).supervisor.state.first { it is EngineState.Running }
+        }
+        if (started !is EngineState.Running) {
+            AppLog.w(TAG, "handoff: engine wait failed on instance '$boundKey'")
+            _state.update {
+                it.copy(handoffNotice = "The Code engine for \"${ref.label}\" did not start.")
+            }
+            return null
+        }
+        // The same bind the composition's engineState LaunchedEffect drives:
+        // sets the port and begins the workspace boot for the target instance.
+        bindEngine(started)
+        // engineReady flips true exactly when bootstrap has claimed the
+        // workspace and settled the agent - the SAME signal the composer's
+        // own send button gates on. No private polling, no new accessor.
+        val ready = withTimeoutOrNull(HANDOFF_BOOT_WAIT_MS) {
+            while (!_state.value.engineReady) delay(100)
+            true
+        }
+        if (ready != true) {
+            AppLog.w(TAG, "handoff: bootstrap wait failed on instance '$boundKey'")
+            _state.update {
+                it.copy(handoffNotice = "Code did not become ready in \"${ref.label}\".")
+            }
+            return null
+        }
+        // SETTLE BEAT (honest about why): bootstrap's tail claims the last-resumed
+        // session the moment engineReady flipped true - its own [openSession]
+        // bumps the view epoch synchronously a few statements after the ready
+        // write. The dispatch's bump has to be the NEWEST epoch write, or the
+        // resume's replay would legitimately write this view over; the beat
+        // gives that tail room to pass, and any replay body already in flight
+        // drops its write against the newer epoch (the machinery's own
+        // stale-view guard, the rule liveRowsForOpenSession was extracted for).
+        delay(HANDOFF_SETTLE_MS)
+        val mgr = workspaces
+        if (mgr == null) {
+            AppLog.w(TAG, "handoff: machinery workspace absent after ready=true")
+            _state.update {
+                it.copy(handoffNotice = "The workspace for \"${ref.label}\" is not attached.")
+            }
+            return null
+        }
+        // (e1) THE dispatch session - the plan's exact API and title shape.
+        if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+            AppLog.w(TAG, "handoff: workspace re-attach failed before session creation")
+            _state.update {
+                it.copy(handoffNotice = "Could not reach the workspace in \"${ref.label}\".")
+            }
+            return null
+        }
+        val target = runCatching { mgr.newSession(handoffSessionTitle(java.time.LocalTime.now())) }
+            .getOrElse { failure ->
+                AppLog.w(TAG, "handoff session creation failed: ${failure.message}")
+                _state.update {
+                    it.copy(
+                        handoffNotice = "No Code session could be created: " +
+                            "${failure.message ?: "unknown failure"}."
+                    )
+                }
+                return null
+            }
+        // (a3) APPROVED -> DISPATCHED, guarded. The fingerprint column stays
+        // NULL this batch (Batch F wires the stat-walk util; the row stores
+        // null until then, per the DAO's contract).
+        val moved = runCatching {
+            container.projectStore.handoffDao().markDispatched(handoffId, target.id, null)
+        }.onFailure { AppLog.w(TAG, "handoff dispatch stamp failed: ${it.message}") }.getOrDefault(0)
+        if (moved != 1) {
+            AppLog.w(TAG, "handoff dispatch: guarded DISPATCHED move refused for $handoffId")
+            _state.update {
+                it.copy(handoffNotice = "The handoff trace moved on - nothing was dispatched.")
+            }
+            return null
+        }
+        // The handoff session becomes the viewed thread, the machinery's own
+        // stale-view guard doing the work: bumping the epoch makes any
+        // replay/bootstrap [openSession] still in flight drop its write, the
+        // exact rule liveRowsForOpenSession was extracted for.
+        sessionId = target.id
+        sessionViewEpoch++
+        _state.update {
+            it.copy(
+                messages = listOf(handoffDispatchNote(handoffId, ref.label)),
+                activeSessionId = target.id,
+                fileChanges = null,
+                pendingPermission = null,
+                pendingQuestion = null,
+            )
+        }
+        workspaceSnapshot = null
+        // THE FIRST TURN (Batch B's FirstTurn wording, the only source).
+        // It rides the same send machinery a bound Code session uses:
+        // setInput + send() -> preflight (re-attach + agent healing) ->
+        // session reuse (the id this dispatch minted) -> streamSend.
+        setInput(
+            firstPrompt(
+                draft = pkg,
+                projectName = ref.label,
+                fingerprint = null,
+                sourceProvider = pkg.sourceProvider,
+            )
+        )
+        send()
+        return target.id
+    }
+
     fun setInput(v: String) {
         _state.update { it.copy(input = v) }
     }
@@ -3219,6 +3664,24 @@ class ChatViewModel(
          * docs/decisions-open.md.
          */
         const val PROMPT_WAIT_MS = 600_000L
+
+        // P6 Batch C dispatch waits: the engine spawn's own budget ("~3s on
+        // the reference device, measured" - the START comment in ChatScreen)
+        // times an order above here, and bootstrap's model probe can take up
+        // to 24 one-token calls; both waits are bounded notice-or-continue
+        // ceilings, not tuned paddings. A miss leaves the row APPROVED and
+        // resumable, never a half-claimed DISPATCHED (plan e1).
+        const val HANDOFF_ENGINE_WAIT_MS = 45_000L
+        const val HANDOFF_BOOT_WAIT_MS = 90_000L
+
+        /**
+         * The dispatch's view-epoch settle beat (see dispatchHandoff): longer
+         * than the synchronous gap between bootstrap's ready write and its
+         * resume openSession's epoch bump, and an order below any turnaround
+         * the user could notice (a sub-beat between "the sheet closes" and
+         * the handoff view landing).
+         */
+        const val HANDOFF_SETTLE_MS = 300L
     }
 }
 

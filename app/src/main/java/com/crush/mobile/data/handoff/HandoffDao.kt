@@ -79,6 +79,15 @@ interface HandoffDao {
      * the verify-first turn re-walks and compares it). A 0 return means the
      * row was not APPROVED - and a failed dispatch leaves the row APPROVED
      * and resumable, never a half-claimed DISPATCHED (plan e1).
+     *
+     * The fingerprint param is NULLABLE (2026-11-09, Batch C gate fix):
+     * Batch C defers the stat-walk to Batch F, and a deferred dispatch must
+     * keep storing NULL rather than an empty string - the column's "not
+     * recorded yet" state and a real digest are different facts. The
+     * fingerprint is a required ingredient of the first turn by CONTRACT,
+     * deferred as a VALUE only: Batch F must supply it at dispatch or the
+     * row keeps its NULL (the assembler renders the documented
+     * "(not recorded)" degradation form).
      */
     @Query(
         "UPDATE handoffs SET targetCodeSessionId = :targetCodeSessionId, " +
@@ -89,7 +98,7 @@ interface HandoffDao {
     suspend fun markDispatched(
         handoffId: String,
         targetCodeSessionId: String,
-        projectTreeFingerprintAtHandoff: String,
+        projectTreeFingerprintAtHandoff: String?,
     ): Int
 
     /**

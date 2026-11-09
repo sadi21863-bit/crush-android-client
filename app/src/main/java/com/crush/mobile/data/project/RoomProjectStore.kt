@@ -2,6 +2,7 @@ package com.crush.mobile.data.project
 
 import android.content.Context
 import androidx.room.Room
+import com.crush.mobile.data.handoff.HandoffDao
 import com.crush.mobile.project.ProjectRef
 import com.crush.mobile.project.ProjectStore
 import java.io.File
@@ -27,11 +28,21 @@ class RoomProjectStore(
     dbName: String = "projects.db",
 ) : ProjectStore, ProjectTrustSource {
 
-    private val dao: ProjectDao =
+    private val database: ProjectDatabase =
         Room.databaseBuilder(context.applicationContext, ProjectDatabase::class.java, dbName)
-            .addMigrations(ProjectDatabase.MIGRATION_1_2)
+            .addMigrations(ProjectDatabase.MIGRATION_1_2, ProjectDatabase.MIGRATION_2_3)
             .build()
-            .projectDao()
+
+    private val dao: ProjectDao = database.projectDao()
+
+    /**
+     * The P6 handoff trace surface (Batch A, 2026-11-08): rides THIS same
+     * database file, builder and migration chain - one databaseBuilder for
+     * the projects+handoffs file, no second store, no re-registered
+     * migration list racing the first (plan a4). Consumed through
+     * `AppContainer.projectStore`; the DI seam itself stays the store.
+     */
+    fun handoffDao(): HandoffDao = database.handoffDao()
 
     override suspend fun create(label: String, repoDir: File): ProjectRef {
         val dir = repoDir.apply { mkdirs() }

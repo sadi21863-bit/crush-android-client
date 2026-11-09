@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -112,18 +113,47 @@ class CrushConnectionSocketIdentityTest {
         // pin the green path exactly (>=2 probes, exactly one server
         // request), and a wrong-shape recovery surfaces as this timeout, not
         // as a wrong pass.
-        runBlocking {
-            withTimeout(60_000) {
-                // UNDISPATCHED runs the body inline on this thread until
-                // its first suspension, so the collector IS subscribed
-                // before ensureAttached runs below (a dispatching async
-                // would only queue the body and lose the ordering).
-                val connected = async(start = CoroutineStart.UNDISPATCHED) {
-                    connection.state.first { it == CrushConnection.State.CONNECTED }
+        // STRIKE-DIAGNOSTICS (2026-11-09, after the fourth strike consumed the
+        // 60s horizon inside a local full-suite run): the bare withTimeout
+        // surfaced a stackless TimeoutCancellationException, so every strike
+        // was recorded as "it happened" with no view of where the ladder
+        // stood. On lapse the SAME failure is now rethrown as an assertion
+        // carrying the strike fingerprint - attempts served, server requests
+        // actually received, connection state, and reader-thread aliveness.
+        // attempts==1 with no server request means the reader never returned
+        // from the first honest fail (host stall or reader-thread death);
+        // attempts>=2 with no request pins the stall inside the ladder before
+        // any socket opened; a request present means the reader/collector
+        // boundary missed a completed CONNECTED. The failure shape is
+        // unchanged; this only makes the next strike diagnosable to its
+        // branch (the diagnosis doc records the ledger and the branches).
+        try {
+            runBlocking {
+                withTimeout(60_000) {
+                    // UNDISPATCHED runs the body inline on this thread until
+                    // its first suspension, so the collector IS subscribed
+                    // before ensureAttached runs below (a dispatching async
+                    // would only queue the body and lose the ordering).
+                    val connected = async(start = CoroutineStart.UNDISPATCHED) {
+                        connection.state.first { it == CrushConnection.State.CONNECTED }
+                    }
+                    connection.ensureAttached("ws-A", "client-1")
+                    connected.await()
                 }
-                connection.ensureAttached("ws-A", "client-1")
-                connected.await()
             }
+        } catch (e: TimeoutCancellationException) {
+            val reader = connection.readerThreadForTest()
+            throw AssertionError(
+                "the 60s horizon lapsed before CONNECTED - strike fingerprint: " +
+                    "attempts=${attempts.get()}, serverRequests=${server.requestCount}, " +
+                    "state=${connection.state.value}, readerThreadAlive=" +
+                    "${reader?.isAlive ?: "absent"}; attempts==1 with no server " +
+                    "request means the reader never returned from the first " +
+                    "honest fail (host stall or reader-thread death); " +
+                    "attempts>=2 with no request means the ladder itself was " +
+                    "stalled before any socket opened",
+                e,
+            )
         }
         assertTrue(
             "the transport must have been resolved more than once (per attempt), got " +

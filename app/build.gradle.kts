@@ -326,4 +326,22 @@ dependencies {
  */
 tasks.withType<Test>().configureEach {
     systemProperty("robolectric.logging", "stdout")
+
+    // STRIKE-2 MITIGATIONS (2026-11-09, socket-identity diagnosis doc): the
+    // 60s budget bump could not stop the strikes because the healthy path
+    // costs ~1s - a strike is a >59x sustained stall, not a slow ladder. The
+    // suite runs all 600+ tests (Robolectric classloader churn among them)
+    // in ONE worker JVM at the DEFAULT heap with no fork policy, so two
+    // stall classes are plausible: GC pressure near the heap ceiling, and
+    // cross-class static/classloader leakage. Both are capped here:
+    // maxHeapSize = 2g gives the suite real headroom, and forkEvery = 50
+    // hands every 50 tests a FRESH JVM, resetting heap and static state
+    // mid-suite. maxParallelForks stays untouched ON PURPOSE: parallel
+    // forks on the 2-vCPU CI host would slow everything and interact with
+    // this suite's timing-sensitive tests. Evidence rule for the next
+    // full-suite gate run: two consecutive clean runs (local + CI) keep
+    // this in; a strike WITH a fingerprint goes back to the diagnosis doc
+    // and its branch table - no further budget bumps either way.
+    maxHeapSize = "2g"
+    forkEvery = 50
 }

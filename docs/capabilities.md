@@ -26,6 +26,7 @@ surfaced on a phone.
 | Real price loading | `catalogue prices loaded for 87 models` |
 | Permission mode persistence | `permissionMode=ASK` survives restarts |
 | Engine lifecycle | Crash/restart, health probing, dynamic thermal tuning. **Per-project stop-on-switch verified 2026-11-04** (`28328b5`): two `libcrush.so` children with a project chat open → ONE child + `I/Lifecycle: stopping project engine for instance 'p8a3825d0' (no run in flight)` on returning to the legacy row (run-in-flight guarded — a mid-run switch leaves the run riding its own engine) |
+| Chat→Code handoff dispatch (P6 Batch C) | E2E on device 2026-11-09: entry chip → consent sheet → `DISPATCHED` row (S-02 ordering proven) → verify-first first turn ran real bash; full record below |
 
 ## Implemented, unverified on device
 
@@ -858,7 +859,9 @@ record: the session's model tag flipped to claude-haiku-5-5 after the
 restart (selection does not survive the relaunch) and battery rose
 27->80% once the socket hand-froze ended; the Batch C entry chip is
 correctly ABSENT in this build (it rides the gate run in flight) - the
-Copy/Save row is unchanged.
+Copy/Save row is unchanged. (NOTE 2026-11-09: that absence note is
+SUPERSEDED - the entry-chip build is device-verified in the P6 Batch C
+record below.)
 
 This parity pass is the security-acceptance artifact the reopened P5
 fold cites.
@@ -929,6 +932,78 @@ flake, non-security); (3) the "smart transfer" denial message pointing
 at Code mode (small polish batch); (4) a read-only Chat allowlist only
 after an engine probe proves strict read-only (deferred by the owner's
 standing decision).
+
+**P6 BATCH C DEVICE VERIFICATION - PASSED 2026-11-09 (device `bbf8ca69`,
+APK 102,369,305 B):** the Chat→Code handoff contract (Batch A rows
+`d65ead0` + Batch B package `e23389c` + Batch C sheet/route `53bd2a7`)
+was exercised END-TO-END on the device: a completed assistant reply in
+chat session `95ec7be6…` showed the third chip "Use this plan in Code"
+(the "entry chip correctly ABSENT" note above is superseded - that probe
+build predated the gate ride), and the sheet opened with the provenance
+line, the FULL summary prefill (Batch B's `take(idx+1)` over the tapped
+transcript prefix), a single-select projects destination picker (row
+"Test project folder") and the honesty consent card. Confirm produced
+the complete dispatch chain in `app.log`: chat-pool instance stopped
+18:40:22, code instance `p536fa26e` started (id = `p` + project-id
+prefix) and reached Running 3162 ms, `bootstrap
+workspacePath=/storage/emulated/0/Test project folder`,
+`permissionMode=ASK` - destination binding proven by the engine's own
+bootstrap line.
+
+Row-level truth, read back from a pulled `projects.db`(+WAL) via run-as
+copy (binary-safe pull, local sqlite3): `status=DISPATCHED`,
+`userApprovedAt=1794229822696`, `targetProjectId=536fa26e…`,
+`targetCodeSessionId=f3e78747…` (which DECODES the dispatch-window log
+flip-flop below), `projectTreeFingerprintAtHandoff=NULL` (the PLANNED
+Batch F deferral: `markDispatched` fingerprint String→`String?`),
+`sourceProvider=deepseek-v4.1-flash` (provider stamp = model id).
+S-02 ORDERING PROVEN ON REAL STAMPS: trust `recordConsent` …654
+strictly before approve …696.
+
+The verify-first protocol ran as designed. The first turn went out
+byte-for-byte from the Batch B template ("SELECTED REFERENCES: (none)",
+RULES 1-4 including the separate-turns confirmation rule); the agent
+executed REAL bash (find+sha256 walk over the bound tree; `ls -la` and
+a `.git` check) and answered; the ask-card approval flow worked live in
+the handoff Code session (`permission requested: bash
+(id=31163177/cd5aa293/adc3e8a4); pendingPermission SET` + prompt-wait
+lines, owner taps). After the owner's confirmation turn ("continue",
+~19:18) the agent ran `lsp_symbols` (finished), a bash marker
+comparison and `crush_info`, and delivered the full mismatch report
+(items 1-7, on screen) - and the protocol itself CAUGHT the tree
+mutation: `.crushrc-ran.marker` mtime 1794232103 = 2,281 s (38m01s)
+AFTER the approval stamp 1794229822; file changes stayed "+0 -0 across
+0 file(s)"; the agent wrote NOTHING and ended "Awaiting confirmation
+before any further action" (rule 4 honored: any further activity = a
+fresh confirmation turn + the usual approval flow). HONESTY
+CROSS-MATCH: the agent's INDEPENDENTLY computed sha256 of `crushrc`
+(`dcba1093…`) equals the gate-recorded trust fingerprint
+`dcba1093d3d1d417…` in the projects table - two implementations
+agreeing byte-for-byte; the mechanism-level read (the stat-walk) is the
+Batch F deferral. The engine stayed Running for the whole window; no
+FATAL/crash anywhere in the session.
+
+Open observations (recorded; none is believed a defect in the dispatch
+mechanism): (1) the FIRST verify turn's run `c2e97e48…` stalled >20 s
+and the app's idle watchdog canceled it - bash ask-cards still finished
+and the agent's opening reply arrived; the owner's "continue" nudge
+re-ran the protocol cleanly (watchdog behaving as designed; re-verify
+rides later batches); (2) a transient dispatch-window log flip-flop
+`4161054d` ↔ `f3e78747` ("resuming session 4161054d (110 msgs)") is
+engine restore noise - the DB stamp records the correct target; (3) the
+header title settled "Handoff: Tool", not the minted "Handoff HHmmss" -
+engine-side title propagation wins the header (observed; cosmetic); (4)
+the transcript view merges old chat content and the handoff turns in
+one scroll (provenance preserved; UX note); (5) the
+`.crushrc-ran.marker` WRITER MECHANISM is unidentified (engine crushrc
+runner vs ask-card bash; a 72 B `.crushrc` probe residue from
+2026-11-06 sits in the tree) - open question for the Batch F stat-walk;
+(6) the instance model tag danced deepseek→haiku→deepseek at start
+(pool default probe), same cosmetic family as the restart reset above.
+
+Evidence: consent-sheet and drive screenshots, `app.log` lines, the
+pulled Room db+WAL rows; the device sdcard probe files (`dc_glob_*`,
+`dc_pull_*`) were removed after capture.
 
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 

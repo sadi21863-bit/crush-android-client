@@ -1082,6 +1082,50 @@ re-attach; the bootstrap-tail resume-grab is designed and absorbed by
 the epoch guard; one probe for the drive: the engine-side session
 lineage, plus the first turn's agent model capture).
 
+**THE D+F DEVICE DRIVE + THE FIX BATCH (`f979d78`, 2026-11-10):** the
+drive ran the D+F build live - dispatch worked, S-02 ordering again
+(approve stamp 1794245706562 = the same second the chat engine stopped),
+and the Fingerprint went to FULL live evidence: the row carries
+`projectTreeFingerprintAtHandoff = e0f610c1db00772512c8a7eb2becd465ff
+8a0343ecb239a979c093082eed66f1`, the verify-first turn renders it
+byte-for-byte on screen, and an INDEPENDENT PowerShell stat walk of the
+same folder produced the same digest (sec-aligned ms rows,
+path-sorted) - row, screen and algorithm agree BYTE-FOR-BYTE. The drive
+also elected obs specimens on the spot: the idle watchdog ate the first
+verify run again (spec #2); the model probe flipped haiku in ahead of
+the first turn and haiku failed to reply while the user's choice (glm)
+worked - the owner nailed the pattern live ("the model changes back to
+haiku... and it failed to reply"). The fix batch closes BOTH roots:
+(1) the AppSettings SELECTED_MODEL slot existed but setModel never
+wrote it and the probe shortlist never read it, so every fresh
+instance (new chat, handoff attach, unlock re-bind) probed the
+registry's static list first - setModel now PERSISTS the verified
+choice (R3's race discipline untouched; only the success branch
+writes) and the shortlist leads with the persisted id, dropping it
+silently when no longer listed; (2) the dispatch and the jump carry
+the stamped model id (a provider-id stamp denotes no model) as a
+one-shot preference the next bootstrap init honors first - the
+verify-first turn runs ON the model the user approved with. The UX
+asks landed too: the redaction-net refusal (the report-derived summary
+hit `long-hex-secret` properly - the owner's eleven "dead" Confirm
+taps: the net, hiding behind the sheet's scrim by snackbar-only
+notice) now renders INSIDE the sheet in error color; and the P2
+enhancement is the replay-surviving resume bar - "Handed off to X -
+Continue in Code" pinned at the source chat's transcript top
+(stickyHeader), built FROM the handoffs row by refreshHandoffResumeHint
+(the table truth the ephemeral dispatch note could never survive a
+replay with), carrying its own F04 dialog state, with the jump made
+sheet-independent (openHandoffInCode reads the active chat's own
+trace) and refreshed at openSession/newThread/dispatch/cold-boot. The
+jump has the now-familiar open question answered twice over: the
+"resuming session 4161054d (110 msgs)" grab at 18:40 was the designed
+bootstrap tail claiming a REAL 1-day-old code session ("GitHub
+Trending Analysis and PDF Report", title seen in the drive's drawer)
+before the dispatch minted its own; the epoch guard absorbed it.
+Tests 669 -> 673 (shortlist head-first + unlisted-head-dropped; the
+stamp split; the hint classification). Local gate 12m per-XML 673/0/0;
+CI run 42676549043 GREEN 3m52s.
+
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

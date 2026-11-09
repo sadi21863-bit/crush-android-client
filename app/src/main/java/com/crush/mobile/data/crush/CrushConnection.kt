@@ -64,6 +64,29 @@ class CrushConnection(
     private val _state = MutableStateFlow(State.IDLE)
     val state: StateFlow<State> = _state
 
+    // STRIKE DIAGNOSTICS (2026-11-09, strike #5): `state` is a StateFlow, so a
+    // TRANSITION the value makes through CONNECTED can be absorbed by
+    // conflation whenever a later write lands before an observer's coroutine
+    // is rescheduled (the exact strike shape: CONNECTED publishes on the 2xx,
+    // then the keep-open stream breaks under a memory-starved CI runner and
+    // the ladder reads CONNECTING back before the test's collector runs its
+    // next tick - the observer can never see the connect that DID happen).
+    // Consumer-side promises cannot defeat this: subscriptions-first is
+    // necessary but only makes the collector subscribed, never transient-
+    // observable. The producer-side ledger is the conflation-proof record:
+    // every write anywhere in this class goes through [publish], which
+    // appends here BEFORE the flow write and never changes the flow's
+    // semantics. Write frequency is state-machine-grain (a handful per
+    // connection), so the copy-on-writes list costs nothing.
+    private val transitionLedger = java.util.concurrent.CopyOnWriteArrayList<State>()
+
+    internal fun stateLedgerForTest(): List<State> = transitionLedger
+
+    private fun publish(next: State) {
+        transitionLedger.add(next)
+        _state.value = next
+    }
+
     /** Live when the reader thread should keep running. */
     private val running = AtomicBoolean(false)
 
@@ -145,13 +168,13 @@ class CrushConnection(
         // `running` flag was hiding rather than fixing.
         if (identityChanged) {
             running.set(false)
-            _state.value = State.STOPPED
+            publish(State.STOPPED)
             inFlight.getAndSet(null)?.cancel()
         }
 
         if (running.get()) return
         running.set(true)
-        _state.value = State.CONNECTING
+        publish(State.CONNECTING)
         val t = Thread({ readLoop() }, "crush-sse")
         t.isDaemon = true
         thread.set(t)
@@ -172,7 +195,7 @@ class CrushConnection(
     @Synchronized
     fun stop() {
         if (!running.getAndSet(false)) return
-        _state.value = State.STOPPED
+        publish(State.STOPPED)
         // Cancel the blocking read; without this the thread sits in
         // readUtf8Line() until the server closes, leaking a thread per stop.
         runCatching { inFlight.getAndSet(null)?.cancel() }
@@ -245,14 +268,14 @@ class CrushConnection(
                             runCatching { inFlight.getAndSet(null)?.cancel() }
                             running.set(false)
                             thread.set(null)
-                            _state.value = State.IDLE
+                            publish(State.IDLE)
                             return
                         }
                         throw IOException("events: HTTP ${response.code}")
                     }
                     sawStream = true
                     attempt = 0
-                    _state.value = State.CONNECTED
+                    publish(State.CONNECTED)
                     AppLog.i(TAG, "connected to workspace $ws")
 
                     val source = response.body?.source()
@@ -284,7 +307,7 @@ class CrushConnection(
             }
 
             if (!running.get()) break
-            if (_state.value != State.IDLE) _state.value = State.CONNECTING
+            if (_state.value != State.IDLE) publish(State.CONNECTING)
             // P2-16: the shift bound was 4, i.e. 250ms shl 4 = 4s, so the
             // `.coerceAtMost(MAX_BACKOFF_MS)` clamp (10s) could never engage and
             // MAX_BACKOFF_MS was dead. The bound is now 6: 250ms shl 5 = 8s,
@@ -298,7 +321,7 @@ class CrushConnection(
             attempt++
             sleep(backoff)
         }
-        _state.value = State.STOPPED
+        publish(State.STOPPED)
     }
 
     private fun sleep(ms: Long) {

@@ -293,4 +293,59 @@ class HandoffConsentContractTest {
         assertTrue("date-time shape", stamp.matches(Regex("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}")))
         assertEquals("ses-disp…", handoffSessionShort("ses-disp-long-token"))
     }
+
+    @Test
+    fun `the stamp splits into a model id only when it is one`() {
+        // Provider-id stamps (the "no selection" fallthrough) denote no model:
+        // the instance's own choice stands and the dispatch overrides nothing.
+        val providerIds = setOf("opencode-go", "opencode-zen", "hyper")
+        assertEquals(null, handoffStampAsModel("opencode-go", providerIds))
+        assertEquals(null, handoffStampAsModel("", providerIds))
+        assertEquals(null, handoffStampAsModel("   ", providerIds))
+        assertEquals("a model-id stamp passes through verbatim",
+            "glm-5.3-flash", handoffStampAsModel("glm-5.3-flash", providerIds))
+    }
+
+    @Test
+    fun `the resume hint is table truth with a real view guard`() {
+        val dispatched = dispatchedRow()                       // targetCodeSessionId = ses-dispatch-1
+        val approved = approvedRow("target-A")
+
+        // No trace: no bar.
+        assertNull(handoffResumeHint(emptyList(), "ses-7") { it.targetCodeSessionId })
+        // An APPROVED row is not the bar (the bar exists only for a jump).
+        assertNull(
+            "approved rows ride the RESUME sheet, not the bar",
+            handoffResumeHint(listOf(approved), "ses-7") { it.targetCodeSessionId },
+        )
+        // The dispatched trace, viewed from ANYWHERE ELSE: the bar.
+        val hint = handoffResumeHint(listOf(dispatched), "ses-7") { it.targetCodeSessionId }
+        assertEquals("handoff-dispatched-4", hint?.handoffId)
+        assertEquals("ses-dispatch-1", hint?.targetSessionId)
+        // Viewing the TARGET itself is not a hint (the user is already there).
+        assertNull(
+            "the target session does not flash its own bar",
+            handoffResumeHint(listOf(dispatched), "ses-dispatch-1") { it.targetCodeSessionId },
+        )
+        // A DISPATCHED row with no target id (an impossible shape) refuses.
+        val ghost = HandoffEntity(
+            handoffId = "handoff-ghost",
+            sourceChatId = "ses-7",
+            targetProjectId = "target-A",
+            summaryMarkdown = "s",
+            userApprovedAt = 9L,
+            sourceProvider = "glm-5.3-flash",
+            targetCodeSessionId = null,
+            status = "DISPATCHED",
+        )
+        assertNull(
+            "no session id means no jump",
+            handoffResumeHint(listOf(ghost), "ses-7") { it.targetCodeSessionId },
+        )
+        // Newest dispatch wins: an older trace under a newer one surfaces only
+        // the newest (the classification is the DAO scan's own order).
+        val older = dispatched.copy(handoffId = "handoff-older", targetCodeSessionId = "ses-old-1")
+        val newest = handoffResumeHint(listOf(dispatched, older), "ses-7") { it.targetCodeSessionId }
+        assertEquals("the newest DISPATCHED row is the bar", "handoff-dispatched-4", newest?.handoffId)
+    }
 }

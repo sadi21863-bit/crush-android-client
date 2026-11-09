@@ -423,7 +423,17 @@ val selectedModel: String = "",
      * stores). Shown through the same snackbar channel deleteError and
      * stopNotice use; null means nothing to say.
      */
-    val handoffNotice: String? = null
+    val handoffNotice: String? = null,
+
+    /**
+     * The replay-surviving resume affordance (the D+F drive's UX
+     * enhancement): when the ACTIVE chat's newest handoff row is
+     * DISPATCHED and the view is NOT the target Code session, the bar
+     * shows "Handed off to X - Continue in Code" - built FROM THE ROW
+     * (the table truth), never from the ephemeral dispatch note. Cleared
+     * whenever the active session changes ([refreshHandoffResumeHint]).
+     */
+    val handoffResumeHint: HandoffResumeHint? = null
 ) {
     val fileChangesLabel: String? get() {
         val s = fileChanges ?: return null
@@ -580,6 +590,17 @@ class ChatViewModel(
      */
     @Volatile
     private var sessionViewEpoch = 0
+
+    /**
+     * The one-shot model preference the NEXT bootstrap init honors first
+     * in its probe shortlist, consumed exactly once. Its only setters are
+     * the handoff dispatch and the jump (the source chat's stamped model -
+     * the 2026-11-09 drive's obs-6 fix: the pool's default probe claimed
+     * every fresh attach with claude-haiku-5-5, and haiku failed to
+     * reply). The persisted AppSettings slot (readSelectedModel) stays
+     * the standing preference everywhere else.
+     */
+    private var handoffPreferredModel: String? = null
 
     /** Drops [handle] as the active run if it still is one; safe either way. */
     private fun abandonRun(handle: RunHandle) {
@@ -1237,7 +1258,31 @@ class ChatViewModel(
         // while the app reported a healthy catalogue. Probe with a 1-token
         // request and take the first id that actually answers. The provider's
         // verified ids (if any) are probed first - see Provider.preferredModelIds.
-        val shortlist = ModelChoice.shortlist(models, Providers.byId(providerId)?.preferredModelIds.orEmpty())
+        //
+        // 2026-11-09 fix (the D+F drive's obs 6, user-reported as "the model
+        // changes back to haiku... and it failed to reply"): the shortlist
+        // never consulted the user's PERSISTED selection (the AppSettings
+        // slot setModel writes) or the handoff's stamped model, so every
+        // fresh instance (new chat, handoff attach, unlock re-bind) probed
+        // the registry's static preferred list first and landed on whatever
+        // answered first - lately claude-haiku-5-5 - regardless of whether
+        // it could actually serve a turn. The persisted slot - and, for a
+        // handoff, the stamped id ahead of it - now leads the shortlist,
+        // while the probe keeps deciding: firstWorking stays fail-safe when
+        // a preferred head is dead.
+        val persistedModel = runCatching {
+            container.settingsRepository.settings.first().selectedModel
+        }
+            .onFailure { AppLog.w(TAG, "persisted model read failed: ${it.message}") }
+            .getOrNull()
+            ?.trim()
+            .takeIf { !it.isNullOrEmpty() }
+        val preferredHead = handoffPreferredModel ?: persistedModel
+        handoffPreferredModel = null
+        val shortlist = ModelChoice.shortlist(
+            models,
+            (listOfNotNull(preferredHead) + (Providers.byId(providerId)?.preferredModelIds.orEmpty())).distinct(),
+        )
         val result = zen.firstWorking(shortlist)
         val chosen = result.model
         if (chosen == null) {
@@ -1370,6 +1415,10 @@ class ChatViewModel(
         // freshly minted session (no resume), where nothing else would.
         reportCurrentSession(sessionId)
         resumable?.let { openSession(it) }
+        // The activity decided the session; the affordance follows the table
+        // (the drive's UX enhancement - the cold-boot mint path nothing else
+        // refreshes).
+        refreshHandoffResumeHint()
     }
 
     /**
@@ -1811,6 +1860,13 @@ class ChatViewModel(
                     api.setModel(ws, slot, SelectedModel(model = id, provider = providerId))
                 }
             }.onFailure { Log.w(TAG, "setModel failed: ${it.message}") }
+            // 2026-11-09 fix: the VERIFIED choice now persists - the
+            // AppSettings slot the bootstrap probe reads first. The model tag
+            // used to reset on every relaunch/new instance (the honest note
+            // capabilities carried), handing fresh instances to the pool's
+            // static preferred probe and lately to haiku; this write closes it.
+            runCatching { container.settingsRepository.saveSelectedModel(id) }
+                .onFailure { AppLog.w(TAG, "persist model selection failed: ${it.message}") }
         }
     }
 
@@ -1945,6 +2001,9 @@ class ChatViewModel(
                     pendingQuestion = null
                 )
             }
+            // The activity decided the session; the resume affordance follows
+            // the table (the drive's UX enhancement).
+            refreshHandoffResumeHint()
         }
     }
 
@@ -2008,6 +2067,9 @@ class ChatViewModel(
                 )
             }
             loadSessions()
+            // A fresh thread is empty by definition; refresh anyway so a
+            // stale hint from the previous session cannot survive the switch.
+            refreshHandoffResumeHint()
         }
     }
 
@@ -2322,6 +2384,53 @@ class ChatViewModel(
                 .getOrDefault(emptyList())
             _state.update { it.copy(handoffProjects = rows) }
         }
+    }
+
+    /**
+     * Refreshes the replay-surviving resume affordance FROM THE TABLE
+     * (`rowsForSource` over the ACTIVE session) - the D+F drive's UX
+     * enhancement. Called at the three places the active session changes
+     * by design: openSession (drawer/restore), newThread (a fresh empty
+     * thread), and the dispatch's own view write. The projects-row label
+     * resolves through the ADR-0001 row; a gone row says "its project"
+     * honestly. A stale refresh (the session moved on mid-read) drops
+     * itself rather than writing a bar for a session the user left.
+     */
+    fun refreshHandoffResumeHint() {
+        val sourceId = _state.value.activeSessionId
+        if (sourceId == null) {
+            _state.update { it.copy(handoffResumeHint = null) }
+            return
+        }
+        viewModelScope.launch {
+            val rows = runCatching { container.projectStore.handoffDao().rowsForSource(sourceId) }
+                .onFailure { AppLog.w(TAG, "handoff hint read failed: ${it.message}") }
+                .getOrDefault(emptyList())
+            val classified = handoffResumeHint(rows, sourceId) { it.targetCodeSessionId } ?: run {
+                if (_state.value.activeSessionId == sourceId) {
+                    _state.update { it.copy(handoffResumeHint = null) }
+                }
+                return@launch
+            }
+            val labeled = rowWithLabel(classified, rows)
+            if (_state.value.activeSessionId != sourceId) return@launch
+            _state.update { it.copy(handoffResumeHint = labeled) }
+        }
+    }
+
+    /** The hint's display label: the ADR-0001 row's name, or the honest
+     *  "its project" fallback when the row is gone (no FK by design). */
+    private suspend fun rowWithLabel(
+        classified: HandoffResumeHint,
+        rows: List<HandoffEntity>,
+    ): HandoffResumeHint {
+        val projectId = rows.firstOrNull { it.handoffId == classified.handoffId }?.targetProjectId
+        val label = projectId
+            ?.let { id -> runCatching { java.util.UUID.fromString(id) }.getOrNull() }
+            ?.let { id -> runCatching { container.projectStore.byId(id) }.getOrNull() }
+            ?.label
+            ?: "its project"
+        return classified.copy(targetLabel = label)
     }
 
     /**
@@ -2717,17 +2826,24 @@ class ChatViewModel(
     }
 
     /**
-     * The DISPATCHED-mode jump (Batch D - the plan's "reads the DISPATCHED
-     * row and re-opens the target session"): the same gate->record order
-     * dispatch and restore honor (plan d2: consent never transfers - a
-     * DISPATCHED row is the reason to re-open, never a substitute for
-     * consent), the F04 dialog where Required/moved answers (re-call
-     * pattern), then [bindCodeForHandoff] and the SESSION DRAWER's own
-     * open route ([openSession] - epoch guard + history replay included).
-     * The COLD-BOOT extension beside restoreLastBinding stays Batch G.
+     * The jump to a dispatched handoff's target session (Batch D + the
+     * drive's UX enhancement): the ACTIVE chat's own trace decides
+     * (`rowsForSource`, newest DISPATCHED) - no sheet required, which is
+     * what lets the replay-surviving resume bar call it directly. The
+     * same gate->record order dispatch and restore honor (plan d2:
+     * consent never transfers - a DISPATCHED row is the reason to
+     * re-open, never a substitute for consent), the F04 dialog where
+     * Required/moved answers (the screen-local re-call pattern), then
+     * [bindCodeForHandoff] and the session drawer's own open route
+     * ([openSession] - epoch guard + history replay included). The
+     * COLD-BOOT extension beside restoreLastBinding stays Batch G.
      */
     fun openHandoffInCode(onTrustRequired: (PendingProjectTrust) -> Unit = {}) {
-        val row = _state.value.handoffSheet?.dispatchedRow ?: return
+        val sourceId = _state.value.activeSessionId
+        if (sourceId == null) {
+            AppLog.w(TAG, "handoff open refused: no active session to trace from")
+            return
+        }
         if (_state.value.isStreaming) {
             AppLog.w(TAG, "handoff open refused: a turn is in flight")
             _state.update {
@@ -2741,20 +2857,17 @@ class ChatViewModel(
                 _state.update { it.copy(handoffNotice = "The handoff store is unavailable.") }
                 return@launch
             }
-            val live = runCatching { dao.getById(row.handoffId) }
+            val row = runCatching { dao.rowsForSource(sourceId).firstOrNull { it.status == "DISPATCHED" } }
                 .onFailure { AppLog.w(TAG, "handoff trace read failed: ${it.message}") }
                 .getOrNull()
-            if (live == null || live.status != "DISPATCHED") {
-                AppLog.w(TAG, "handoff jump refused: ${row.handoffId} is not a DISPATCHED trace")
+            if (row == null) {
+                AppLog.w(TAG, "handoff open refused: no DISPATCHED trace for $sourceId")
                 _state.update {
-                    it.copy(
-                        handoffSheet = null,
-                        handoffNotice = "The handoff trace moved on - it cannot be opened.",
-                    )
+                    it.copy(handoffNotice = "No dispatched handoff traces from this chat yet.")
                 }
                 return@launch
             }
-            val target = live.targetCodeSessionId
+            val target = row.targetCodeSessionId
             if (target == null) {
                 // Impossible by the state machine (DISPATCHED writes the id)
                 // - a data-shaped lie refuses honestly rather than opening
@@ -2768,17 +2881,16 @@ class ChatViewModel(
                 }
                 return@launch
             }
-            val targetUuid = runCatching { java.util.UUID.fromString(live.targetProjectId) }.getOrNull()
+            val targetUuid = runCatching { java.util.UUID.fromString(row.targetProjectId) }.getOrNull()
             val ref = targetUuid?.let { id ->
                 runCatching { container.projectStore.byId(id) }
                     .onFailure { AppLog.w(TAG, "handoff project read failed: ${it.message}") }
                     .getOrNull()
             }
             if (ref == null) {
-                AppLog.w(TAG, "handoff jump: trace target project row gone (${live.targetProjectId})")
+                AppLog.w(TAG, "handoff jump: trace target project row gone (${row.targetProjectId})")
                 _state.update {
                     it.copy(
-                        handoffSheet = null,
                         handoffNotice = "The handoff's project row is gone - the trace stays in the record; " +
                             "re-create the project to open its session.",
                     )
@@ -2819,9 +2931,15 @@ class ChatViewModel(
             }
             container.clearPendingProjectTrust()
             Log.i(TAG, "handoff ${row.handoffId}: reopening Code session $target in '${ref.label}'")
+            // The stamped model rides the jump's attach too (obs 6): the
+            // bootstrap's probe honors it ahead of the registry default.
+            handoffPreferredModel = handoffStampAsModel(
+                row.sourceProvider,
+                Providers.ALL.map { it.id }.toSet(),
+            )
             bindCodeForHandoff(ref) ?: return@launch
             openSession(target)
-            _state.update { it.copy(handoffSheet = null) }
+            _state.update { it.copy(handoffSheet = null, handoffResumeHint = null) }
         }
     }
 
@@ -2846,7 +2964,14 @@ class ChatViewModel(
         // The binding half of the Projects row-open route (gate + record ran
         // at confirm; the row-open's record->bind order is honoured) - the
         // Batch D extraction [bindCodeForHandoff], shared with the
-        // dispatched-trace jump so there is exactly ONE choreography.
+        // dispatched-trace jump so there is exactly ONE choreography. The
+        // stamped model rides the attach: the bootstrap's probe honors it
+        // ahead of the registry default (obs 6 - haiku used to claim every
+        // fresh attach ahead of the user's actual choice).
+        handoffPreferredModel = handoffStampAsModel(
+            pkg.sourceProvider,
+            Providers.ALL.map { it.id }.toSet(),
+        )
         val mgr = bindCodeForHandoff(ref) ?: return null
         // (e1) THE dispatch session - the plan's exact API and title shape.
         if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
@@ -2899,6 +3024,7 @@ class ChatViewModel(
                 fileChanges = null,
                 pendingPermission = null,
                 pendingQuestion = null,
+                handoffResumeHint = null,
             )
         }
         workspaceSnapshot = null

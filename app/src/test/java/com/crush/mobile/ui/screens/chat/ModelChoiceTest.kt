@@ -5,6 +5,7 @@ import com.crush.mobile.data.api.ModelPrice
 import com.google.gson.JsonParser
 import com.crush.mobile.data.api.ZenModelsApi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,6 +39,36 @@ class ModelChoiceTest {
     fun `shortlist is empty when catalogue is empty`() {
         assertTrue(ModelChoice.shortlist(emptyList()).isEmpty())
         assertNull(ModelChoice.pick(emptyList()))
+    }
+
+    // ------------------------------------------------ 2026-11-09 obs-6 rows
+    // The drive's decode: the probe shortlist never consulted the user's
+    // PERSISTED selection (or a handoff's stamped model), so every fresh
+    // instance probed the registry's static preferred ids first and landed
+    // on whatever answered - lately haiku, which failed to reply. The
+    // bootstrap now heads the shortlist with the persisted/stamped id;
+    // these rows pin the order contract that fix leans on.
+
+    @Test
+    fun `the persisted head goes first - ahead of the registry's preferred list`() {
+        val s = ModelChoice.shortlist(
+            listOf(m("paid-a", false), m("free-a", true), m("lab-haiku", true)),
+            preferred = listOf("lab-haiku", "paid-a"),
+        )
+        assertEquals("lab-haiku", s.first())
+        assertEquals("the registry order follows the head, never overtakes it",
+            listOf("lab-haiku", "paid-a", "free-a"), s)
+    }
+
+    @Test
+    fun `a head the catalogue no longer lists is dropped, never invented`() {
+        val s = ModelChoice.shortlist(
+            listOf(m("free-a", true), m("paid-a", false)),
+            preferred = listOf("retired-choice"),
+        )
+        assertFalse("an unlisted head must not smuggle itself in",
+            s.contains("retired-choice"))
+        assertEquals(listOf("free-a", "paid-a"), s)
     }
 
     @Test

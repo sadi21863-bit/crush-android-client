@@ -238,6 +238,56 @@ internal fun handoffApprovalStamp(approvedAtMs: Long): String =
 internal fun handoffSessionShort(id: String): String = id.take(8) + "…"
 
 /**
+ * The handoff row's provider stamp split into a MODEL id when it can be
+ * one: the stamp carries "model id else provider id" (see
+ * [handoffProviderStamp]), so a stamp that IS a provider id denotes no
+ * model choice and returns null - the instance's own selection stands.
+ * Pure: the provider-id universe is injected, keeping the contract
+ * testable without the registry.
+ */
+internal fun handoffStampAsModel(stamp: String, providerIds: Set<String>): String? =
+    stamp.trim().takeIf { it.isNotEmpty() && !providerIds.contains(it) }
+
+/**
+ * The replay-surviving resume affordance (the D+F drive's UX
+ * enhancement), classified pure: when the ACTIVE source chat's newest
+ * handoff row is DISPATCHED and the user is NOT already viewing the
+ * target Code session, the bar shows. Built FROM THE ROW - the table
+ * truth the ephemeral dispatch note (view state) can never survive a
+ * replay with. The caller resolves the label (the projects row may be
+ * gone; its honest fallback lives there).
+ *
+ * [targetSessionIdOf] extracts the jump target so room-shape drift
+ * cannot buy a wrong view; a row with no target is not a hint.
+ */
+internal fun handoffResumeHint(
+    rows: List<HandoffEntity>,
+    activeSessionId: String?,
+    targetSessionIdOf: (HandoffEntity) -> String?,
+): HandoffResumeHint? {
+    if (activeSessionId == null) return null
+    val row = rows.firstOrNull { it.status == "DISPATCHED" } ?: return null
+    val target = targetSessionIdOf(row) ?: return null
+    if (target == activeSessionId) return null
+    return HandoffResumeHint(
+        handoffId = row.handoffId,
+        targetSessionId = target,
+        targetLabel = "",
+    )
+}
+
+/**
+ * The resume bar's state: the minimum the jump needs plus the label the
+ * ViewModel resolves. [targetLabel] is the ADR-0001 project row's display
+ * name, or the ViewModel's honest "its project" when that row is gone.
+ */
+data class HandoffResumeHint(
+    val handoffId: String,
+    val targetSessionId: String,
+    val targetLabel: String,
+)
+
+/**
  * The app's best-known "which provider/model served the source chat"
  * stamp (the row's NOT NULL column and the first turn's provenance
  * parameter): the model id when a live selection exists, else the provider

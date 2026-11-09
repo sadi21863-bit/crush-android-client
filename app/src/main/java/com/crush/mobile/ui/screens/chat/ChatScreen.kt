@@ -292,6 +292,38 @@ bottomBar = {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // The replay-surviving resume affordance (the D+F drive's UX
+                // enhancement): a table-driven bar PINNED at the transcript's
+                // top, shown when this chat's newest handoff row is
+                // DISPATCHED and the view is not already the target session.
+                // It survives every replay because it is built FROM the row,
+                // never from the ephemeral dispatch note.
+                s.handoffResumeHint?.takeIf { it.targetSessionId != s.activeSessionId }?.let { hint ->
+                    stickyHeader(key = "handoff-resume-${hint.handoffId}") {
+                        // The bar's own F04 host: its trust decision is
+                        // nearest the affordance (hoisted in this sticky
+                        // row's composition - state lives and dies with the
+                        // bar itself).
+                        var pendingResumeTrust by remember {
+                            mutableStateOf<PendingProjectTrust?>(null)
+                        }
+                        HandoffResumeBar(
+                            label = hint.targetLabel,
+                            onContinue = { vm.openHandoffInCode { pendingResumeTrust = it } }
+                        )
+                        pendingResumeTrust?.let { pending ->
+                            CrushrcTrustDialog(
+                                folderLabel = pending.ref.label,
+                                reasonNote = crushrcTrustNote(pending.kind),
+                                onConfirm = {
+                                    pendingResumeTrust = null
+                                    vm.openHandoffInCode { pendingResumeTrust = it }
+                                },
+                                onDismiss = { pendingResumeTrust = null },
+                            )
+                        }
+                    }
+                }
                 itemsIndexed(s.messages, key = { _, m -> m.id }) { idx, m ->
                     // D13 RETRY WIRING. The retry prompt is derived at render
                     // time, not stored on the model: the nearest preceding user
@@ -524,6 +556,12 @@ bottomBar = {
             onDismiss = { vm.closeHandoffSheet() },
             onDiscard = { vm.discardHandoff() },
             onOpenInCode = { vm.openHandoffInCode { pendingHandoffTrust = it } },
+            // The Batch F drive's UX fix: a refused Confirm (the redaction
+            // net's verdict, an in-flight turn) renders INSIDE the sheet -
+            // the snackbars fired behind the sheet's scrim, and eleven
+            // taps that "did nothing" taught the owner eleven invisible
+            // refusals.
+            notice = s.handoffNotice,
         )
         pendingHandoffTrust?.let { pending ->
             val mode = handoffSheetMode(sheet)

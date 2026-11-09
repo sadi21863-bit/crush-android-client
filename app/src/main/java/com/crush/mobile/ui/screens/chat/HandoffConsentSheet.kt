@@ -109,6 +109,9 @@ internal fun HandoffConsentSheet(
     onDiscard: () -> Unit,
     /** The DISPATCHED-mode jump to the trace's target Code session. */
     onOpenInCode: () -> Unit,
+    /** The flow's honest notice (a refused Confirm's verdict) rendered INSIDE
+     *  the sheet - the snackbar-only channel fell behind the sheet scrim. */
+    notice: String? = null,
 ) {
     val mode = handoffSheetMode(sheet)
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -129,6 +132,16 @@ internal fun HandoffConsentSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
             )
+            // The refused-Confirm notice, IN the sheet (the drive's UX fix):
+            // a Blocked verdict on this summary is readable where it happened.
+            notice?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
             // Mode banner (Batch D): the RESUME and DISPATCHED surfaces tell
             // the user what their row already carries before any picker;
             // the fresh open shows none.
@@ -416,4 +429,44 @@ private fun DestinationRow(
         }
     }
     Spacer(Modifier.height(6.dp))
+}
+
+/**
+ * The replay-surviving Continue-in-Code bar (the D+F drive's UX
+ * enhancement): one surfaceVariant line, one action, pinned at the
+ * transcript's top as a [androidx.compose.foundation.lazy.stickyHeader].
+ * The label is the ADR-0001 project row's display name; a gone row says
+ * "its project" through the ViewModel's honest fallback. The jump rides
+ * openHandoffInCode - trust gates and all - exactly as the sheet's
+ * Open-In-Code does.
+ */
+@Composable
+internal fun HandoffResumeBar(
+    label: String,
+    onContinue: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Handed off to \"$label\".",
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = onContinue,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("Continue in Code", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
 }

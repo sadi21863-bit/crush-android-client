@@ -256,14 +256,18 @@ class EngineConfigInjectorChatPolicyTest {
     // v0.99.0 libcrush.so, PLUS the four sub-agent tools the v0.100.0
     // release notes document (dispatch commits 965d1a7 + 938fef2).
     //
-    // NEEDS-STRINGS-CONFIRM: this snapshot is what the 0.100.0 engine SHOULD
-    // document per the release notes - it has NOT been verified by strings
-    // over a v0.100.0 libcrush.so yet. At fetch time (tools/fetch-crush.ps1)
-    // the fresh binary re-confirms every id here and exposes any ADDITIONAL
-    // new ids; those land in BOTH this snapshot and CHAT_DISABLED_TOOLS
-    // before the device gate. ("task"/"diagnostics" are inert extra ids the
-    // deny list also carries; they are not engine-raised built-ins and stay
-    // out of this snapshot.)
+    // STRINGS-CONFIRMED 2026-11-09: the official
+    // crush_0.100.0_Android_arm64.tar.gz (sha256 cdb15f23393c7e334b059a37d
+    // 2c41a12fcb5f4d02d6e940795b7707e4b0afeaa, byte-verified against the
+    // release's own checksums.txt) was unpacked out-of-tree and scanned -
+    // ALL 33 ids above are present in the binary, the four agent tools
+    // included, and no ADDITIONAL built-in tool id surfaced beyond them
+    // (the probe id "agent_task" is absent). At fetch time the SAME
+    // verification reruns over the in-tree libcrush.so the script writes;
+    // any then-unforeseen new ids land in BOTH this snapshot and
+    // CHAT_DISABLED_TOOLS before the device gate. ("task"/"diagnostics"
+    // are inert extra ids the deny list also carries; they are not
+    // engine-raised built-ins and stay out of this snapshot.)
     private val ENGINE_V0100_BUILTIN_TOOLS = listOf(
         "agent", "bash", "crush_info", "crush_logs", "job_output", "job_kill",
         "download", "edit", "multiedit", "lsp_call_hierarchy", "lsp_definition",
@@ -271,8 +275,8 @@ class EngineConfigInjectorChatPolicyTest {
         "lsp_restart", "lsp_symbols", "fetch", "agentic_fetch", "glob", "grep",
         "ls", "question", "sourcegraph", "todos", "view", "write",
         "list_mcp_resources", "read_mcp_resource",
-        // v0.100.0 sub-agent additions (release notes; strings-confirm still
-        // pending - see the NEEDS-STRINGS-CONFIRM note above).
+        // v0.100.0 sub-agent additions (release notes; strings-confirm DONE
+        // 2026-11-09 - see the STRINGS-CONFIRMED note above).
         "agent_dispatch", "agent_send", "agent_status", "agent_stop",
     )
 

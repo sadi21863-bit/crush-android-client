@@ -1050,6 +1050,38 @@ the first local gate's client survived a host restart as a detached job
 and completed the work; the observed re-run verified 90 tasks
 UP-TO-DATE and the suite verdict was taken per-XML.
 
+**P6 BATCH F BUILD (2026-11-09, `327a47c`) — the stat-walk deferral
+CLOSED, device drive pending:** `ProjectTreeFingerprint` (domain/file,
+plan §8 f1) walks the project folder STAT-ONLY - per file: relative path
+(forward slashes), byte size, mtimeMs - sorts the rows by path and
+hashes the stream to lowercase hex (the trust service's hex
+discipline). The WorkspaceSnapshotter's noise rule (.git/build/
+node_modules and friends) and depth cap ride, DOCUMENTED as the shared
+false-negative family; the markers keep the explicit-over-silent ethos:
+a refused file or directory records `<path><TAB>?<TAB>?` - never
+silent, never invented numbers; a refused directory's subtree is not
+visited (the first cut keyed that branch on `listFiles()==null` only -
+the gate caught it via its own row and the fix landed before any
+commit). A missing root is a deterministic empty digest; the walk lives
+on Dispatchers.IO with no file contents read. Wiring: `dispatchHandoff`
+computes the digest AT dispatch and carries it to BOTH the row
+(`markDispatched`'s column - single-shot, a later stamp can never
+rewrite it) and the verify-first first turn's provenance line - the
+"(not recorded)" degradation now means exactly "the walk could not
+run", never a missing feature. The resume dispatch stamps ITS OWN
+fresh digest at its dispatch (the recorded tree is always the tree AS
+DISPATCHED; and the digest is the app's own metric - the agent's
+verify turn re-walks SEMANTICALLY, comparing tree reality against the
+approved summary). Tests 660 → 669 (7 determinism rows + the DAO stamp
+row + the real-digest render row); the first gate run was 668+1 and
+the re-run lands 669/0/0; CI run 42661917711 GREEN 4m4s. The six Batch
+C observations are also resolved by mechanism this window:
+`docs/batch-c-observations-resolution-2026-11-09.md` (the marker
+writer is the consented crushrc execution on every workspace
+re-attach; the bootstrap-tail resume-grab is designed and absorbed by
+the epoch guard; one probe for the drive: the engine-side session
+lineage, plus the first turn's agent model capture).
+
 ### Import-removal first-use defects - BOTH FIXED (2026-11-04)
 
 **S1/S1b security probes — VERIFIED 2026-11-05 (device `bbf8ca69`, engine v0.99.0)**

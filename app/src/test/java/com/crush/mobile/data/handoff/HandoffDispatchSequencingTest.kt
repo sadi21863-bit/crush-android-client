@@ -335,6 +335,29 @@ class HandoffDispatchSequencingTest {
         }
 
     @Test(timeout = 120_000)
+    fun `dispatch stamps the tree digest`() =
+        runBlocking {
+            val dao = newStore().handoffDao()
+            val entity = sealedEntity("ses-7", "target-A")
+            approve(dao, entity, 42_000L)
+            val digest = "a".repeat(64)
+
+            // Batch F: the AT-dispatch stat digest lands in the row column
+            // (the "(not recorded)" NULL remains the WALK-FAILURE shape,
+            // never the normal dispatch shape).
+            assertEquals(1, dao.markDispatched(entity.handoffId, "ses-1", digest))
+            val row = dao.getById(entity.handoffId) ?: error("row must exist")
+            assertEquals("DISPATCHED", row.status)
+            assertEquals("the digest rides the guarded stamp", digest, row.projectTreeFingerprintAtHandoff)
+            assertEquals("the approval stamp is untouched by the digest", 42_000L, row.userApprovedAt)
+
+            // Single-shot even with the same id: a second stamp can never
+            // rewrite the recorded digest (or the session it was taken with).
+            assertEquals(0, dao.markDispatched(entity.handoffId, "ses-2", null))
+            assertEquals(digest, dao.getById(entity.handoffId)?.projectTreeFingerprintAtHandoff)
+        }
+
+    @Test(timeout = 120_000)
     fun `resume stamp keeps approval`() =
         runBlocking {
             val dao = newStore().handoffDao()

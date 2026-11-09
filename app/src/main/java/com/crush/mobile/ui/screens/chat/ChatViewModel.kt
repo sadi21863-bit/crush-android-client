@@ -26,6 +26,7 @@ import com.crush.mobile.data.crush.RunComplete
 import com.crush.mobile.data.crush.SelectedModel
 import com.crush.mobile.data.crush.Session
 import com.crush.mobile.domain.file.FileChangeCollector
+import com.crush.mobile.domain.file.ProjectTreeFingerprint
 import com.crush.mobile.domain.provider.Provider
 import com.crush.mobile.domain.provider.Providers
 import com.crush.mobile.domain.file.FileChangeSet
@@ -2467,8 +2468,11 @@ class ChatViewModel(
      * - SAME destination: belt-check the row, the S-02 prelude re-runs
      *   (consent is never transferable, plan d2), then the guarded single
      *   markDispatched - no insert, no re-approve (markApproved is
-     *   single-shot and a second stamp would be a lie), the fingerprint
-     *   stays the Batch F NULL (an approved row's summary is immutable).
+     *   single-shot and a second stamp would be a lie). The fingerprint
+     *   column keeps its approval-time NULL until THIS dispatch stamps
+     *   it: the Batch F stat-walk runs at every dispatch (design §4(5)),
+     *   never at approval, so the recorded digest is always the tree AS
+     *   DISPATCHED.
      * - CHANGED destination: the no-alias rule (plan :416) - the approval
      *   NEVER transfers. ORDER MATTERS: the new destination's gate+record
      *   (the same prelude) resolves FIRST - nothing writes until trust is
@@ -2863,11 +2867,17 @@ class ChatViewModel(
                 }
                 return null
             }
-        // (a3) APPROVED -> DISPATCHED, guarded. The fingerprint column stays
-        // NULL this batch (Batch F wires the stat-walk util; the row stores
-        // null until then, per the DAO's contract).
+        // (a3) APPROVED -> DISPATCHED, guarded - now carrying the Batch F
+        // fingerprint VALUE: the stat-walk over the bound folder AT dispatch
+        // (design §4(5)) fills the row column AND the first turn's
+        // provenance line. Fail-soft: a walk that cannot run stores null -
+        // the "(not recorded)" degradation stays owned by the walk's
+        // failure, never a forged digest.
+        val treeDigest = runCatching { ProjectTreeFingerprint.of(ref.repoDir) }
+            .onFailure { AppLog.w(TAG, "handoff tree fingerprint walk failed: ${it.message}") }
+            .getOrNull()
         val moved = runCatching {
-            container.projectStore.handoffDao().markDispatched(handoffId, target.id, null)
+            container.projectStore.handoffDao().markDispatched(handoffId, target.id, treeDigest)
         }.onFailure { AppLog.w(TAG, "handoff dispatch stamp failed: ${it.message}") }.getOrDefault(0)
         if (moved != 1) {
             AppLog.w(TAG, "handoff dispatch: guarded DISPATCHED move refused for $handoffId")
@@ -2900,7 +2910,7 @@ class ChatViewModel(
             firstPrompt(
                 draft = pkg,
                 projectName = ref.label,
-                fingerprint = null,
+                fingerprint = treeDigest,
                 sourceProvider = pkg.sourceProvider,
             )
         )

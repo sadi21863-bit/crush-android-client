@@ -112,6 +112,22 @@ class FirstTurnTest {
     }
 
     @Test
+    fun `a real digest renders in the provenance line`() {
+        // Batch F supplies the AT-dispatch stat digest; the assembler renders
+        // it verbatim in the slot the (not recorded) form leaves open - the
+        // verify-first turn's machine anchor is exactly the row's column.
+        val digest = "c0ffee" + "0".repeat(58)
+        val prompt = firstPrompt(
+            aPackage(references = emptyList()),
+            projectName = "Ledger",
+            fingerprint = digest,
+            sourceProvider = "glm-5.3-flash",
+        )
+        assertTrue(prompt.contains("Project tree fingerprint at handoff: $digest"))
+        assertEquals(1, prompt.countOf(digest))
+    }
+
+    @Test
     fun `no selected references renders the none wording`() {
         val prompt = firstPrompt(
             aPackage(references = emptyList()),

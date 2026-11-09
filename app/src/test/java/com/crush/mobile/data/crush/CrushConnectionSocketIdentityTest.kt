@@ -98,18 +98,22 @@ class CrushConnectionSocketIdentityTest {
         // be load-bearing for this assert. Subscribing first makes the
         // interleaving irrelevant.
         //
-        // Budget 30s (was 15s): the honest-fail ladder routes success through
-        // real wall time. Its sleeps for six consecutive failed attempts sum
-        // 250+500+1000+2000+4000+8000 = 15.75s, which is DEEPER than the old
-        // 15s horizon in one failure run, and both observed failures were
-        // full-suite runs on loaded runners (one 2-core, one 2-vCPU CI host)
-        // where the entire window was consumed inside a single sustained
-        // stall. This test pins transport identity and honest attempt shape,
-        // not a wall clock - the asserts below still pin the green path
-        // exactly (>=2 probes, exactly one server request), and a wrong-shape
-        // recovery surfaces as this timeout, not as a wrong pass.
+        // Budget 60s (was 30s, was 15s): the honest-fail ladder routes
+        // success through real wall time. Its sleeps for six consecutive
+        // failed attempts sum 250+500+1000+2000+4000+8000 = 15.75s, which is
+        // DEEPER than the old 15s horizon in one failure run, and ALL THREE
+        // observed failures (2026-11-06; 2026-11-08 twice, both on docs-only
+        // commits with zero code delta) were full-suite runs on loaded
+        // 2-core/2-vCPU CI hosts where the entire window was consumed inside
+        // a single sustained stall - every immediate rerun was green. 60s
+        // keeps a generous 3.8x headroom over the 15.75s ladder while
+        // remaining a real bound. This test pins transport identity and
+        // honest attempt shape, not a wall clock - the asserts below still
+        // pin the green path exactly (>=2 probes, exactly one server
+        // request), and a wrong-shape recovery surfaces as this timeout, not
+        // as a wrong pass.
         runBlocking {
-            withTimeout(30_000) {
+            withTimeout(60_000) {
                 // UNDISPATCHED runs the body inline on this thread until
                 // its first suspension, so the collector IS subscribed
                 // before ensureAttached runs below (a dispatching async

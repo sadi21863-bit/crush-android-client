@@ -48,7 +48,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crush.mobile.CrushMobileApp
 import com.crush.mobile.data.crush.Session
+import com.crush.mobile.data.project.PendingProjectTrust
 import com.crush.mobile.di.AppContainer
+import com.crush.mobile.ui.CrushrcTrustDialog
+import com.crush.mobile.ui.crushrcTrustNote
 import com.crush.mobile.util.AppLog
 import com.crush.mobile.engine.EngineState
 
@@ -487,16 +490,29 @@ bottomBar = {
         )
     }
 
-    // P6 Batch C: the Chat->Code handoff consent sheet. The selection and the
-    // edited summary are hoisted HERE (the chip/tap lifecycle is view state),
-    // keyed on the sheet instance so every fresh open starts from its own
-    // prefill and its own no-project default. Confirm carries both back as
-    // parameters - the ViewModel can only express a Confirm as a fresh
-    // package seal, which is the composable-contract face of the no-alias
-    // rule (plan :416).
+    // P6 Batch C + Batch D: the Chat->Code handoff consent sheet. The
+    // selection and the edited summary are hoisted HERE (the chip/tap
+    // lifecycle is view state), keyed on the sheet instance so every fresh
+    // open starts from its own prefill and its own no-project default -
+    // except RESUME, whose preselect IS the approved destination (the
+    // same-target Confirm dispatches on the existing approval). Confirm
+    // carries both back as parameters - the ViewModel can only express a
+    // Confirm as a fresh decision, which is the composable-contract face
+    // of the no-alias rule (plan :416).
     s.handoffSheet?.let { sheet ->
-        var selectedDestination by remember(sheet) { mutableStateOf<String?>(null) }
+        var selectedDestination by remember(sheet) {
+            mutableStateOf(sheet.approvedRow?.targetProjectId)
+        }
         var summaryDraft by remember(sheet) { mutableStateOf(sheet.initialSummary) }
+        // The F04 consent decision for the sheet's paths (Batch D rewire):
+        // screen-local exactly like the Projects row-tap's dialog - the
+        // container's root-level pending flow stays the restore's. Allow
+        // RE-CALLS the same entry; the second gate finds Allow (consent was
+        // just recorded) and the same code path runs on. Dismiss keeps the
+        // sheet exactly as it was.
+        var pendingHandoffTrust by remember(sheet) {
+            mutableStateOf<PendingProjectTrust?>(null)
+        }
         HandoffConsentSheet(
             sheet = sheet,
             projects = s.handoffProjects,
@@ -504,9 +520,31 @@ bottomBar = {
             summary = summaryDraft,
             onSummary = { summaryDraft = it },
             onSelect = { selectedDestination = it },
-            onConfirm = { vm.confirmHandoff(summaryDraft, selectedDestination) },
-            onDismiss = { vm.closeHandoffSheet() }
+            onConfirm = { vm.confirmHandoff(summaryDraft, selectedDestination) { pendingHandoffTrust = it } },
+            onDismiss = { vm.closeHandoffSheet() },
+            onDiscard = { vm.discardHandoff() },
+            onOpenInCode = { vm.openHandoffInCode { pendingHandoffTrust = it } },
         )
+        pendingHandoffTrust?.let { pending ->
+            val mode = handoffSheetMode(sheet)
+            CrushrcTrustDialog(
+                folderLabel = pending.ref.label,
+                reasonNote = crushrcTrustNote(pending.kind),
+                onConfirm = {
+                    pendingHandoffTrust = null
+                    // The re-call: same arguments, same path - the gate now
+                    // Allow (the dialog recorded consent for THIS gate's
+                    // observed bytes), so the flow continues. Whatever moved
+                    // AGAIN inside the re-call's gate re-opens the dialog.
+                    if (mode == HandoffSheetMode.DISPATCHED) {
+                        vm.openHandoffInCode { pendingHandoffTrust = it }
+                    } else {
+                        vm.confirmHandoff(summaryDraft, selectedDestination) { pendingHandoffTrust = it }
+                    }
+                },
+                onDismiss = { pendingHandoffTrust = null },
+            )
+        }
     }
 }
 

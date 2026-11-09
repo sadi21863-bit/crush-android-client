@@ -45,18 +45,39 @@ import java.util.Locale
  */
 data class HandoffSheetState(
     val draft: HandoffPackageDraft,
-    /** A still-touched DRAFT row for this source chat, or null. */
+    /** A still-untouched Room DRAFT row for this source chat, or null (DRAFT mode). */
     val existingDraft: HandoffEntity? = null,
+    /**
+     * A resumable APPROVED row for this source chat (Batch D), or null
+     * (RESUME mode): a dispatch that failed before the guarded stamp leaves
+     * the row APPROVED and resumable, and the sheet's re-open surfaces it.
+     * The approval never transfers in place: Confirm on the SAME destination
+     * dispatches on the row's existing approval (the DAO's single-shot
+     * markDispatched from APPROVED), a changed destination abandons the row
+     * and re-approves a fresh draft (the no-alias rule, plan :416).
+     */
+    val approvedRow: HandoffEntity? = null,
+    /**
+     * The durable DISPATCHED trace for this source chat (Batch D), or null
+     * (jump mode): its target Code session is re-openable through the drawer
+     * machinery. The trace row itself can never be discarded or re-approved
+     * from here - the DAO guard refuses (the dispatch surface offers only
+     * Cancel and "Open in Code").
+     */
+    val dispatchedRow: HandoffEntity? = null,
 ) {
     /**
-     * The summary the sheet's composer initialises: the user's own
-     * persisted draft text beats the machine prefill whenever the row is
-     * still untouched. Empty in the degraded open and STAYS editable -
-     * the degrade law (design §4(1), plan b3) is that empty is allowed
-     * and never blocks Confirm.
+     * The summary the sheet's composer initialises. The three slots are
+     * mutually exclusive (each `with*` builder clears the others), and the
+     * priority order is the mode priority: the resumable approval shows the
+     * approved summary, the durable trace its dispatched summary, the draft
+     * its own text, and the fresh open the machine prefill.
      */
     val initialSummary: String
-        get() = existingDraft?.summaryMarkdown ?: draft.summaryMarkdown
+        get() = approvedRow?.summaryMarkdown
+            ?: dispatchedRow?.summaryMarkdown
+            ?: existingDraft?.summaryMarkdown
+            ?: draft.summaryMarkdown
 
     /** Display provenance: the source session's title as the app knows it. */
     val sourceChatTitle: String get() = draft.sourceChatTitle
@@ -68,13 +89,28 @@ data class HandoffSheetState(
     val sourceChatId: String? get() = draft.sourceChatId
 
     /**
-     * Attaches the current-draft lookup's row (Batch A's
-     * `latestDraftForSource`), the re-open its own contract describes: the
-     * user's untouched draft is what the composer opens with, never a
-     * minted twin.
+     * Attaches the DRAFT slot (Batch A's `latestDraftForSource`), the
+     * re-open its own contract describes: the user's untouched draft is what
+     * the composer opens with, never a minted twin. Clears the other two
+     * slots - the three modes are mutually exclusive by construction.
      */
     fun withExisting(entity: HandoffEntity): HandoffSheetState =
-        copy(existingDraft = entity)
+        copy(existingDraft = entity, approvedRow = null, dispatchedRow = null)
+
+    /**
+     * Attaches the RESUME slot: the sheet re-opens as the approved row's
+     * resume surface (Batch D) - the approved summary, the approved
+     * destination preselected, the guarded dispatch re-stamp as Confirm.
+     */
+    fun withApproved(entity: HandoffEntity): HandoffSheetState =
+        copy(approvedRow = entity, existingDraft = null, dispatchedRow = null)
+
+    /**
+     * Attaches the DISPATCHED slot: the sheet re-opens as the trace's jump
+     * surface (Batch D) - read-only record, "Open in Code" as the move.
+     */
+    fun withDispatched(entity: HandoffEntity): HandoffSheetState =
+        copy(dispatchedRow = entity, existingDraft = null, approvedRow = null)
 }
 
 /**
@@ -140,6 +176,66 @@ internal fun handoffConfirmEnabled(selectedDestinationId: String?): Boolean =
 internal fun handoffUsableExistingDraft(entity: HandoffEntity?): Boolean =
     entity != null && entity.userApprovedAt == null &&
         entity.status == HandoffEntity.STATUS_DRAFT
+
+/**
+ * The sheet's three modes (Batch D), decided once and read everywhere else
+ * as a value: the slots are mutually exclusive by construction (the `with*`
+ * builders clear each other), so the mode priority is the classification the
+ * ViewModel's trace scan already performed - a resumable approval outranks a
+ * draft re-open, and the durable dispatched trace outranks both.
+ */
+internal enum class HandoffSheetMode { DRAFT, RESUME, DISPATCHED }
+
+/** The mode the sheet state carries; DRAFT is the fallthrough (fresh open). */
+internal fun handoffSheetMode(state: HandoffSheetState): HandoffSheetMode = when {
+    state.approvedRow != null -> HandoffSheetMode.RESUME
+    state.dispatchedRow != null -> HandoffSheetMode.DISPATCHED
+    else -> HandoffSheetMode.DRAFT
+}
+
+/**
+ * The summary stays editable ONLY in the fresh/draft modes. The approved
+ * row's summary is exactly what the user approved - editing it would be a
+ * new approval pretending to be the old one, so RESUME (and the durable
+ * trace) show it read-only; a different plan is a new draft (the no-alias
+ * rule's editing face, plan :416).
+ */
+internal fun handoffEditAllowed(mode: HandoffSheetMode): Boolean =
+    mode == HandoffSheetMode.DRAFT
+
+/**
+ * Resume-mode Confirm semantics, named once for both the sheet's banner and
+ * the ViewModel's branch: a selection that MATCHES the approved
+ * destination continues the approved row (dispatch only, no new row); a
+ * changed destination REPLACES the trace (abandon the approved row, mint a
+ * fresh draft that this same Confirm approves - the old approval never
+ * transfers, plan :416). A null selection means "no decision yet"; the
+ * Confirm gate keeps that shape from reaching the ViewModel anyway.
+ */
+internal fun handoffResumeReplacingTarget(
+    approved: HandoffEntity,
+    selectedDestination: String?,
+): Boolean = selectedDestination != null && selectedDestination != approved.targetProjectId
+
+/**
+ * A display-ready stamp for the RESUME banner (the row's `userApprovedAt`),
+ * the device zone + Locale.US digits - the same formatting discipline
+ * [handoffSourceStamp] documents (a UTC string would mislead about when the
+ * approval happened). <= 0 never reaches a real APPROVED row's stamp; the
+ * callers guard the null before calling.
+ */
+internal fun handoffApprovalStamp(approvedAtMs: Long): String =
+    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
+        .withZone(java.time.ZoneId.systemDefault())
+        .format(java.time.Instant.ofEpochMilli(approvedAtMs))
+
+/**
+ * The engine session id is a long opaque token; the surfaces that name a
+ * session in prose (the DISPATCHED banner) show a short prefix + ellipsis -
+ * full ids pasted into copy, not prose. First characters keep sort order and
+ * enough to match the drawer by eye.
+ */
+internal fun handoffSessionShort(id: String): String = id.take(8) + "…"
 
 /**
  * The app's best-known "which provider/model served the source chat"

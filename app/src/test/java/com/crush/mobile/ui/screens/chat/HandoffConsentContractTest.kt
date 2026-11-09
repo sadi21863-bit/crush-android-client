@@ -228,4 +228,69 @@ class HandoffConsentContractTest {
         assertEquals(1, prompt.split("APPROVED SUMMARY").size - 1)
         assertEquals(1, prompt.split("the reviewed plan").size - 1)
     }
+
+    // --------------------------------------------------- P6 Batch D rows
+    // The sheet's mode machine: three mutually exclusive surfaces over one
+    // hoisted composable, and the resume decision's exact contract.
+
+    @Test
+    fun `sheet mode classification and exclusivity`() {
+        val sheet = handoffSheetFor(
+            listOf(assistantMsg("a1", "the reviewed plan")),
+            tappedIndex = 0,
+            sourceChatId = "ses-7",
+            sourceSessionTitle = "Ledger",
+        )
+        // A fresh open is the DRAFT surface (Batch C, byte-for-byte).
+        assertEquals(HandoffSheetMode.DRAFT, handoffSheetMode(sheet))
+        assertTrue("the fresh summary stays editable", handoffEditAllowed(HandoffSheetMode.DRAFT))
+        assertEquals("the machine prefill is the fresh initial text", "the reviewed plan", sheet.initialSummary)
+
+        // A resumable APPROVED row re-opens as the RESUME surface.
+        val approved = approvedRow("target-A")
+        val resumed = sheet.withApproved(approved)
+        assertEquals(HandoffSheetMode.RESUME, handoffSheetMode(resumed))
+        assertFalse("the approved summary is read-only", handoffEditAllowed(HandoffSheetMode.RESUME))
+        assertEquals("the approved summary is what the composer shows", "the approved summary", resumed.initialSummary)
+
+        // The durable DISPATCHED trace re-opens as the jump surface.
+        val dispatched = sheet.withDispatched(dispatchedRow())
+        assertEquals(HandoffSheetMode.DISPATCHED, handoffSheetMode(dispatched))
+        assertFalse("the trace summary is read-only too", handoffEditAllowed(HandoffSheetMode.DISPATCHED))
+        assertEquals("the dispatched row's summary shows", "the approved summary", dispatched.initialSummary)
+
+        // Exclusivity: each builder clears the other two - the mode is ONE
+        // value, never a stack.
+        val overridden = resumed.withDispatched(dispatchedRow())
+        assertEquals(HandoffSheetMode.DISPATCHED, handoffSheetMode(overridden))
+        assertNull("RESUME slot cleared by the trace attach", overridden.approvedRow)
+        val cleared = overridden.withExisting(draftRow("target-A"))
+        assertEquals(HandoffSheetMode.DRAFT, handoffSheetMode(cleared))
+        assertNull("trace slot cleared by the draft attach", cleared.dispatchedRow)
+        assertNull("resume slot still cleared", cleared.approvedRow)
+    }
+
+    @Test
+    fun `resume semantics - same rides changed replaces`() {
+        val approved = approvedRow("target-A")
+        assertFalse(
+            "same target keeps the row - dispatch on the existing approval",
+            handoffResumeReplacingTarget(approved, "target-A"),
+        )
+        assertTrue(
+            "a changed destination is the no-alias replace (plan :416)",
+            handoffResumeReplacingTarget(approved, "target-B"),
+        )
+        assertFalse(
+            "no decision yet is not a replace decision",
+            handoffResumeReplacingTarget(approved, null),
+        )
+
+        // The banner's display helpers are stable shapes: the stamp is a
+        // device-zone date-time with Locale.US digits, and the session
+        // display is a short prefix + ellipsis (ids are paste-matter).
+        val stamp = handoffApprovalStamp(1_773_298_842_696)
+        assertTrue("date-time shape", stamp.matches(Regex("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}")))
+        assertEquals("ses-disp…", handoffSessionShort("ses-disp-long-token"))
+    }
 }

@@ -61,6 +61,21 @@ interface HandoffDao {
     suspend fun latestDraftForSource(sourceChatId: String): HandoffEntity?
 
     /**
+     * The source chat's whole trace, newest first - the Batch D
+     * classification read for the sheet's open (P6 Batch C/D comment block
+     * in ChatViewModel): the newest DISPATCHED row runs the jump surface,
+     * the newest APPROVED row the resume surface, else the still-untouched
+     * DRAFT takes Batch C's re-open, else the sheet opens the fresh prefill.
+     * One query, the branching lives Kotlin-side in one place. No LIMIT: the
+     * rows are long-lived traces and the sheet only reads them.
+     */
+    @Query(
+        "SELECT * FROM handoffs WHERE sourceChatId = :sourceChatId " +
+            "ORDER BY rowid DESC"
+    )
+    suspend fun rowsForSource(sourceChatId: String): List<HandoffEntity>
+
+    /**
      * DRAFT -> APPROVED. Writes the user's confirmation stamp - the caller
      * supplies it, so an APPROVED row can be minted only WITH a non-null
      * userApprovedAt (the a5 rule). Returns 0 (no-op, row untouched) when

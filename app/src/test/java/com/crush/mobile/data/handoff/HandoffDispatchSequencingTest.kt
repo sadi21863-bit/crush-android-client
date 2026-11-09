@@ -220,4 +220,136 @@ class HandoffDispatchSequencingTest {
             assertNull("still un-dispatched: resumable", approved.targetCodeSessionId)
             assertFalse("the stamped row is out of the rewrite covenant", handoffUsableExistingDraft(approved))
         }
+
+    // --------------------------------------------------- P6 Batch D rows
+    // The post-approval surface: abandon (the explicit move), the no-alias
+    // replace, the trace classification read, and the resume stamp's
+    // approval-survival. Same tier, same ~35-char method-name budget.
+
+    @Test(timeout = 120_000)
+    fun `discard abandons approved`() =
+        runBlocking {
+            val store = newStore()
+            val dao = store.handoffDao()
+            val entity = sealedEntity("ses-7", "target-A")
+            approve(dao, entity, 5_000L)
+
+            // The explicit post-approval abandon (Batch D): DRAFT and
+            // APPROVED are the allowed FROM states. Only status moves; the
+            // approval stamp and the sealed package stay as the record of
+            // what was approved (the "orientable ABANDONED row").
+            assertEquals(1, dao.abandon(entity.handoffId))
+            val row = dao.getById(entity.handoffId) ?: error("row must exist")
+            assertEquals("ABANDONED", row.status)
+            assertEquals("the approval stamp survives the abandon", 5_000L, row.userApprovedAt)
+            assertEquals("the approved target survives", "target-A", row.targetProjectId)
+            assertEquals(
+                "the approved summary survives",
+                "Here is the plan:\n1. split the ledger\n2. keep totals",
+                row.summaryMarkdown,
+            )
+            assertNull("no target session was ever written", row.targetCodeSessionId)
+            assertNull(row.projectTreeFingerprintAtHandoff)
+
+            // Traces are append-only: an ABANDONED row cannot re-enter the
+            // machine through any guarded transition.
+            assertEquals(0, dao.abandon(entity.handoffId))
+            assertEquals(0, dao.markApproved(entity.handoffId, 9_000L))
+            assertEquals("ABANDONED", dao.getById(entity.handoffId)?.status)
+        }
+
+    @Test(timeout = 120_000)
+    fun `discard refused on dispatched`() =
+        runBlocking {
+            val store = newStore()
+            val dao = store.handoffDao()
+            val entity = sealedEntity("ses-7", "target-A")
+            approve(dao, entity, 5_000L)
+            assertEquals(1, dao.markDispatched(entity.handoffId, "ses-disp-1", null))
+
+            // A DISPATCHED row can NEVER be abandoned - it is the durable
+            // cross-restart trace the resume route reads exactly in this
+            // state: the guard returns 0 and every column stays verbatim.
+            assertEquals(0, dao.abandon(entity.handoffId))
+            val row = dao.getById(entity.handoffId) ?: error("row must exist")
+            assertEquals("DISPATCHED", row.status)
+            assertEquals("ses-disp-1", row.targetCodeSessionId)
+            assertEquals(5_000L, row.userApprovedAt)
+            assertEquals("target-A", row.targetProjectId)
+        }
+
+    @Test(timeout = 120_000)
+    fun `rows-for-source newest-first all`() =
+        runBlocking {
+            val dao = newStore().handoffDao()
+            // One source's three-shape history: a stale ABANDONED head over
+            // a live APPROVED trace over the oldest untouched draft.
+            val oldest = sealedEntity("ses-7", "target-A")
+            dao.insertDraft(oldest)
+            val live = sealedEntity("ses-7", "target-B")
+            dao.insertDraft(live)
+            assertEquals(1, dao.markApproved(live.handoffId, 2_000L))
+            val stale = sealedEntity("ses-7", "target-C")
+            dao.insertDraft(stale)
+            assertEquals(1, dao.abandon(stale.handoffId))
+
+            val rows = dao.rowsForSource("ses-7")
+            assertEquals(
+                "newest first across EVERY status",
+                listOf(stale.handoffId, live.handoffId, oldest.handoffId),
+                rows.map { it.handoffId },
+            )
+            assertTrue(
+                "the classification needs every status in one list",
+                rows.map { it.status }.containsAll(listOf("ABANDONED", "APPROVED", "DRAFT")),
+            )
+            assertTrue("other sources never bleed in", dao.rowsForSource("ses-other").isEmpty())
+        }
+
+    @Test(timeout = 120_000)
+    fun `no-alias replace path`() =
+        runBlocking {
+            val dao = newStore().handoffDao()
+            // Plan :416 at the DAO level: approved@target-A; a destination
+            // change abandons it and a NEW handoffId re-approves - the old
+            // approval never transfers in place.
+            val old = sealedEntity("ses-7", "target-A")
+            dao.insertDraft(old)
+            assertEquals(1, dao.markApproved(old.handoffId, 5_000L))
+
+            assertEquals(1, dao.abandon(old.handoffId))
+            val fresh = sealedEntity("ses-7", "target-B")
+            dao.insertDraft(fresh)
+            assertEquals(1, dao.markApproved(fresh.handoffId, 6_000L))
+            assertEquals(1, dao.markDispatched(fresh.handoffId, "ses-new-1", null))
+
+            val oldRow = dao.getById(old.handoffId) ?: error("row must exist")
+            assertEquals("ABANDONED", oldRow.status)
+            assertEquals("the old approval stamp stays intact", 5_000L, oldRow.userApprovedAt)
+            assertEquals("the old target stays intact", "target-A", oldRow.targetProjectId)
+            val freshRow = dao.getById(fresh.handoffId) ?: error("row must exist")
+            assertEquals("DISPATCHED", freshRow.status)
+            assertEquals("target-B", freshRow.targetProjectId)
+            assertEquals("ses-new-1", freshRow.targetCodeSessionId)
+            assertEquals("two rows, never a rewritten one", 2, dao.observeLatest().first().size)
+        }
+
+    @Test(timeout = 120_000)
+    fun `resume stamp keeps approval`() =
+        runBlocking {
+            val dao = newStore().handoffDao()
+            val entity = sealedEntity("ses-7", "target-A")
+            approve(dao, entity, 77_000L)
+
+            // The Batch D resume dispatches ON the existing approval: the
+            // DISPATCHED stamp adds only the session id - the approval stamp
+            // is the ORIGINAL one, never rewritten (the first-turn template
+            // renders exactly what this carries).
+            assertEquals(1, dao.markDispatched(entity.handoffId, "ses-resume-1", null))
+            val row = dao.getById(entity.handoffId) ?: error("row must exist")
+            assertEquals("DISPATCHED", row.status)
+            assertEquals("the ORIGINAL approval stamp rides the resume", 77_000L, row.userApprovedAt)
+            assertEquals("ses-resume-1", row.targetCodeSessionId)
+            assertNull("the fingerprint deferral stands at resume too", row.projectTreeFingerprintAtHandoff)
+        }
 }

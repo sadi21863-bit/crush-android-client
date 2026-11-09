@@ -3,6 +3,7 @@ package com.crush.mobile.ui.screens.chat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,17 +49,24 @@ import com.crush.mobile.project.ProjectRef
  * (plan :416 - "If the target project changes, require new confirmation;
  * no dynamic target alias").
  *
- * Structure, per the batch brief:
- * - the EDITABLE summary composer (degrade law: empty is allowed and stays
- *   allowed - Confirm never blocks on an empty summary);
- * - the source provenance line (title + session id, non-editable);
- * - the destination picker: the Room projects-table rows, SINGLE select,
- *   with the "no project selected" default (Confirm stays disabled until
- *   one row is chosen);
- * - the consent card: what will run there, the fresh-session note, the
- *   no-alias statement, and the honesty hint that this is not a hands-free
- *   run (ask cards may still fire);
- * - [Cancel] (silent) / [Confirm] (enabled once a project is selected).
+ * Structure, per the batch briefs (Batch C shape, Batch D modes):
+ * - [HandoffSheetMode.DRAFT] is Batch C's sheet: the EDITABLE summary composer
+ *   (degrade law: empty is allowed and stays allowed - Confirm never blocks on
+ *   an empty summary), the source provenance line, the destination picker
+ *   (single select, "no project selected" default), the consent card, and
+ *   [Cancel] (silent) / [Confirm] (enabled once a project is chosen);
+ * - [HandoffSheetMode.RESUME] re-opens a resumable APPROVED row (Batch D): the
+ *   approved summary READ-ONLY (what was approved is what dispatches), the
+ *   approved destination preselected by the caller, Confirm relabeled
+ *   "Dispatch" (the guarded re-use of the existing approval), the no-alias
+ *   banner when the selection changes, and the explicit "Discard" affordance
+ *   (the abandon is a decision, never a dismiss);
+ * - [HandoffSheetMode.DISPATCHED] is the durable trace's jump surface (Batch
+ *   D): no picker, no editable summary, Cancel + "Open in Code", and NO
+ *   discard - the trace cannot be abandoned (the DAO guard refuses it anyway).
+ *
+ * Still no `remember` of its own: the caller owns the selection and the
+ * edited summary in every mode, so every Confirm remains a fresh decision.
  */
 private const val CONSENT_RUN_COPY =
     "A Code agent with file and shell tools will run in the chosen project."
@@ -67,6 +76,14 @@ private const val CONSENT_NO_ALIAS_COPY =
     "Changing the destination after approval requires a new draft and a new approval - the approved target never changes in place."
 private const val CONSENT_ASK_CARDS_COPY =
     "This does not promise a hands-free run: the agent's first turn may ask for permission through the usual ask cards."
+private const val CONSENT_RESUME_COPY =
+    "This handoff was already approved - Confirm dispatches on that approval, no new approval is written."
+private const val RESUME_LOCKED_HINT =
+    "The approved summary - read-only; a new draft re-approves a plan."
+private const val DISPATCHED_TRACE_COPY =
+    "This chat's plan already runs in Code - the handoff trace is durable."
+private const val DISPATCHED_JUMP_COPY =
+    "Re-open its session below; the trace row cannot be discarded or re-approved here."
 private const val SUMMARY_HINT =
     "Editable - empty is allowed and stays allowed."
 
@@ -85,9 +102,15 @@ internal fun HandoffConsentSheet(
     onSelect: (String) -> Unit,
     /** Whispered only when a destination is chosen - see handoffConfirmEnabled. */
     onConfirm: () -> Unit,
-    /** Cancel: silent, nothing was written (never-inserted mapping). */
+    /** Cancel: silent in EVERY mode - discard is the only explicit abandon. */
     onDismiss: () -> Unit,
+    /** The explicit abandon move (HandoffDao.abandon); rendered only where a
+     *  written row rides the sheet (DRAFT or RESUME slot), never DISPATCHED. */
+    onDiscard: () -> Unit,
+    /** The DISPATCHED-mode jump to the trace's target Code session. */
+    onOpenInCode: () -> Unit,
 ) {
+    val mode = handoffSheetMode(sheet)
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier
@@ -97,7 +120,7 @@ internal fun HandoffConsentSheet(
                 .navigationBarsPadding()
         ) {
             Text(
-                "Use this plan in Code",
+                if (mode == HandoffSheetMode.DISPATCHED) "Handoff in Code" else "Use this plan in Code",
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
@@ -106,6 +129,53 @@ internal fun HandoffConsentSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
             )
+            // Mode banner (Batch D): the RESUME and DISPATCHED surfaces tell
+            // the user what their row already carries before any picker;
+            // the fresh open shows none.
+            sheet.approvedRow?.takeIf { mode == HandoffSheetMode.RESUME }?.let { row ->
+                val replacing = handoffResumeReplacingTarget(row, selectedDestination)
+                val label = if (replacing) {
+                    projects.firstOrNull { it.id.toString() == selectedDestination }?.label
+                        ?: "the new project"
+                } else {
+                    projects.firstOrNull { it.id.toString() == row.targetProjectId }?.label
+                        ?: "the approved project"
+                }
+                Text(
+                    CONSENT_RESUME_COPY + " Approved " +
+                        handoffApprovalStamp(row.userApprovedAt ?: 0L) + ".",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Text(
+                    if (!replacing) "Dispatching to \"$label\" on the existing approval."
+                    else CONSENT_NO_ALIAS_COPY,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            sheet.dispatchedRow?.takeIf { mode == HandoffSheetMode.DISPATCHED }?.let { row ->
+                val label = projects.firstOrNull { it.id.toString() == row.targetProjectId }?.label
+                    ?: "its project"
+                Text(
+                    DISPATCHED_TRACE_COPY,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Text(
+                    "Session ${handoffSessionShort(row.targetCodeSessionId ?: "")} in \"$label\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+                Text(
+                    DISPATCHED_JUMP_COPY,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Text(
                 "Plan summary",
@@ -115,12 +185,18 @@ internal fun HandoffConsentSheet(
             OutlinedTextField(
                 value = summary,
                 onValueChange = onSummary,
+                // The approved summary is read-only in RESUME/DISPATCHED:
+                // editing it would be a NEW approval wearing the old one's
+                // approval stamp; a different plan is a new draft (plan :416).
+                enabled = handoffEditAllowed(mode),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp),
                 minLines = 5,
                 maxLines = 14,
-                supportingText = { Text(SUMMARY_HINT) }
+                supportingText = {
+                    Text(if (handoffEditAllowed(mode)) SUMMARY_HINT else RESUME_LOCKED_HINT)
+                }
             )
             Text(
                 "Summary text is the whole package: nothing from the chat rides along that you cannot already copy.",
@@ -129,40 +205,58 @@ internal fun HandoffConsentSheet(
                 modifier = Modifier.padding(top = 2.dp)
             )
             Spacer(Modifier.height(12.dp))
-            Text(
-                "Destination",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (projects.isEmpty()) {
+            if (mode == HandoffSheetMode.DISPATCHED) {
+                // The trace's destination is FIXED - the no-alias rule in its
+                // purest form: no picker is offered at all (plan :416).
+                val label = sheet.dispatchedRow?.let { row ->
+                    projects.firstOrNull { it.id.toString() == row.targetProjectId }?.label
+                } ?: "its approved project"
                 Text(
-                    "No projects yet - create one on the Projects screen first.",
+                    "Destination",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Runs in \"$label\" (the approved destination).",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             } else {
-                Spacer(Modifier.height(4.dp))
-                projects.forEach { ref ->
-                    DestinationRow(
-                        ref = ref,
-                        selected = ref.id.toString() == selectedDestination,
-                        onSelect = { onSelect(ref.id.toString()) }
+                Text(
+                    "Destination",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (projects.isEmpty()) {
+                    Text(
+                        "No projects yet - create one on the Projects screen first.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
                     )
+                } else {
+                    Spacer(Modifier.height(4.dp))
+                    projects.forEach { ref ->
+                        DestinationRow(
+                            ref = ref,
+                            selected = ref.id.toString() == selectedDestination,
+                            onSelect = { onSelect(ref.id.toString()) }
+                        )
+                    }
                 }
+                Spacer(Modifier.height(6.dp))
+                val chosenRef = projects.firstOrNull { it.id.toString() == selectedDestination }
+                Text(
+                    when {
+                        selectedDestination == null -> "No project selected"
+                        chosenRef != null -> "Will run in \"${chosenRef.label}\""
+                        else -> "The chosen project row is gone - pick another destination."
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
             }
-            Spacer(Modifier.height(6.dp))
-            val chosenRef = projects.firstOrNull { it.id.toString() == selectedDestination }
-            Text(
-                when {
-                    selectedDestination == null -> "No project selected"
-                    chosenRef != null -> "Will run in \"${chosenRef.label}\""
-                    else -> "The chosen project row is gone - pick another destination."
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
             Spacer(Modifier.height(12.dp))
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -170,25 +264,56 @@ internal fun HandoffConsentSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        CONSENT_RUN_COPY,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        CONSENT_FRESH_COPY,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        CONSENT_NO_ALIAS_COPY,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        CONSENT_ASK_CARDS_COPY,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    when (mode) {
+                        HandoffSheetMode.DRAFT -> {
+                            Text(
+                                CONSENT_RUN_COPY,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                CONSENT_FRESH_COPY,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                CONSENT_NO_ALIAS_COPY,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                CONSENT_ASK_CARDS_COPY,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        HandoffSheetMode.RESUME -> {
+                            Text(
+                                CONSENT_RUN_COPY,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                CONSENT_NO_ALIAS_COPY,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                CONSENT_ASK_CARDS_COPY,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        HandoffSheetMode.DISPATCHED -> {
+                            Text(
+                                DISPATCHED_TRACE_COPY,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                DISPATCHED_JUMP_COPY,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -199,14 +324,40 @@ internal fun HandoffConsentSheet(
                 OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
                     Text("Cancel")
                 }
-                Button(
-                    onClick = onConfirm,
-                    // The Confirm gate: a destination must be chosen; the
-                    // summary's emptiness is never a blocker (degrade law).
-                    enabled = handoffConfirmEnabled(selectedDestination),
-                    modifier = Modifier.weight(1f)
+                if (mode == HandoffSheetMode.DISPATCHED) {
+                    Button(
+                        onClick = onOpenInCode,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Open in Code")
+                    }
+                } else {
+                    Button(
+                        onClick = onConfirm,
+                        // The Confirm gate: a destination must be chosen; the
+                        // summary's emptiness is never a blocker (degrade law
+                        // - and in RESUME the approved summary stands in).
+                        enabled = handoffConfirmEnabled(selectedDestination),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (mode == HandoffSheetMode.RESUME) "Dispatch" else "Confirm")
+                    }
+                }
+            }
+            // The explicit discard (Batch D): abandon via HandoffDao.abandon
+            // is a decision the user makes, never a dismiss. DISPATCHED rows
+            // offer nothing here - the DAO guard refuses them and the trace
+            // is the proof-row-(b) surface.
+            if (sheet.existingDraft != null || sheet.approvedRow != null) {
+                TextButton(
+                    onClick = onDiscard,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
-                    Text("Confirm")
+                    Text(
+                        "Discard this handoff",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
             Spacer(Modifier.height(12.dp))

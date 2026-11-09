@@ -815,6 +815,51 @@ staleness is a prompt-hygiene defect with no demonstrated execution
 path, and it RODES the engine-upgrade ladder (v0.100.0 re-verification
 will require the ratchet test + a fresh-advertisement probe).
 
+RESIDUAL-2 CLOSED - FRESH-AGENT ADVERTISEMENT PROBE, DEVICE 2026-11-09
+(bbf8ca69, session "List tools and try", 5th send): after the four
+deepseek-v4.1-flash probe sends every produced an EMPTY turn (+0 -0, no
+cards, no reply), the fifth send ran on **GLM-5.3-Flash** (protocol note:
+the residual plan pinned GLM-5.2; the picker row drift made that the
+chosen row of the same generation - owner-selected in the picker, one
+hand tap; model switch verified in the header tag). The fresh agent
+REPLIED (~17s, current-session 95ec7be6, EngineProxy CONNECT ok, "file
+changes: +0 -0") and its verbatim answer is the advertisement finding in
+the model's own words: "None are actually callable here: no tool
+definitions are attached to this chat, so there is no verbatim list I
+can truthfully give, and I cannot attempt lsp_rename (any 'attempt'
+would be fabricated text, not a real call)." - and it distinguished,
+unprompted, the system prompt's PROSE mentions (view, bash, edit,
+multiedit, write, lsp_rename, lsp_replace_symbol, lsp_symbols,
+lsp_definition, lsp_call_hierarchy, todos, agent, web_fetch,
+find_references) from provided schemas: "a tool is only callable if its
+schema is provided to me in-session, and none is." So the asymmetry the
+S-01 record hypothesised is CONFIRMED on device: fresh agent =
+ZERO advertised tools (no schemas delivered at all), while long-lived
+chat-pool agents still advertise the 7 stale ids; and the turn logged
+ZERO tool lines in app.log (nothing executed - consistent with the
+fabrication refusal). The upstream defect isolation stands: prompt-side
+toolset staleness (long-lived agents) and never-delivering a schema set
+to fresh agents are BOTH upstream v0.99.0 engine semantics, riding the
+v0.100.0 ladder re-verification (ratchet + fresh-advertisement probe
+rerun). Evidence: device screenshots of the exchange, app.log lines of
+15:06:38-15:06:55 2026-11-09.
+
+DEVICE UPGRADE, SAME WINDOW (2026-11-09 15:17): the Batch B build from
+the 13:47 gate (app-debug.apk 101,684,841 B) installed over the running
+app (`install -r`, Streamed Install Success) - S-4-era build's denial
+note, Batch A's Room schema v3, and Batch B's domain model are now the
+device build. Post-install restart PROOF: relaunch resumed straight
+into the probe thread with the full pool intact (Room v2->v3 migration
+opened clean - no FATAL/exception lines, alive heartbeat restarted at
+t=30s granularity from 15:18); the handoffs table itself is not
+queried by any current product path (no handoff dispatched on device
+yet), so no deeper table proof is claimed. Cosmetic observables on
+record: the session's model tag flipped to claude-haiku-5-5 after the
+restart (selection does not survive the relaunch) and battery rose
+27->80% once the socket hand-froze ended; the Batch C entry chip is
+correctly ABSENT in this build (it rides the gate run in flight) - the
+Copy/Save row is unchanged.
+
 This parity pass is the security-acceptance artifact the reopened P5
 fold cites.
 

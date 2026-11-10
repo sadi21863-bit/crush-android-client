@@ -52,13 +52,32 @@ class ProjectTreeFingerprintTest {
         )
         val baseline = ProjectTreeFingerprint.of(root)
 
-        file.writeText("two")
-        assertNotEquals("a rewrite flips (size and usually mtime together)", baseline, ProjectTreeFingerprint.of(root))
+        // The rewrite's deterministic flip rides SIZE, not mtime: a
+        // same-size rewrite can land inside the filesystem's mtime
+        // resolution and then the digest HOLDS - the metric's own
+        // documented false-negative family (ProjectTreeFingerprint:
+        // "a same-size rewrite landing inside the filesystem's mtime
+        // resolution is DOCUMENTED, not discriminated"). First CI
+        // specimen 2026-11-10, 04:56 Z (run 42758736412): a 3->3 rewrite
+        // on the runner landed in the same millisecond bucket as the
+        // original write, lastModified() returned one value for both
+        // walks, size was equal, and the unconditional "usually mtime
+        // together" assert - which was the flake, the metric behaved
+        // exactly as documented - failed (local Windows runs never
+        // reproduced it; the ms-bucket collision is runner-speed luck).
+        // So: the unconditional flip asserts ride the stat changes a
+        // stat-only walk CAN always see (size and path), and the pure
+        // mtime component is pinned by an explicit setLastModified.
+        file.writeText("two-three")
+        assertNotEquals("a rewrite flips (size changes)", baseline, ProjectTreeFingerprint.of(root))
         val baseline2 = ProjectTreeFingerprint.of(root)
 
         assertTrue(file.renameTo(File(root, "moved.md")))
         assertNotEquals("a path change flips (rename)", baseline2, ProjectTreeFingerprint.of(root))
-        val file2 = f(root, "moved.md", "two")
+        // Re-write with the SAME length on purpose: from here on the flip
+        // under test is the mtime component alone, exactly the metric's
+        // "visible identity" row.
+        val file2 = f(root, "moved.md", "two-three")
         val baseline3 = ProjectTreeFingerprint.of(root)
 
         assertTrue(file2.setLastModified(System.currentTimeMillis() + 60_000))

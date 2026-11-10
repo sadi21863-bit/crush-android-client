@@ -3772,8 +3772,8 @@ class ChatViewModel(
                     }
                 }
                 // While an ask/question dialog stands open the engine is
-                // PARKED, not silent, so the 20s idle race must not fire
-                // (z4, 2026-10-29). Parked receives race the remaining
+                // PARKED, not silent, so the (then-20s, now-60s) idle race
+                // must not fire (z4, 2026-10-29). Parked receives race the remaining
                 // PROMPT_WAIT ceiling instead, so a prompt nobody answers
                 // still ends the turn with the same awaited server cancel
                 // the other expiries use; answering the dialog (or any
@@ -4155,10 +4155,24 @@ class ChatViewModel(
          * moment as the whole budget: a turn that streamed steadily died at
          * exactly 180s, and a silent-but-alive agent wasted the window. Idle
          * resets on every received frame, so only a genuinely SILENT agent
-         * expires early. 20s is under the workspace's ~30s reap window and
-         * comfortably above a normal frame gap.
+         * expires early.
+         *
+         * 60s (2026-11-10, the D+F drive's obs-1 specimen #3): at 20s the
+         * watchdog killed a LIVE turn exactly 20s after the owner granted its
+         * last ask (07:23:27 grant ok -> 07:23:47 "stream idle > 20s ...
+         * requesting engine cancel", file scan +0 -0 / 2 unreadable) - the
+         * post-grant resume executes tools server-side WITHOUT SSE frames for
+         * >20s, and the parked-prompt loop hands back to the frame race at
+         * exactly that silent moment. The grant was proof of life; the race
+         * read it as silence. Three specimens now share the signature (the
+         * 2026-10-29 z4 ask was #1). 60s still covers the intended catch - a
+         * genuinely dead socket goes quiet for good - while the workspace's
+         * own ~30s reap window remains the earlier, honest terminator for
+         * engine-side corpses. Follow-up (not shipped here): on idle expiry,
+         * probe the engine's actual run state first and only cancel when it
+         * is not busy.
          */
-        const val STREAM_IDLE_MS = 20_000L
+        const val STREAM_IDLE_MS = 60_000L
 
         /**
          * Ceiling for ONE parked prompt - the ask/question dialog the user is

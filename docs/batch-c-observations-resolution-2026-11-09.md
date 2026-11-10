@@ -41,6 +41,22 @@ That cost is recorded here; if the v0.100 ladder re-proves the stream's
 tool-phase frame flow (schema messages land per tool event), a longer
 tool-aware idle is a candidate change, deliberately NOT taken now.
 
+**SUPERSEDED 2026-11-10 (the drive-fix batch, `37b1ab5`): the retune IS 
+taken.** The next morning the same signature killed a live,
+owner-granted run — specimen #3, the first proven TURN KILL: grants
+closed at 07:23:27 ("prompt CLOSED (grant ok)", ls + view), the engine
+executed the just-granted tools server-side with no SSE frames
+(exactly the silent phase), and the frame loop — handed back from the
+parked-prompt loop AT the grant — read the silence as death:
+`07:23:47.681 stream idle > 20s ... requesting engine cancel` (scan
+`+0 -0 across 0 file(s), 2 unreadable`). Grant = proof of life; the
+race read it as silence. STREAM_IDLE_MS 20 s → 60 s, same commit:
+60 s still catches a genuinely dead socket, the workspace's own ~30 s
+reap window stays the earlier honest terminator for corpses, and the
+10-minute parked-prompt ceiling is untouched. Follow-up recorded in
+the code comment, not shipped: on idle expiry, probe the run state
+first and cancel only when the run is not busy.
+
 ## (2) The "resuming session 4161054d (110 msgs)" flip-flop
 
 Evidence lines (18:40:26-29):

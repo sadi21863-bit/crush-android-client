@@ -1590,6 +1590,22 @@ class ChatViewModel(
         // Publish the list so the drawer is populated before we pick.
         _state.update { it.copy(sessions = list, sessionsLoading = false) }
 
+        // Batch G: a cold-boot DISPATCHED trace publishes its target session
+        // BEFORE the binding lands; claim it here when this workspace really
+        // has it (a listing mismatch = the wrong instance's bootstrap - leave
+        // the intent for the right one). This is the deterministic resume the
+        // restart proof needs, never "last-with-content".
+        val pendingOpen = container.pendingOpenSession.value
+        if (pendingOpen != null) {
+            val match = list.firstOrNull { it.id == pendingOpen }
+            if (match != null) {
+                container.clearPendingOpenSession()
+                AppLog.i(TAG, "resuming session ${match.id} (${match.messageCount} msgs; the handoff trace's target)")
+                return match.id
+            }
+            AppLog.w(TAG, "pending handoff session $pendingOpen not in this workspace's listing; using last-with-content")
+        }
+
         val withMessages = list.filter { it.messageCount > 0 }
         val target = withMessages.maxByOrNull { it.updatedAt }
             ?: list.maxByOrNull { it.updatedAt }

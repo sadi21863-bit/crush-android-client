@@ -111,6 +111,24 @@ class AppContainer(context: Context) {
         _pendingProjectTrust.asStateFlow()
 
     /**
+     * Batch G's cold-boot one-shot: the DISPATCHED trace's target session id,
+     * noticed by [openLastDispatchedHandoff] before the binding lands and
+     * claimed by the chat layer's bootstrap when that id appears in the bound
+     * workspace's listing (`findSessionToResume`). A plain property is not
+     * enough because the container publishes before the ViewModel exists; a
+     * StateFlow gives the bootstrap a readable value whichever side lands
+     * second. Claiming = get-AND-clear only on a successful listing match,
+     * so a bootstrap that cannot see the id (wrong instance's listing) leaves
+     * the intent for the right one.
+     */
+    private val _pendingOpenSession = MutableStateFlow<String?>(null)
+    val pendingOpenSession: StateFlow<String?> = _pendingOpenSession.asStateFlow()
+
+    fun clearPendingOpenSession() {
+        _pendingOpenSession.value = null
+    }
+
+    /**
      * P4 "Review" runtime store (2026-11-07): per-turn measured changes with
      * per-file revert on the latest completed turn. Process-scoped like the
      * lock state, because the Review screen must outlive the chat's
@@ -531,13 +549,135 @@ class AppContainer(context: Context) {
         }
     }
 
+    private var handoffResumeTried = false
+
+    /**
+     * Batch G (plan §9 g2): the cold-boot resume of the newest DISPATCHED
+     * handoff trace — a SEPARATE function beside [restoreLastBinding], whose
+     * bytes it does not touch. The row is the cross-restart proof: this reads
+     * it, trust-gates the target project in the same fail-closed order
+     * (Required or a moved-inside-window record publishes
+     * [PendingProjectTrust], whose Allow lands the binding), and either rides
+     * the binding the restore already applied or applies the trace's own
+     * binding when nothing was bound. The trace's target session is
+     * remembered in [pendingOpenSession] so the chat bootstrap resumes THAT
+     * session by id — deterministic, never "whichever session the workspace
+     * last touched".
+     *
+     * Posture: the extension adopts a trace only when its target is the
+     * active binding or nothing is bound yet. A user who has since bound
+     * elsewhere is never yanked; the row stays DISPATCHED and surfaceable
+     * (its source chat's resume bar, the drawer). A target session missing
+     * from the workspace listing at boot is the chat layer's fallback
+     * (last-with-content), never a row rewrite — the trace is never
+     * auto-deleted.
+     */
+    suspend fun openLastDispatchedHandoff() {
+        if (handoffResumeTried) return
+        handoffResumeTried = true
+        val dao = runCatching { projectStore.handoffDao() }.getOrElse { failure ->
+            com.crush.mobile.util.AppLog.w(
+                "Lifecycle",
+                "handoff resume skipped: handoff store unavailable (${failure.javaClass.simpleName})"
+            )
+            return
+        }
+        val row = runCatching { dao.latestDispatched() }.getOrElse { failure ->
+            com.crush.mobile.util.AppLog.w(
+                "Lifecycle",
+                "handoff resume skipped: trace read failed (${failure.javaClass.simpleName})"
+            )
+            return
+        } ?: return
+        val targetSession = row.targetCodeSessionId ?: return
+        val ref = runCatching {
+            projectStore.byId(java.util.UUID.fromString(row.targetProjectId))
+        }.getOrNull()
+        if (ref == null) {
+            com.crush.mobile.util.AppLog.w(
+                "Lifecycle",
+                "handoff resume skipped: target row ${row.targetProjectId} is gone; the trace stays surfaceable"
+            )
+            return
+        }
+        val activeProject = (_activeBinding.value as? EngineBinding.Project)?.ref
+        val alreadyBound = activeProject?.id == ref.id
+        if (!alreadyBound && _activeInstanceKey.value != "") {
+            com.crush.mobile.util.AppLog.i(
+                "Lifecycle",
+                "handoff resume deferred: active binding is '${_activeInstanceKey.value}', not '${ref.label}'"
+            )
+            return
+        }
+        _pendingOpenSession.value = targetSession
+        if (alreadyBound) {
+            // The restore already gated + bound this exact row; only the
+            // session intent was missing.
+            com.crush.mobile.util.AppLog.i(
+                "Lifecycle",
+                "handoff resume: binding '${ref.label}' already restored; opening trace session $targetSession"
+            )
+            return
+        }
+        val verdict = runCatching { projectTrust.gate(ref) }.getOrElse { failure ->
+            val why = failure.message ?: failure.javaClass.simpleName
+            Log.w("Lifecycle", "handoff resume blocked: trust state unreadable ($why)")
+            com.crush.mobile.util.AppLog.w(
+                "Lifecycle", "handoff resume blocked: trust state unreadable ($why)", failure
+            )
+            _pendingOpenSession.value = null
+            return
+        }
+        when (verdict) {
+            is TrustVerdict.Allow -> {
+                val outcome = runCatching {
+                    projectTrust.confirmAtGate(ref, verdict.observedFingerprint)
+                }.getOrNull()
+                val movedTo = outcome?.movedTo
+                if (outcome != null && movedTo == null) {
+                    com.crush.mobile.util.AppLog.i(
+                        "Lifecycle",
+                        "handoff resume: restoring project '${ref.label}' + trace session $targetSession"
+                    )
+                    applyBinding(EngineBinding.Project(ref))
+                } else if (movedTo != null) {
+                    val msg = "handoff resume blocked: project consent required (${movedTo.text})"
+                    Log.i("Lifecycle", msg)
+                    com.crush.mobile.util.AppLog.i("Lifecycle", msg)
+                    _pendingProjectTrust.value = PendingProjectTrust(ref, movedTo)
+                } else {
+                    // Unrecordable consent state: fail closed exactly like the
+                    // restore's corner - nothing binds, no session intent
+                    // survives a bind that will not happen.
+                    _pendingOpenSession.value = null
+                }
+            }
+            is TrustVerdict.Required -> {
+                val msg = "handoff resume blocked: project consent required (${verdict.reason})"
+                Log.i("Lifecycle", msg)
+                com.crush.mobile.util.AppLog.i("Lifecycle", msg)
+                // The root-level F04 prompt takes the decision; its Allow
+                // (approvePendingProjectTrust) applies the binding and the
+                // session intent set above lands with the chat bootstrap.
+                _pendingProjectTrust.value = PendingProjectTrust(ref, verdict.kind)
+            }
+        }
+    }
+
     init {
         // A11/A12: prime the restore ahead of composition. The chat layer's
         // LaunchedEffect(activeInstanceKey) re-drives bindProject on ANY later
         // emission, so a restore landing a frame or two late still rebinds -
         // but bootstraps that read the binding should not have to wait for
         // frame timing.
-        containerScope.launch { runCatching { restoreLastBinding() } }
+        containerScope.launch {
+            runCatching { restoreLastBinding() }
+            // Batch G (plan §9 g2): the DISPATCHED trace's resume runs BESIDE
+            // the restore, after it - restoreLastBinding's bytes are untouched,
+            // and this only acts when no binding landed (or the restore landed
+            // the trace's own target).
+            runCatching { openLastDispatchedHandoff() }
+        }
     }
 
     private fun applyBinding(binding: EngineBinding) {

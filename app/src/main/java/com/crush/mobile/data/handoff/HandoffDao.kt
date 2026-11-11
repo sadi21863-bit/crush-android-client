@@ -76,6 +76,19 @@ interface HandoffDao {
     suspend fun rowsForSource(sourceChatId: String): List<HandoffEntity>
 
     /**
+     * Batch G's cold-boot resume read: the NEWEST DISPATCHED trace globally
+     * (insertion order, the observeLatest contract). The row is the durable
+     * restart proof - one query, no LIMIT beyond 1 because only the latest
+     * dispatch is the resume candidate; older traces stay surfaceable
+     * through their own source chats.
+     */
+    @Query(
+        "SELECT * FROM handoffs WHERE status = 'DISPATCHED' " +
+            "ORDER BY rowid DESC LIMIT 1"
+    )
+    suspend fun latestDispatched(): HandoffEntity?
+
+    /**
      * DRAFT -> APPROVED. Writes the user's confirmation stamp - the caller
      * supplies it, so an APPROVED row can be minted only WITH a non-null
      * userApprovedAt (the a5 rule). Returns 0 (no-op, row untouched) when

@@ -92,6 +92,41 @@ class HandoffDispatchSequencingTest {
         return dao.markApproved(entity.handoffId, stampMs)
     }
 
+    /**
+     * Batch G's cold-boot read: the newest DISPATCHED trace, and NOTHING
+     * else. Newer ABANDONED/DRAFT rows must never mask it (only a
+     * dispatched row is restart-resume evidence), and a newer dispatch
+     * wins in insertion order.
+     */
+    @Test(timeout = 120_000)
+    fun `latest dispatched only`() =
+        runBlocking {
+            val store = newStore()
+            val dao = store.handoffDao()
+
+            val dispatched = sealedEntity("ses-a", "target-A")
+            approve(dao, dispatched, 1_000L)
+            assertEquals(1, dao.markDispatched(dispatched.handoffId, "sess-A", null))
+            assertEquals(dispatched.handoffId, dao.latestDispatched()?.handoffId)
+
+            val abandoned = sealedEntity("ses-b", "target-A")
+            dao.insertDraft(abandoned)
+            assertEquals(1, dao.abandon(abandoned.handoffId))
+            val draft = sealedEntity("ses-c", "target-A")
+            dao.insertDraft(draft)
+            assertEquals(
+                "newer non-DISPATCHED rows never mask the resume trace",
+                dispatched.handoffId,
+                dao.latestDispatched()?.handoffId,
+            )
+
+            val newer = sealedEntity("ses-d", "target-B")
+            approve(dao, newer, 2_000L)
+            assertEquals(1, dao.markDispatched(newer.handoffId, "sess-D", null))
+            assertEquals(newer.handoffId, dao.latestDispatched()?.handoffId)
+            assertEquals("target-B", dao.latestDispatched()?.targetProjectId)
+        }
+
     @Test(timeout = 120_000)
     fun `confirm through the guarded approve`() =
         runBlocking {

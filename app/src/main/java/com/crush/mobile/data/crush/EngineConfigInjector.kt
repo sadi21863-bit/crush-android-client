@@ -449,6 +449,16 @@ object EngineConfigInjector {
      * The two inert ids ("task", "diagnostics") stay: hiding an id the
      * engine does not know is inert, and unknown ids cover forks. The
      * MODE-01 acceptance drive on the real engine is what proves a release.
+     *
+     * 2026-11-12 ENGINE ACCEPTANCE KIT: the four sub-agent tools below were
+     * pre-grown from the v0.100.0 release notes (dispatch commits 965d1a7 +
+     * 938fef2) and strings-CONFIRMED 2026-11-09 over the official
+     * crush_0.100.0_Android_arm64 artifact out-of-tree (all 33 ids present;
+     * the "agent_task" probe id absent, so the snapshot is exhaustive; see
+     * EngineCatalogues). They are inert under the v0.99.0 engine of record -
+     * unknown ids are inert by contract - and the catalogue ratchet test
+     * now pins EVERY known engine version to full deny-list coverage, so a
+     * version bump cannot ship an uncovered id.
      */
     val CHAT_DISABLED_TOOLS: List<String> = listOf(
         "agent", "bash", "crush_info", "crush_logs", "job_output",
@@ -464,6 +474,10 @@ object EngineConfigInjector {
         // Built-in MCP-resource surfaces (2026-11-08 parity pass - upstream
         // allToolNames lists them; previously missing).
         "list_mcp_resources", "read_mcp_resource",
+        // v0.100.0 sub-agent lifecycle tools (release notes, 2026-11-09
+        // strings-CONFIRM): dispatch a detached sub-agent, message it
+        // mid-run, check on it, stop it.
+        "agent_dispatch", "agent_send", "agent_status", "agent_stop",
     )
 
     private fun ModelSpec.toJson(): JsonObject = JsonObject().apply {

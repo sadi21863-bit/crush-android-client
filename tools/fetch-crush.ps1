@@ -60,6 +60,14 @@ param(
         # Cross-checked: the downloaded checksums.txt hashed to the digest the
         # GitHub release API attests for it (343f90ac...4a688).
         "5224fab3b8eea3555b7ba3d8b9c6f3558fa60d8bafe018f77ac61520c7a49b08"
+    } elseif ($Version -eq "0.100.0") {
+        # Recorded 2026-11-09 from the SIGNED release's checksums.txt
+        # (v0.100.0, published 2026-11-05), asset
+        # crush_0.100.0_Android_arm64.tar.gz, byte-verified out-of-tree by
+        # the ladder's strings-CONFIRM (docs/research-crush-v0.100.0-2026-11-08.md).
+        # NOT the default: 0.99.0 stays the engine of record until the
+        # acceptance kit's device rails pass (docs/engine-acceptance-kit.md).
+        "cdb15f23393c7e334b059a37d2c41a12fcb5f4d02d6e940795b7707e4b0afeaa"
     } elseif ($Version -eq "0.98.1") {
         "88f42f9302cbf72cd268d05b52395266acecd9b44afa4a1c4dec8c6cf0879ab3"
     } elseif ($Version -eq "0.97.1") {

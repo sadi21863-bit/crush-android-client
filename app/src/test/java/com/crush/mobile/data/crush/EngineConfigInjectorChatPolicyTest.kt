@@ -250,35 +250,51 @@ class EngineConfigInjectorChatPolicyTest {
         )
     }
 
-    // The FROZEN v0.99.0 built-in catalogue this build pins (2026-11-08
-    // parity pass): enumerated from upstream `internal/config/config.go`
-    // `allToolNames()` (v0.99.0 lineage) and independently confirmed by
-    // strings over the shipped app/src/main/jniLibs/arm64-v8a/libcrush.so.
-    // v0.100.0 GROWS this list (agent_dispatch/agent_send/agent_status/
-    // agent_stop) and changes permission semantics - see the ratchet test.
-    private val ENGINE_V0990_BUILTIN_TOOLS = listOf(
-        "agent", "bash", "crush_info", "crush_logs", "job_output", "job_kill",
-        "download", "edit", "multiedit", "lsp_call_hierarchy", "lsp_definition",
-        "lsp_diagnostics", "lsp_references", "lsp_rename", "lsp_replace_symbol",
-        "lsp_restart", "lsp_symbols", "fetch", "agentic_fetch", "glob", "grep",
-        "ls", "question", "sourcegraph", "todos", "view", "write",
-        "list_mcp_resources", "read_mcp_resource",
-    )
-
-    // RATCHET: when tools/fetch-crush.ps1 moves the engine to a newer
-    // version, FIRST re-diff that version's upstream allToolNames(), extend
-    // BOTH this frozen list and CHAT_DISABLED_TOOLS, THEN bump the version.
-    // This test fails whenever the Chat policy stops covering every id the
-    // pinned engine documents - the S-01 contract is catalogue parity, not
-    // "whatever the last drive happened to catch".
+    // THE ENGINE-CATALOGUE RATCHET (2026-11-12, acceptance-kit form):
+    // every KNOWN engine version's documented built-ins must be covered by
+    // the Chat deny list BEFORE that engine can ever ship. The manifest
+    // lives in EngineCatalogues (one row per version, newest last); adding
+    // a future version = adding its row — the failure this test raises
+    // names exactly the ids to deny, and the deny list grows FIRST, the
+    // fetch happens second (docs/engine-acceptance-kit.md has the order).
     @Test
-    fun `the pinned v0990 upstream catalogue is fully denied`() {
-        val missing = ENGINE_V0990_BUILTIN_TOOLS
-            .filterNot(EngineConfigInjector.CHAT_DISABLED_TOOLS::contains)
+    fun `every known engine catalogue is fully denied`() {
+        val gaps = EngineCatalogues.KNOWN.map { catalogue ->
+            catalogue.version to EngineCatalogues.missingDenials(catalogue)
+        }.filter { it.second.isNotEmpty() }
         assertTrue(
-            "CHAT_DISABLED_TOOLS is missing ids the pinned v0.99.0 engine " +
-                "documents: $missing",
-            missing.isEmpty()
+            "CHAT_DISABLED_TOOLS is missing ids for known engine versions: $gaps",
+            gaps.isEmpty()
+        )
+    }
+
+    // The manifest's own shape: unique rows, the pinned version present,
+    // and the v0.100.0 delta being EXACTLY the four sub-agent tools — a
+    // hand-pasted row cannot hide a new id in a rewrite, and the pinned
+    // row documents which engine the shipped libcrush.so must be.
+    @Test
+    fun `the catalogue manifest is consistent`() {
+        val versions = EngineCatalogues.KNOWN.map { it.version }
+        assertEquals("manifest rows are unique", versions.distinct(), versions)
+        assertTrue(
+            "the pinned version ${EngineCatalogues.PINNED_VERSION} must be a known row",
+            EngineCatalogues.byVersion(EngineCatalogues.PINNED_VERSION) != null
+        )
+        assertTrue(
+            "every catalogue row is non-empty",
+            EngineCatalogues.KNOWN.all { it.builtinTools.isNotEmpty() }
+        )
+        val old = EngineCatalogues.byVersion("0.99.0")!!.builtinTools.toSet()
+        val new = EngineCatalogues.byVersion("0.100.0")!!.builtinTools.toSet()
+        assertEquals(
+            "the v0.100.0 delta is exactly the four sub-agent tools",
+            setOf("agent_dispatch", "agent_send", "agent_status", "agent_stop"),
+            new - old
+        )
+        assertEquals(
+            "no built-in id was dropped between v0.99.0 and v0.100.0",
+            emptySet<String>(),
+            old - new
         )
     }
 

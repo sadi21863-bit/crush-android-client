@@ -570,14 +570,22 @@ bottomBar = {
                 reasonNote = crushrcTrustNote(pending.kind),
                 onConfirm = {
                     pendingHandoffTrust = null
-                    // The re-call: same arguments, same path - the gate now
-                    // Allow (the dialog recorded consent for THIS gate's
-                    // observed bytes), so the flow continues. Whatever moved
-                    // AGAIN inside the re-call's gate re-opens the dialog.
-                    if (mode == HandoffSheetMode.DISPATCHED) {
-                        vm.openHandoffInCode { pendingHandoffTrust = it }
-                    } else {
-                        vm.confirmHandoff(summaryDraft, selectedDestination) { pendingHandoffTrust = it }
+                    // THE CONSENT STEP (the 2026-11-11 P5 drive's bug): this
+                    // callback used to re-call WITHOUT recording anything on
+                    // the chat side, so the second gate returned Required
+                    // again and the dialog re-opened forever (27 cycles
+                    // logged, zero DB writes). Record consent for the
+                    // pending ref's CURRENT bytes first (the service
+                    // re-hashes at record time), then re-call - the second
+                    // gate finds Allow and the flow continues. Whatever
+                    // moved AGAIN inside the re-call's gate re-opens the
+                    // dialog.
+                    vm.grantHandoffTrust(pending.ref) {
+                        if (mode == HandoffSheetMode.DISPATCHED) {
+                            vm.openHandoffInCode { pendingHandoffTrust = it }
+                        } else {
+                            vm.confirmHandoff(summaryDraft, selectedDestination) { pendingHandoffTrust = it }
+                        }
                     }
                 },
                 onDismiss = { pendingHandoffTrust = null },

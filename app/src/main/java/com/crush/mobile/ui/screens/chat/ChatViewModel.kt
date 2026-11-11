@@ -1,7 +1,6 @@
 package com.crush.mobile.ui.screens.chat
 
 import android.content.Context
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -1859,7 +1858,7 @@ class ChatViewModel(
                 for (slot in listOf(SetModelRequest.LARGE, SetModelRequest.SMALL)) {
                     api.setModel(ws, slot, SelectedModel(model = id, provider = providerId))
                 }
-            }.onFailure { Log.w(TAG, "setModel failed: ${it.message}") }
+            }.onFailure { AppLog.w(TAG, "setModel failed: ${it.message}") }
             // 2026-11-09 fix: the VERIFIED choice now persists - the
             // AppSettings slot the bootstrap probe reads first. The model tag
             // used to reset on every relaunch/new instance (the honest note
@@ -2618,7 +2617,7 @@ class ChatViewModel(
                 }
                 return
             }
-            Log.i(TAG, "handoff ${row.handoffId} ABANDONED for the no-alias replace; a fresh draft re-approves")
+            AppLog.i(TAG, "handoff ${row.handoffId} ABANDONED for the no-alias replace; a fresh draft re-approves")
             sealAndDispatch(sheet, summary, freshRef, dao)
             return
         }
@@ -2651,7 +2650,7 @@ class ChatViewModel(
             sourceChatTitle = sheet.draft.sourceChatTitle,
             sourceChatTime = sheet.draft.sourceChatTime,
         )
-        Log.i(TAG, "handoff ${live.handoffId} RESUMED from the approved trace; dispatching to '${freshRef.label}'")
+        AppLog.i(TAG, "handoff ${live.handoffId} RESUMED from the approved trace; dispatching to '${freshRef.label}'")
         _state.update { it.copy(handoffSheet = null) }
         val dispatched = dispatchHandoff(pkg, freshRef, live.handoffId)
         if (dispatched == null) {
@@ -2663,7 +2662,7 @@ class ChatViewModel(
                 )
             }
         } else {
-            Log.i(TAG, "handoff ${live.handoffId} DISPATCHED; target session $dispatched")
+            AppLog.i(TAG, "handoff ${live.handoffId} DISPATCHED; target session $dispatched")
         }
     }
 
@@ -2760,7 +2759,7 @@ class ChatViewModel(
             }
             return
         }
-        Log.i(TAG, "handoff $sealedId APPROVED at $approvedAtMs; dispatching to '${ref.label}'")
+        AppLog.i(TAG, "handoff $sealedId APPROVED at $approvedAtMs; dispatching to '${ref.label}'")
         _state.update { it.copy(handoffSheet = null) }
         // 5. DISPATCH - plan e1/e2: bind through the Projects row-open
         // route's bind half, mint the fresh Code session via the exact
@@ -2779,7 +2778,7 @@ class ChatViewModel(
                 )
             }
         } else {
-            Log.i(TAG, "handoff $sealedId DISPATCHED; target session $dispatched")
+            AppLog.i(TAG, "handoff $sealedId DISPATCHED; target session $dispatched")
         }
     }
 
@@ -2806,7 +2805,7 @@ class ChatViewModel(
                 .onFailure { AppLog.w(TAG, "handoff abandon failed: ${it.message}") }
                 .getOrDefault(0)
             if (moved == 1) {
-                Log.i(TAG, "handoff $rowId DISCARDED: the trace row is ABANDONED")
+                AppLog.i(TAG, "handoff $rowId DISCARDED: the trace row is ABANDONED")
                 _state.update {
                     it.copy(
                         handoffSheet = null,
@@ -2820,6 +2819,33 @@ class ChatViewModel(
                 AppLog.w(TAG, "handoff abandon was refused for $rowId")
                 _state.update {
                     it.copy(handoffNotice = "The handoff trace moved on - nothing was discarded.")
+                }
+            }
+        }
+    }
+
+    /**
+     * The F04 dialog's Allow for the HANDOFF surfaces (the 2026-11-11 P5
+     * drive's bug, fixed here): the dialog callback used to re-call
+     * [confirmHandoff]/[openHandoffInCode] directly, but NOTHING on this
+     * path ever recorded consent - the second gate returned Required
+     * again, re-published, and the dialog re-opened forever (27 loop
+     * cycles logged, zero DB writes; the Projects site never showed the
+     * bug because ITS dialog calls grantTrustAndOpen, which records).
+     * This is that missing step: record consent for the CURRENT bytes
+     * (the service re-hashes at record time, so an approval can never be
+     * persisted for a stale fingerprint), then run [then] - the
+     * same-entry re-call whose second gate now finds Allow. A record
+     * failure is fail-closed: the sheet stays open with an honest notice,
+     * nothing was approved, and the next Confirm re-gates.
+     */
+    fun grantHandoffTrust(ref: ProjectRef, then: () -> Unit) {
+        viewModelScope.launch {
+            val failure = recordConsentThen({ container.projectTrust.recordConsent(ref) }, then)
+            if (failure != null) {
+                AppLog.e(TAG, "handoff consent record failed: ${failure.javaClass.simpleName}: ${failure.message}")
+                _state.update {
+                    it.copy(handoffNotice = "Consent could not be recorded - nothing was approved.")
                 }
             }
         }
@@ -2924,13 +2950,13 @@ class ChatViewModel(
             if (movedInsideWindow != null) {
                 // Local capture (custom-getter property); wired EXACTLY like
                 // the Required verdict, restore parity.
-                Log.i(TAG, "handoff jump blocked: folder moved inside the gate-record window (${movedInsideWindow.text})")
+                AppLog.i(TAG, "handoff jump blocked: folder moved inside the gate-record window (${movedInsideWindow.text})")
                 container.clearPendingProjectTrust()
                 onTrustRequired(PendingProjectTrust(ref, movedInsideWindow))
                 return@launch
             }
             container.clearPendingProjectTrust()
-            Log.i(TAG, "handoff ${row.handoffId}: reopening Code session $target in '${ref.label}'")
+            AppLog.i(TAG, "handoff ${row.handoffId}: reopening Code session $target in '${ref.label}'")
             // The stamped model rides the jump's attach too (obs 6): the
             // bootstrap's probe honors it ahead of the registry default.
             handoffPreferredModel = handoffStampAsModel(
@@ -4204,5 +4230,27 @@ class ChatViewModel(
          */
         const val HANDOFF_SETTLE_MS = 300L
     }
+}
+
+/**
+ * The F04-Allow ordering the 2026-11-11 P5 drive's bug fixed (extracted so
+ * the ordering has a JVM-pinned regression net): record consent for the
+ * observed state FIRST, run [then] (the same-entry re-call) ONLY on
+ * success, and surface a record failure to the caller as the returned
+ * Throwable - a failed record is fail-closed (nothing approved, the
+ * dialog's next Confirm re-gates).
+ */
+internal suspend fun recordConsentThen(
+    record: suspend () -> Unit,
+    then: () -> Unit,
+): Throwable? {
+    val failure = try {
+        record()
+        null
+    } catch (t: Throwable) {
+        t
+    }
+    if (failure == null) then()
+    return failure
 }
 

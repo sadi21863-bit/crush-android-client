@@ -64,8 +64,12 @@ A03 restore-trust drive PASSED 2026-11-06. Residuals ride the E6 stress
 pass: 4 JVM-only A03 variants (cancel / changed-crushrc / noConfig-flip
 / real-install migration), REST boot-window row, S-01 Failed-badge row.
 
-Branch state truth (2026-11-10, after the CI flake fix):
-HEAD/main/origin-main = `20d2ce0` (test fix: the rewrite-flip assert
+Branch state truth (2026-11-11, after the P4-excursion drive fold):
+HEAD/main/origin-main = the P4-excursion fold commit (docs-only, this
+commit: the strand + RESUME + dispatch lifecycle closed live on
+`1dda7d90`/`593a04a6`, the synthetic-input map extended, the redaction
+blocks explained) ← `6c749fc` (docs: the CI flake specimen fold; run
+42760602680 GREEN) ← `20d2ce0` (test fix: the rewrite-flip assert
 rides SIZE, not the same-millisecond mtime race; CI 42760055813) ←
 `593f518` (docs: the retune fold + the drive's lateral proofs; CI
 42758736412 FAILED - the fingerprint-test flake, fixed by the next

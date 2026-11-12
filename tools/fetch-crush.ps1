@@ -15,13 +15,15 @@
 param(
     # Default tracks the engine of record. Running this script as-is on a
     # missing binary MUST NOT silently downgrade the app to an older engine -
-    # the default advanced to 0.98.1 with the binary in 2026-10-18, and to
-    # 0.98.2 on 2026-10-31 once the upstream release checksum was recorded.
-    # One honest caveat: the libcrush.so currently in jniLibs is a locally
-    # instrumented "0.98.2+dirty" build of that upstream release (landed
-    # in-tree at d50f26e, 2026-10-29); a fresh-clone fetch reconstitutes the
-    # clean upstream 0.98.2 engine - same version, minus the instrumentation.
-    [string]$Version = "0.99.0",
+    # the default advanced to 0.98.1 with the binary in 2026-10-18, to
+    # 0.98.2 on 2026-10-31, to 0.99.0 on 2026-11-01, and to 0.100.0 on
+    # 2026-11-12 (the T3 device rails + rollback drill went green and the
+    # candidate merged; see docs/engine-acceptance-kit.md).
+    # Historical caveat: the 0.98.2-era local libcrush.so was an instrumented
+    # "0.98.2+dirty" build (landed in-tree at d50f26e, 2026-10-29); fetches
+    # since then reconstitute the clean upstream binary, and the binary is
+    # gitignored by design on every branch.
+    [string]$Version = "0.100.0",
     # Expected SHA-256 of the release TARBALL, not the extracted binary.
     #
     # WHY THIS EXISTS
@@ -48,10 +50,10 @@ param(
     [string]$ExpectedSha256 = $(if ($Version -eq "0.99.0") {
         # Recorded 2026-10-31 from the SIGNED release's checksums.txt
         # (v0.99.0, published 2026-10-29), asset crush_0.99.0_Android_arm64.tar.gz.
-        # This is the engine of record since the 2026-11-01 promotion: the
-        # v099-experiment lane proved it end to end (UDS boot, Go model
-        # access, turns, file-diff) and the Go session-header support plus
-        # the corrected model wiring require it.
+        # The engine of record from the 2026-11-01 promotion until the
+        # 2026-11-12 v0.100.0 merge; the v099-experiment lane proved it end
+        # to end (UDS boot, Go model access, turns, file-diff). Kept for the
+        # rollback drill and for pinning an older build on demand.
         "d18cd1f961a4c587f26a50aad8ef1fed38ad4362bb6237807e57cda1c170f78c"
     } elseif ($Version -eq "0.98.2") {
         # Recorded 2026-10-31 from the SIGNED release's checksums.txt (v0.98.2,
@@ -65,8 +67,8 @@ param(
         # (v0.100.0, published 2026-11-05), asset
         # crush_0.100.0_Android_arm64.tar.gz, byte-verified out-of-tree by
         # the ladder's strings-CONFIRM (docs/research-crush-v0.100.0-2026-11-08.md).
-        # NOT the default: 0.99.0 stays the engine of record until the
-        # acceptance kit's device rails pass (docs/engine-acceptance-kit.md).
+        # THE ENGINE OF RECORD since the 2026-11-12 merge: T3 device rails,
+        # the same-destination dispatch, and the rollback drill all green.
         "cdb15f23393c7e334b059a37d2c41a12fcb5f4d02d6e940795b7707e4b0afeaa"
     } elseif ($Version -eq "0.98.1") {
         "88f42f9302cbf72cd268d05b52395266acecd9b44afa4a1c4dec8c6cf0879ab3"

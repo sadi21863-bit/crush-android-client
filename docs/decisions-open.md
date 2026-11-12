@@ -142,20 +142,7 @@ socket/Gson reflective risk) is untouched by today's result.
 
 ## 2. Create the release keystore and ship one signed assembleRelease
 
-**Status: OPEN — human credential work.**
-
-No signed release has ever been produced: every artifact so far was unsigned
-or debug. `requireReleaseSigning` and the credentials loader already exist in
-`app/build.gradle.kts` (lines 32–34, 99–117) and `keystore/` is gitignored;
-only the keystore + `keystore/credentials.properties` are missing.
-
-**The decision/task:** create the keystore, write the four properties
-(`storeFile`, `storePassword`, `keyAlias`, `keyPassword`), then run
-`.\gradlew :app:assembleRelease -PrequireReleaseSigning` and install the APK
-on the reference device. Until this happens the README's "debug builds are
-not shareable" rule means the app still cannot be handed to anyone.
-
-**2026-11-08: SHIPPED.** The credential work happened and the signed
+**Status: CLOSED 2026-11-08 — SHIPPED.** The credential work happened and the signed
 release exists: `keystore/opencode-release.jks` +
 `keystore/credentials.properties` are on disk (gitignored; present by
 2026-11-02, which the signed release-rigored runs required), the build
@@ -182,12 +169,11 @@ instead of relying on a gitignore to make an on-disk key safe.
 
 ## 4. Injector-vs-engine concurrent `crush.json` write needs a design
 
-**Status: OPEN — direction chosen 2026-10-31 (user adopted the
-recommendation), design doc pending. Chosen direction: single-writer
-— key injection moves to the socket only, the engine becomes the sole
-writer of `crush.json`; the app injects at bootstrap and on key
-change. The guard note this trades against (item 6) folds into the
-same design.**
+**Status: CLOSED 2026-11-08 — designed AND landed** (direction chosen
+2026-10-31, user adopted the recommendation: single-writer — key injection
+moves to the socket only, the engine becomes the sole writer of
+`crush.json`; the app injects at bootstrap and on key change. The guard note
+this trades against (item 6) folded into the same design).
 
 When the app's `EngineConfigInjector` rewrites `crush.json` with the provider
 key and the engine writes its own config changes concurrently, one write can

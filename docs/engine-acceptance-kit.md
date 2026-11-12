@@ -30,6 +30,15 @@ its tool catalogue and its API surface are recorded, and a test asserts the
 version sets match — the ratchet answers "are the tools denied?", the contract
 answers "does the app speak this engine?", and neither can drift alone.
 
+**ARTIFACT PROVENANCE (structural, discovered 2026-11-12):** `libcrush.so` is
+GITIGNORED by design (`.gitignore: app/src/main/jniLibs/arm64-v8a/*`) — the
+engine binary is a LOCAL artifact, never a git object, and CI never builds
+with a checked-in engine. A fresh clone MUST run `tools/fetch-crush.ps1`; the
+script's recorded SHA-256 (from the signed release's `checksums.txt`) plus the
+T1 strings scan over the WRITTEN file are the provenance chain. A version
+branch therefore carries the constants + docs, not the binary — the device
+build from that checkout is the candidate.
+
 Parser/route note: the engine's version string is logged at boot
 (`bindEngine state=Running(... version={"version":"vX.Y.Z"...})`) — that line is
 the device's own statement of which artifact is running.

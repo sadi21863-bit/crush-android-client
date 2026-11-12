@@ -16,7 +16,9 @@ Crush ships for macOS, Linux, Windows and BSD. **Android is not one of those pla
 > as `6800c0e` (CI run 43227604396 green) after the full T3 device-rail pass on
 > `bbf8ca69` (scripted rails 8/0, F04 fresh consent, cold-boot resume, E6
 > switch stress, same-destination dispatch, and the rollback drill proving
-> v0.99 opens v0.100 session data unchanged). The current capability ledger is
+> v0.99 opens v0.100 session data unchanged). The follow-up ratchet `7346e20`
+> makes the fetch default track the Kotlin pin (`FetchScriptPinTest`, CI run
+> 43244539199 green). The current capability ledger is
 > [docs/capabilities.md](docs/capabilities.md); the commit chain and the
 > acceptance kit live in
 > [docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md)

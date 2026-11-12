@@ -91,9 +91,14 @@ Rail "no failed bootstrap in this process" ($bootFailures -eq 0) (
 Section "2b. permission route"
 $expectModeEnum = ([version]$ExpectedVersion) -ge ([version]"0.100.0")
 $expectedWire = if ($expectModeEnum) { "MODE_ENUM" } else { "SKIP_FLAG" }
-$wireLines = @([regex]::Matches($log, 'bootstrap permission wire:.*wire=(\w+)') |
+# The engine's version claim carries a TRAILING NEWLINE, so a log line that
+# embeds it (bootstrap permission wire: ... engineVersion={...}\n wire=...) is
+# split across two physical lines. Match against a flattened copy; the route
+# check must never fail on presentation alone.
+$logFlat = $log -replace "\r?\n", " "
+$wireLines = @([regex]::Matches($logFlat, 'bootstrap permission wire:.*wire=(\w+)') |
     ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
-$routeLines = @([regex]::Matches($log, 'open: permissionWire=(\S+)') |
+$routeLines = @([regex]::Matches($logFlat, 'open: permissionWire=(\S+)') |
     ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
 $routeFailures = ([regex]::Matches($log, 'skipPermissions\([^)]*\) failed')).Count +
     ([regex]::Matches($log, 'setPermissionMode\([^)]*\) failed')).Count +

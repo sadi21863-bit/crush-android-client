@@ -156,10 +156,58 @@ synthetic (the accepted synthetic map in `docs/capabilities.md`).
   404'd. The runner now carries **rail 1b** (two checks: the version-appropriate
   family was chosen; zero permission-route 404s), and `BootstrapOrderTest` pins
   both directions in the JVM gate, so a future bump cannot pass on the wrong
-  family. Re-run is the remaining device step.
-- Remaining: T2 (this batch's gate), the permission adapter (implemented in
-  code by `EngineProtocol` — the dual-family DTO/API/WorkspaceManager/Session
-  path with unknown versions failing safe to the pinned family; its v0.100
-  half is proven at the rails, not by the JVM gate alone), and T3 (owner +
-  device), plus two product decisions named in the ladder plan (Sysadmin Mode
-  surface; piped permissions).
+  family. Fixed + re-run green.
+- **T3 MEASURED 2026-11-12 on candidate `be35981` + `84d4bfa` (device
+  `bbf8ca69`, engine v0.100.0).**
+  - Scripted half: **8 PASS / 0 FAIL** (`-ExpectedVersion 0.100.0
+    -MinDenied 33`) — version, bootstrap health (attempts=1, failures=0,
+    one designed locked-refusal), rail 1b (`wire=MODE_ENUM`,
+    `open: permissionWire=normal`, zero route 404s), on-disk deny readback
+    **35 ids**, no FATAL.
+  - Rail 5 (F04, imported folder): swapped `Test project folder/crushrc`
+    bytes → row tap → CHANGED_SINCE_CONSENT dialog. Cancel: marker
+    unchanged, zero supervisor starts, DB untouched. Allow: consent stamp
+    `1794484916475`, engine start `17:31:56`, marker `1794484921`, DB
+    fingerprint == SHA-256 of the pulled bytes. Consent provably precedes
+    attach.
+  - Rail 7 (restore): project binding cold boot → restore + gate while
+    locked → `bootstrap refused: locked` → unlock → `resuming session
+    9c17ad6a`; Batch G cold boot → `handoff resume: restoring project
+    'Legacy workspace' + trace session b894b36f` → `resuming session
+    b894b36f (25 msgs; the handoff trace's target)`; handoff `65770c54`
+    stayed DISPATCHED with its stamp byte-identical.
+  - Rail 8 (E6): Legacy↔Test switches logged stop-on-switch, children
+    never exceeded 2 (prewarm + active), ended at 1, no FATAL.
+  - Rail 9 (rollback): main `d60f7c9` + engine 0.99.0 (release hash
+    verified) installed over the v0.100 data. v0.99.0 booted, unlocked,
+    resumed `b894b36f` with all 25 messages, and the engine state DB was
+    unchanged after the open (goose `goose_db_version` 13, sessions 2,
+    messages 25). **v0.99 opens v0.100 data; no one-way door.**
+  - Correction for future runs: the **legacy row tap intentionally bypasses
+    F04** (commit `4058588`: legacy binds the unkeyed shared engine) — only
+    imported project rows gate. The Nov 5 F04 proof was on the project row
+    `536fa26e`, not legacy. A benign crushrc planted at
+    `files/workspace/crushrc` therefore executes on a legacy row tap with no
+    dialog; it is app-private and the handoff/restore paths for the Legacy
+    *project row* do gate. Recorded as pre-existing design, not a v0.100
+    regression.
+  - Rail 7b (same-destination dispatch, owner finger) — **MEASURED on the
+    reinstalled candidate**: source chat `b894b36f` (inside Legacy
+    `077dc19e`) → sheet → Legacy preselected → owner's Confirm. ONE insert
+    (`eb78ea9d`), APPROVED at `1794488827242`, DISPATCHED at
+    `18:37:07.936` on the first try to engine session
+    `755fcfd0-0462-47e6-b27e-f4e3d0276061`; the gate's consent stamp
+    `1794488827189` precedes the approval by 53 ms (S-02 order). DB diff:
+    exactly one new row, **all nine prior handoff rows byte-identical**
+    (including `65770c54` — status, target session `b894b36f`, stamp
+    `1794412509337` and summary hash unchanged); the only project change was
+    `077dc19e.consented_at_ms` (the gate re-stamp). The new session landed in
+    `files/crush-p077dc19e/state/crush.db` (sessions 2→3, messages 25→41,
+    title "Handoff fingerprint mismatch audit") and the first turn completed
+    (six granted bash asks, `open: permissionWire=normal` on the v0.100
+    family, `file changes: +0 -0`); zero 404/FATAL.
+- Remaining before merge: the docs fold only. Rails 3/4 and the
+  `sub_agent_report` SSE render check stay advisory (the deny readback and
+  tool_call parsing cover the same config/parse surface) plus the two
+  product decisions named in the ladder plan (Sysadmin Mode surface; piped
+  permissions).

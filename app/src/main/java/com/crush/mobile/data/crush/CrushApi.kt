@@ -449,6 +449,16 @@ suspend fun deleteSession(workspaceId: String, sessionId: String): DeleteOutcome
     }
 
     /**
+     * v0.100.0+ replacement for [skipPermissions] (that endpoint was REMOVED
+     * upstream). [mode] is "normal" | "yolo" | "sysadmin"; this app never
+     * sends "sysadmin" (EngineProtocol.modeFor). EngineProtocol picks the
+     * family from the bound engine's observed version — never both calls.
+     */
+    suspend fun setPermissionMode(workspaceId: String, mode: String) {
+        postEmpty("/v1/workspaces/$workspaceId/permissions/mode", PermissionModeBody(mode))
+    }
+
+    /**
      * Echoes the entire request back, not just its id.
      */
     suspend fun grant(workspaceId: String, grant: PermissionGrant): PermissionGrantResponse =

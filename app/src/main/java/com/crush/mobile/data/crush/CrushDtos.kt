@@ -34,7 +34,14 @@ data class CreateWorkspaceRequest(
     val id: String,
     val path: String,
     @SerializedName("data_dir") val dataDir: String? = null,
-    val yolo: Boolean = true,
+    /**
+     * v0.99.0 wire: the auto-approve flag. NULL on the v0.100.0 wire — Gson
+     * omits nulls, and v0.100.0 REPLACED this field with [permissionMode]
+     * (EngineProtocol decides which family a bound engine speaks).
+     */
+    val yolo: Boolean? = true,
+    /** v0.100.0+ wire: "normal" | "yolo" | "sysadmin" (sysadmin never sent). */
+    @SerializedName("permission_mode") val permissionMode: String? = null,
     @SerializedName("client_id") val clientId: String? = null
 )
 
@@ -113,6 +120,9 @@ data class SetProviderKeyRequest(
 }
 
 data class SkipPermissionsRequest(val skip: Boolean)
+
+/** v0.100.0+ POST …/permissions/mode body (replaces permission/skip). */
+data class PermissionModeBody(val mode: String)
 
 /**
  * Preferred model selection, `POST /v1/workspaces/{id}/config/model`.

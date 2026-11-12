@@ -47,9 +47,10 @@ object EngineApiContracts {
     )
 
     /**
-     * The surface THIS app build implements — CrushApi.skipPermissions
-     * (v0.99.0 path), the workspace-create `yolo` field, and a renderer that
-     * treats unknown SSE part types as log-and-ignore.
+     * The surface THIS build has RAILS-PROVEN. The adapter (EngineProtocol)
+     * implements BOTH permission families in code, but this pinned row is the
+     * version whose DEVICE rails have actually passed — it moves in the same
+     * act as EngineCatalogues.PINNED_VERSION.
      */
     val IMPLEMENTED = ApiSurface(
         version = "0.99.0",
@@ -57,6 +58,16 @@ object EngineApiContracts {
         workspacePermissionField = WorkspacePermissionField.YOLO_BOOL,
         newSseShapes = emptyList(),
     )
+
+    /**
+     * What the EngineProtocol adapter can SPEAK today, independent of which
+     * version has been rails-proven. The adapter selects per bound-engine
+     * version, so both families coexist in one build.
+     */
+    val SUPPORTED_CONTROLS: Set<PermissionControl> =
+        setOf(PermissionControl.SKIP_ENDPOINT, PermissionControl.MODE_ENDPOINT)
+    val SUPPORTED_FIELDS: Set<WorkspacePermissionField> =
+        setOf(WorkspacePermissionField.YOLO_BOOL, WorkspacePermissionField.PERMISSION_MODE_ENUM)
 
     /**
      * Every engine surface the kit knows. Add rows in the SAME act as the
@@ -86,17 +97,16 @@ object EngineApiContracts {
      * [surface] — empty means this build speaks that engine's surface.
      */
     fun gapsFor(surface: ApiSurface): List<String> = buildList {
-        if (surface.permissionControl != IMPLEMENTED.permissionControl) {
+        if (surface.permissionControl !in SUPPORTED_CONTROLS) {
             add(
                 "permission control: engine wants ${surface.permissionControl}, " +
-                    "app speaks ${IMPLEMENTED.permissionControl}"
+                    "adapter speaks $SUPPORTED_CONTROLS"
             )
         }
-        if (surface.workspacePermissionField != IMPLEMENTED.workspacePermissionField) {
+        if (surface.workspacePermissionField !in SUPPORTED_FIELDS) {
             add(
                 "workspace permission field: engine wants " +
-                    "${surface.workspacePermissionField}, app writes " +
-                    "${IMPLEMENTED.workspacePermissionField}"
+                    "${surface.workspacePermissionField}, adapter writes $SUPPORTED_FIELDS"
             )
         }
         surface.newSseShapes.forEach { shape ->

@@ -33,12 +33,28 @@ class EngineApiContractTest {
         val gaps = EngineApiContracts.gapsFor(EngineApiContracts.byVersion("0.100.0")!!)
         assertEquals(
             listOf(
-                "permission control: engine wants MODE_ENDPOINT, app speaks SKIP_ENDPOINT",
-                "workspace permission field: engine wants PERMISSION_MODE_ENUM, app writes YOLO_BOOL",
                 "SSE shape to tolerate on the rails: sub_agent_report (new message part type)",
                 "SSE shape to tolerate on the rails: pinentry/ssh prompt events (new SSE event families)",
             ),
             gaps,
+        )
+    }
+
+    @Test
+    fun `the adapter speaks both permission families`() {
+        assertEquals(
+            setOf(
+                EngineApiContracts.PermissionControl.SKIP_ENDPOINT,
+                EngineApiContracts.PermissionControl.MODE_ENDPOINT,
+            ),
+            EngineApiContracts.SUPPORTED_CONTROLS,
+        )
+        assertEquals(
+            setOf(
+                EngineApiContracts.WorkspacePermissionField.YOLO_BOOL,
+                EngineApiContracts.WorkspacePermissionField.PERMISSION_MODE_ENUM,
+            ),
+            EngineApiContracts.SUPPORTED_FIELDS,
         )
     }
 

@@ -1059,11 +1059,17 @@ class ChatViewModel(
             }
         }
 
+        // The bound engine's OWN version — EngineProtocol keys the permission
+        // wire family from it (v0.99.0: yolo bool + /permissions/skip;
+        // v0.100.0+: permission_mode enum + /permissions/mode).
+        val boundEngineVersion =
+            (container.runtimeFor(boundKey).supervisor.state.value as? EngineState.Running)?.version
         val opened = session.openWorkspace(
             workspacePathFor(),
             engineStateDirFor(),
             effectivePermissionMode,
-            providerId
+            providerId,
+            engineVersion = boundEngineVersion
         )
         // Read the key for the provider we are about to configure, not for whatever
         // was cached last.

@@ -166,7 +166,22 @@ class WorkspaceManager(private val api: CrushApi) {
     @Volatile
     private var yoloMode: Boolean? = null
 
-    suspend fun open(path: String, dataDir: String, yolo: Boolean): Workspace {
+    /**
+     * v0.100.0+ permission wire value this workspace was last opened with
+     * (EngineProtocol.modeFor). NULL = the v0.99.0 family (create `yolo` bool
+     * + /permissions/skip). Kept beside [yoloMode] so a re-attach re-applies
+     * the SAME family the workspace was created under — a re-attach must
+     * never flip an engine from one protocol family to the other.
+     */
+    @Volatile
+    private var permissionModeWire: String? = null
+
+    suspend fun open(
+        path: String,
+        dataDir: String,
+        yolo: Boolean,
+        permissionModeWire: String? = null,
+    ): Workspace {
         // P2-22: createWorkspace can legitimately throw (engine cold-boot,
         // mid-restart socket churn). NOTHING below this line runs until it
         // succeeds, so a failed open leaves the PREVIOUS truthful state
@@ -179,7 +194,12 @@ class WorkspaceManager(private val api: CrushApi) {
                 id = requestedId,
                 path = path,
                 dataDir = dataDir,
-                yolo = yolo,
+                // The two families send DIFFERENT create bodies: v0.100.0
+                // REPLACED the yolo bool with permission_mode (EngineProtocol
+                // decided which family this engine speaks). Gson omits nulls,
+                // so exactly one of the two fields rides each request.
+                yolo = if (permissionModeWire == null) yolo else null,
+                permissionMode = permissionModeWire,
                 clientId = clientId
             )
         )
@@ -188,6 +208,7 @@ class WorkspaceManager(private val api: CrushApi) {
         // timestamp. Order matters even at success: an id is claimed for a
         // generation only after the POST that created it returned.
         yoloMode = yolo
+        this.permissionModeWire = permissionModeWire
         workspacePath = path
         workspaceDataDir = dataDir
         val id = ws.id.ifBlank { requestedId }
@@ -205,8 +226,18 @@ class WorkspaceManager(private val api: CrushApi) {
         // runCatchingNonCancellation (not plain runCatching): this sits in a
         // suspend context; a cancelled caller must abort, not be logged as a
         // permission-mode failure and continue.
-        runCatchingNonCancellation { api.skipPermissions(id, yolo) }
-            .onFailure { AppLog.w("WorkspaceManager", "skipPermissions($yolo) failed: ${it.message}") }
+        if (permissionModeWire == null) {
+            runCatchingNonCancellation { api.skipPermissions(id, yolo) }
+                .onFailure { AppLog.w("WorkspaceManager", "skipPermissions($yolo) failed: ${it.message}") }
+        } else {
+            runCatchingNonCancellation { api.setPermissionMode(id, permissionModeWire) }
+                .onFailure {
+                    AppLog.w(
+                        "WorkspaceManager",
+                        "setPermissionMode($permissionModeWire) failed: ${it.message}"
+                    )
+                }
+        }
 
         // The coordinator must exist before a prompt is accepted, otherwise
         // POST .../agent returns 400 "agent coordinator not initialized".

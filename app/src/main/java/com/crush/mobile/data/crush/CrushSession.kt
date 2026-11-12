@@ -60,15 +60,29 @@ class CrushSession(
         dataDir: String,
         permissionMode: com.crush.mobile.domain.model.PermissionMode =
             com.crush.mobile.domain.model.PermissionMode.ASK,
-        providerId: String = com.crush.mobile.domain.provider.Providers.DEFAULT.id
+        providerId: String = com.crush.mobile.domain.provider.Providers.DEFAULT.id,
+        /**
+         * The version the BOUND engine reported (`EngineState.Running.version`)
+         * — the adapter decides the permission wire family from it. Null/unknown
+         * fails safe to the pinned v0.99.0 family (EngineProtocol).
+         */
+        engineVersion: String? = null,
     ): Ready {
+        val wire = EngineProtocol.permissionWireFor(engineVersion)
         val ws = workspaces.open(
             path,
             dataDir,
             // ASK means do NOT skip: the engine then emits permission_request
             // events and blocks until the UI answers. This was hardcoded true
             // (yolo) before, so the agent approved its own file edits silently.
-            yolo = permissionMode == com.crush.mobile.domain.model.PermissionMode.AUTO_APPROVE
+            yolo = permissionMode == com.crush.mobile.domain.model.PermissionMode.AUTO_APPROVE,
+            // v0.100.0+ replaces the yolo bool with the mode enum; the adapter
+            // never sends the sysadmin value (EngineProtocol.modeFor).
+            permissionModeWire = if (wire == EngineProtocol.PermissionWire.MODE_ENUM) {
+                EngineProtocol.modeFor(permissionMode)
+            } else {
+                null
+            },
         )
         return Ready(ws.id, providerId, false, listOf("workspace ${ws.id.take(8)} created"))
     }

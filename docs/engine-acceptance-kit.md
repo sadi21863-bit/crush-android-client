@@ -115,15 +115,21 @@ synthetic (the accepted synthetic map in `docs/capabilities.md`).
   `gapsFor("0.100.0")` pins exactly four upgrade items: the permission
   endpoint (skip→mode), the workspace permission field (yolo→enum), and the
   two new SSE families (`sub_agent_report`, pinentry/SSH events).
-- T1: artifact hash cross-checked against the release's `checksums.txt`
-  (recorded in the research doc and pinned in `tools/fetch-crush.ps1`);
-  jniLibs still v0.99.0 BY DESIGN until the rails run.
+- T1: **FETCHED AND VERIFIED IN-TREE on branch `engine-v0100`** — the
+  pinned SHA-256 matched the signed release, the written
+  `libcrush.so` (94.8 MB AArch64 PIE) strings-scan is 33/33 catalogue ids,
+  the `agent_task` probe is absent (exhaustive), the version strings say
+  v0.100.0 and v0.99.0 occurs zero times; `PINNED_VERSION` = "0.100.0" on
+  the branch only. `main` stays v0.99.0 until the rails pass.
 - Deny list: pre-grown with `agent_dispatch`/`agent_send`/`agent_status`/
   `agent_stop` on `main` (inert under v0.99.0; fully covers the v0.100.0 row).
 - Rails runner: `tools/engine-rails.ps1` shipped; a live run on the pinned
   build passes 6/0 (version v0.99.0, bootstrap health, on-disk deny readback
   count=31 via `files/crush-chat/data/crush.json`, no FATAL) — the tool-wall
   and interactive rows stay observations by design.
-- Remaining: T2 (this batch's gate), the permission adapter (the four pinned
-  gaps), and T3 (owner + device), plus two product decisions named in the
-  ladder plan (Sysadmin Mode surface; piped permissions).
+- Remaining: T2 (this batch's gate), the permission adapter (implemented in
+  code by `EngineProtocol` — the dual-family DTO/API/WorkspaceManager/Session
+  path with unknown versions failing safe to the pinned family; its v0.100
+  half is proven at the rails, not by the JVM gate alone), and T3 (owner +
+  device), plus two product decisions named in the ladder plan (Sysadmin Mode
+  surface; piped permissions).

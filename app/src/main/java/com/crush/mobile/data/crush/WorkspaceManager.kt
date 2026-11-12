@@ -188,6 +188,10 @@ class WorkspaceManager(private val api: CrushApi) {
         // untouched: the old yoloMode still describes what will be re-applied
         // on a later reattach, and no phantom path/claim lingers for
         // reattachIfStale to resurrect half-configured.
+        AppLog.d(
+            "WorkspaceManager",
+            "open: permissionWire=$permissionModeWire (null = v0.99 skip family) yolo=$yolo"
+        )
         val requestedId = UUID.nameUUIDFromBytes(path.toByteArray()).toString()
         val ws = api.createWorkspace(
             CreateWorkspaceRequest(
@@ -287,7 +291,7 @@ class WorkspaceManager(private val api: CrushApi) {
         // as "reattach failed" and retried after the coroutine was already
         // told to stop.
         return runCatchingNonCancellation {
-            open(path, dir, yolo = yoloMode ?: false)
+            open(path, dir, yolo = yoloMode ?: false, permissionModeWire = permissionModeWire)
         }.isSuccess
     }
 

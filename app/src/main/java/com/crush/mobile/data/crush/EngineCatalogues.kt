@@ -39,7 +39,7 @@ object EngineCatalogues {
      * as `version v0.99.0`). Bumping this is a DELIBERATE act that follows
      * the maintenance order above — never a side effect of a fetch.
      */
-    const val PINNED_VERSION = "0.99.0"
+    const val PINNED_VERSION = "0.100.0"
 
     /**
      * Every engine version the kit knows, oldest first. Provenance:

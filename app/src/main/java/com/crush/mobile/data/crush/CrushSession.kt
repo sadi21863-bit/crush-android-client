@@ -64,7 +64,7 @@ class CrushSession(
         /**
          * The version the BOUND engine reported (`EngineState.Running.version`)
          * — the adapter decides the permission wire family from it. Null/unknown
-         * fails safe to the pinned v0.99.0 family (EngineProtocol).
+         * fails safe to EngineCatalogues.PINNED_VERSION's family (EngineProtocol).
          */
         engineVersion: String? = null,
     ): Ready {

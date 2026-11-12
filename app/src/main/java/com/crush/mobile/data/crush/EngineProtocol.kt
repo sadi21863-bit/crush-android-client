@@ -32,12 +32,25 @@ object EngineProtocol {
     }
 
     /**
-     * Parses "0.100.0", "v0.100.0", or a suffixed build string ("0.99.0+dirty")
-     * into a comparable triple; null when no leading semver triple exists.
+     * Parses the engine's version claim. The engine reports its version as a
+     * JSON OBJECT string in [com.crush.mobile.engine.EngineState.Running]
+     * (`{"version":"v0.100.0","commit":"unknown",...}` — measured on device
+     * 2026-11-12: the first rails run 404'd on /permissions/skip because this
+     * parser only accepted a LEADING semver), so the JSON form is tried first;
+     * plain "0.100.0" / "v0.100.0" / "0.99.0+dirty" forms follow.
+     * Null when no version is recoverable.
      */
     fun parseVersion(raw: String?): Triple<Int, Int, Int>? {
-        val cleaned = raw?.trim()?.removePrefix("v") ?: return null
-        val m = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)").find(cleaned) ?: return null
+        val text = raw?.trim() ?: return null
+        val json = Regex("\"version\"\\s*:\\s*\"v?([0-9][0-9.]*)\"").find(text)
+        if (json != null) {
+            return leadingTriple(json.groupValues[1])
+        }
+        return leadingTriple(text.removePrefix("v"))
+    }
+
+    private fun leadingTriple(text: String): Triple<Int, Int, Int>? {
+        val m = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)").find(text) ?: return null
         return Triple(
             m.groupValues[1].toInt(),
             m.groupValues[2].toInt(),
@@ -62,12 +75,22 @@ object EngineProtocol {
     }
 
     /**
-     * The wire family for an observed engine version. An unparseable/absent
-     * version fails SAFE to the pinned family (the shipped engine is v0.99.0):
-     * the create call keeps the old shape, which is exactly what that engine
-     * understands.
+     * The wire family for an observed engine version. An absent OR unparseable
+     * claim (`null`, `"nightly"`, a shape a future engine invents) fails SAFE to
+     * the PINNED family (EngineCatalogues.PINNED_VERSION — the engine this build
+     * actually ships), not to a hardcoded family: on the v0.99.0 pin that means
+     * the old `yolo`+skip shape, on the v0.100.0 pin the
+     * `permission_mode`+mode shape. Hardcoding SKIP_FLAG, or letting
+     * `isAtLeast("nightly") == false` choose it, was a latent live 404 on the
+     * v0.100.0 candidate whenever the version claim was unreadable.
      */
-    fun permissionWireFor(engineVersion: String?): PermissionWire =
-        if (isAtLeast(engineVersion, 0, 100, 0)) PermissionWire.MODE_ENUM
-        else PermissionWire.SKIP_FLAG
+    fun permissionWireFor(engineVersion: String?): PermissionWire {
+        val effective = engineVersion?.takeIf { parseVersion(it) != null }
+            ?: EngineCatalogues.PINNED_VERSION
+        return if (isAtLeast(effective, 0, 100, 0)) {
+            PermissionWire.MODE_ENUM
+        } else {
+            PermissionWire.SKIP_FLAG
+        }
+    }
 }

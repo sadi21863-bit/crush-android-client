@@ -49,8 +49,9 @@ object EngineApiContracts {
     /**
      * The surface THIS build has RAILS-PROVEN. The adapter (EngineProtocol)
      * implements BOTH permission families in code, but this pinned row is the
-     * version whose DEVICE rails have actually passed — it moves in the same
-     * act as EngineCatalogues.PINNED_VERSION.
+     * version whose DEVICE rails have actually passed — it moves when the
+     * rails PASS for the candidate engine, NOT at fetch time (a fetched
+     * candidate is not a proven one).
      */
     val IMPLEMENTED = ApiSurface(
         version = "0.99.0",

@@ -34,12 +34,21 @@ class BootstrapOrderTest {
     /** Every request the client made, in order, for order assertions. */
     private val seen = mutableListOf<String>()
 
+    /**
+     * How many recorded requests this test has already taken. MockWebServer's
+     * [MockWebServer.getRequestCount] is CUMULATIVE, so a second drain that
+     * used it directly would wait forever for requests already consumed —
+     * exactly the hang the first version of the re-attach test produced.
+     */
+    private var drained = 0
+
     /** Endpoints that should fail, mapped to status + body. */
     private val failures = mutableMapOf<String, Pair<Int, String>>()
 
     @Before
     fun setUp() {
         seen.clear()
+        drained = 0
         failures.clear()
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
@@ -81,9 +90,10 @@ class BootstrapOrderTest {
             s.ensureAgentReady("oc_sk_test", providerId = "opencode-zen", modelId = modelId)
         }
 
-    /** Drains every recorded request. MockWebServer has no bulk accessor. */
+    /** Drains requests not yet taken in this test (cumulative count aware). */
     private fun drainRequests(): List<RecordedRequest> {
-        val n = server.requestCount
+        val n = server.requestCount - drained
+        drained += n
         return (0 until n).map { server.takeRequest() }
     }
 
@@ -142,6 +152,55 @@ class BootstrapOrderTest {
         val body = req.body.readUtf8()
         assertTrue("api_key must be a quoted string, got: $body", body.contains("\"api_key\":\"oc_sk_test\""))
         assertTrue("must not be an array, got: $body", !body.contains("api_key\":["))
+    }
+
+    @Test
+    fun `reattach re-applies the SAME permission wire family (the live v0 100 404)`() = runTest {
+        // MEASURED ON DEVICE 2026-11-12: open() had been taught the v0.100.0
+        // wire but reattachIfStale() still called the old two-arg open(), so
+        // the initial attach used /permissions/mode and EVERY re-attach fell
+        // back to /permissions/skip -> 404 on the v0.100 engine. The stored
+        // wire must ride both paths.
+        val mgr = WorkspaceManager(api)
+        mgr.open("/data/tmp", "/data/tmp/state", yolo = false, permissionModeWire = "normal")
+        drainRequests() // empty the initial open: this test observes the re-attach only
+        seen.clear()
+
+        assertTrue("re-attach should succeed", mgr.reattachIfStale(force = true))
+
+        val modeCalls = drainRequests()
+            .filter { it.path?.endsWith("/permissions/mode") == true }
+        assertEquals("re-attach must re-apply the mode exactly once; saw $seen", 1, modeCalls.size)
+        assertEquals(
+            "the re-attach must carry the SAME enum value",
+            "{\"mode\":\"normal\"}",
+            modeCalls.single().body.readUtf8()
+        )
+        assertTrue(
+            "a v0.100 workspace must NEVER re-attach through /permissions/skip; saw $seen",
+            seen.none { it.endsWith("/permissions/skip") }
+        )
+    }
+
+    @Test
+    fun `reattach keeps the v0_99 skip family when opened with it`() = runTest {
+        // The other direction of the same invariant: a rollback engine (or a
+        // workspace opened before the version was known) stays on its family.
+        val mgr = WorkspaceManager(api)
+        mgr.open("/data/tmp", "/data/tmp/state", yolo = false, permissionModeWire = null)
+        drainRequests()
+        seen.clear()
+
+        assertTrue("re-attach should succeed", mgr.reattachIfStale(force = true))
+
+        val skipCalls = drainRequests()
+            .filter { it.path?.endsWith("/permissions/skip") == true }
+        assertEquals("re-attach must re-apply the skip flag exactly once; saw $seen", 1, skipCalls.size)
+        assertEquals("{\"skip\":false}", skipCalls.single().body.readUtf8())
+        assertTrue(
+            "a v0.99 workspace must NEVER re-attach through /permissions/mode; saw $seen",
+            seen.none { it.endsWith("/permissions/mode") }
+        )
     }
 
     @Test

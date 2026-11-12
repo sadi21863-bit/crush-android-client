@@ -19,6 +19,16 @@ class EngineProtocolTest {
         assertEquals(Triple(0, 100, 0), EngineProtocol.parseVersion("0.100.0"))
         assertEquals(Triple(0, 100, 0), EngineProtocol.parseVersion("v0.100.0"))
         assertEquals(Triple(0, 99, 0), EngineProtocol.parseVersion("0.99.0+dirty"))
+        // THE MEASURED FORM (2026-11-12): EngineState.Running.version carries
+        // the engine's whole JSON claim, not a bare semver.
+        assertEquals(
+            Triple(0, 100, 0),
+            EngineProtocol.parseVersion("{\"version\":\"v0.100.0\",\"commit\":\"unknown\",\"build_id\":\"x\"}")
+        )
+        assertEquals(
+            Triple(0, 99, 0),
+            EngineProtocol.parseVersion("{\"version\":\"v0.99.0\",\"commit\":\"unknown\"}")
+        )
         assertNull(EngineProtocol.parseVersion(""))
         assertNull(EngineProtocol.parseVersion(null))
         assertNull(EngineProtocol.parseVersion("nightly"))
@@ -46,15 +56,13 @@ class EngineProtocolTest {
             EngineProtocol.PermissionWire.MODE_ENUM,
             EngineProtocol.permissionWireFor("0.101.0")
         )
-        // Fail safe: unknown/absent versions speak the PINNED family.
-        assertEquals(
-            EngineProtocol.PermissionWire.SKIP_FLAG,
-            EngineProtocol.permissionWireFor(null)
-        )
-        assertEquals(
-            EngineProtocol.PermissionWire.SKIP_FLAG,
-            EngineProtocol.permissionWireFor("nightly")
-        )
+        // Fail safe: unknown/absent versions speak the PINNED family — the
+        // engine this build actually ships (v0.99.0 on main, v0.100.0 on the
+        // candidate branch). Asserting against the pin keeps this test honest
+        // across a version bump instead of hardcoding yesterday's family.
+        val pinnedFamily = EngineProtocol.permissionWireFor(EngineCatalogues.PINNED_VERSION)
+        assertEquals(pinnedFamily, EngineProtocol.permissionWireFor(null))
+        assertEquals(pinnedFamily, EngineProtocol.permissionWireFor("nightly"))
     }
 
     @Test

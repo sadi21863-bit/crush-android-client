@@ -32,12 +32,25 @@ object EngineProtocol {
     }
 
     /**
-     * Parses "0.100.0", "v0.100.0", or a suffixed build string ("0.99.0+dirty")
-     * into a comparable triple; null when no leading semver triple exists.
+     * Parses the engine's version claim. The engine reports its version as a
+     * JSON OBJECT string in [com.crush.mobile.engine.EngineState.Running]
+     * (`{"version":"v0.100.0","commit":"unknown",...}` — measured on device
+     * 2026-11-12: the first rails run 404'd on /permissions/skip because this
+     * parser only accepted a LEADING semver), so the JSON form is tried first;
+     * plain "0.100.0" / "v0.100.0" / "0.99.0+dirty" forms follow.
+     * Null when no version is recoverable.
      */
     fun parseVersion(raw: String?): Triple<Int, Int, Int>? {
-        val cleaned = raw?.trim()?.removePrefix("v") ?: return null
-        val m = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)").find(cleaned) ?: return null
+        val text = raw?.trim() ?: return null
+        val json = Regex("\"version\"\\s*:\\s*\"v?([0-9][0-9.]*)\"").find(text)
+        if (json != null) {
+            return leadingTriple(json.groupValues[1])
+        }
+        return leadingTriple(text.removePrefix("v"))
+    }
+
+    private fun leadingTriple(text: String): Triple<Int, Int, Int>? {
+        val m = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)").find(text) ?: return null
         return Triple(
             m.groupValues[1].toInt(),
             m.groupValues[2].toInt(),

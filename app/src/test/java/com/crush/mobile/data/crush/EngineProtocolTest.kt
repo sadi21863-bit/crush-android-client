@@ -19,6 +19,16 @@ class EngineProtocolTest {
         assertEquals(Triple(0, 100, 0), EngineProtocol.parseVersion("0.100.0"))
         assertEquals(Triple(0, 100, 0), EngineProtocol.parseVersion("v0.100.0"))
         assertEquals(Triple(0, 99, 0), EngineProtocol.parseVersion("0.99.0+dirty"))
+        // THE MEASURED FORM (2026-11-12): EngineState.Running.version carries
+        // the engine's whole JSON claim, not a bare semver.
+        assertEquals(
+            Triple(0, 100, 0),
+            EngineProtocol.parseVersion("{\"version\":\"v0.100.0\",\"commit\":\"unknown\",\"build_id\":\"x\"}")
+        )
+        assertEquals(
+            Triple(0, 99, 0),
+            EngineProtocol.parseVersion("{\"version\":\"v0.99.0\",\"commit\":\"unknown\"}")
+        )
         assertNull(EngineProtocol.parseVersion(""))
         assertNull(EngineProtocol.parseVersion(null))
         assertNull(EngineProtocol.parseVersion("nightly"))

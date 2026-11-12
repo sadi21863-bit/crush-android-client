@@ -56,15 +56,13 @@ class EngineProtocolTest {
             EngineProtocol.PermissionWire.MODE_ENUM,
             EngineProtocol.permissionWireFor("0.101.0")
         )
-        // Fail safe: unknown/absent versions speak the PINNED family.
-        assertEquals(
-            EngineProtocol.PermissionWire.SKIP_FLAG,
-            EngineProtocol.permissionWireFor(null)
-        )
-        assertEquals(
-            EngineProtocol.PermissionWire.SKIP_FLAG,
-            EngineProtocol.permissionWireFor("nightly")
-        )
+        // Fail safe: unknown/absent versions speak the PINNED family — the
+        // engine this build actually ships (v0.99.0 on main, v0.100.0 on the
+        // candidate branch). Asserting against the pin keeps this test honest
+        // across a version bump instead of hardcoding yesterday's family.
+        val pinnedFamily = EngineProtocol.permissionWireFor(EngineCatalogues.PINNED_VERSION)
+        assertEquals(pinnedFamily, EngineProtocol.permissionWireFor(null))
+        assertEquals(pinnedFamily, EngineProtocol.permissionWireFor("nightly"))
     }
 
     @Test

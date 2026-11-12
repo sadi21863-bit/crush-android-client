@@ -34,6 +34,26 @@ Parser/route note: the engine's version string is logged at boot
 (`bindEngine state=Running(... version={"version":"vX.Y.Z"...})`) — that line is
 the device's own statement of which artifact is running.
 
+**Adapter invariants learned live on the first v0.100.0 T3 run (2026-11-12) —
+every future bump re-checks all three:**
+
+1. The version claim is the WHOLE JSON object (`{"version":"v0.100.0",...}`),
+   not a bare semver. Parse the quoted `version` field first. A
+   leading-semver-only parser returned null, silently chose the pinned family,
+   and produced a live `404` on `/permissions/skip`.
+2. A re-attach must replay the SAME permission wire family the workspace was
+   opened with. Making `open()` version-aware is not enough: `reattachIfStale()`
+   re-POSTs the workspace, and if it drops the stored wire it falls back to the
+   old family — a live `404` on every re-attach (the ~30 s reap vs 15 s lease
+   makes that hit normal turns).
+3. The unknown-version fail-safe follows `EngineCatalogues.PINNED_VERSION` (the
+   engine actually shipped), never a hardcoded family.
+
+The JVM gate pins all three (`EngineProtocolTest` JSON rows;
+`BootstrapOrderTest` re-attach both directions). T3 still greps `files/app.log`
+for `permissions/skip ... 404` and `setPermissionMode ... failed`: **zero is
+the pass**, because only the device proves which route actually ran.
+
 ## 2. The tiers
 
 **T0 — MANIFEST (host, minutes).** Add the new version's row to
@@ -63,6 +83,7 @@ screenshot). Run on a BRANCH build; main advances only after green.
 | # | Rail | Pass evidence |
 |---|---|---|
 | 1 | Boot + attach | `bindEngine ... version=v<row version>`; `bootstrap instance=...`; no `bootstrap failed` |
+| 1b | Permission route | `bootstrap permission wire: ... engineVersion={"version":"v<row>"...} wire=<family>` then `open: permissionWire=<value>` on every attach/re-attach; ZERO `permissions/skip ... 404` and ZERO `setPermissionMode ... failed` in `files/app.log`. The wire must match the row's API contract (v0.99 = SKIP_FLAG/null; v0.100+ = MODE_ENUM) |
 | 2 | Deny readback | the instance config on disk carries ALL `CHAT_DISABLED_TOOLS` ids; spawn gate logs `policy installed/verified` (readback verifier). The chat pool's config lives at `files/crush-chat/data/crush.json` (measured 2026-11-12 — `cfg/` is empty; `data/` is the chain's real file) |
 | 3 | Zero-tool wall (Chat) | a CHAT-pool turn that asks for shell/read/write yields ZERO `observed tool_call` events + the denial note renders |
 | 4 | Advertisement probe | a FRESH agent listing attempt reports no callable tools; long-lived stale advertisement recorded as an upstream fact if present |
@@ -105,7 +126,9 @@ synthetic (the accepted synthetic map in `docs/capabilities.md`).
    step 2.
 7. Bump `EngineCatalogues.PINNED_VERSION`.
 8. Full gate (T2) green.
-9. Install + device rails (T3) green.
+9. Install + device rails (T3) green — including rail **1b permission route**
+   (`bootstrap permission wire` + zero skip/mode 404s; the adapter's only true
+   proof is the device log).
 10. Fold evidence; merge; record the chain row.
 
 ## 5. v0.100.0 kit state (as of 2026-11-12)
@@ -127,6 +150,13 @@ synthetic (the accepted synthetic map in `docs/capabilities.md`).
   build passes 6/0 (version v0.99.0, bootstrap health, on-disk deny readback
   count=31 via `files/crush-chat/data/crush.json`, no FATAL) — the tool-wall
   and interactive rows stay observations by design.
+- 2026-11-12 candidate run: the FIRST v0.100.0 T3 run exposed an adapter bug
+  that no JVM test had covered — the initial attach spoke `MODE_ENUM`, but
+  every `reattachIfStale()` fell back to the removed `/permissions/skip` and
+  404'd. The runner now carries **rail 1b** (two checks: the version-appropriate
+  family was chosen; zero permission-route 404s), and `BootstrapOrderTest` pins
+  both directions in the JVM gate, so a future bump cannot pass on the wrong
+  family. Re-run is the remaining device step.
 - Remaining: T2 (this batch's gate), the permission adapter (implemented in
   code by `EngineProtocol` — the dual-family DTO/API/WorkspaceManager/Session
   path with unknown versions failing safe to the pinned family; its v0.100

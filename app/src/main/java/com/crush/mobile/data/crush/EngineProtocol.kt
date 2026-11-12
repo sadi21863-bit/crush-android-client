@@ -75,12 +75,22 @@ object EngineProtocol {
     }
 
     /**
-     * The wire family for an observed engine version. An unparseable/absent
-     * version fails SAFE to the pinned family (the shipped engine is v0.99.0):
-     * the create call keeps the old shape, which is exactly what that engine
-     * understands.
+     * The wire family for an observed engine version. An absent OR unparseable
+     * claim (`null`, `"nightly"`, a shape a future engine invents) fails SAFE to
+     * the PINNED family (EngineCatalogues.PINNED_VERSION — the engine this build
+     * actually ships), not to a hardcoded family: on the v0.99.0 pin that means
+     * the old `yolo`+skip shape, on the v0.100.0 pin the
+     * `permission_mode`+mode shape. Hardcoding SKIP_FLAG, or letting
+     * `isAtLeast("nightly") == false` choose it, was a latent live 404 on the
+     * v0.100.0 candidate whenever the version claim was unreadable.
      */
-    fun permissionWireFor(engineVersion: String?): PermissionWire =
-        if (isAtLeast(engineVersion, 0, 100, 0)) PermissionWire.MODE_ENUM
-        else PermissionWire.SKIP_FLAG
+    fun permissionWireFor(engineVersion: String?): PermissionWire {
+        val effective = engineVersion?.takeIf { parseVersion(it) != null }
+            ?: EngineCatalogues.PINNED_VERSION
+        return if (isAtLeast(effective, 0, 100, 0)) {
+            PermissionWire.MODE_ENUM
+        } else {
+            PermissionWire.SKIP_FLAG
+        }
+    }
 }

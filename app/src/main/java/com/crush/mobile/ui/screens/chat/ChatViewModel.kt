@@ -19,6 +19,7 @@ import com.crush.mobile.data.crush.CrushEvent
 import com.crush.mobile.data.crush.CrushEventRouter
 import com.crush.mobile.data.crush.CrushEventStream
 import com.crush.mobile.data.crush.CrushSession
+import com.crush.mobile.data.crush.EngineProtocol
 import com.crush.mobile.data.crush.PermissionGrant
 import com.crush.mobile.data.crush.PermissionRequest
 import com.crush.mobile.data.crush.RunComplete
@@ -1064,6 +1065,11 @@ class ChatViewModel(
         // v0.100.0+: permission_mode enum + /permissions/mode).
         val boundEngineVersion =
             (container.runtimeFor(boundKey).supervisor.state.value as? EngineState.Running)?.version
+        AppLog.d(
+            TAG,
+            "bootstrap permission wire: instance=$boundKey engineVersion=$boundEngineVersion " +
+                "wire=${EngineProtocol.permissionWireFor(boundEngineVersion)}"
+        )
         val opened = session.openWorkspace(
             workspacePathFor(),
             engineStateDirFor(),

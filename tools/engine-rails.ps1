@@ -84,6 +84,29 @@ Rail "no failed bootstrap in this process" ($bootFailures -eq 0) (
     "attempts={0} failures={1} locked-refusals={2} (locked refusals are the DESIGNED fail-closed boot)" -f $bootAttempts, $bootFailures, $lockRefusals
 )
 
+# --- 2b. permission route family (the adapter's live proof) -------------------
+# The v0.100.0 first-run failure was NOT a crash: open() spoke the new family
+# but reattachIfStale() dropped the wire and 404'd on /permissions/skip. A log
+# with zero 404s is the only device-side proof which route actually ran.
+Section "2b. permission route"
+$expectModeEnum = ([version]$ExpectedVersion) -ge ([version]"0.100.0")
+$expectedWire = if ($expectModeEnum) { "MODE_ENUM" } else { "SKIP_FLAG" }
+$wireLines = @([regex]::Matches($log, 'bootstrap permission wire:.*wire=(\w+)') |
+    ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+$routeLines = @([regex]::Matches($log, 'open: permissionWire=(\S+)') |
+    ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+$routeFailures = ([regex]::Matches($log, 'skipPermissions\([^)]*\) failed')).Count +
+    ([regex]::Matches($log, 'setPermissionMode\([^)]*\) failed')).Count +
+    ([regex]::Matches($log, 'permissions/(skip|mode)[^\r\n]*404')).Count
+
+Rail "bootstrap chose the $expectedWire family for v$ExpectedVersion" ($wireLines -contains $expectedWire) $(
+    if ($wireLines.Count -eq 0) { "no 'bootstrap permission wire' line in this process (run after unlock + bind)" }
+    else { "wire(s) seen: " + ($wireLines -join ", ") + "; open: " + $(if ($routeLines) { ($routeLines -join ", ") } else { "(none yet)" }) }
+)
+Rail "zero permission-route failures (skip/mode 404s)" ($routeFailures -eq 0) (
+    "failures={0}; a 404 on the removed /permissions/skip means the stale family ran" -f $routeFailures
+)
+
 # --- 3. deny-list readback on disk (chat pool config) -------------------------
 # The engine's config search chain includes BOTH files/crush-chat/cfg/crush.json
 # and files/crush-chat/data/crush.json; on a healthy instance the INJECTED

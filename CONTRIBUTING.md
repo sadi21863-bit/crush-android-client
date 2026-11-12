@@ -45,11 +45,14 @@ binary, and the emulator refuses ARM guests on an x86_64 host.
   `nativeLibraryDir`.
 - **Never** change `useLegacyPackaging` to `false`. The engine is then never
   extracted from the APK and `exec()` fails with `ENOENT`.
-- **Never** bind the engine to TCP — not `0.0.0.0`, and not `127.0.0.1` either.
+- **Never** bind the *engine* to TCP — not `0.0.0.0`, and not `127.0.0.1` either.
   The engine is launched with an app-private Unix-domain socket (`-H unix://…`);
-  any TCP listener re-opens the sibling-app surface documented in
+  any TCP listener on the engine re-opens the sibling-app surface documented in
   [docs/p1-attack-surface.md](docs/p1-attack-surface.md), because on Android
-  loopback is shared by every app on the device.
+  loopback is shared by every app on the device. The one deliberate loopback
+  listener is the app's own CONNECT egress bridge (`engine/EngineProxy.kt`,
+  strictly `127.0.0.1`, relay-only, TLS end-to-end) — it is not the engine's
+  control API, and it must never carry it.
 - **Never** hardcode a model id. Zen's `/models` is a public endpoint that still
   lists retired models; ids must come from the live probe in `ModelChoice` /
   `ZenModelsApi`.

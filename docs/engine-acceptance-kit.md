@@ -131,6 +131,11 @@ synthetic (the accepted synthetic map in `docs/capabilities.md`).
 4. Add those ids to `EngineConfigInjector.CHAT_DISABLED_TOOLS` (deny FIRST).
 5. Record the tarball's checksum in `tools/fetch-crush.ps1` (from the SIGNED
    release's `checksums.txt`; a wrong hash means STOP, not retry).
+5b. Advance the script's default `$Version` to the new version — the default
+   IS the engine a fresh clone fetches. `FetchScriptPinTest` pins
+   `default == EngineCatalogues.PINNED_VERSION` AND the matching checksum
+   branch, so a bump cannot leave either half behind (the v0.100.0 merge
+   exposed exactly that drift).
 6. Fetch; re-run the strings scan over the written `libcrush.so`; new ids →
    step 2.
 7. Bump `EngineCatalogues.PINNED_VERSION`.
@@ -215,8 +220,8 @@ synthetic (the accepted synthetic map in `docs/capabilities.md`).
     title "Handoff fingerprint mismatch audit") and the first turn completed
     (six granted bash asks, `open: permissionWire=normal` on the v0.100
     family, `file changes: +0 -0`); zero 404/FATAL.
-- Remaining before merge: the docs fold only. Rails 3/4 and the
-  `sub_agent_report` SSE render check stay advisory (the deny readback and
-  tool_call parsing cover the same config/parse surface) plus the two
-  product decisions named in the ladder plan (Sysadmin Mode surface; piped
-  permissions).
+- Merge landed 2026-11-12 as `6800c0e` (CI run 43227604396 GREEN). Rails 3/4
+  and the `sub_agent_report` SSE render check stay advisory (the deny
+  readback and tool_call parsing cover the same config/parse surface) plus
+  the two product decisions named in the ladder plan (Sysadmin Mode
+  surface; piped permissions).

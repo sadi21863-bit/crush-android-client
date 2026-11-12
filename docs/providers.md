@@ -28,9 +28,10 @@ environment. Its id comes from that line, not from a JSON file.
 
 The engine embeds a Catwalk *snapshot*, not Catwalk `main`. This caveat was
 written against **0.97.1** and still holds — the bundled build moved to
-**v0.98.2+dirty** (bundled since `d50f26e`, 2026-10-29) and then to the upstream
-clean release **v0.99.0** (promoted 2026-11-01 to this repo's engine of record),
-each with its own, still-not-`main` snapshot. Ids
+**v0.98.2+dirty** (bundled since `d50f26e`, 2026-10-29), then to the upstream
+clean release **v0.99.0** (engine of record 2026-11-01), and now to
+**v0.100.0** (engine of record since the 2026-11-12 merge), each with its own,
+still-not-`main` snapshot. Ids
 read from `main` may not resolve on this engine:
 
 - a provider added to Catwalk after the pinned snapshot shipped may not exist on device
@@ -141,8 +142,8 @@ Paste the key whole, env assignment included if that is what you copied, then
 pick a model. On OpenRouter choose one whose id ends `:free`.
 
 Crush's bundled Catwalk snapshot decides which provider models are visible.
-Since engine v0.98.1 (the bundled build is now **v0.99.0**, promoted
-2026-11-01) the OpenRouter snapshot is fresh (15 `:free` models with
+Since engine v0.98.1 (the bundled build is now **v0.100.0**, engine of record
+since 2026-11-12) the OpenRouter snapshot is fresh (15 `:free` models with
 shapes — `dots-studio/dots-3-note-preview:free` among them). Groq-specific:
 the snapshot predates Groq's 2026-08-16 llama shutdown for free/developer
 tiers, so if the picker offers `llama-3.3-70b-versatile` under `groq` it will
@@ -189,8 +190,8 @@ hold a provider's raw API key.
 > family) does not offer, per the user's pick. The Copilot device-flow
 > remains the one real OAuth feature the engine backs, if it is ever
 > wanted. Related registry findings recorded the same day: Go requires
-> `x-opencode-session` on every request AND only the 0.99.0 engine carries
-> it (0.98.2 has none) — see `docs/providers/opencode-go.md`.
+> `x-opencode-session` on every request AND only engines from 0.99.0 onward
+> carry it (0.98.2 has none) — see `docs/providers/opencode-go.md`.
 
 ## Adding a provider
 

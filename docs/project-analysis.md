@@ -24,6 +24,15 @@ Architecture, the defects that shaped it, and what is left.
 > schema v2) with one engine instance per project (`di/AppContainer.kt:250`)
 > and an import-only Projects surface. Live status lives in `capabilities.md`.
 
+> **2026-11-12 correction — the engine advanced to v0.100.0.** The merge
+> `6800c0e` promoted the engine of record to v0.100.0 after the T3 device
+> rails and the rollback drill (v0.99 opens v0.100 session data unchanged).
+> The version-aware permission adapter means one build speaks both engines
+> (the wire family follows the bound engine's own version). The test row is
+> now **689 tests across 74 suites**, runner-verified (local gate 689/0/0 on
+> `7346e20`); the bare scorecard rows below are updated where they state a
+> count. The rest of the 2026-11-08 note stands.
+
 ## 1. Scorecard
 
 | Area | State |
@@ -36,9 +45,9 @@ Architecture, the defects that shaped it, and what is left.
 | App lock | Fixed and verified; bypass removed and now covered |
 | Markdown | Implemented, streaming-safe, hand-rolled |
 | Tool-call visibility | Built; wire shape confirmed on the wire 2026-10-25 (D3 closed) - parser pinned by tests |
-| File diffs | Built and JVM-tested; a real edited-file turn rendered on device 2026-10-29 (z6/z7, after the `readNBytes` API-33 fix); multi-file real-code turn still untested |
-| Security | Key encrypted; engine transport app-private UDS (cross-app reach closed); HTTP layer still unauthenticated |
-| Test coverage | 455 JVM tests (455 `@Test` methods, grep-counted 2026-10-31; 38 test files); **no instrumentation suite** |
+| File diffs | Built and JVM-tested; a real edited-file turn rendered on device 2026-10-29 (z6/z7, after the `readNBytes` API-33 fix); the multi-file real-code turn is device-proven in the P4 Gate-2 drives (2026-11-07) |
+| Security | Key encrypted; engine transport app-private UDS (cross-app reach closed); HTTP layer still unauthenticated; the one loopback listener is the app's relay-only egress bridge |
+| Test coverage | **689 JVM tests across 74 suites** (per-XML census 2026-11-12); 8 instrumentation tests device-verified 2026-11-01 and compiled by CI |
 
 ## 1a. The Zen free tier is gone (measured 2026-10-11)
 
@@ -170,9 +179,10 @@ carried forward.
 Ordered by how much each matters for a coding agent. Detail in
 [`capabilities.md`](capabilities.md).
 
-1. **File diffs** — now device-verified once (created +1/-0 and diff-edit
-   routes, 2026-10-29, after the `readNBytes` API-33 fix); a multi-file,
-   real-code-edit turn is still the largest untested prong.
+1. **File diffs** — device-verified (created +1/-0 and diff-edit routes,
+   2026-10-29, after the `readNBytes` API-33 fix); the multi-file
+   real-code-edit prong closed in the P4 Gate-2 drives (2026-11-07, two files
+   edited per turn with byte-identical Revert).
 2. **Tool-call timeline** — summary per message, not a live view.
 3. **Per-turn cost display**.
 4. **Verify a third provider** — `opencode-zen` and `openrouter` are verified end to end (OpenRouter since 2026-10-17, including the model-probe fallback order); `groq` is probe-verified but parked (8K TPM). Next candidates: `hyper` (device-code flow, no OAuth plumbing needed) or `gemini`. See [providers.md](providers.md).
@@ -221,6 +231,11 @@ items 3, 6, 7 drop out. The exposed **Groq** key was rotated by the user
 items 1 and 2 below are closed (D12 verified on device 2026-10-29; the
 file-diff turn and the "1 unreadable" miss were closed the same day by
 `d779c17`/`584bf3d` + z7 verification), so the live list is 3–5.
+**2026-11-12: all five are now closed** — 3 by the P4 Gate-2 drives
+(multi-file real-code turns + byte-identical Revert, 2026-11-07), 4 by the
+instrumentation suite (`MainActivityLockFlowTest` + `MainActivitySmokeTest`,
+device-verified 2026-11-01), and 5 by the signed R8 device run (2026-11-02).
+The live queue is `capabilities.md` / the status hub.
 
 1. ~~Verify a live ask-then-grant turn on device (D12)~~ — **CLOSED
    2026-10-29**: z6/z7 live on device (ask card → automated Allow-once →

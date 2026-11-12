@@ -7,6 +7,15 @@ records, as measured facts with dates and evidence links, what the tree
 contained and what had been proven at the time of writing. The P0 sibling task
 (README drift correction) was delivered the same day, 2026-11-02.
 
+> **Snapshot warning (2026-11-12).** This file records the tree as measured on
+> 2026-11-01/02. The engine of record has since advanced: v0.99.0
+> (2026-11-01) → **v0.100.0** (merged 2026-11-12 as `6800c0e`). The v0.99.0
+> measurements below remain the historical baseline; the current pin, the
+> runner-verified census (**689 tests across 74 suites**) and the device
+> evidence live in [capabilities.md](capabilities.md),
+> [CRUSH-MOBILE-STATUS-AND-DECISIONS.md](CRUSH-MOBILE-STATUS-AND-DECISIONS.md)
+> and [engine-acceptance-kit.md](engine-acceptance-kit.md).
+
 Evidence-grade legend, used inline:
 
 - **A** — publicly confirmed (upstream sources, GitHub-visible state)
@@ -102,9 +111,13 @@ the `2c1c629` tree** (engine-egress + session-view fixes) and **467 at
 
 - **Engine of record: upstream Crush v0.99.0** (A: upstream clean release,
   published 2026-10-29, GitHub-verified and checksums.txt-pinned;
-  `tools/fetch-crush.ps1` defaults to 0.99.0 with its SHA-256 pin). Promoted
+  `tools/fetch-crush.ps1` defaulted to 0.99.0 with its SHA-256 pin at this
+  snapshot). Promoted
   to this repo's engine of record **2026-11-01**, replacing the
   instrumented `0.98.2+dirty` build (retired to the z-evidence archive).
+  **Superseded 2026-11-12 by v0.100.0** (merged as `6800c0e`; the fetch
+  default now tracks 0.100.0 — use `-Version 0.99.0` to reproduce this
+  snapshot's tree).
   See README §Toolchain "Upstream pins" and
   [capabilities.md](capabilities.md).
 - On-device app-diagnostics log (AppLog) examined 2026-11-02: engine
@@ -211,8 +224,10 @@ From a clean checkout:
 
 1. `git checkout bb76e4964dd30e415069e6b19e9efe1e77d6c7b3` (tree hash:
    `6c0338c794b96298b328c14ebe9d6ccf06ea35c3`, recorded in §1).
-2. `./tools/fetch-crush.ps1` — fetches the engine (defaults to 0.99.0
-   behind the SHA-256 pin; the binary is not committed).
+2. `./tools/fetch-crush.ps1 -Version 0.99.0` — fetches this snapshot's
+   engine (the script's default advanced to 0.100.0 on 2026-11-12, so the
+   explicit version keeps this reproduce path faithful; both releases stay
+   behind their SHA-256 pins; the binary is not committed).
 3. Run the gate:
    `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintRelease`
    — expect `BUILD SUCCESSFUL`; the unit-test task at this revision carries

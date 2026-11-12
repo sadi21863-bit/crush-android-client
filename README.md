@@ -1,6 +1,6 @@
 # Crush Android
 
-A native Android chat client that runs a **hidden local [Crush](https://github.com/charmbracelet/crush) agent** on-device and streams replies over an **app-private Unix-domain socket** (one long-lived SSE stream; never loopback HTTP/TCP — see [Security](#security)).
+A native Android chat client that runs a **hidden local [Crush](https://github.com/charmbracelet/crush) agent** on-device and streams replies over an **app-private Unix-domain socket** (one long-lived SSE stream; the engine's control API never listens on TCP — see [Security](#security)).
 
 The Crush engine (a Go binary) ships inside the APK and is `exec()`d at app start. It talks to the provider the user configures in Settings — thirteen Catwalk-registered ids are offered (see [docs/providers.md](docs/providers.md)) — for inference. Everything — Compose UI, engine lifecycle, SSE client — lives in this repo.
 
@@ -12,12 +12,15 @@ Crush ships for macOS, Linux, Windows and BSD. **Android is not one of those pla
 
 ## Status
 
-> **Last verified:** `fe9e7e8` (2026-11-08; CI run 42403223894 green). The newest
-> rows (Review screen, chat save surface, chat tool policy, Projects) came from
-> the 2026-11-07/08 device drives; the full Chat/Code mode work, the S5
-> acceptance drive and the gate roadmap live in
-> [docs/capabilities.md](docs/capabilities.md) and
-> [docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md).
+> **Last verified:** 2026-11-12 — the **Crush engine v0.100.0** upgrade merged
+> as `6800c0e` (CI run 43227604396 green) after the full T3 device-rail pass on
+> `bbf8ca69` (scripted rails 8/0, F04 fresh consent, cold-boot resume, E6
+> switch stress, same-destination dispatch, and the rollback drill proving
+> v0.99 opens v0.100 session data unchanged). The current capability ledger is
+> [docs/capabilities.md](docs/capabilities.md); the commit chain and the
+> acceptance kit live in
+> [docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md)
+> and [docs/engine-acceptance-kit.md](docs/engine-acceptance-kit.md).
 
 Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / API 29):
 
@@ -36,7 +39,8 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 | In-app diagnostics + crash reports | ⚠️ implemented — the on-device log path was exercised during the 2026-10-29 D12 pass; the screen/crash-export flow itself is not fully walked |
 | Review screen (revert + export) | ✅ device-proven 2026-11-07 ([capabilities.md](docs/capabilities.md) Gate-2): reverting restores the workspace record, and the "Export a copy" no-op found live in the first drive was fixed same-day (`bf5019a`) |
 | Chat save/copy surface | ✅ device-proven 2026-11-08 (`fe9e7e8`): code-block Copy/Save chips plus per-message "Copy message" / "Save as Markdown" through the SAF `CreateDocument` picker (`ChatExport.kt`) |
-| Chat tool policy (deny all) | ✅ shipped 2026-11-05 (S-01): `EngineConfigInjector.injectChatToolPolicy` writes `options.disabled_tools` and readback-verifies; the `chatPolicyGate` fails closed (`CrushEngine.kt`, pinned by unit tests) |
+| Chat tool policy (deny all) | ✅ shipped 2026-11-05 (S-01): `EngineConfigInjector.injectChatToolPolicy` writes `options.disabled_tools` and readback-verifies; the `chatPolicyGate` fails closed (`CrushEngine.kt`, pinned by unit tests). The on-disk list is engine-version sized: 31 ids on v0.99.0, **35 ids on v0.100.0** (measured 2026-11-12) |
+| Engine v0.100.0 + version-aware permission adapter | ✅ device-proven 2026-11-12 (`6800c0e`): v0.100.0 boots and streams; the wire family follows the bound engine's own version (`SKIP_FLAG`/`yolo` on 0.99, `MODE_ENUM`/`permission_mode` on 0.100+); the rollback drill proved v0.99 opens v0.100 session data unchanged |
 | Projects mode (import-only) | ✅ built — an imported folder becomes its own keyed engine instance (`crush-<key>.sock`); the runtime registry caps liveness at two live engines, chat + one project (`AppContainer.kt`, `EngineInstanceRegistry.kt`) |
 
 `minSdk 29` · `targetSdk 36` · `compileSdk 37` · arm64-v8a only
@@ -45,10 +49,10 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 
 ## Build from source
 
-The engine binary is **not committed** (92 MB; see [Fetching the engine](#fetching-the-engine)).
+The engine binary is **not committed** (95 MB; see [Fetching the engine](#fetching-the-engine)).
 
 ```powershell
-# 1. Fetch the engine binary (~92 MB, once)
+# 1. Fetch the engine binary (~95 MB once; defaults to the pinned v0.100.0)
 ./tools/fetch-crush.ps1
 
 # 2. Build (JDK 17+ required for CLI builds)
@@ -69,8 +73,11 @@ This is why verification is done on real hardware.
 
 ## Fetching the engine
 
-`tools/fetch-crush.ps1` downloads the official `Android_arm64` release of Crush
-and ELF-verifies it. Place the result at:
+`tools/fetch-crush.ps1` downloads the official `Android_arm64` release of Crush,
+SHA-256-verifies the tarball against the recorded signed-release pin, and
+ELF-verifies the extracted binary. With no arguments it fetches the **pinned
+engine of record (v0.100.0)**; `-Version 0.99.0` still fetches the rollback-drill
+release. Place the result at:
 
 ```
 app/src/main/jniLibs/arm64-v8a/libcrush.so
@@ -188,6 +195,15 @@ app UID** with no credentials, and `GET /v1/workspaces/{id}/config`
 
 The root-kit caveat is honest: root/adbd with `CAP_DAC_OVERRIDE` can still read
 the socket. That is a root-equivalent threat, outside the sibling-app model.
+
+**The one loopback listener is the app's own egress bridge, not the engine.**
+Android has no `/etc/resolv.conf`, so the engine's pure-Go resolver falls back to
+the compiled-in `127.0.0.1:53` / `[::1]:53` nameservers and fails whenever the
+phone is not tethering. `EngineProxy` (added 2026-11-02) binds a CONNECT bridge
+strictly on `127.0.0.1` and points the child's `HTTPS_PROXY`/`HTTP_PROXY` at it;
+the bridge resolves the CONNECT authority with the JVM resolver and relays raw
+bytes, so TLS stays end-to-end and the bridge sees only `CONNECT host:port`, never
+plaintext. The engine's control API remains the app-private Unix socket.
 
 Upstream has been asked for a documented `unix://` scheme plus optional token
 auth for TCP: [charmbracelet/crush#4092](https://github.com/charmbracelet/crush/issues/4092).
@@ -343,35 +359,39 @@ See [`docs/toolchain.md`](docs/toolchain.md) for the contingency plan.
 
 > An external audit flagged the 2.4.10 / 2.4.20 split as a compatibility
 > hazard and suggested matching them. That is worth considering, but the build
-> is green across 594 JVM unit tests and repeated release builds, so it is a
+> is green across 689 JVM unit tests and repeated release builds, so it is a
 > real risk to weigh rather than a demonstrated fault. Aligning to 2.4.20 is
 > the safer change if made deliberately.
 
 AGP 9 migration notes that silently broke the `exec()` architecture are in
 [`app/build.gradle.kts`](app/build.gradle.kts).
 
-Upstream pins: the engine of record is **Crush v0.99.0** since the
-2026-11-01 promotion (`0.98.2+dirty` instrumented build retired to the
-z-evidence archive; v0.99.0 is the upstream clean release, published
-2026-10-29). **`tools/fetch-crush.ps1` defaults to 0.99.0** with its SHA-256
-pin from the signed release's checksums.txt; the earlier 0.98.x pins remain
-for historical fetches. Two facts carried into the promotion from the
-v099-experiment lane (that branch, commits `55dae84` back to `d326e60`,
-holds the device evidence): OpenCode Go model access REQUIRES this engine
-(the `x-opencode-session` header exists only from 0.99.0), and the model
-layer gained plan-split bases for the OpenCode/Console family (see
-`domain/provider/Providers.kt`). Earlier pins for the record: 0.98.2 was the
-2026-10-27 instrumented upgrade whose D12 ask-delivery evidence (z6/z7
-sessions) was gathered on-device with it; 0.98.1 was the 2026-10-18 upgrade
-for the `unix://` listen scheme; the older 0.97.1 binary is backed up under
-`engine-backups/`. A `nightly` tag also exists and is not used. **Bubble Tea
-is not used** — it is Crush's terminal UI framework, compiled into the
-binary but unreachable from Compose.
+Upstream pins: the engine of record is **Crush v0.100.0** since the
+2026-11-12 promotion (`PINNED_VERSION` = 0.100.0; `EngineApiContracts.IMPLEMENTED`
+stays 0.99.0 because RAILS-PROVEN is the stricter claim). v0.100.0 is the
+upstream clean release, published 2026-11-05; the T3 device rails, the
+same-destination dispatch and the rollback drill all passed before the merge
+(see [docs/engine-acceptance-kit.md](docs/engine-acceptance-kit.md)).
+**`tools/fetch-crush.ps1` defaults to 0.100.0** with its SHA-256 pin from the
+signed release's checksums.txt (`FetchScriptPinTest` pins the default to the
+Kotlin pin AND requires the matching checksum branch, so a bump cannot leave
+either half behind). The 0.99.0 pin stays for the rollback drill. The
+permission adapter speaks BOTH wire families from the bound engine's own
+version: v0.99.0 keeps `yolo` + `/permissions/skip`; v0.100.0+ sends
+`permission_mode` (`normal|yolo`) + `/permissions/mode`; an absent or
+unparseable version fails safe to the pinned family. Earlier pins for the
+record: 0.99.0 was the 2026-11-01 promotion (OpenCode Go model access needs
+the `x-opencode-session` header, which exists only from 0.99.0); 0.98.2 was
+the 2026-10-27 instrumented upgrade (its z6/z7 D12 ask-delivery evidence
+stands); 0.98.1 brought the `unix://` listen scheme; the older 0.97.1 binary
+is backed up under `engine-backups/`. A `nightly` tag also exists and is not
+used. **Bubble Tea is not used** — it is Crush's terminal UI framework,
+compiled into the binary but unreachable from Compose.
 
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 594 JVM unit tests (594 @Test methods across 57 files, grep-counted 2026-11-08)
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 689 JVM tests across 74 suites (per-XML census 2026-11-12)
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -435,7 +455,8 @@ gate evidence — real arm64 hardware — is recorded in
 
 **First green recorded 2026-11-02.** The bring-up day's pending item closed on
 2026-11-02, and the gate has stayed green: monitor runs 12–20 completed on
-2026-11-02, latest success at the time of writing on commit `bb76e49`. One
+2026-11-02, and the chain has been green since (latest at the v0.100.0 merge:
+run **43227604396** on `6800c0e`, 2026-11-12). One
 flake is on record, not on code: run 16 exited 1 in the unit-test step on code
 that passed identically in runs 18–20 (re-trigger documented in the commit
 message of `95b2ebf`). Locally, the same day produced three green full-gate
@@ -467,6 +488,10 @@ Bring-up facts (measured 2026-11-01, first green recorded 2026-11-02):
 |---|---|
 | [`docs/capabilities.md`](docs/capabilities.md) | What works vs. what does not, per feature |
 | [`docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md`](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md) | Where the work stands now: commit chain, gate roadmap, agreed decisions, risk register |
+| [`docs/engine-acceptance-kit.md`](docs/engine-acceptance-kit.md) | The per-engine-version test system: T0–T3 tiers, device rails, promotion/rollback rules |
+| [`docs/v0100-ladder-plan-2026-11-12.md`](docs/v0100-ladder-plan-2026-11-12.md) | The v0.100.0 execution ladder: adapter, rails, evidence, decisions |
+| [`docs/research-engine-v0100-2026-11-12.md`](docs/research-engine-v0100-2026-11-12.md) | v0.100.0 engine research: API deltas, permission wire, SSE shapes |
+| [`docs/adr-0001-project-workspace-identity.md`](docs/adr-0001-project-workspace-identity.md) | Project identity: path-keyed workspaces, one engine instance per project |
 | [`docs/chat-code-modes-plan-2026-11-04.md`](docs/chat-code-modes-plan-2026-11-04.md) | Chat/Code mode split: decisions, shipped slices, verification matrix |
 | [`docs/toolchain.md`](docs/toolchain.md) | Versions, AGP 10 contingency, backup plan |
 | [`docs/project-analysis.md`](docs/project-analysis.md) | Architecture, known defects, capability plan |
@@ -488,9 +513,9 @@ This app redistributes the Crush binary, so its terms apply directly.
 FSL-1.1-MIT grants use and redistribution for permitted purposes, requires that
 redistributions retain and link the licence and copyright notices, restricts
 competing commercial use, and **≥ converts each version to MIT on the second
-anniversary of its availability**. The bundled build is now **v0.99.0** (the
-upstream clean release, published 2026-10-29; promoted to this repo's engine
-of record 2026-11-01 — see the Upstream pins note in Toolchain), so its
+anniversary of its availability**. The bundled build is now **v0.100.0** (the
+upstream clean release, published 2026-11-05; promoted to this repo's engine
+of record 2026-11-12 — see the Upstream pins note in Toolchain), so its
 future-MIT date computes to two years from publication; confirm it against
 upstream before relying on MIT terms for that version. The backup of the
 retired v0.97.1 binary under `engine-backups/` has its own future-MIT date.
@@ -549,3 +574,9 @@ Spot-checked against the current tree; items not listed above were found accurat
 - Engine of record updated later in the day: the bundled build is now
   **v0.99.0** (promoted 2026-11-01, published 2026-10-29); see the Upstream
   pins note in Toolchain for the pin and the engine-of-record trail.
+
+- Engine of record updated again 2026-11-12: **v0.100.0** (published
+  2026-11-05) after the T3 device rails, the same-destination dispatch and
+  the rollback drill all passed; the gate is runner-verified at **689 tests
+  across 74 suites** (per-XML census). See
+  [docs/v0100-ladder-plan-2026-11-12.md](docs/v0100-ladder-plan-2026-11-12.md).

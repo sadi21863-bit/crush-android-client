@@ -44,7 +44,8 @@ a reasonable de-risking step, but it is a **change to be made deliberately**, no
 a bug to be fixed: the build was green across 401 unit tests and repeated signed
 release builds on AGP 9.4.1 / Gradle 9.8 with the split in place. (The suite has
 grown since: 455 `@Test` methods in 39 files as of 2026-10-31, 594 in
-57 files as of 2026-11-08.) If aligning,
+57 files as of 2026-11-08, and **689 tests across 74 suites** by the
+runner-verified per-XML census of 2026-11-12.) If aligning,
 change both to 2.4.20 in one commit and re-run the full suite.
 
 ## The AGP 10 problem

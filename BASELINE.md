@@ -3,6 +3,13 @@
 Executable evidence, not assertions. Every number here came from a real command
 run on this date; reproduction commands are listed in \[Reproduce\](#reproduce).
 
+> **Snapshot warning (2026-11-12).** This is the 2026-10-17 freeze (engine
+> v0.98.1). The engine of record has since advanced twice: v0.99.0
+> (2026-11-01) and **v0.100.0** (merged 2026-11-12 as `6800c0e`). The rows
+> below stay frozen as the October snapshot; current state lives in
+> [docs/capabilities.md](docs/capabilities.md) and
+> [docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md).
+
 ## 1. Source freeze
 
 | Fact | Value |

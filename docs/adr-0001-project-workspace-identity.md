@@ -79,7 +79,9 @@ citation below was read against that tree.**
 > 3. **Sessions bleed across workspaces**: `listSessions` IGNORES the
 >    requested workspace id — A's and B's lists were IDENTICAL (each contained
 >    BOTH marker sessions plus every historical session in the shared data
->    dir). In crush v0.99.0, sessions are a GLOBAL pool per `-D` data dir;
+>    dir). In crush v0.99.0 (and still in v0.100.0 — re-verified 2026-11-12:
+>    one `state/crush.db` holds all sessions for the instance), sessions are a
+>    GLOBAL pool per `-D` data dir;
 >    there is NO engine-side session boundary across workspaces on one engine
 >    process.
 >

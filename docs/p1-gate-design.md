@@ -127,3 +127,11 @@ engine-side authentication at the HTTP layer, the transport boundary is
 still the app-private UDS socket file (`-H unix://<socketPath>`,
 `engine/CrushEngine.kt:333`, no TCP listener), and the gate module remains
 unbuilt — the fallback design stays unclaimed.
+
+**Re-check 2026-11-12.** The engine advanced to **v0.100.0** (merge
+`6800c0e`; engine of record since 2026-11-12 after the T3 device rails and
+the rollback drill). The security posture is unchanged: there is still no
+engine-side authentication at the HTTP layer, the control transport is still
+the app-private UDS socket with no TCP listener, and the one loopback
+listener in the app is the CONNECT egress bridge (`engine/EngineProxy.kt`,
+strictly `127.0.0.1`, relay-only, TLS end-to-end).

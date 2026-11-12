@@ -29,8 +29,10 @@ with API paths appended (`/openai/v1/chat/completions`, `/openai/v1/responses`,
 session header on every request: `x-opencode-session: ses_...`.
 Engine-binary reality on 2026-10-31: the header string exists in the
 0.99.0 engine (2 occurrences) and NOT in 0.98.2 (0) — **Go turns are only
-servable by the 0.99.0 engine**; the main-tree 0.98.2 build cannot speak
-the Go header requirement.
+servable by engines from 0.99.0 onward**; the then-main-tree 0.98.2 build
+could not speak the Go header requirement. Re-checked on the shipped
+v0.100.0 binary (2026-11-12): 2 occurrences — the requirement carries
+forward.
 
 **No OAuth for model traffic.** Harnesses authenticate with a pasted
 Console API key (`oc_sk_...`, shown once; personal or service-account keys).

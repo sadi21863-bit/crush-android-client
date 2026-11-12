@@ -7,14 +7,16 @@ pointers — it never copies long sections; each claim links the ledger
 that owns it. Facts that moved after the pack's pin are restated here
 from the repo's own records, with what was re-verified live marked.
 
-Last verified: code HEAD `fe9e7e8` (2026-11-08 — the chat output save
-surface, CI run 42403223894 green); only docs-only commits collect above it.
+Last verified: code HEAD `7346e20` (2026-11-12). The v0.100.0 merge
+`6800c0e` is CI-green (run 43227604396); the post-merge `7346e20` (the
+fetch-default ratchet + `FetchScriptPinTest`) carries a local gate of
+**689/0/0 across 74 suites**. Only docs commits collect above it.
 
 ---
 
-## 1. Commit chain (exact, sha-verified 2026-11-05 against the local repo)
+## 1. Commit chain (exact, sha-verified; rows added through 2026-11-12)
 
-| SHA (2026-11-05) | What | CI |
+| SHA (2026-11-05 → 2026-11-12) | What | CI |
 |---|---|---|
 | `8da8d66` (19:20) | docs parallel batch: Gate-7 runtime-registry design memo; live wedge **shape 2** captured (loss of delivery, not death); S6 ask-for-shell recon map; 3 upstream issue drafts | not recorded |
 | `42536e8` (19:40) | docs: S5 no-card mystery RESOLVED in upstream source (v0.99.0 bash safe-read-only prefix bypass); `kill`/`killall` flagged as upstream-notable | not recorded |
@@ -70,6 +72,8 @@ surface, CI run 42403223894 green); only docs-only commits collect above it.
 | `be35981` (2026-11-12) | **THE RE-ATTACH WIRE FIX (the live v0.100.0 404)**: the first v0.100.0 device run exposed that `reattachIfStale()` re-POSTed via the two-arg `open()` and dropped the stored `permissionModeWire`, so every re-attach fell back to the removed `/permissions/skip` and got HTTP 404 while the initial attach was fine. The stored wire now rides re-attach; the fail-safe for an absent OR unparseable version (`null`, `"nightly"`) follows `EngineCatalogues.PINNED_VERSION` instead of a hardcoded family. `BootstrapOrderTest` pins the re-attach family in BOTH directions (and its `drainRequests` now tracks the cumulative MockWebServer count — the first version hung the gate in `takeRequest`); `EngineProtocolTest` pins the JSON claim, the pin, and the unparseable form. Rail 1b added to the runner | ✅ completed-success — local gate 10m07s per-XML 687/0/0 across 73 suites |
 | `84d4bfa` (2026-11-12) | **RAIL 1b PRESENTATION FIX + T3 DEVICE RAILS GREEN on v0.100.0**: the engine's version claim is a JSON object ending in a newline, so the `bootstrap permission wire: ... wire=MODE_ENUM` log record splits across two physical lines and the single-line regex missed it (the route itself was already correct: `open: permissionWire=normal`, zero 404s). The runner flattens newlines before matching. Re-run **8 PASS / 0 FAIL**; interactive rails measured on the candidate — F04 fresh consent on the imported folder (Cancel inert; Allow stamps consent BEFORE the attach, DB fingerprint == pulled SHA-256), project cold-boot gate with `bootstrap refused: locked`, Batch G `b894b36f (25 msgs)` + handoff `65770c54` untouched, E6 switch stress ≤2 children, and the rollback drill: main/0.99.0 opened the v0.100 engine state DB unchanged (goose 13 / sessions 2 / messages 25) — no one-way door | ✅ completed-success — local gate 1m06s (tree up-to-date), per-XML 687/0/0; device 8/0 + interactive rails |
 | (docs row, 2026-11-12 late) | **T3 DEVICE-RAILS FOLD + RAIL 7b CLOSED (the last merge blocker)**: acceptance kit §5 records the scripted + interactive results and the legacy-row F04 correction (row tap bypasses by design since `4058588`; the Nov 5 proof was project row `536fa26e`); ladder plan gains step 4c; capabilities gains the v0.100.0 T3 paragraph. The reinstalled candidate re-ran the scripted rails **8/0** and the **same-destination dispatch** closed live on the owner's finger: from Legacy chat `b894b36f` → Legacy `077dc19e`, ONE insert `eb78ea9d`, consent `1794488827189` → APPROVED `1794488827242` → DISPATCHED `18:37:07.936` to engine session `755fcfd0`, first turn completed on v0.100 (zero 404/FATAL); full-row diff = one new row, all nine prior rows byte-identical (`65770c54` untouched), only `077dc19e.consented_at_ms` re-stamped; Legacy engine DB 2→3 sessions / 25→41 messages. Chain rows added for `8365481`/`79c3815`/`b0939f6`/`d60f7c9` with CI run IDs; branch-state paragraph moved to `d60f7c9` + the `engine-v0100` candidate stack | — docs closure record; merge next |
+| `6800c0e` (2026-11-12) | **THE v0.100.0 MERGE — the engine of record is now v0.100.0**: `engine-v0100` merged into `main` (main's extra commits were docs-only; the merge tree's code is byte-identical to the gated branch tip `84d4bfa`). `EngineCatalogues.PINNED_VERSION` = `0.100.0`; `EngineApiContracts.IMPLEMENTED` stays `0.99.0` (RAILS-PROVEN remains the stricter claim and promotes only on a future rails pass). Device proof on `bbf8ca69`: scripted rails **8/0**; F04 fresh consent (Cancel inert; Allow stamps consent before the attach, DB fingerprint == pulled SHA-256); project cold-boot gate + resume `9c17ad6a`; Batch G cold boot resumed `b894b36f` (25 msgs) with `65770c54` untouched; E6 switch stress (children ≤2); same-destination dispatch `eb78ea9d` → engine session `755fcfd0`, first turn completed; rollback drill: main `d60f7c9` + engine 0.99.0 opened the v0.100 engine state DB unchanged (goose 13 / sessions 2 / messages 25) — **no one-way door**. Local gate on the merged tree 3m41s, per-XML **687/0/0 across 73 suites**; CI run **43227604396 GREEN** | ✅ completed-success — merge commit; CI GREEN |
+| `7346e20` (2026-11-12) | **THE FETCH-DEFAULT RATCHET**: the merge exposed that `main` pinned 0.100.0 while `tools/fetch-crush.ps1` still defaulted to 0.99.0 — the binary is gitignored, so a fresh clone would have silently built against the previous engine (the adapter speaks both families, so nothing else failed). The default advances to 0.100.0 (the 0.99.0 checksum branch stays for the rollback drill), and `FetchScriptPinTest` pins BOTH halves: default == `PINNED_VERSION` and the matching 64-hex release checksum branch. Also folds the docs-audit pass (README status/pins/test counts, toolchain count, providers' engine trail, project-analysis scorecard, BASELINE snapshot warnings, the egress-bridge security note) | ✅ completed-success — local gate 689/0/0 across 74 suites; CI run pending at push time |
 
 **GATE 0 = CLOSED on both halves.** Code: `7ec34ed` (S-01), `3a3a233`
 (S-02), `f5d24dc` (S-04), wording-honesty in S-03's ledger row. Device:
@@ -77,7 +81,9 @@ A03 restore-trust drive PASSED 2026-11-06. Residuals ride the E6 stress
 pass: 4 JVM-only A03 variants (cancel / changed-crushrc / noConfig-flip
 / real-install migration), REST boot-window row, S-01 Failed-badge row.
 
-Branch state truth (2026-11-12, candidate-ready): HEAD/main/origin-main =
+Branch state truth (2026-11-12, post-merge): code HEAD = `7346e20` (the
+fetch-default ratchet + `FetchScriptPinTest`; local gate 689/0/0, CI pending
+at push time) ← `6800c0e` (**THE v0.100.0 MERGE**; CI run 43227604396 GREEN) ←
 `d60f7c9` (docs: the v0.100.0 morning runbook; CI 43134345245 GREEN) ←
 `b0939f6` (docs: adapter + staged candidate folded; CI 43134117008) ←
 `79c3815` (feat: the version-aware permission adapter; tests 680→685, gate
@@ -130,13 +136,15 @@ batch 1) ← `526b3a6` (test hardening) ← `f516d1f` (E5 nav fix) ←
 and the pack-referenced `1d229de`/`00964da` stay reachable for the
 owner pack's SHA references.
 
-The open candidate is branch `engine-v0100`, forked from `d60f7c9`:
-`84d4bfa` (rail 1b newline flatten) ← `be35981` (re-attach keeps the
-stored wire) ← `02bfb18` (JSON version parse) ← `d1794e1` (candidate
-staged: fetch verified, strings scan clean, constants bumped). `main`
-keeps engine 0.99.0 until the device rails close and the merge lands;
-the engine binary is gitignored on every branch, so a checkout never
-carries it — always re-run `tools/fetch-crush.ps1` for the branch's pin.
+The v0.100.0 candidate WAS branch `engine-v0100`, cut from `79c3815`:
+`0b231f5` (the T3 docs fold) ← `84d4bfa` (rail 1b newline flatten) ←
+`be35981` (re-attach keeps the stored wire) ← `02bfb18` (JSON version
+parse) ← `d1794e1` (candidate staged: fetch verified, strings scan clean,
+constants bumped). It merged at `6800c0e`. `main` now carries engine
+0.100.0; the engine binary is gitignored on every branch, so a checkout
+never carries it — re-run `tools/fetch-crush.ps1` (the default now fetches
+the pinned 0.100.0; `FetchScriptPinTest` keeps the default and the Kotlin
+pin from drifting apart).
 
 ## 2. Capability ledger
 

@@ -572,6 +572,36 @@ never exceeded 1 across every hop — at most 2 children counting legacy,
 inside the 2-non-legacy budget. The budget REFUSAL itself remains
 JVM-covered: normal stop-on-switch always frees the second slot.
 
+### Real `sub_agent_report` in a Code pool — 2026-11-14 04:48 (folder 2, instance `pd871eee8`)
+
+**Dispatch + report proven end to end.** Prompt: "Use the agent_dispatch
+tool to launch ONE detached sub-agent ... reply with exactly SUBAGENT-OK
+... reply DONE." The app rendered the `agent_dispatch` tool row (699 ms)
+with the engine's args (`label: subagent-ok`, `access: read`) and the
+assistant line "Sub-agent `pepper-subagent-ok` launched; waiting for its
+report." Engine ground truth (`files/crush-pd871eee8/state/crush.db`):
+child session `...$$call_879adf...` answered `SUBAGENT-OK`, then the parent
+received a user-role message whose only part is
+`{"type":"sub_agent_report","data":{"label":"pepper-subagent-ok",
+"output":"SUBAGENT-OK","model":"opencode-go/deepseek-v4.1-flash"}}` and
+replied `DONE`.
+
+**Replay retention proven.** Reopening the project re-fetched the session
+and rendered the dedicated card — `Sub-agent pepper-subagent-ok` with
+`opencode-go/deepseek-v4...` and monospace `SUBAGENT-OK` — followed by the
+parent `DONE` bubble.
+
+**LIMITATION FOUND (live append missing).** The report arrived ~6 s after
+dispatch, while the screen was still open, but the transcript did NOT
+append it: the turn's event stream had already closed on `end_turn`, and
+the app only re-reads messages on session (re)open. The screen said
+"waiting for its report" for ~4 minutes until the session was reopened.
+The session list's message count did refresh (2 -> 8 msg), so metadata
+updates but the open transcript does not. Follow-up: consume
+engine-initiated wake runs (or a bounded post-dispatch re-fetch) so
+detached reports append live; this is the one behavior the optional
+device run exposed beyond replay.
+
 ### Gate-1 device stress drive — E6 warm-switch + E5 back-nav, 2026-11-06 evening (device `bbf8ca69`, clean-rebuilt `app-debug`, same session's app pid `3053` throughout)
 
 **E6 warm-switch stress: PASS (within the two-row limitation below).**

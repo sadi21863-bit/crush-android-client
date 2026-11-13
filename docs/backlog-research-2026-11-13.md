@@ -244,3 +244,13 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   row's history intact, and never more than one
   live non-legacy child (legacy + one project = 2 total, inside the
   non-legacy budget; the refusal path remains JVM-covered).
+- **#6 real `sub_agent_report` (device, 2026-11-14):** an `agent_dispatch`
+  in folder 2 spawned `pepper-subagent-ok` (child answered `SUBAGENT-OK`);
+  the engine stored the user-role `sub_agent_report` part and the parent
+  replied `DONE`. Reopening the session rendered the dedicated card
+  correctly (label, model, monospace output) — replay retention proven.
+  **Live append gap found:** the report arrived ~6 s after dispatch but
+  the open transcript stayed on "waiting for its report" until the
+  session was reopened; the turn stream closes at `end_turn`, and only
+  session (re)open re-reads messages. Follow-up: consume engine-initiated
+  wake runs or bounded post-dispatch re-fetch.

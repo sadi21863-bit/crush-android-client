@@ -229,3 +229,18 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   opens only when no ciphertext exists (fresh install) and Onboarding prompts
   when it creates the key; later cold starts prompt. The store-level
   fail-closed batch is item 3 / §A3. Recorded in `decisions-open.md` §5.
+- **S-01 break/recover (device, 2026-11-13):** malformed 1-byte
+  `files/crush-chat/data/crush.json` made the chat pool fail closed — four
+  supervisor refusals (first after 33 ms), permanent `Failed`, honest Failed
+  badge, zero chat children, file never rewritten. Restoring the 2137 B
+  backup cold-booted `chat tool policy installed and readback-verified (35
+  ids denied)` and `[chat] engine Running after 25009ms` with one child.
+- **Second imported project row (device, 2026-11-13):** `Test project folder
+  2` (`pd871eee8`) imported via SAF beside `Test project folder`
+  (`pe26670d9`). Three-way switch folder2 -> folder1 -> folder2 -> legacy
+  logged stop-on-switch on every hop, distinct cwds/state DBs/sockets,
+  fresh-subscribe restarts of the same key (2880 ms), preserved per-project
+  history with no bleed, a real turn on the new row (`OK`) and the older
+  row's history intact, and never more than one
+  live non-legacy child (legacy + one project = 2 total, inside the
+  non-legacy budget; the refusal path remains JVM-covered).

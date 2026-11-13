@@ -510,11 +510,67 @@ files/crush-*.sock`). No `rest: socket not present yet` line appeared and
 no engine-port plain-TCP connect was logged; the `127.0.0.1` lines in the
 same window are `EngineProxy`'s own egress bridge, which fronts the UDS.
 
-**Still queued (device dropped off ADB before them):** the S-01
-Failed-badge break-and-recover row and the second imported project row
-(2-child ceiling). The test crushrc is still planted in `Test project
-folder` (95 B, sha256 `5eae14...d1e8a`) with matching consent; it must be
-removed and the folder re-consented at the next owner-present session.
+**Both queued rows completed 2026-11-13 evening** — the S-01 Failed-badge
+break-and-recover row and the second imported project row. The planted
+crushrc was removed and `Test project folder` re-consented
+(`trust_fingerprint = NULL`, stamp `1794586107172`); see the next section.
+
+### S-01 break/recover + second imported project row — 2026-11-13 evening (device `bbf8ca69`, app pid `16931` from the 22:01 cold boot)
+
+**S-01 break (fail-closed) proven.** `files/crush-chat/data/crush.json` was
+backed up (2137 B) then replaced with the 1-byte text `{` while the app was
+force-stopped. The 21:54 cold start booted the legacy pool normally; opening
+the chat pool at 21:58 produced:
+
+- `chat tool policy failed: crush.json malformed in the chat state dir
+  (JsonSyntaxException); never rewritten - refusing to spawn`
+- `[chat] chat tool policy failed before exec (...); no engine child will
+  be born`
+- `bindEngine state=Failed(reason=Chat tool policy could not be installed
+  (...))`; the supervisor logged four refusals (`retryable=true`, first
+  after 33 ms) and then held `Failed` permanently with `willRetry=false`.
+- `ps` showed zero chat children and the file stayed 1 byte (never
+  rewritten). The session sheet rendered the row with the honest `Failed`
+  badge (`12-chat-policy-failed.png`).
+
+**S-01 recovery proven.** Restoring the 2137 B backup and cold-starting at
+22:01 logged `chat tool policy installed and readback-verified (35 ids
+denied)` and `[chat] engine Running after 25009ms`; the profile reads
+`Chat - no tools - ready` (`14-lock-check.png`), `ps` holds exactly one
+chat child, `files/crush-chat.sock` exists, and the policy parses with 35
+ids under `options.disabled_tools` (readback, not just the write).
+
+**Second imported project row (the queued drive).** `Test project folder 2`
+was imported through SAF with `second.md` (22 B) and the store now holds
+three rows: `Legacy workspace` -> key `""` (shared), `Test project folder`
+-> `pe26670d9`, `Test project folder 2` -> `pd871eee8`. Both imported
+folders carry `trust_fingerprint = NULL` (no crushrc, so no trust gate).
+
+Three-way warm switch, all on app pid `16931`:
+
+1. First open of folder 2: `[pd871eee8] engine Running after 3361ms`,
+   bootstrap cwd `/storage/emulated/0/Test project folder 2`,
+   `agent/init ok` (one transient `HTTP 500 ... coder agent configuration
+   is missing` on open, then the normal retry succeeded). A real turn
+   `Reply with exactly: OK` -> `OK` (2 msg, $0.00); one child, pid 19345.
+2. Folder 2 -> folder 1: `stopping project engine for instance 'pd871eee8'
+   (no run in flight)`; `[pe26670d9] engine Running after 4416ms`; folder 1
+   restored its own `Repository Handoff` history; child 19603. Folder 2's
+   child vanished and its socket was removed.
+3. Folder 1 -> folder 2: stop `pe26670d9`; the SAME key `pd871eee8`
+   restarted as a NEW child (19753) in 2880 ms and restored its own
+   `Reply Exactly OK` history — no folder-1 bleed.
+4. Folder 2 -> Legacy: stop `pd871eee8`; legacy `[]` started (child 19888)
+   in 2831 ms on `files/workspace`, surface `chat / ready`; the persisted
+   last binding is `legacy`.
+
+Per-instance state is distinct (`files/crush-pd871eee8/state/crush.db`
+110592 B vs `files/crush-pe26670d9/state/crush.db` 167936 B), sockets are
+honest (`crush-pd871eee8.sock` / `crush-pe26670d9.sock` while bound,
+removed on stop; `crush.sock` for legacy), and live non-legacy children
+never exceeded 1 across every hop — at most 2 children counting legacy,
+inside the 2-non-legacy budget. The budget REFUSAL itself remains
+JVM-covered: normal stop-on-switch always frees the second slot.
 
 ### Gate-1 device stress drive — E6 warm-switch + E5 back-nav, 2026-11-06 evening (device `bbf8ca69`, clean-rebuilt `app-debug`, same session's app pid `3053` throughout)
 
@@ -549,6 +605,10 @@ Limitation recorded: with only one non-legacy project row, the
 registry's 2-non-legacy-children budget ceiling is NOT exercisable on
 device (JVM-covered only). Needs a second imported project row in a
 future drive.
+**Update 2026-11-13:** the second imported row exists and the three-way
+drive passed (previous section) — every hop stopped its outgoing child and
+live non-legacy children never exceeded 1; the budget REFUSAL itself stays
+JVM-covered because stop-on-switch always frees the second slot.
 
 **E5 back-nav: DEFECT MEASURED AND REPRODUCED (engine-safe, nav-broken).**
 Repro sequence: drawer -> Projects -> back (returns to chat, twice

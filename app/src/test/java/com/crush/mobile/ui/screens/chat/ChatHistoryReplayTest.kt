@@ -84,4 +84,37 @@ class ChatHistoryReplayTest {
     fun `a parts-less user row is not replayed`() {
         assertNull(replayRow(msg("u2", "user", emptyList())))
     }
+
+    @Test
+    fun `a sub-agent report user row survives replay`() {
+        // Exact v0.100.0 shape: the report is written back as a USER message
+        // whose only part is `sub_agent_report` - no text part at all. The old
+        // replay kept user rows only when text was non-blank, so completed
+        // detached agents vanished after a reopen.
+        val report = obj(
+            """{"type":"sub_agent_report","data":{"label":"probe",
+               "output":"PONG","failed":false,"model":"openai/gpt-4o"}}"""
+        )
+        val row = replayRow(msg("u3", "user", listOf(report)))
+        assertNotNull(row)
+        assertEquals("user", row!!.role)
+        assertEquals("h-u-u3", row.id)
+        assertEquals("", row.text)
+        assertEquals(1, row.reports.size)
+        assertEquals("probe", row.reports[0].label)
+        assertEquals("PONG", row.reports[0].output)
+        assertTrue(!row.reports[0].failed)
+        assertEquals("openai/gpt-4o", row.reports[0].model)
+    }
+
+    @Test
+    fun `a failed sub-agent report keeps its failed flag and no model`() {
+        val report = obj(
+            """{"type":"sub_agent_report","data":{"label":"audit","output":"boom","failed":true}}"""
+        )
+        val row = replayRow(msg("u4", "user", listOf(report)))
+        assertNotNull(row)
+        assertTrue(row!!.reports[0].failed)
+        assertEquals("", row.reports[0].model)
+    }
 }

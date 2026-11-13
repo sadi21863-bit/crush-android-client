@@ -289,6 +289,23 @@ class CrushEngine(
                         // Policy confirmed on disk; exec continues below
                         // unchanged - and the idempotent re-injection keeps
                         // every supervisor restart attempt byte-stable.
+                        //
+                        // Positive evidence for rail 3: before this line the
+                        // only policy record was a FAILURE, so a passing gate
+                        // was indistinguishable from a skipped one. Counts
+                        // only - the config file holds the raw key.
+                        Log.i(
+                            TAG,
+                            "chat tool policy installed and readback-verified " +
+                                "(${com.crush.mobile.data.crush.EngineConfigInjector.CHAT_DISABLED_TOOLS.size} ids denied)"
+                        )
+                        com.crush.mobile.util.AppLog.i(
+                            TAG,
+                            "[$instanceKey] chat tool policy installed " +
+                                "(readback-verified, " +
+                                "${com.crush.mobile.data.crush.EngineConfigInjector.CHAT_DISABLED_TOOLS.size} ids denied); " +
+                                "spawning with the deny-all toolset"
+                        )
                     }
                     is ChatPolicyDecision.FailFast -> {
                         // S5-style honest pair (Log + AppLog), reason is

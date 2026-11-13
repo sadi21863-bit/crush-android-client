@@ -52,7 +52,15 @@ object EngineConfigInjector {
         val defaultMaxTokens: Int,
         val canReason: Boolean = false,
         val reasoningEfforts: List<String> = emptyList(),
-        val defaultReasoningEffort: String? = null
+        val defaultReasoningEffort: String? = null,
+        /**
+         * Whether the model accepts images. Engine v0.100.0 reads this from
+         * the nested `capabilities.vision` field (catwalk v3); the legacy
+         * top-level `supports_images` is written from the same value so an
+         * older engine cannot disagree with a newer one.
+         */
+        val supportsVision: Boolean = false,
+        val supportsAudio: Boolean = false
     )
 
     /**
@@ -480,13 +488,77 @@ object EngineConfigInjector {
         "agent_dispatch", "agent_send", "agent_status", "agent_stop",
     )
 
+    /**
+     * Mirrors catwalk v3.0.1's `effortLevelDisplay`: the display label is the
+     * value with its first letter uppercased, EXCEPT `xhigh`, whose upstream
+     * label is `X-High`. The app writes the config the engine unmarshals, so
+     * a divergent label would show up in the TUI as `Xhigh`.
+     */
+    private fun effortLevelDisplay(value: String): String = when (value) {
+        "" -> ""
+        "xhigh" -> "X-High"
+        else -> value.replaceFirstChar { c -> c.uppercase() }
+    }
+
     private fun ModelSpec.toJson(): JsonObject = JsonObject().apply {
         addProperty("id", id)
         addProperty("name", displayName)
-        addProperty("provider", "")
         addProperty("context_window", contextWindow)
-        addProperty("max_tokens", defaultMaxTokens)
         addProperty("default_max_tokens", defaultMaxTokens)
+
+        // ---- engine v0.100.0 schema (catwalk v3.0.1) ----------------
+        //
+        // The engine of record unmarshals `catwalk.Model`, whose capabilities
+        // are a nested object (`capabilities.vision` / `capabilities.audio`)
+        // and whose reasoning config is a nested object too (`reasoning.
+        // thinking`, `reasoning.effort_levels[]`, `reasoning.
+        // default_effort_level`). The previous flat keys this function wrote
+        // (`can_reason`, `reasoning_levels`, `default_reasoning_effort`,
+        // `supports_images`) belong to the older Catwalk shape and are
+        // IGNORED by v0.100.0. That made an injected reasoning model lose its
+        // effort levels, and would have silently downgraded an injected
+        // vision model to text-only.
+        //
+        // `pricing` is deliberately absent: a written zero reads as
+        // "known free" (P2-21), and absence lets live catalogue discovery
+        // fill in the real numbers.
+        add(
+            "capabilities",
+            JsonObject().apply {
+                addProperty("vision", supportsVision)
+                addProperty("audio", supportsAudio)
+            }
+        )
+        add(
+            "reasoning",
+            JsonObject().apply {
+                addProperty("thinking", if (canReason) "toggleable" else "never")
+                if (canReason) {
+                    add(
+                        "effort_levels",
+                        JsonArray().apply {
+                            reasoningEfforts.forEach { effort ->
+                                add(
+                                    JsonObject().apply {
+                                        addProperty("value", effort)
+                                        addProperty("display", effortLevelDisplay(effort))
+                                    }
+                                )
+                            }
+                        }
+                    )
+                    if (defaultReasoningEffort != null) {
+                        addProperty("default_effort_level", defaultReasoningEffort)
+                    }
+                }
+            }
+        )
+
+        // ---- legacy v0.99 schema, same facts -------------------------
+        //
+        // Both engine schemas are written, from the SAME values, so a
+        // downgrade (or an older engine on the same device state) cannot
+        // disagree with the newer one about cost, vision or reasoning.
         if (canReason) {
             addProperty("can_reason", true)
             add("reasoning_levels", JsonArray().apply { reasoningEfforts.forEach { add(it) } })
@@ -494,16 +566,6 @@ object EngineConfigInjector {
                 addProperty("default_reasoning_effort", defaultReasoningEffort)
             }
         }
-        addProperty("supports_images", false)
-        // NO cost fields (P2-21). The old 2026-10-17 frozen table wrote
-        // cost_per_1m_* = 0 for every injected id, and ZenModelsApi treats an
-        // engine-reported 0 as "known free" - so a paid Groq model was
-        // labelled free on the strength of a spreadsheet snapshot. Zero is
-        // also unfixable later: absence can be filled in by discovery, an
-        // explicit 0 has to be actively overwritten. Cost truth comes from
-        // LIVE catalogue discovery (the engine's own Catwalk cache, patched
-        // through /providers pricing), never from this frozen table, so the
-        // injected specs omit the fields and let the engine/its catalogue
-        // carry real numbers - or no number, which is honest.
+        addProperty("supports_images", supportsVision)
     }
 }

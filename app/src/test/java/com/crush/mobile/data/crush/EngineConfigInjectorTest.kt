@@ -127,6 +127,116 @@ class EngineConfigInjectorTest {
     }
 
     /**
+     * #11 stage 1. Engine v0.100.0 reads catwalk v3's nested schema:
+     * `capabilities.vision` and `reasoning.thinking` / `effort_levels` /
+     * `default_effort_level`. The flat keys this injector used to write are
+     * ignored by that engine, so an injected reasoning model lost its levels
+     * and a future vision model would have been silently text-only.
+     */
+    @Test
+    fun `injected specs use the engine v0_100 nested capabilities and reasoning schema`() {
+        val dir = tmp.newFolder("catwalk-v3")
+        val spec = EngineConfigInjector.ModelSpec(
+            id = "vision/model",
+            displayName = "Vision Model",
+            contextWindow = 32_000,
+            defaultMaxTokens = 4096,
+            canReason = true,
+            reasoningEfforts = listOf("low", "high"),
+            defaultReasoningEffort = "low",
+            supportsVision = true
+        )
+        EngineConfigInjector.syncProviderModels(dir, "test-provider", listOf(spec))
+        val model = JsonParser.parseString(java.io.File(dir, "crush.json").readText())
+            .asJsonObject.getAsJsonObject("providers")
+            .getAsJsonObject("test-provider").getAsJsonArray("models")[0].asJsonObject
+
+        val caps = model.getAsJsonObject("capabilities")
+        assertTrue("v0.100.0 must see capabilities.vision", caps.get("vision").asBoolean)
+        assertFalse(caps.get("audio").asBoolean)
+
+        val reasoning = model.getAsJsonObject("reasoning")
+        assertEquals("toggleable", reasoning.get("thinking").asString)
+        assertEquals("low", reasoning.get("default_effort_level").asString)
+        val levels = reasoning.getAsJsonArray("effort_levels")
+        assertEquals(2, levels.size())
+        assertEquals("low", levels[0].asJsonObject.get("value").asString)
+        assertEquals("Low", levels[0].asJsonObject.get("display").asString)
+        assertEquals("high", levels[1].asJsonObject.get("value").asString)
+
+        // Legacy v0.99 keys carry the SAME facts, so a downgrade cannot
+        // disagree about vision or reasoning.
+        assertTrue(model.get("supports_images").asBoolean)
+        assertTrue(model.get("can_reason").asBoolean)
+        assertEquals("low", model.get("default_reasoning_effort").asString)
+        assertEquals(
+            listOf("low", "high"),
+            model.getAsJsonArray("reasoning_levels").map { it.asString }
+        )
+    }
+
+    /**
+     * The display label is part of the config the engine unmarshals, so it
+     * must match catwalk v3.0.1's `effortLevelDisplay` exactly: uppercase the
+     * first letter, with `xhigh` spelled `X-High` upstream. A naive
+     * title-case shows `Xhigh`, which the engine would render verbatim.
+     */
+    @Test
+    fun `effort level display labels match catwalk v3 derivation`() {
+        val dir = tmp.newFolder("catwalk-v3-display")
+        EngineConfigInjector.syncProviderModels(
+            dir,
+            "test-provider",
+            listOf(
+                EngineConfigInjector.ModelSpec(
+                    id = "reasoning/model",
+                    displayName = "Reasoning Model",
+                    contextWindow = 32_000,
+                    defaultMaxTokens = 4096,
+                    canReason = true,
+                    reasoningEfforts = listOf("minimal", "high", "xhigh"),
+                    defaultReasoningEffort = "xhigh"
+                )
+            )
+        )
+        val reasoning = JsonParser.parseString(java.io.File(dir, "crush.json").readText())
+            .asJsonObject.getAsJsonObject("providers")
+            .getAsJsonObject("test-provider").getAsJsonArray("models")[0].asJsonObject
+            .getAsJsonObject("reasoning")
+        assertEquals(
+            listOf("Minimal", "High", "X-High"),
+            reasoning.getAsJsonArray("effort_levels").map {
+                it.asJsonObject.get("display").asString
+            }
+        )
+        assertEquals("xhigh", reasoning.get("default_effort_level").asString)
+    }
+
+    @Test
+    fun `a non-reasoning injected model says so explicitly in both schemas`() {
+        val dir = tmp.newFolder("catwalk-v3-noreason")
+        EngineConfigInjector.syncProviderModels(
+            dir,
+            "test-provider",
+            listOf(
+                EngineConfigInjector.ModelSpec(
+                    id = "plain/model",
+                    displayName = "Plain",
+                    contextWindow = 8_000,
+                    defaultMaxTokens = 2048
+                )
+            )
+        )
+        val model = JsonParser.parseString(java.io.File(dir, "crush.json").readText())
+            .asJsonObject.getAsJsonObject("providers")
+            .getAsJsonObject("test-provider").getAsJsonArray("models")[0].asJsonObject
+        assertEquals("never", model.getAsJsonObject("reasoning").get("thinking").asString)
+        assertFalse(model.has("can_reason"))
+        assertFalse(model.getAsJsonObject("capabilities").get("vision").asBoolean)
+        assertFalse(model.get("supports_images").asBoolean)
+    }
+
+    /**
      * P2-21: the frozen 2026-10-17 table used to write cost_per_1m_* = 0,
      * which ZenModelsApi then read as "known free" - a paid model labelled
      * free by a stale spreadsheet. The fix is ABSENCE, not a corrected

@@ -649,73 +649,144 @@ private fun Bubble(
         )
         return
     }
-    val isUser = m.role == "user"
+    val reportOnly = m.reports.isNotEmpty() && m.text.isBlank() && m.tools.isEmpty()
+    val isUser = m.role == "user" && !reportOnly
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
-        // Tool activity sits ABOVE the reply bubble, and only for the agent.
-        //
-        // Placement matters: the agent reads files and runs commands, and the
-        // user must see that happening before the summary, not buried inside
-        // it. Previously this was parsed and discarded, so all of it was
-        // invisible.
-        if (!isUser && m.tools.isNotEmpty()) {
-            ToolActivityList(m.tools)
-            Spacer(Modifier.height(6.dp))
+        // Detached sub-agent results (engine v0.100.0+) are genuine transcript
+        // rows, not model speech: they render as their own card above the
+        // bubble that used them, both live and after a reopen.
+        if (m.reports.isNotEmpty()) {
+            m.reports.forEach { report ->
+                SubAgentReportCard(report)
+                Spacer(Modifier.height(6.dp))
+            }
         }
-        if (!isUser && m.error != null) {
-            // D13 RETRY CARD: a failed assistant turn is not a normal bubble
-            // with error text bolted on - it is a failed object. Giving it its
-            // own surface (errorContainer), its own announcement and its own
-            // recovery affordance is what turns a recorded failure into an
-            // actionable one.
-            FailedBubbleCard(
-                error = m.error,
-                partialText = m.text,
-                retryText = retryText,
-                retryEnabled = retryEnabled,
-                onRetry = onRetry
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 16.dp, topEnd = 16.dp,
-                            bottomStart = if (isUser) 16.dp else 4.dp,
-                            bottomEnd = if (isUser) 4.dp else 16.dp
+        // A report carrier has no text part (v0.100.0 writes it as a user
+        // message). Do not draw an empty user bubble underneath its card.
+        if (!reportOnly) {
+            // Tool activity sits ABOVE the reply bubble, and only for the
+            // agent.
+            //
+            // Placement matters: the agent reads files and runs commands, and
+            // the user must see that happening before the summary, not buried
+            // inside it. Previously this was parsed and discarded, so all of it
+            // was invisible.
+            if (!isUser && m.tools.isNotEmpty()) {
+                ToolActivityList(m.tools)
+                Spacer(Modifier.height(6.dp))
+            }
+            if (!isUser && m.error != null) {
+                // D13 RETRY CARD: a failed assistant turn is not a normal
+                // bubble with error text bolted on - it is a failed object.
+                // Giving it its own surface (errorContainer), its own
+                // announcement and its own recovery affordance is what turns a
+                // recorded failure into an actionable one.
+                FailedBubbleCard(
+                    error = m.error,
+                    partialText = m.text,
+                    retryText = retryText,
+                    retryEnabled = retryEnabled,
+                    onRetry = onRetry
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 16.dp, topEnd = 16.dp,
+                                bottomStart = if (isUser) 16.dp else 4.dp,
+                                bottomEnd = if (isUser) 4.dp else 16.dp
+                            )
                         )
-                    )
-                    .background(
-                        if (isUser) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-            ) {
-                Column {
-                    if (m.text.isEmpty() && m.isStreaming && m.error == null) {
-                        Text(
-                            if (m.tools.isEmpty()) "thinking..." else "working...",
-                            style = MaterialTheme.typography.bodyMedium
+                        .background(
+                            if (isUser) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant
                         )
-                    } else {
-                        MarkdownText(m.text, modifier = Modifier.fillMaxWidth())
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Column {
+                        if (m.text.isEmpty() && m.isStreaming && m.error == null) {
+                            Text(
+                                if (m.tools.isEmpty()) "thinking..." else "working...",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        } else {
+                            MarkdownText(m.text, modifier = Modifier.fillMaxWidth())
+                        }
                     }
                 }
+                // Completed assistant text gets an always-visible actions row -
+                // copy the whole message, save it as a .md via the SAF picker,
+                // or hand the plan into a Code project (P6 Batch C). App-side
+                // only (see ChatExport.kt): no tool fires, the engine never
+                // sees this, S-01's deny-all chat policy is untouched.
+                // Hidden while streaming (a save mid-draw is a partial artifact)
+                // and on failed rows (that card's affordance is Retry, not
+                // save). The gate is ONE expression - handoffEntryVisible,
+                // extracted verbatim from this line - so the handoff chip
+                // provably rides the Copy/Save gate's conjunction rather than
+                // a lookalike.
+                if (handoffEntryVisible(m)) {
+                    MessageActionsRow(m.text, onUsePlanInCode = onUsePlan)
+                }
             }
-            // Completed assistant text gets an always-visible actions row -
-            // copy the whole message, save it as a .md via the SAF picker,
-            // or hand the plan into a Code project (P6 Batch C). App-side
-            // only (see ChatExport.kt): no tool fires, the engine never
-            // sees this, S-01's deny-all chat policy is untouched.
-            // Hidden while streaming (a save mid-draw is a partial artifact)
-            // and on failed rows (that card's affordance is Retry, not save).
-            // The gate is ONE expression - handoffEntryVisible, extracted
-            // verbatim from this line - so the handoff chip provably rides
-            // the Copy/Save gate's conjunction rather than a lookalike.
-            if (handoffEntryVisible(m)) {
-                MessageActionsRow(m.text, onUsePlanInCode = onUsePlan)
+        }
+    }
+}
+
+/**
+ * One detached sub-agent result (engine v0.100.0+).
+ *
+ * The report is engine-authored evidence of a separate agent's work - label,
+ * model, output, failed flag - not model prose. It gets its own surface so it
+ * cannot be mistaken for something the primary agent said, and it is retained
+ * through replay (see `replayRow`).
+ */
+@Composable
+private fun SubAgentReportCard(report: com.crush.mobile.data.crush.SubAgentReport) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        color = if (report.failed) scheme.errorContainer else scheme.secondaryContainer,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (report.failed) Icons.Default.Warning else Icons.Default.CheckCircle,
+                    contentDescription = if (report.failed) "sub-agent failed" else "sub-agent finished",
+                    tint = if (report.failed) scheme.error else scheme.onSecondaryContainer,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    text = "Sub-agent ${report.label.ifBlank { "report" }}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (report.failed) scheme.onErrorContainer else scheme.onSecondaryContainer
+                )
+                if (report.model.isNotBlank()) {
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        text = report.model,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (report.failed) scheme.onErrorContainer else scheme.onSecondaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+            }
+            if (report.output.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = report.output,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (report.failed) scheme.onErrorContainer else scheme.onSecondaryContainer
+                )
             }
         }
     }
@@ -1003,6 +1074,13 @@ internal fun FileDiffRow(diff: FileDiff) {
     }
 }
 
+/** Compact app-observed duration: 850ms, 1.2s, 2m 05s. */
+private fun formatToolDuration(ms: Long): String = when {
+    ms < 1_000L -> "${ms}ms"
+    ms < 60_000L -> String.format(java.util.Locale.US, "%.1fs", ms / 1000.0)
+    else -> "${ms / 60_000}m ${String.format(java.util.Locale.US, "%02ds", (ms % 60_000) / 1000)}"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ToolRow(tool: ToolActivity) {
@@ -1078,6 +1156,22 @@ private fun ToolRow(tool: ToolActivity) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
+                // App-observed elapsed time, only when BOTH edges were seen.
+                // The engine sends no timings; labelling them as ours is the
+                // honest half of the timeline (replayed rows show none).
+                val elapsedMs = if (tool.firstSeenAt > 0L && tool.finishedAt >= tool.firstSeenAt) {
+                    tool.finishedAt - tool.firstSeenAt
+                } else {
+                    0L
+                }
+                if (elapsedMs > 0L) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        formatToolDuration(elapsedMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             if (expanded && (tool.args.isNotBlank() || tool.output.isNotBlank() || tool.error != null)) {

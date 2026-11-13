@@ -50,7 +50,17 @@ data class LiveZenModel(
     val id: String,
     val name: String,
     /** True when Zen prices it at zero, i.e. it costs nothing to use. */
-    val isFree: Boolean
+    val isFree: Boolean,
+    /**
+     * Whether the ENGINE advertises this model as image-capable.
+     *
+     * Read from its `/providers` catalogue (`capabilities.vision` in engine
+     * v0.100.0, legacy `supports_images` as a fallback). Defaults to false so
+     * an unavailable catalogue can only ever withhold the capability, never
+     * invent it - the engine silently drops images for a model it considers
+     * text-only.
+     */
+    val supportsImages: Boolean = false
 )
 
 /**
@@ -350,6 +360,47 @@ private fun isFree(o: com.google.gson.JsonObject): Boolean {
                 }
             }
             return out
+        }
+
+        /**
+         * Model ids for [providerId] that the ENGINE advertises as
+         * image-capable.
+         *
+         * Engine v0.100.0 (catwalk v3) serializes the flag as
+         * `capabilities.vision`; older configs wrote a flat
+         * `supports_images`. Both are read so a downgrade cannot silently
+         * change what the app believes a model can do.
+         *
+         * FAIL-CLOSED by design: only an explicit `true` counts. Absence means
+         * "not capable" here, because sending an image to a text-only model
+         * is silently dropped at the engine boundary - the user would pay for
+         * a turn in which the model never saw the picture.
+         */
+        fun visionCapableModelIds(
+            providers: List<JsonObject>,
+            providerId: String
+        ): Set<String> {
+            val out = mutableSetOf<String>()
+            for (p in providers) {
+                if (p.get("id")?.asString != providerId) continue
+                val models = p.getAsJsonArray("models") ?: return emptySet()
+                for (m in models) {
+                    val mo = m.asJsonObject
+                    val id = mo.get("id")?.asString ?: continue
+                    val caps = mo.get("capabilities")
+                        ?.takeIf { it.isJsonObject }
+                        ?.asJsonObject
+                    val nested = caps?.get("vision")
+                        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }
+                        ?.asBoolean
+                    val legacy = mo.get("supports_images")
+                        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }
+                        ?.asBoolean
+                    if (nested == true || legacy == true) out.add(id)
+                }
+                return out
+            }
+            return emptySet()
         }
 
         /**

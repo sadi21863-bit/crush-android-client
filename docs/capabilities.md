@@ -49,13 +49,13 @@ These are the real gaps, ordered by how much they matter for a coding agent.
 | Gap | Impact |
 |---|---|
 | **File diffs** | Built and JVM-tested (snapshot → tracked files → diff → render), and the collector endpoint is verified running on device. 2026-11-04: the FIRST real edit turn was measured (imported-folder project: `notes.md` + `todo.md` written into `/storage/emulated/0/Test project folder`) — but the changes rail failed to display it: it counted `0 files changed +0 -0` and listed both files `(unreadable, binary, or too large)`. That external-file event routing is the known defect below; the diff render was still unexercised by end-to-end data then — *superseded: the `349bad3` drive (2026-11-05) measured this same rail at `2 files changed +2 -0` with the expanded unified hunk rendered on screen, and the P4 Gate-2 drives (2026-11-07) re-proved on-screen hunks + byte-identical Revert on it (see the FIXED and P4 sections below)* |
-| **Tool-call timeline** | Tool activity is a per-message summary, not a live view of what the agent is doing turn by turn |
+| **Tool-call timeline** | Turn-long tool rows now merge across every LLM step by call id, keep first-seen order, and show app-observed elapsed time when both edges were seen (2026-11-13). Still missing: step-grouped anchors and any engine-side timing (the wire carries none) |
 | **Per-turn cost display** | Cost is parsed and shown in the drawer only |
 | **Multi-provider** | Plumbing in, 13 ids offered. **Verified end to end: `opencode-zen`, `openrouter`, `opencode-go`** — including Go's PAID lanes, all three measured 2026-11-02 evening: `deepseek-v4.1-flash` + `glm-5.3-flash` turns (21:55) and `deepseek-v4-pro` turn ("Reply with exactly: OK" → `OK`, 22:14), after ~1h paid-lane provision lag post-subscription (the 402s were allowance provisioning, never a client defect — see [providers/opencode-go.md](providers/opencode-go.md)). `hyper` real-key verified to its $0 ceiling (23 live models all `402 authentic-but-unfunded`, `badKey=false`; a completed turn awaits funded credits). `groq` probe-verified but parked. See [providers.md](providers.md) |
 | **Multi-project / workspaces** | **Identity + isolation + persistence + first UI + LIVE BINDING all measured on device (ADR-0001 arc, accepted 2026-11-03):** the engine keys logical workspaces on the PATH (attach is idempotent, multiple workspaces coexist on one engine process — `TwoProjectAttachTest`), BUT sessions are a **global pool per data dir** in crush v0.99.0 (`listSessions` ignores the workspace id — measured) → the selected shape is **one engine instance per project** (own socket + own state dir), measured isolating sessions/workspaces exactly per project in `TwoEngineInstancesPerProjectTest`. P2: `RoomProjectStore` restart-survival + idempotent legacy migration proven (`ProjectStoreRoomPersistenceTest`). P3 slice 1 **live on device**: the Projects screen (session-sheet entry) lists rows from the production registry — the legacy workspace migrated in automatically on first entry, and create minted a canonical `files/projects/<uuid8>/repo` row (retro-note 2026-11-04: THAT minted-internal-repo creation path has since been REMOVED by product decision — Projects are created ONLY via Import folder now; the store's `create` survives solely as the migration + import seam, and the removal semantics at (5) below cover rows it minted). **Slice 2 measured live (22:18, test-project):** tapping a project row binds the chat to that project's OWN engine instance — `starting supervisor for instance 'p8a3825d0' (prewarm on)`, `bridge up on 127.0.0.1:38109`, `bootstrap instance=p8a3825d0 workspacePath=.../projects/83cc71bd/repo`, agent/init ok on the fresh state dir, **"no prior session with content"** (fresh pool — no bleed from the legacy 10-hour history), a real turn "Reply with exactly: OK" → `OK` on the project engine (deepseek-v4.1-flash), and `ps` showing TWO `libcrush.so` children (legacy + project) simultaneously. The engine's own start routing had to be fixed to reach this (prewarm start hard-coded the legacy singleton — measured as a permanent "engine stopped", fixed in `b8d3be7`) — and now the close-out of that row's lifecycle part, 2026-11-04:
 
   **2026-11-04 measured (device `bbf8ca69`, build `28328b5`): (1) import-folder-as-project WORKS end to end — SAF `OpenDocumentTree` → pure `FolderUriDecoder` → row `Test project folder` / `/storage/emulated/0/Test project folder` (spaces intact), `bootstrap instance=p536fa26e workspacePath=/storage/emulated/0/Test project folder` on its own engine child. (2) The engine edits the REAL folder in place: a deepseek-v4.1-flash turn created exactly `notes.md` + `todo.md` there (`ls` verified 2 files, contents per spec: a three-bullet plan + two unchecked `- [ ]` boxes), ASK approvals surfaced and honored, the engine self-verified with its own `ls`, and after the turn the OTHER project's repo dir (`files/projects/83cc71bd/repo`) remained EMPTY — cross-project isolation held with a real user folder in the mix. The user-visible consequence: engine-made files in imported folders are plain files in the user's storage (openable/shareable in any file manager), which is the answer to "where do created files go". (3) The stop-on-switch polish is PROVEN on the fixed build: legacy → test-project gave two children (8422 + 9566), back to the legacy row gave ONE child + `I/Lifecycle: stopping project engine for instance 'p8a3825d0' (no run in flight)` — while the pre-fix build (measured 09:27–09:30) had left BOTH children alive on the same trace. Root cause: the chat ViewModel is scoped to the nav back-stack entry and a projects↔chat round trip recreates it, so the stop in its `bindProject` never fired (the fresh VM early-returned on the default `""` key); the stop moved to `AppContainer.setActiveProject` (`28328b5`), which outlives every entry, guarded by a VM-reported run-in-flight marker (`reportRunInFlight`, set at `send()` start, cleared key-guarded in `abandonRun`). (4) NEW known defect, discovered in the same drive: on the imported-folder instance the events socket never connects (`CrushConnection: events connect failed (attempt N): No such file or directory` — attempts 73→98+ at ~5s cadence), so the UI missed the run's terminal event and showed a false "This reply failed — no reply received" banner while the engine side actually completed both writes (bubble/tool-call content arrived via re-fetch); the changes rail also classified both external files "(unreadable, binary, or too large)" (0 +0 -0 counted). This is ADR-0001 §7's predicted per-binding event-routing cost landing; fix queued as the next cycle's first item. (5) PRODUCT DECISION (user, 2026-11-04): Projects are created ONLY via Import folder (the desktop-app model) — the "New project" minted-internal-repo path is REMOVED (its `filesDir/projects/<uuid>/repo` content was invisible to the user's file manager — the very failure import-folder exists to fix), and a per-row REMOVE lands with a type-honest confirmation: an imported (external) folder is USER DATA (removing drops only the row/reference — the folder and every file stay untouched; re-importing the same folder later starts a FRESH project, fresh row id → fresh engine state dir, so no session bleed), an app-minted internal repo is DELETED WITH its row (the `filesDir/projects/...` tree plus its `filesDir/crush-<key>` engine state dir), and the legacy workspace row is permanent (it hosts the existing history; no Remove affordance rendered; the idempotent entry migration would re-create the row anyway). Removal REFUSES while a run is in flight on that row's engine ("a run is active on this project's engine — remove it after the run finishes"), then stops the engine instance, drops the row, and deletes the internal trees. Implemented this cycle: `ProjectDao.deleteById` → `RoomProjectStore.remove` (row-only) → `ProjectsViewModel.removeProject` (guards + ordered IO) → the screen (single full-width Import button; per-row Remove icon; the type-honest dialog per kind); compile-green, on-device verification pending the gate. VERIFIED ON DEVICE the same evening (`5ef70f5`, drive shots + `run-as`): the screen shows ONLY the Import button, the legacy row carries no Remove affordance, per-row Remove + per-kind type-honest dialogs branch correctly, removing `test-project` and `hello` fired `I/Lifecycle: stopping project engine for instance 'p8a3825d0'/'p80e7971b' (project removed)` AND deleted both `crush-<key>` engine state dirs + the rows' `repo` data, and the imported `Test project folder` row survives the dialog-cancel path with `/sdcard/Test project folder` (`notes.md` + `todo.md`) fully intact. Two first-use defects measured AND fixed the same evening (slot-fix batch): the removal dialog printed literal `%s` placeholders (Kotlin `.format` bound to the last concatenated literal — now parenthesized around the whole string), and the empty minted-slot wrapper `files/projects/<uuid8>` was left behind while its `repo` child was deleted (removal now deletes the whole slot; the two orphan wrappers swept manually; the Proof-A/Proof-B `marker-A.txt`/`marker-B.txt` isolation artifacts under `a/repo`/`b/repo` are deliberately preserved). Both fixes shipped in `4a59b68` and re-verified on device: the imported-row confirmation now renders the REAL folder path ("`Your folder /storage/emulated/0/Test project folder and every file in it stay untouched…`" — no literal placeholders), and Cancel keeps the row, the folder, and its files intact. |
-| **Attachments / image input** | Text only |
+| **Attachments / image input** | Text only — no picker or send path. Stage 1 landed 2026-11-13: the engine catalogue's `capabilities.vision` is read (legacy `supports_images` fallback) and injected model specs now write the v0.100.0 nested schema, so a future vision model is no longer silently downgraded |
 | **Instrumentation tests** | **OK (8 tests) on device 2026-11-01**: `MainActivitySmokeTest` (2, launch-level) + `MainActivityLockFlowTest` (6, app-lock security contract — gate↔FLAG_SECURE, recreation-survival, no-decrypted-key-on-locked-resume, **real Keystore** roundtrip/isolation/tamper-clear, `require()`-never-caches). CI compiles androidTest on every push (`:app:assembleDebugAndroidTest`); connected runs still need a device (`connectedDebugAndroidTest` when attached) |
 | **Remote crash reporting** | In-app export only |
 
@@ -460,6 +460,61 @@ crushrc 72 B, sha256
 dcba1093d3d1d41758f9170458190a903f5ef5837bc47c9c7d9e84599af3e147; the
 recorded fingerprint matches, so future binds of this folder stay
 unblocked (no further prompts from THIS sentinel).
+
+**2026-11-13 update:** the 72 B sentinel was removed in #29, so the
+"stays planted" sentence above is historical only - the next bind
+honestly re-gates as REMOVED_SINCE_CONSENT. Cancel-at-restore,
+changed-crushrc on the restore path, and noConfig-flip are now
+device-measured (next section); only the real-install 1->2 migration
+remains JVM-only.
+
+### Gate-0 residual device drive — 2026-11-13 (v0.100.0, device `bbf8ca69`)
+
+**noConfig baseline.** Opening `Test project folder` after #29 removed its
+sentinel showed the REMOVED_SINCE_CONSENT F04; the synthetic Allow wrote
+`trust_fingerprint = NULL` (the noConfig state) and `consented_at_ms =
+1794541597793`, then bound `pe26670d9` and resumed the project session. The
+DB pull is the evidence for the "no file recorded as noConfig" branch.
+
+**noConfig-flip + cancel-at-restore.** While the app was dead, a valid 95 B
+`crushrc` was planted (two shell lines, one touching a marker). Cold start
+logged `last-binding restore blocked: project consent required (crushrc
+present, no consent recorded)` at 09:19:48.981; the legacy pool started
+instead (`[] supervise loop start`, `engine Running after 2527ms`) and no
+project instance was started. The marker was absent after the cold boot.
+Cancel on the root F04 closed the dialog, left the legacy chat `ready`, and
+wrote nothing - the folder's marker stayed absent (no execution while
+gated).
+
+**Allow records the OBSERVED bytes.** The same F04's synthetic Allow wrote
+`trust_fingerprint = a3e28b89efacc19b7fdf5e95b8812ee1c239b0d7e14ec04606b08a53756ff290`,
+byte-equal to `sha256sum` of the planted 95 B file; the marker appeared at
+09:24 and the project engine reached `Running after 3754ms`.
+
+**changed-crushrc re-gate on restore.** The app was force-stopped, the
+crushrc bytes were replaced (new sha256
+`5eae14bf3b417a5225046d92f0ee90a843eee8d80f9b5e629809d702cd1d1e8a`), and
+the marker was deleted. Cold start logged `last-binding restore blocked:
+project consent required (crushrc changed since consent (fingerprint
+moved))` at 09:25:57.442; the F04 copy read "The crushrc CHANGED since your
+last approval - the earlier consent no longer covers these bytes." The
+marker stayed absent through the block (no pre-consent execution). Allow
+then moved `trust_fingerprint` to `5eae14...d1e8a` exactly (stamp
+1794542622367), created the marker at 09:33, and bound the project engine
+(`Running after 5374ms`).
+
+**REST boot-window (S-04).** Both cold boots completed their boot flows and
+reached `bindEngine state=Running` with the event transport attached to the
+UDS path (`event transport identity change -> <datadir>/com.crush.mobile/
+files/crush-*.sock`). No `rest: socket not present yet` line appeared and
+no engine-port plain-TCP connect was logged; the `127.0.0.1` lines in the
+same window are `EngineProxy`'s own egress bridge, which fronts the UDS.
+
+**Still queued (device dropped off ADB before them):** the S-01
+Failed-badge break-and-recover row and the second imported project row
+(2-child ceiling). The test crushrc is still planted in `Test project
+folder` (95 B, sha256 `5eae14...d1e8a`) with matching consent; it must be
+removed and the folder re-consented at the next owner-present session.
 
 ### Gate-1 device stress drive — E6 warm-switch + E5 back-nav, 2026-11-06 evening (device `bbf8ca69`, clean-rebuilt `app-debug`, same session's app pid `3053` throughout)
 

@@ -401,7 +401,10 @@ suspend fun agentInfo(workspaceId: String): AgentInfo =
  * Deletes a session.
  *
  * Transport failures are reported, never swallowed. The caller re-acquires the
- * workspace and retries; only a server-confirmed 404 counts as success.
+ * workspace and retries. A 404 is NOT taken at face value: sessions are a
+ * global pool per engine data dir (ADR-0001), so a workspace-level 404 says
+ * nothing about the session. The 404 is confirmed against the live session
+ * list; only a list that succeeds AND omits the id counts as AlreadyGone.
  */
 suspend fun deleteSession(workspaceId: String, sessionId: String): DeleteOutcome {
     val path = "/v1/workspaces/$workspaceId/sessions/$sessionId"
@@ -417,8 +420,15 @@ suspend fun deleteSession(workspaceId: String, sessionId: String): DeleteOutcome
             ).execute().use { resp ->
                 when {
                     resp.isSuccessful -> DeleteOutcome.Deleted
-                    // 404 on a LIVE workspace means the session truly is gone.
-                    resp.code == 404 -> DeleteOutcome.AlreadyGone
+                    resp.code == 404 -> {
+                        val sessions = runCatching { listSessions(workspaceId) }.getOrNull()
+                        when {
+                            sessions == null ->
+                                DeleteOutcome.Failed("HTTP 404 with an unverifiable workspace")
+                            sessions.none { it.id == sessionId } -> DeleteOutcome.AlreadyGone
+                            else -> DeleteOutcome.Failed("HTTP 404 but the session is still listed")
+                        }
+                    }
                     else -> DeleteOutcome.Failed("HTTP ${resp.code}")
                 }
             }

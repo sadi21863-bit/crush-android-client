@@ -72,7 +72,69 @@ internal class RunHandle(val turnId: String) {
     @Volatile
     var bubbleId: String? = null
 
+    /**
+     * Tool rows accumulated across EVERY assistant message of this turn.
+     *
+     * The engine starts a new assistant message for each LLM step, so the
+     * view model's old "replace tools with this frame's list" behaviour erased
+     * step 1's rows as soon as step 2 called its first tool. Keyed by the
+     * engine's tool-call id and insertion-ordered, so a republish updates the
+     * existing row and first-seen order is preserved. Guarded by its own lock:
+     * the stream coroutine is the only writer, but the snapshot can be read
+     * while finalising.
+     */
+    private val observedTools = java.util.LinkedHashMap<String, ToolActivity>()
+
+    /** How many extra idle windows a busy engine earned this turn. */
+    @Volatile
+    var idleExtensions: Int = 0
+
     val isStopped: Boolean get() = stoppedFlag.get()
+
+    /**
+     * Merges one message frame's tool rows into this turn's accumulated list.
+     *
+     * Returns the full ordered list plus only the ids seen for the first time,
+     * which is what the per-call rail log uses (a shape log is not a call log:
+     * a second `bash` call must still be visible).
+     */
+    @Synchronized
+    fun mergeTools(
+        incoming: List<ToolActivity>,
+        nowMs: Long = System.currentTimeMillis()
+    ): ToolMerge {
+        val added = mutableListOf<ToolActivity>()
+        incoming.forEach { fresh ->
+            val prev = observedTools[fresh.id]
+            val merged = if (prev == null) {
+                added += fresh
+                fresh.copy(
+                    firstSeenAt = nowMs,
+                    finishedAt = if (fresh.state == ToolState.COMPLETED) nowMs else 0L
+                )
+            } else {
+                // A late/duplicate republish must never downgrade a finished
+                // row back to running; otherwise prefer the newest fields.
+                val next = if (prev.state == ToolState.COMPLETED &&
+                    fresh.state != ToolState.COMPLETED
+                ) {
+                    prev.copy(output = prev.output.ifBlank { fresh.output })
+                } else {
+                    fresh
+                }
+                next.copy(
+                    firstSeenAt = prev.firstSeenAt,
+                    finishedAt = when {
+                        prev.finishedAt > 0L -> prev.finishedAt
+                        next.state == ToolState.COMPLETED -> nowMs
+                        else -> 0L
+                    }
+                )
+            }
+            observedTools[fresh.id] = merged
+        }
+        return ToolMerge(observedTools.values.toList(), added)
+    }
 
     /**
      * True while this turn is still allowed to reach the engine.
@@ -117,6 +179,12 @@ internal class RunHandle(val turnId: String) {
         return StopAction.CancelOnServer(w, s, p)
     }
 }
+
+/** Result of [RunHandle.mergeTools]: the full turn list plus newly seen rows. */
+internal data class ToolMerge(
+    val tools: List<ToolActivity>,
+    val added: List<ToolActivity>
+)
 
 /** What [RunHandle.stop] says the caller must do next. */
 internal sealed class StopAction {

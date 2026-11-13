@@ -70,7 +70,17 @@ data class ToolActivity(
     val description: String? = null,
     /** File or target the call touches, when the engine supplies one. */
     val path: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    /**
+     * App-observed wall-clock timestamps (epoch ms), stamped by
+     * [RunHandle.mergeTools] on the first and final frames of this call id.
+     *
+     * These are deliberately APP observations, not engine timings: the wire
+     * carries no start/finish timestamps. 0 means "not observed yet", so a
+     * replayed history row shows no duration rather than inventing one.
+     */
+    val firstSeenAt: Long = 0L,
+    val finishedAt: Long = 0L
 ) {
     /** A running tool should read as live, not as finished. */
     val isRunning: Boolean get() = state == ToolState.RUNNING || state == ToolState.PENDING

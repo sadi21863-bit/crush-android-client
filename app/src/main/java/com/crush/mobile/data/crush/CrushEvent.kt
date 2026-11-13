@@ -129,7 +129,43 @@ data class StreamMessage(
 
     val toolCalls: List<JsonObject>
         get() = parts.filter { it.optString("type") == "tool_call" }
+
+    /**
+     * Detached sub-agent reports attached to this message.
+     *
+     * v0.100.0 writes a completed/failed sub-agent run back as a NEW USER
+     * message whose only part is `{"type":"sub_agent_report","data":{...}}`
+     * (upstream `internal/proto/message.go`, `internal/agent/agent.go`). The
+     * part carries `label`, `output`, and optional `failed`/`model`. A report
+     * has no text part, which is exactly why the old replay dropped it.
+     */
+    val subAgentReports: List<SubAgentReport>
+        get() = parts.filter { it.optString("type") == "sub_agent_report" }
+            .mapNotNull { part ->
+                val d = part.data() ?: return@mapNotNull null
+                SubAgentReport(
+                    label = d.optString("label").orEmpty(),
+                    output = d.optString("output").orEmpty(),
+                    failed = d.optBoolean("failed") ?: false,
+                    model = d.optString("model").orEmpty()
+                )
+            }
 }
+
+/**
+ * One detached sub-agent's result, as v0.100.0 publishes it.
+ *
+ * Field names and the user-role carrier are confirmed from the v0.100.0
+ * source (not guessed): `proto/message.go` builds the part and
+ * `agent/agent.go` appends it as a user message. `failed` and `model` are
+ * omitempty on the wire, hence the safe defaults.
+ */
+data class SubAgentReport(
+    val label: String = "",
+    val output: String = "",
+    val failed: Boolean = false,
+    val model: String = ""
+)
 
 /**
  * Reads the `data` sub-object, or null when absent/null/not an object.

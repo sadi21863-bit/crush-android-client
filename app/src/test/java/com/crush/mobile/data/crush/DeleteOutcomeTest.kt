@@ -64,11 +64,46 @@ class DeleteOutcomeTest {
     }
 
     @Test
-    fun `a 404 on a live workspace is AlreadyGone, not merely unknown`() = runBlocking {
+    fun `a 404 whose session list omits the id is AlreadyGone`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("[]")
+        )
+        val outcome = api.deleteSession("ws-1", "sess-1")
+        // Confirmed gone: the workspace is live and its list omits the id.
+        assertEquals(DeleteOutcome.AlreadyGone, outcome)
+        val reqs = drain()
+        assertEquals("DELETE", reqs[0].method)
+        assertEquals("GET", reqs[1].method)
+        assertTrue(reqs[1].path!!.endsWith("/sessions"))
+    }
+
+    @Test
+    fun `a 404 whose session list STILL contains the id is Failed`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""[{"id":"sess-1","title":"still here"}]""")
+        )
+        val outcome = api.deleteSession("ws-1", "sess-1")
+        assertTrue(
+            "a 404 contradicted by the live session list is not success",
+            outcome is DeleteOutcome.Failed
+        )
+    }
+
+    @Test
+    fun `a 404 with an unverifiable workspace is Failed, not AlreadyGone`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(404))
         server.enqueue(MockResponse().setResponseCode(404))
         val outcome = api.deleteSession("ws-1", "sess-1")
-        // Genuinely gone: the server answered, on a workspace we know is live.
-        assertEquals(DeleteOutcome.AlreadyGone, outcome)
+        assertTrue(
+            "a reaped workspace says nothing about the session",
+            outcome is DeleteOutcome.Failed
+        )
     }
 
     @Test

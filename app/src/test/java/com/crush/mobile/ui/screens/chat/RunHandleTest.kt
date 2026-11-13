@@ -96,6 +96,59 @@ class RunHandleTest {
     }
 
     @Test
+    fun `mergeTools keeps earlier steps and stamps only the first sighting`() {
+        // The engine starts a new assistant message per LLM step. The old
+        // view-model code replaced the turn's tool list with each frame's, so
+        // step 2's first tool erased step 1's rows. Rows now accumulate by
+        // call id, in first-seen order.
+        val handle = RunHandle(turnId = "t1")
+        val bashRunning = ToolActivity(
+            id = "call-1", name = "bash", args = "{}", state = ToolState.RUNNING, output = ""
+        )
+        val first = handle.mergeTools(listOf(bashRunning), nowMs = 1_000L)
+        assertEquals(1, first.tools.size)
+        assertEquals(1, first.added.size)
+        assertEquals(1_000L, first.tools[0].firstSeenAt)
+        assertEquals(0L, first.tools[0].finishedAt)
+
+        val bashDone = bashRunning.copy(state = ToolState.COMPLETED, output = "ok")
+        val second = handle.mergeTools(listOf(bashDone), nowMs = 2_500L)
+        assertEquals("the same call must update, not duplicate", 1, second.tools.size)
+        assertEquals(0, second.added.size)
+        assertEquals(ToolState.COMPLETED, second.tools[0].state)
+        assertEquals(1_000L, second.tools[0].firstSeenAt)
+        assertEquals(2_500L, second.tools[0].finishedAt)
+
+        val read = ToolActivity(
+            id = "call-2", name = "read", args = "{}", state = ToolState.RUNNING, output = ""
+        )
+        val third = handle.mergeTools(listOf(read), nowMs = 3_000L)
+        assertEquals(listOf("call-1", "call-2"), third.tools.map { it.id })
+        assertEquals(2, third.tools.size)
+        assertEquals(1, third.added.size)
+    }
+
+    @Test
+    fun `a late republish cannot downgrade a completed tool row`() {
+        val handle = RunHandle(turnId = "t1")
+        val done = ToolActivity(
+            id = "call-1", name = "bash", args = "{}",
+            state = ToolState.COMPLETED, output = "ok"
+        )
+        handle.mergeTools(listOf(done), nowMs = 1_000L)
+        val runningAgain = done.copy(state = ToolState.RUNNING, output = "")
+        val merged = handle.mergeTools(listOf(runningAgain), nowMs = 2_000L)
+        assertEquals(ToolState.COMPLETED, merged.tools[0].state)
+        assertEquals("ok", merged.tools[0].output)
+        assertEquals(1_000L, merged.tools[0].finishedAt)
+    }
+
+    @Test
+    fun `idle extensions start at zero`() {
+        assertEquals(0, RunHandle(turnId = "t1").idleExtensions)
+    }
+
+    @Test
     fun `a target frozen after the stop cannot resurrect the turn`() {
         // The regression this pins: stop claims the turn during preflight
         // (NothingPosted), the preflight completes anyway and freezes a target

@@ -24,6 +24,7 @@ import com.crush.mobile.data.crush.PermissionGrant
 import com.crush.mobile.data.crush.PermissionRequest
 import com.crush.mobile.data.crush.RunComplete
 import com.crush.mobile.data.crush.SelectedModel
+import com.crush.mobile.data.crush.SubAgentReport
 import com.crush.mobile.data.crush.Session
 import com.crush.mobile.domain.file.FileChangeCollector
 import com.crush.mobile.domain.file.ProjectTreeFingerprint
@@ -96,17 +97,29 @@ import okhttp3.OkHttpClient
 internal fun replayRow(m: StreamMessage): ChatMessage? {
     val text = m.text
     val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
+    val reports = m.subAgentReports
     val error = m.finishError
     return when {
-        m.role == "user" && text.isNotBlank() ->
-            ChatMessage(id = "h-u-${m.id}", role = "user", text = text)
-        m.role == "assistant" && (text.isNotBlank() || tools.isNotEmpty() || error != null) ->
+        // A v0.100.0 sub-agent report is a USER message with no text part at
+        // all. Dropping it because `text.isBlank()` is what made completed
+        // detached agents invisible after a reopen (the live frame was
+        // ignored for the same reason until both halves were fixed).
+        m.role == "user" && (text.isNotBlank() || reports.isNotEmpty()) ->
+            ChatMessage(
+                id = "h-u-${m.id}",
+                role = "user",
+                text = text,
+                reports = reports
+            )
+        m.role == "assistant" &&
+            (text.isNotBlank() || tools.isNotEmpty() || reports.isNotEmpty() || error != null) ->
             ChatMessage(
                 id = "h-a-${m.id}",
                 role = "assistant",
                 text = text,
                 tools = tools,
-                error = error
+                error = error,
+                reports = reports
             )
         else -> null
     }
@@ -251,9 +264,20 @@ data class ChatMessage(
      *
      * The engine republishes WHOLE messages, so this is replaced wholesale on
      * every frame rather than appended to - appending would duplicate rows
-     * every time a tool's state advanced.
+     * every time a tool's state advanced. The per-turn accumulation in
+     * [RunHandle.mergeTools] is what keeps rows from an earlier LLM step from
+     * disappearing when the next step starts a fresh assistant message.
      */
-    val tools: List<ToolActivity> = emptyList()
+    val tools: List<ToolActivity> = emptyList(),
+    /**
+     * Detached sub-agent results (engine v0.100.0+).
+     *
+     * Reports arrive as user-role messages with a `sub_agent_report` part and
+     * no text. They are rendered as their own card and retained on replay;
+     * before this field existed the row was silently dropped both live and
+     * after a reopen.
+     */
+    val reports: List<SubAgentReport> = emptyList()
 )
 
 /**
@@ -536,6 +560,14 @@ class ChatViewModel(
      */
     @Volatile private var engineVisibleIdsCache: Set<String> = emptySet()
     @Volatile private var engineVisibleProviderId: String = ""
+
+    /**
+     * Image-capable ids for [engineVisionProviderId], from the same
+     * `/providers` payload. Fail-closed: an empty cache means "no model here
+     * is known to accept images", never "assume it can".
+     */
+    @Volatile private var engineVisionIdsCache: Set<String> = emptySet()
+    @Volatile private var engineVisionProviderId: String = ""
 
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
@@ -1202,6 +1234,15 @@ class ChatViewModel(
         // when the workspace-attach already proved what the engine accepts).
         engineVisibleIdsCache = visibleEngineIds
         engineVisibleProviderId = providerId
+        // #11 stage 1: read the engine's vision capability now, while the
+        // catalogue is in hand. No attachment UI ships in this stage; this is
+        // what lets the transcript gate/explain image input later, and it is
+        // logged as a count so the claim is checkable on device.
+        val visionIds = runCatching {
+            ZenModelsApi.visionCapableModelIds(engineProviders, providerId)
+        }.getOrDefault(emptySet())
+        engineVisionIdsCache = visionIds
+        engineVisionProviderId = providerId
         val prices = runCatching {
             ZenModelsApi.pricesFromProviders(engineProviders, providerId)
         }.getOrDefault(emptyMap())
@@ -1246,7 +1287,13 @@ class ChatViewModel(
                 // Preserve catalogue order probe-shortlist assumptions.
                 listed.filter { it.id in visibleEngineIds }
             }
-        }
+        }.map { m -> m.copy(supportsImages = m.id in visionIds) }
+        // Count only: the claim is checkable on device without logging ids.
+        AppLog.i(
+            TAG,
+            "engine capabilities: ${models.count { it.supportsImages }}/${models.size} " +
+                "offered model(s) accept images"
+        )
         if (models.isEmpty()) {
             AppLog.w(TAG, "no usable model: ${usable?.error}")
             _state.update {
@@ -1663,7 +1710,10 @@ class ChatViewModel(
             // verify yet.
             val visible = engineVisibleIdsCache
                 .takeIf { engineVisibleProviderId == providerId && it.isNotEmpty() }
-            val models = if (visible == null) {
+            val vision = engineVisionIdsCache
+                .takeIf { engineVisionProviderId == providerId }
+                .orEmpty()
+            val models = (if (visible == null) {
                 r.models
             } else {
                 val dropped = r.models.filter { it.id !in visible }.map { it.id }
@@ -1675,7 +1725,7 @@ class ChatViewModel(
                     )
                 }
                 r.models.filter { it.id in visible }
-            }
+            }).map { m -> m.copy(supportsImages = m.id in vision) }
             _state.update {
                 it.copy(
                     models = models,
@@ -1774,6 +1824,8 @@ class ChatViewModel(
         // inherit the old one's accepted-id set.
         engineVisibleIdsCache = emptySet()
         engineVisibleProviderId = ""
+        engineVisionIdsCache = emptySet()
+        engineVisionProviderId = ""
         AppLog.i(TAG, "provider switched to ${provider.id}; re-bootstrapping")
         _state.update {
             it.copy(
@@ -3882,15 +3934,42 @@ class ChatViewModel(
                             if (waitingOnPrompt) receiveWhilePromptOpen()
                             else withTimeoutOrNull(STREAM_IDLE_MS) { frames.receiveCatching() }
                         if (got == null) {
-                            // Idle deadline expired: the engine went silent on
-                            // this run. A stopped turn already handles its own
-                            // cancel; anything else gets the same
-                            // cancel-then-end treatment as the total deadline.
+                            // Idle deadline expired. Before declaring the turn
+                            // dead, ASK THE ENGINE: a long provider call or a
+                            // server-side tool phase emits no SSE frames while
+                            // the run is demonstrably busy. The recorded
+                            // follow-up to the 60s retune (2026-11-10) was
+                            // "probe the run state first, cancel only when not
+                            // busy"; this is that probe. The extension budget
+                            // keeps a wedged-busy engine from hanging forever.
                             if (!handle.isStopped) {
+                                val p = handle.port
+                                val w = handle.ws
+                                val busy = if (p != null && w != null) {
+                                    runCatching { crushApi(p).agentInfo(w).isBusy }
+                                        .getOrNull()
+                                } else {
+                                    null
+                                }
+                                if (busy == true && handle.idleExtensions < IDLE_EXTENSIONS_MAX) {
+                                    handle.idleExtensions++
+                                    AppLog.w(
+                                        TAG,
+                                        "stream idle > ${STREAM_IDLE_MS / 1000}s for run " +
+                                            "${handle.turnId}; engine reports busy - extending " +
+                                            "(${handle.idleExtensions}/$IDLE_EXTENSIONS_MAX)"
+                                    )
+                                    continue
+                                }
                                 AppLog.w(
                                     TAG,
                                     "stream idle > ${STREAM_IDLE_MS / 1000}s for run " +
-                                        "${handle.turnId}; requesting engine cancel"
+                                        "${handle.turnId}" +
+                                        if (busy == true) {
+                                            " (extension budget spent); requesting engine cancel"
+                                        } else {
+                                            "; requesting engine cancel"
+                                        }
                                 )
                                 awaitServerCancel(handle)
                             }
@@ -3911,19 +3990,41 @@ class ChatViewModel(
                             CrushEvent.PayloadType.MESSAGE -> {
                                 val m = gson.fromJson(ev.body, StreamMessage::class.java)
                                 if (m.role == "assistant") {
-                                    // Crush republishes the WHOLE message, so replace.
-                                    // Tools are replaced with it, never appended: each
-                                    // frame carries the full set, and appending would
-                                    // stack a duplicate row every time a tool advanced.
-                                    val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
+                                    // Crush republishes the WHOLE message, so a
+                                    // single frame's tool list REPLACES itself.
+                                    // Across frames it must not replace the
+                                    // turn's earlier steps: the engine starts a
+                                    // new assistant message per LLM step, so
+                                    // step 2's first tool would erase step 1's
+                                    // rows. [RunHandle.mergeTools] accumulates
+                                    // by call id and stamps app-observed times.
+                                    val merge = handle.mergeTools(
+                                        m.toolCalls.mapNotNull(ToolActivityParser::from)
+                                    )
+                                    // Rail 3 needs CALL evidence, not shape
+                                    // evidence: the parser logs a shape once,
+                                    // which cannot prove "a second bash call
+                                    // never executed". Content-free by design.
+                                    merge.added.forEach { t ->
+                                        AppLog.i(
+                                            TAG,
+                                            "tool_call observed instance=$instanceKey " +
+                                                "name=${t.name} run=${handle.turnId.take(8)}"
+                                        )
+                                    }
                                     updateStreaming(handle) {
                                         it.copy(
                                             text = m.text.ifBlank { it.text },
                                             thinking = m.thinking.ifBlank { it.thinking },
-                                            tools = tools.ifEmpty { it.tools },
+                                            tools = merge.tools.ifEmpty { it.tools },
                                             error = m.finishError ?: it.error
                                         )
                                     }
+                                } else if (m.subAgentReports.isNotEmpty()) {
+                                    // v0.100.0 reports are user-role messages
+                                    // with no text part. They used to be
+                                    // ignored here and dropped on replay.
+                                    appendReportRow(handle, m)
                                 }
                             }
 
@@ -4009,13 +4110,21 @@ class ChatViewModel(
                                     // THIS bubble's RUNNING rows to COMPLETED,
                                     // never on timeout/stop, where the run did
                                     // not complete.
+                                    val nowMs = System.currentTimeMillis()
                                     updateStreaming(handle) {
                                         it.copy(
                                             isStreaming = false,
                                             text = rc.text.ifBlank { it.text },
                                             tools = it.tools.map { t ->
                                                 if (t.isRunning) {
-                                                    t.copy(state = ToolState.COMPLETED)
+                                                    t.copy(
+                                                        state = ToolState.COMPLETED,
+                                                        finishedAt = if (t.finishedAt > 0L) {
+                                                            t.finishedAt
+                                                        } else {
+                                                            nowMs
+                                                        }
+                                                    )
                                                 } else {
                                                     t
                                                 }
@@ -4082,6 +4191,40 @@ class ChatViewModel(
                     if (target != null && m.id == target) transform(m) else m
                 }
             )
+        }
+    }
+
+    /**
+     * Appends (or refreshes) one detached sub-agent report row.
+     *
+     * Reports precede the assistant message they feed, so when this turn's
+     * streaming bubble is already on screen the report is inserted ABOVE it -
+     * appending would draw the result below the reply that used it. Keyed by
+     * the engine message id so a republish updates in place.
+     */
+    private fun appendReportRow(handle: RunHandle, m: StreamMessage) {
+        val rowId = "live-report-${m.id.ifBlank { handle.turnId }}"
+        val reports = m.subAgentReports
+        _state.update { st ->
+            val existing = st.messages.indexOfFirst { it.id == rowId }
+            if (existing >= 0) {
+                val next = st.messages.toMutableList()
+                next[existing] = next[existing].copy(reports = reports)
+                st.copy(messages = next)
+            } else {
+                val row = ChatMessage(
+                    id = rowId,
+                    role = "user",
+                    text = m.text,
+                    reports = reports
+                )
+                val bubble = handle.bubbleId?.let { id ->
+                    st.messages.indexOfFirst { it.id == id }
+                } ?: -1
+                val next = st.messages.toMutableList()
+                if (bubble >= 0) next.add(bubble, row) else next.add(row)
+                st.copy(messages = next)
+            }
         }
     }
 
@@ -4222,11 +4365,21 @@ class ChatViewModel(
          * 2026-10-29 z4 ask was #1). 60s still covers the intended catch - a
          * genuinely dead socket goes quiet for good - while the workspace's
          * own ~30s reap window remains the earlier, honest terminator for
-         * engine-side corpses. Follow-up (not shipped here): on idle expiry,
-         * probe the engine's actual run state first and only cancel when it
-         * is not busy.
+         * engine-side corpses. The 2026-11-10 follow-up shipped 2026-11-13:
+         * on idle expiry the frame loop now probes [CrushApi.agentInfo] and
+         * extends a run the engine reports busy, up to
+         * [IDLE_EXTENSIONS_MAX] extra windows, before cancelling.
          */
         const val STREAM_IDLE_MS = 60_000L
+
+        /**
+         * Extra idle windows a BUSY engine earns before the watchdog wins.
+         *
+         * Three windows (180s) covers a slow provider first token / long
+         * server-side tool phase without letting a wedged-busy run hang
+         * forever. Extensions are per turn and reset with the handle.
+         */
+        const val IDLE_EXTENSIONS_MAX = 3
 
         /**
          * Ceiling for ONE parked prompt - the ask/question dialog the user is

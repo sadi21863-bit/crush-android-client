@@ -269,12 +269,16 @@ App-side mitigations:
   `unix://<app-private path>`. The gate itself was never built — superseded.
   Evidence: [docs/p1-attack-surface.md](docs/p1-attack-surface.md) §4/§8,
   decision record [docs/p1-gate-design.md](docs/p1-gate-design.md).
-- **Delete's 404 is ambiguous.** A 404 on a workspace the ~30s reap has already
-  taken cannot be told apart from a 404 on the session itself. The flow
-  re-attaches first and force-retries once, but "session gone" is still inferred
-  rather than confirmed, so a stale `AlreadyGone` remains possible.
-- **No tool-call timeline or per-turn cost.** Tool activity is a per-message
-  summary, not a live view of what the agent is doing.
+- **Delete's 404 is now disambiguated (2026-11-13).** A 404 on a workspace
+  the ~30s reap has already taken used to be indistinguishable from a 404 on
+  the session itself. The flow now re-lists the workspace's sessions: only a
+  successful listing that omits the id counts as `AlreadyGone`; a failed
+  listing stays `Failed`, and local state is untouched.
+- **Tool activity is now a turn-long timeline; per-turn cost is still
+  drawer-only.** Tool rows accumulate by call id across every LLM step of a
+  turn (step 2 used to erase step 1), keep first-seen order, and show
+  app-observed elapsed time where both edges were seen. There is no
+  step-grouped view or per-turn cost in the transcript.
 - **File diffs: the real-turn prong is now checked (2026-10-29).** The whole
   path is built and JVM-tested (snapshot → tracked files → diff → render),
   and the first measured device turn tracked zero files. The 10-29 pass then
@@ -286,10 +290,14 @@ App-side mitigations:
   closed the loop: `diff-created(+1/-0)`, diff-edit routes on the earlier
   files, `snapKeys=[4 files]`, `0 unreadable`. Still untested: a multi-file
   turn editing real code.
-- **A slow turn still strands a bubble.** `streamSend`'s `finally` now finalises
-  the live bubble, but a turn whose provider simply never replies leaves an
-  empty bubble marked "no reply received". That is honest. A FAILED turn
-  (finish `reason:"error"`) now shows the provider's own wording instead —
+- **A slow turn can still strand a bubble, but the watchdog now asks first.**
+  `streamSend`'s `finally` finalises the live bubble. On an idle expiry the
+  frame loop now probes the engine's run state and extends a demonstrably
+  busy run for up to three extra 60s windows before cancelling; a run that is
+  not busy, or has spent the extension budget, still ends with a server-side
+  cancel. A turn whose provider simply never replies leaves an empty bubble
+  marked "no reply received" — honest, not fabricated. A FAILED turn
+  (finish `reason:"error"`) shows the provider's own wording instead —
   including nested-object `details`, which previously crashed the stream
   update and masked the server's message.
 - **First-launch app lock bypass.** On a *fresh* install the first session opens

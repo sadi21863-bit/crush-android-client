@@ -27,6 +27,8 @@ surfaced on a phone.
 | Permission mode persistence | `permissionMode=ASK` survives restarts |
 | Engine lifecycle | Crash/restart, health probing, dynamic thermal tuning. **Per-project stop-on-switch verified 2026-11-04** (`28328b5`): two `libcrush.so` children with a project chat open → ONE child + `I/Lifecycle: stopping project engine for instance 'p8a3825d0' (no run in flight)` on returning to the legacy row (run-in-flight guarded — a mid-run switch leaves the run riding its own engine) |
 | Chat→Code handoff dispatch (P6 Batch C) | E2E on device 2026-11-09: entry chip → consent sheet → `DISPATCHED` row (S-02 ordering proven) → verify-first first turn ran real bash; full record below |
+| Permission modes (ASK / AUTO-APPROVE) | ASK: card + grant proven. AUTO-APPROVE on v0.100.0 (2026-11-13): `permissionWire=yolo`, a read-only `ls` turn ran one completed bash call with **zero permission requests**; restored to ASK (`permissionWire=normal`) |
+| In-app diagnostics | Screen + Copy + Share device-walked 2026-11-13: status block, 95-line log tail, copy verified by pasting the report, share opened the system chooser |
 | Engine v0.100.0 + version-aware permission adapter | Device-proven 2026-11-12 (`6800c0e`): v0.100.0 bound and streamed; the wire family follows the bound engine (`MODE_ENUM`/`permission_mode` on 0.100+, `SKIP_FLAG`/`yolo` on 0.99); chat-pool deny readback **35 ids**; rollback drill: v0.99.0 opened the v0.100 engine state DB unchanged (no one-way door). T3 evidence in [engine-acceptance-kit.md](engine-acceptance-kit.md) §5 |
 
 ## Implemented, unverified on device

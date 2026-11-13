@@ -37,8 +37,8 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 | Long-lived workspace SSE | ✅ verified — no ~30s reap between turns |
 | Tool-call visibility | ✅ built — wire format CONFIRMED 2026-10-25 (D3): tool_call parts carry data {id, name, input (args as a JSON string), finished (bool)}; parser reads data first, pinned by unit tests |
 | File diffs | ✅ built and JVM-tested — a real edited-file turn rendered on device 2026-10-29 (z6/z7: `diff-created(+1/-0)`, diff-edit routes, `snapKeys=[4 files]`, `0 unreadable` after the `readNBytes` API-33 defect was fixed); a multi-file, real-code-edit turn is still untested |
-| Permission prompts (ask / always / never) | ✅ ask-mode grant verified end-to-end on device 2026-10-29 (z6/z7: ask card rendered, automated Allow-once granted, turn resumed); always / never modes not device-walked |
-| In-app diagnostics + crash reports | ⚠️ implemented — the on-device log path was exercised during the 2026-10-29 D12 pass; the screen/crash-export flow itself is not fully walked |
+| Permission prompts (ask / auto-approve) | ✅ both modes device-proven on v0.100.0 (2026-11-13): ASK renders the card and grants end-to-end; AUTO-APPROVE ran a read-only `ls` turn with zero asks (`permissionWire=yolo`), then the setting was restored to ASK (`permissionWire=normal`). There is no third "never" mode in the code — `PermissionMode` is ASK or AUTO_APPROVE |
+| In-app diagnostics + crash reports | ✅ screen device-walked 2026-11-13: status block (app/API/device/ABIs, engine installed+running+responding via `GET /v1/version`), 95-line log tail, **Copy verified by pasting the report**, **Share opens the system chooser**. A real crash-archive entry was not manufactured (the screen correctly reported "No crash recorded") |
 | Review screen (revert + export) | ✅ device-proven 2026-11-07 ([capabilities.md](docs/capabilities.md) Gate-2): reverting restores the workspace record, and the "Export a copy" no-op found live in the first drive was fixed same-day (`bf5019a`) |
 | Chat save/copy surface | ✅ device-proven 2026-11-08 (`fe9e7e8`): code-block Copy/Save chips plus per-message "Copy message" / "Save as Markdown" through the SAF `CreateDocument` picker (`ChatExport.kt`) |
 | Chat tool policy (deny all) | ✅ shipped 2026-11-05 (S-01): `EngineConfigInjector.injectChatToolPolicy` writes `options.disabled_tools` and readback-verifies; the `chatPolicyGate` fails closed (`CrushEngine.kt`, pinned by unit tests). The on-disk list is engine-version sized: 31 ids on v0.99.0, **35 ids on v0.100.0** (measured 2026-11-12) |
@@ -295,11 +295,11 @@ App-side mitigations:
 - **First-launch app lock bypass.** On a *fresh* install the first session opens
   without a lock prompt, because there is no stored key at that moment. Later
   cold starts do prompt.
-- **Diagnostics/crash-export is still under-verified on device; permission
-  ask mode is verified.** The ask-mode prompt was verified end-to-end on
-  2026-10-29 (Status table, D12), but the always/never permission modes and
-  the diagnostics screen/crash-report export have not been device-walked
-  (the log path itself was exercised during that pass).
+- **Diagnostics and both permission modes are now device-verified; the crash
+  archive itself is not.** 2026-11-13: the diagnostics screen, Copy and Share
+  were walked; ASK was already proven; AUTO-APPROVE ran a read-only turn with
+  zero asks and the setting was restored. A real crash-archive entry has not
+  been manufactured (the screen honestly reports "No crash recorded").
 - **The `FALLBACK_PROBE_MODEL` literal was removed.** The early agent init now
   runs only when a model is actually chosen; with none selected, no retired
   hardcoded id is fed to the provider any more (that guess was the "large model
@@ -493,6 +493,7 @@ Bring-up facts (measured 2026-11-01, first green recorded 2026-11-02):
 | [`docs/engine-acceptance-kit.md`](docs/engine-acceptance-kit.md) | The per-engine-version test system: T0–T3 tiers, device rails, promotion/rollback rules |
 | [`docs/v0100-ladder-plan-2026-11-12.md`](docs/v0100-ladder-plan-2026-11-12.md) | The v0.100.0 execution ladder: adapter, rails, evidence, decisions |
 | [`docs/research-engine-v0100-2026-11-12.md`](docs/research-engine-v0100-2026-11-12.md) | v0.100.0 engine research: API deltas, permission wire, SSE shapes |
+| [`docs/backlog-research-2026-11-13.md`](docs/backlog-research-2026-11-13.md) | Standing-backlog research: store blockers, rails 3/4/6, sysadmin/piped permissions, timeline, attachments |
 | [`docs/adr-0001-project-workspace-identity.md`](docs/adr-0001-project-workspace-identity.md) | Project identity: path-keyed workspaces, one engine instance per project |
 | [`docs/chat-code-modes-plan-2026-11-04.md`](docs/chat-code-modes-plan-2026-11-04.md) | Chat/Code mode split: decisions, shipped slices, verification matrix |
 | [`docs/toolchain.md`](docs/toolchain.md) | Versions, AGP 10 contingency, backup plan |

@@ -157,6 +157,12 @@ runtime unproven" row in external-review-triage.md closed same day). The
 
 **Status: OPEN — key is live, file re-confirmed present 2026-10-31.**
 
+**2026-11-13:** the rotation/deletion runbook (Console → create replacement
+with expiry → paste on device → verify a turn → revoke old → confirm 401 →
+delete file → hunt copies) is in
+[backlog-research-2026-11-13.md](backlog-research-2026-11-13.md) §A1. Still
+owner-only; deletion alone is not remediation.
+
 `"opencode api key for testing.txt"` sits at the repo root. It is gitignored
 (`*key*.txt`, `.gitignore:15`) so it will never be committed, but the key
 itself is real and live. The old world-readable `/sdcard/zenkey.txt` fallback
@@ -205,6 +211,11 @@ anchor above is a dated record of the app-side path that moved).
 user; a store-distribution build additionally requires the fail-closed
 lock first (fail-open stays a documented beta property until that
 ships).**
+
+**2026-11-13:** Play does **not** require an app lock — this is an internal
+store gate. The smallest safe fail-closed batch (distinct `NoCredential`
+outcome + recovery LockOverlay + one shared key-write guard + tests) is in
+[backlog-research-2026-11-13.md](backlog-research-2026-11-13.md) §A3.
 
 With no lock configured, the app opens without any lock prompt
 (`DeviceAuth.kt:54–62`; README "First-launch app lock bypass", D9). This is
@@ -370,6 +381,11 @@ is superseded by that plan's 2026-11-08 addendum.
 **Status: OPEN — not needed while the app is beta-installed via adb;
 REQUIRED before any store listing (Google Play policy). Raised by the
 independent review (F05).**
+
+**2026-11-13:** current Play policy research (AFA's permitted categories do
+not include "developer tool"; the narrow-SAF + mirror option) is in
+[backlog-research-2026-11-13.md](backlog-research-2026-11-13.md) §A2, with
+the recommended B-MVP. Owner decision needed.
 
 Today's import flow asks for All Files Access (MANAGE_EXTERNAL_STORAGE)
 before the SAF tree picker, then decodes the picked `primary:` document ID

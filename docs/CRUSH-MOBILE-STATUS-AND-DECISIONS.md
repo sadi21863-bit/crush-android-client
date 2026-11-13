@@ -254,10 +254,11 @@ above for status; map back to slices only when reading the plan doc.
 
 ## 6. Upstream filings
 
-- Awaiting owner go: [`upstream-outreach-drafts-2026-11-05.md`](upstream-outreach-drafts-2026-11-05.md)
-  (candidates 1–3 fully drafted, nothing filed) and candidate 4 in
-  [`upstream-outreach-plan.md`](upstream-outreach-plan.md) (the S-03
-  discussion-first draft).
+- **2026-11-13: closed as NO ACTION.** The unfiled drafts (candidates 1–3 in
+  [`upstream-outreach-drafts-2026-11-05.md`](upstream-outreach-drafts-2026-11-05.md),
+  candidate 4 in [`upstream-outreach-plan.md`](upstream-outreach-plan.md))
+  are not blocking anything and stay available; upstream issue #4222 remains
+  the one filed item. Re-open only if the owner wants to file.
 - On record: charmbracelet/crush **issue #4222** filed by the owner —
   gh-verified 2026-11-05 (OPEN, created 2026-11-03, author `sadi21863-bit`,
   "Plan catalog drift: agent/init 500s 'large model not found in provider

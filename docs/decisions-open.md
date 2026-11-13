@@ -217,6 +217,13 @@ store gate. The smallest safe fail-closed batch (distinct `NoCredential`
 outcome + recovery LockOverlay + one shared key-write guard + tests) is in
 [backlog-research-2026-11-13.md](backlog-research-2026-11-13.md) §A3.
 
+**2026-11-13 (#21): the fresh-install first-launch bypass is by design, not
+a defect.** `AppLockPolicy.decide` returns `OPEN` only when `hasCiphertext`
+is false (nothing is stored yet), and Onboarding runs its own prompt when it
+creates the key; every later cold start with a stored key prompts. No code
+change. The store-level fail-closed requirement is backlog item 3 (§A3),
+which covers the distinct no-device-credential branch.
+
 With no lock configured, the app opens without any lock prompt
 (`DeviceAuth.kt:54–62`; README "First-launch app lock bypass", D9). This is
 documented and deliberate while in beta.

@@ -224,3 +224,7 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   restored to ASK and re-verified (`permissionWire=normal`, `yolo=false`).
 - **#28 upstream filings:** not a problem — no blocking impact; issue #4222 is
   filed and the drafts stay available. Closed as “no action”.
+- **#21 first-launch app lock bypass:** by design, not a defect. The gate
+  opens only when no ciphertext exists (fresh install) and Onboarding prompts
+  when it creates the key; later cold starts prompt. The store-level
+  fail-closed batch is item 3 / §A3. Recorded in `decisions-open.md` §5.

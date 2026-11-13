@@ -122,9 +122,9 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   `PermissionMode` has two). Surfacing needs a third mode, a fail-safe parser,
   an engine-version gate, a three-state UI with a persistent warning, and
   mode readback; a persisted sysadmin must fail closed on rollback to 0.99.
-- **Recommendation: A** (keep unreachable) for v1; B (Code-only, typed
-  confirmation, red state) only on concrete demand. High risk: no mechanical
-  guard on bash and no undo for shell effects.
+- **DECIDED 2026-11-13 (owner): A — keep sysadmin unreachable in v1.**
+  B (Code-only, typed confirmation, red state) only on concrete demand. High
+  risk either way: no mechanical guard on bash and no undo for shell effects.
 
 ### C2. `CRUSH_PERMISSIONS_PIPED` (recommended: do not adopt)
 
@@ -135,8 +135,9 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   ceiling), and it launches `crush server` headless — there is no TUI dialog to
   suppress. Setting it would be a **no-op today** and a semantic trap if
   mistaken for auto-approval.
-- **Recommendation: A** (do not set). Revisit only if an embedded TUI becomes
-  a second prompt surface; then pair with a watchdog proving asks still arrive.
+- **DECIDED 2026-11-13 (owner): A — do not set it.** Revisit only if an
+  embedded TUI becomes a second prompt surface; then pair it with a watchdog
+  proving asks still arrive.
 
 ### C3. Tool-call timeline (smallest honest version: S)
 

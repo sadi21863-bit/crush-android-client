@@ -1156,14 +1156,13 @@ private fun ToolRow(tool: ToolActivity) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                // App-observed elapsed time, only when BOTH edges were seen.
-                // The engine sends no timings; labelling them as ours is the
-                // honest half of the timeline (replayed rows show none).
-                val elapsedMs = if (tool.firstSeenAt > 0L && tool.finishedAt >= tool.firstSeenAt) {
-                    tool.finishedAt - tool.firstSeenAt
-                } else {
-                    0L
-                }
+                // ENGINE-reported execution time, when the call's tool_result
+                // carried start/end metadata. The wire's `finished` flag is
+                // part-final, so the old first-frame-to-finish chip measured
+                // frame latency, not execution (device finding 2026-11-14:
+                // 274 ms displayed for a call gated 2m20s). No result -> no
+                // chip; never invent one.
+                val elapsedMs = tool.durationMs
                 if (elapsedMs > 0L) {
                     Spacer(Modifier.width(6.dp))
                     Text(

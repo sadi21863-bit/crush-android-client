@@ -125,31 +125,68 @@ internal class RunHandle(val turnId: String) {
                 added += fresh
                 fresh.copy(
                     firstSeenAt = nowMs,
-                    finishedAt = if (fresh.state == ToolState.COMPLETED) nowMs else 0L
+                    // A live tool-call frame is PART-final at best (class
+                    // doc: `finished` lands before execution). Execution is
+                    // proven only by a later tool_result, so a fresh row
+                    // starts RUNNING unless the frame carries a failure.
+                    state = if (fresh.state == ToolState.FAILED) {
+                        ToolState.FAILED
+                    } else {
+                        ToolState.RUNNING
+                    },
+                    finishedAt = 0L,
+                    durationMs = 0L
                 )
+            } else if (prev.state != ToolState.RUNNING && prev.state != ToolState.PENDING) {
+                // A row completed by completeTool (or settled at run end)
+                // must never be downgraded by a late/duplicate republish.
+                prev.copy(output = prev.output.ifBlank { fresh.output })
             } else {
-                // A late/duplicate republish must never downgrade a finished
-                // row back to running; otherwise prefer the newest fields.
-                val next = if (prev.state == ToolState.COMPLETED &&
-                    fresh.state != ToolState.COMPLETED
-                ) {
-                    prev.copy(output = prev.output.ifBlank { fresh.output })
-                } else {
-                    fresh
-                }
-                next.copy(
+                fresh.copy(
                     firstSeenAt = prev.firstSeenAt,
-                    finishedAt = when {
-                        prev.finishedAt > 0L -> prev.finishedAt
-                        next.state == ToolState.COMPLETED -> nowMs
-                        else -> 0L
-                    }
+                    state = if (fresh.state == ToolState.FAILED) {
+                        ToolState.FAILED
+                    } else {
+                        ToolState.RUNNING
+                    },
+                    finishedAt = prev.finishedAt,
+                    durationMs = prev.durationMs
                 )
             }
             observedTools[fresh.id] = merged
         }
         return ToolMerge(observedTools.values.toList(), added)
     }
+
+    /**
+     * Marks a call complete from its engine `tool_result` message.
+     *
+     * This is the only live completion signal that means the tool actually
+     * ran: the assistant message's `finished` flag is PART-final (measured
+     * 2026-11-14 - a `sleep 8` call "finished" in 274 ms, then executed
+     * 2m20s later). [durationMs] is the engine's own start/end metadata and
+     * is shown only when it is present. Returns false when the call id is
+     * unknown (the result raced ahead of the call frame).
+     */
+    @Synchronized
+    fun completeTool(
+        callId: String,
+        failed: Boolean,
+        durationMs: Long = 0L,
+        nowMs: Long = System.currentTimeMillis()
+    ): Boolean {
+        val prev = observedTools[callId] ?: return false
+        observedTools[callId] = prev.copy(
+            state = if (failed) ToolState.FAILED else ToolState.COMPLETED,
+            finishedAt = if (prev.finishedAt > 0L) prev.finishedAt else nowMs,
+            durationMs = if (durationMs > 0L) durationMs else prev.durationMs
+        )
+        return true
+    }
+
+    /** The turn's rows in first-seen order, for publishing to the bubble. */
+    @Synchronized
+    fun snapshotTools(): List<ToolActivity> = observedTools.values.toList()
 
     /**
      * True while this turn is still allowed to reach the engine.

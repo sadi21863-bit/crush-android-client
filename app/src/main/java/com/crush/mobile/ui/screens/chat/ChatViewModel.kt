@@ -3715,6 +3715,27 @@ class ChatViewModel(
             updateStreaming(handle) { m ->
                 m.copy(
                     isStreaming = false,
+                    // Rows still RUNNING here can never produce another live
+                    // signal: the turn ended by stop, idle cancel, transport
+                    // death, or a quiet close. Their spinner must end with the
+                    // bubble. No duration is invented - the chip requires a
+                    // tool_result's engine metadata - so this marks the row
+                    // finished WITHOUT claiming how long it ran (2026-11-14:
+                    // part-final frames no longer complete rows).
+                    tools = m.tools.map { t ->
+                        if (t.isRunning) {
+                            t.copy(
+                                state = ToolState.COMPLETED,
+                                finishedAt = if (t.finishedAt > 0L) {
+                                    t.finishedAt
+                                } else {
+                                    System.currentTimeMillis()
+                                }
+                            )
+                        } else {
+                            t
+                        }
+                    },
                     // Keep whatever text arrived. An empty bubble is finalised as
                     // empty and marked, so the user is told the turn ended rather
                     // than left watching "thinking..." forever.
@@ -4070,6 +4091,40 @@ class ChatViewModel(
                                             tools = merge.tools.ifEmpty { it.tools },
                                             error = m.finishError ?: it.error
                                         )
+                                    }
+                                } else if (m.role == "tool" && m.toolResults.isNotEmpty()) {
+                                    // The engine's REAL completion signal: a
+                                    // role="tool" message carries the result,
+                                    // its is_error flag, and the engine's own
+                                    // start/end metadata. Live rows stay
+                                    // RUNNING until this lands because the
+                                    // assistant frame's `finished` flag is
+                                    // only part-final (device finding
+                                    // 2026-11-14: sleep-8 "finished" in
+                                    // 274 ms, executed 2m20s later).
+                                    var completedAny = false
+                                    m.toolResults.forEach { r ->
+                                        if (r.toolCallId.isNotBlank() &&
+                                            handle.completeTool(
+                                                callId = r.toolCallId,
+                                                failed = r.failed,
+                                                durationMs = r.durationMs
+                                            )
+                                        ) {
+                                            completedAny = true
+                                            AppLog.i(
+                                                TAG,
+                                                "tool_result observed instance=$instanceKey " +
+                                                    "call=${r.toolCallId.take(12)} " +
+                                                    "failed=${r.failed} " +
+                                                    "duration=${r.durationMs}ms"
+                                            )
+                                        }
+                                    }
+                                    if (completedAny) {
+                                        updateStreaming(handle) {
+                                            it.copy(tools = handle.snapshotTools())
+                                        }
                                     }
                                 } else if (m.subAgentReports.isNotEmpty()) {
                                     // v0.100.0 reports are user-role messages

@@ -1,6 +1,7 @@
 package com.crush.mobile.data.crush
 
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 
 /**
  * A decoded frame from `GET /v1/workspaces/{id}/events`.
@@ -131,6 +132,33 @@ data class StreamMessage(
         get() = parts.filter { it.optString("type") == "tool_call" }
 
     /**
+     * Engine `tool_result` parts, i.e. the result of a call that ACTUALLY ran.
+     *
+     * v0.100.0 persists each result as its own `role="tool"` message whose
+     * only part is `{"type":"tool_result","data":{...}}`. The data carries
+     * `tool_call_id`, `is_error`, and a `metadata` field that is a
+     * JSON-ENCODED STRING (not an object) of engine execution facts:
+     * `{"start_time":1794621312209,"end_time":…,"output":"…"}` (epoch ms,
+     * confirmed from the on-device DB 2026-11-14).
+     *
+     * The start/end pair is the ONLY real execution duration on the wire.
+     * The assistant tool-call frame's `finished` flag is part-final and can
+     * precede execution by minutes (sleep-8 finding, 2026-11-14), so this
+     * accessor is what lets the UI complete a row honestly and show a true
+     * duration instead of frame latency.
+     */
+    val toolResults: List<ToolResult>
+        get() = parts.filter { it.optString("type") == "tool_result" }
+            .mapNotNull { part ->
+                val d = part.data() ?: return@mapNotNull null
+                ToolResult(
+                    toolCallId = d.optString("tool_call_id").orEmpty(),
+                    failed = d.optBoolean("is_error") ?: false,
+                    durationMs = parseResultDurationMs(d.optString("metadata"))
+                )
+            }
+
+    /**
      * Detached sub-agent reports attached to this message.
      *
      * v0.100.0 writes a completed/failed sub-agent run back as a NEW USER
@@ -168,6 +196,35 @@ data class SubAgentReport(
 )
 
 /**
+ * One tool execution result, as a v0.100.0 `role="tool"` message carries it.
+ *
+ * [durationMs] is the engine's own `end_time - start_time` from the metadata
+ * string, or 0 when the metadata is absent/malformed or the pair is inverted -
+ * the UI then shows no duration rather than a guessed one.
+ */
+data class ToolResult(
+    val toolCallId: String = "",
+    val failed: Boolean = false,
+    val durationMs: Long = 0L
+)
+
+/**
+ * Extracts `end_time - start_time` (epoch ms) from a tool result's `metadata`.
+ *
+ * The field is a JSON STRING on the wire, not an object, so it needs a second
+ * parse. Anything unexpected yields 0: a wrong duration is worse than none.
+ */
+private fun parseResultDurationMs(metadata: String?): Long {
+    if (metadata.isNullOrBlank()) return 0L
+    val root = runCatching { JsonParser.parseString(metadata) }.getOrNull() ?: return 0L
+    if (!root.isJsonObject) return 0L
+    val obj = root.asJsonObject
+    val start = obj.optLongOrNull("start_time") ?: return 0L
+    val end = obj.optLongOrNull("end_time") ?: return 0L
+    return if (end >= start) end - start else 0L
+}
+
+/**
  * Reads the `data` sub-object, or null when absent/null/not an object.
  *
  * Must NOT use getAsJsonObject(): that throws ClassCastException when the value
@@ -201,3 +258,15 @@ internal fun JsonObject.optString(key: String): String? =
 
 internal fun JsonObject.optBoolean(key: String): Boolean? =
     if (has(key) && !get(key).isJsonNull) get(key).asBoolean else null
+
+/**
+ * Reads a numeric primitive as Long, or null when it is absent, null, or not
+ * a parseable number. Same safety rule as [optString]: never let a malformed
+ * engine field throw out of a parser.
+ */
+private fun JsonObject.optLongOrNull(key: String): Long? =
+    if (has(key) && get(key).isJsonPrimitive) {
+        runCatching { get(key).asLong }.getOrNull()
+    } else {
+        null
+    }

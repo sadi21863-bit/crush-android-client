@@ -36,17 +36,28 @@ import androidx.compose.runtime.Immutable
  * the fallback, so both the whole envelope and legacy reduced payloads parse.
  *
  * State: the engine sends NO text state for tool calls - it sends a `finished`
- * boolean. Streaming frames omit it (or carry `input:""`), history keeps it
- * set. So: finished==true -> COMPLETED; a `state` string still maps through
- * [parseState]; a part with an id but neither -> RUNNING; else UNKNOWN.
- * NEVER optimistically claimed COMPLETED without `finished:true`.
+ * boolean. History keeps it set; on the live stream it can settle EARLY (see
+ * the correction below). So: finished==true -> COMPLETED; a `state` string
+ * still maps through [parseState]; a part with an id but neither -> RUNNING;
+ * else UNKNOWN. NEVER optimistically claimed COMPLETED without `finished:true`.
  *
- * Permission requests (the OTHER shape carrying tool_name/tool_call_id/
- * params/path/description) still parse through the same candidate lists -
- * spec/crush-openapi.json documents those names, but engine v0.98.1 does not
- * broadcast `permission_request` on the events stream at all (D3 finding),
- * so today the app cannot receive that shape live. The lists are kept per
- * the spec ahead of the engine fix.
+ * CORRECTION 2026-11-14 (`finished` is PART-final, not execution-final): a
+ * `sleep 8` bash call streamed `finished:true` 274 ms after first sighting,
+ * then raised a permission request and only EXECUTED 2m20s later (engine
+ * result metadata: start 07:25:04.166, end 07:25:12.209). Two `echo` calls
+ * showed 178/104 ms chips against 1 ms of recorded execution. So the live
+ * `finished` flag marks the tool-call PART as final (the model finished
+ * emitting it), not the tool's execution. Live rows therefore stay RUNNING
+ * until their `tool_result` message arrives; [RunHandle.completeTool] records
+ * the engine's real start/end metadata as [durationMs]. A `run_complete`
+ * settles any row that never got a result (denied, stopped) without
+ * inventing a duration.
+ *
+ * Permission requests (tool_name/tool_call_id/params/path/description) parse
+ * through the same candidate lists; v0.98.2+ delivers them live (device-
+ * verified again 2026-11-14: dialog rendered, grant resumed the run). While
+ * one is pending the turn is blocked, so its row stays RUNNING - nothing has
+ * executed until the user answers.
  */
 /**
  * [Immutable] is a composability ASSERTION (analysis §4 P0-1): the class holds a
@@ -72,15 +83,25 @@ data class ToolActivity(
     val path: String? = null,
     val error: String? = null,
     /**
-     * App-observed wall-clock timestamps (epoch ms), stamped by
-     * [RunHandle.mergeTools] on the first and final frames of this call id.
-     *
-     * These are deliberately APP observations, not engine timings: the wire
-     * carries no start/finish timestamps. 0 means "not observed yet", so a
-     * replayed history row shows no duration rather than inventing one.
+     * App-observed wall-clock timestamps (epoch ms). [firstSeenAt] is stamped
+     * by [RunHandle.mergeTools] on the first sighting; [finishedAt] is stamped
+     * when the app observes the call's `tool_result` (or the turn's
+     * `run_complete` settles it). 0 means "not observed yet", so a replayed
+     * history row shows no timestamps rather than inventing them.
      */
     val firstSeenAt: Long = 0L,
-    val finishedAt: Long = 0L
+    val finishedAt: Long = 0L,
+    /**
+     * Real execution duration in ms, from the `tool_result` metadata's
+     * `start_time`/`end_time` (epoch ms) - ENGINE-reported, and shown only
+     * when present. 0 means the app never saw a timed result (history replay,
+     * a denied call, or a run settled without one), so no chip is drawn.
+     *
+     * This replaced the old first-frame-to-finish chip: the wire's `finished`
+     * flag turned out to be PART-final, so that span measured frame latency,
+     * not execution (device finding 2026-11-14).
+     */
+    val durationMs: Long = 0L
 ) {
     /** A running tool should read as live, not as finished. */
     val isRunning: Boolean get() = state == ToolState.RUNNING || state == ToolState.PENDING

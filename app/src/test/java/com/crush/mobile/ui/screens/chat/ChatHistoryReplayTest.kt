@@ -4,6 +4,7 @@ import com.crush.mobile.data.crush.StreamMessage
 import com.google.gson.JsonParser
 import com.google.gson.JsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -116,5 +117,43 @@ class ChatHistoryReplayTest {
         assertNotNull(row)
         assertTrue(row!!.reports[0].failed)
         assertEquals("", row.reports[0].model)
+    }
+
+    @Test
+    fun `a tool result carries the call id, failure flag and engine duration`() {
+        // Exact v0.100.0 shape from the on-device DB (2026-11-14): the result
+        // is its own role="tool" message and `metadata` is a JSON-encoded
+        // STRING holding the engine's start/end epoch ms.
+        val result = obj(
+            """{"type":"tool_result","data":{"tool_call_id":"call_1","name":"bash",
+               "content":"step-one","metadata":"{\"start_time\":1794620808982,\"end_time\":1794620808983,\"output\":\"step-one\"}",
+               "is_error":false}}"""
+        )
+        val m = msg("t1", "tool", listOf(result))
+        assertEquals(1, m.toolResults.size)
+        assertEquals("call_1", m.toolResults[0].toolCallId)
+        assertFalse(m.toolResults[0].failed)
+        assertEquals(1L, m.toolResults[0].durationMs)
+    }
+
+    @Test
+    fun `malformed or missing tool_result metadata yields no invented duration`() {
+        val bad = obj(
+            """{"type":"tool_result","data":{"tool_call_id":"call_1","metadata":"not json","is_error":true}}"""
+        )
+        val badResult = msg("t2", "tool", listOf(bad)).toolResults[0]
+        assertTrue(badResult.failed)
+        assertEquals(0L, badResult.durationMs)
+
+        val absent = obj("""{"type":"tool_result","data":{"tool_call_id":"call_2"}}""")
+        assertEquals(0L, msg("t3", "tool", listOf(absent)).toolResults[0].durationMs)
+    }
+
+    @Test
+    fun `an inverted start and end time yields no duration`() {
+        val inverted = obj(
+            """{"type":"tool_result","data":{"tool_call_id":"call_1","metadata":"{\"start_time\":200,\"end_time\":100}"}}"""
+        )
+        assertEquals(0L, msg("t4", "tool", listOf(inverted)).toolResults[0].durationMs)
     }
 }

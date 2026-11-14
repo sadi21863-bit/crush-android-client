@@ -111,13 +111,18 @@ class RunHandleTest {
         assertEquals(1_000L, first.tools[0].firstSeenAt)
         assertEquals(0L, first.tools[0].finishedAt)
 
-        val bashDone = bashRunning.copy(state = ToolState.COMPLETED, output = "ok")
-        val second = handle.mergeTools(listOf(bashDone), nowMs = 2_500L)
+        // A `finished:true` republish is PART-final, not execution-final:
+        // the row must stay RUNNING until the tool_result arrives.
+        val bashPartFinal = bashRunning.copy(state = ToolState.COMPLETED, output = "ok")
+        val second = handle.mergeTools(listOf(bashPartFinal), nowMs = 2_500L)
         assertEquals("the same call must update, not duplicate", 1, second.tools.size)
         assertEquals(0, second.added.size)
-        assertEquals(ToolState.COMPLETED, second.tools[0].state)
+        assertEquals(
+            "a part-final frame must not complete the row",
+            ToolState.RUNNING, second.tools[0].state
+        )
         assertEquals(1_000L, second.tools[0].firstSeenAt)
-        assertEquals(2_500L, second.tools[0].finishedAt)
+        assertEquals(0L, second.tools[0].finishedAt)
 
         val read = ToolActivity(
             id = "call-2", name = "read", args = "{}", state = ToolState.RUNNING, output = ""
@@ -129,18 +134,85 @@ class RunHandleTest {
     }
 
     @Test
+    fun `completeTool is the only live completion and records the engine duration`() {
+        // Device truth 2026-11-14: `sleep 8` streamed finished=true after
+        // 274 ms, then executed only after a permission grant, ending with
+        // engine metadata start 07:25:04.166 / end 07:25:12.209.
+        val handle = RunHandle(turnId = "t1")
+        val row = ToolActivity(
+            id = "call-1", name = "bash", args = "{}", state = ToolState.RUNNING, output = ""
+        )
+        handle.mergeTools(listOf(row), nowMs = 1_000L)
+        handle.mergeTools(listOf(row.copy(state = ToolState.COMPLETED)), nowMs = 1_274L)
+        assertEquals(ToolState.RUNNING, handle.snapshotTools()[0].state)
+
+        val completed = handle.completeTool(
+            callId = "call-1", failed = false, durationMs = 8_043L, nowMs = 140_000L
+        )
+        assertTrue(completed)
+        val settled = handle.snapshotTools()[0]
+        assertEquals(ToolState.COMPLETED, settled.state)
+        assertEquals("engine duration, not frame latency", 8_043L, settled.durationMs)
+        assertEquals(140_000L, settled.finishedAt)
+        assertEquals(1_000L, settled.firstSeenAt)
+    }
+
+    @Test
     fun `a late republish cannot downgrade a completed tool row`() {
         val handle = RunHandle(turnId = "t1")
         val done = ToolActivity(
             id = "call-1", name = "bash", args = "{}",
-            state = ToolState.COMPLETED, output = "ok"
+            state = ToolState.RUNNING, output = "ok"
         )
         handle.mergeTools(listOf(done), nowMs = 1_000L)
+        handle.completeTool(
+            callId = "call-1", failed = false, durationMs = 117L, nowMs = 2_000L
+        )
         val runningAgain = done.copy(state = ToolState.RUNNING, output = "")
-        val merged = handle.mergeTools(listOf(runningAgain), nowMs = 2_000L)
+        val merged = handle.mergeTools(listOf(runningAgain), nowMs = 3_000L)
         assertEquals(ToolState.COMPLETED, merged.tools[0].state)
         assertEquals("ok", merged.tools[0].output)
-        assertEquals(1_000L, merged.tools[0].finishedAt)
+        assertEquals("the engine duration survives the republish", 117L, merged.tools[0].durationMs)
+        assertEquals(2_000L, merged.tools[0].finishedAt)
+    }
+
+    @Test
+    fun `completeTool ignores an unknown call id and invents no row`() {
+        // The result can race ahead of the call frame; completing nothing is
+        // honest, and a phantom row would be a lie.
+        val handle = RunHandle(turnId = "t1")
+        assertFalse(handle.completeTool(callId = "call-late", failed = false))
+        assertTrue(handle.snapshotTools().isEmpty())
+    }
+
+    @Test
+    fun `a failed tool_result marks the row failed`() {
+        val handle = RunHandle(turnId = "t1")
+        handle.mergeTools(
+            listOf(
+                ToolActivity(
+                    id = "call-1", name = "bash", args = "{}",
+                    state = ToolState.RUNNING, output = ""
+                )
+            ),
+            nowMs = 1_000L
+        )
+        handle.completeTool(callId = "call-1", failed = true, durationMs = 31L)
+        assertEquals(ToolState.FAILED, handle.snapshotTools()[0].state)
+        assertEquals(31L, handle.snapshotTools()[0].durationMs)
+    }
+
+    @Test
+    fun `an explicit failure frame is not held running`() {
+        // `finished` is part-final, but a failure is a definite outcome and
+        // stays visible while the turn is still open.
+        val handle = RunHandle(turnId = "t1")
+        val failed = ToolActivity(
+            id = "call-1", name = "bash", args = "{}",
+            state = ToolState.FAILED, output = "", error = "exit 1"
+        )
+        val merged = handle.mergeTools(listOf(failed), nowMs = 1_000L)
+        assertEquals(ToolState.FAILED, merged.tools[0].state)
     }
 
     @Test

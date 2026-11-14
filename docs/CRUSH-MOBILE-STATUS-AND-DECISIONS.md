@@ -7,12 +7,14 @@ pointers — it never copies long sections; each claim links the ledger
 that owns it. Facts that moved after the pack's pin are restated here
 from the repo's own records, with what was re-verified live marked.
 
-Last verified: code HEAD `af178f8` (2026-11-14). The v0.100.0 merge
-`6800c0e` remains CI-green (run 43227604396); `7346e20` (the fetch-default
-ratchet + `FetchScriptPinTest`) carries a local gate of **689/0/0 across 74
-suites** and CI run **43244539199 GREEN**; the #9 fix `b7b4ae5` and the AFA
-review-hardening `af178f8` carry local gates of 715/76 and **716/0/0 across
-76 suites** (lint 0 errors / 1 warning). Only docs commits collect above it.
+Last verified: code HEAD `af178f8` (2026-11-14), docs HEAD `2fef885`. The
+v0.100.0 merge `6800c0e` remains CI-green (run 43227604396); `7346e20` (the
+fetch-default ratchet + `FetchScriptPinTest`) carries a local gate of
+**689/0/0 across 74 suites** and CI run **43244539199 GREEN**; the #9 fix
+`b7b4ae5` and the AFA review-hardening `af178f8` carry local gates of 715/76
+and **716/0/0 across 76 suites** (lint 0 errors / 1 warning). CI run
+**43592253901 GREEN** (3m12s) covers the `2fef885` push. Only docs commits
+collect above the code HEAD.
 
 ---
 
@@ -81,6 +83,7 @@ review-hardening `af178f8` carry local gates of 715/76 and **716/0/0 across
 | `022ca46` (2026-11-14) | docs: storage-strategy research — AFA vs narrow SAF vs the two-flavor split, primary sources S1–S14; direct answer: live bidirectional sync is not equivalent to AFA (SAF is `content://` provider access; the native engine needs a POSIX cwd) | docs-only |
 | `1581a37` (2026-11-14) | docs: **AFA-first decision** — attempt All Files Access on the first Play submission (declaration + demo video + review instructions; Document-management category), with the two-flavor SAF-mirror fallback pre-scoped. **The owner then deferred the release: no submission is in flight** | docs-only |
 | `af178f8` (2026-11-14) | **AFA REVIEW HARDENING (prepared, not submitted)**: the Android 11+ AFA request now sits behind a just-in-time "All files access, explained" dialog (never at launch; "Not now" exits cleanly), and the importer refuses the volume root as a project (`FolderUriDecoder.primaryProjectPathFromTreeDocumentId`, unit-pinned) with a specific error. App-level boundary, not an OS sandbox; API 29 device cannot exercise the dialog, so proof is compile/unit-level | ✅ completed-success — local gate green per-XML 716 tests / 76 suites / 0 failures; lint 0 errors / 1 warning |
+| `2fef885` (2026-11-14) | docs sweep + submission package: per-XML count census (716/76), AFA hardening and release-deferral folded across the ledger, `docs/play-afa-submission-2026-11-14.md` added | docs-only — CI run **43592253901 GREEN** (3m12s) |
 
 **GATE 0 = CLOSED on both halves.** Code: `7ec34ed` (S-01), `3a3a233`
 (S-02), `f5d24dc` (S-04), wording-honesty in S-03's ledger row. Device:
@@ -93,9 +96,9 @@ Branch state truth (2026-11-14): code rows above the 2026-11-12 line are
 0 failures, lint 0 errors / 1 warning), `3bd9107` (docs: #1 closed + #9 device
 proof), `022ca46` (docs: storage-strategy research), `1581a37` (docs:
 AFA-first decision). `af178f8` is the AFA review-hardening code commit (local
-gate 716 tests / 76 suites / 0 failures; lint 0 errors / 1 warning); the doc
-sweep and submission draft collect above it. The 2026-11-12 chain below is
-retained as the v0.100.0 merge record.
+gate 716 tests / 76 suites / 0 failures; lint 0 errors / 1 warning); `2fef885`
+is the docs sweep + submission package above it (CI run 43592253901 GREEN).
+The 2026-11-12 chain below is retained as the v0.100.0 merge record.
 
 Branch state truth (2026-11-12, post-merge): code HEAD = `7346e20` (the
 fetch-default ratchet + `FetchScriptPinTest`; local gate 689/0/0, CI run

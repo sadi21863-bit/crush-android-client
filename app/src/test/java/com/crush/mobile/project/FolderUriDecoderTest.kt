@@ -38,6 +38,15 @@ class FolderUriDecoderTest {
     }
 
     @Test
+    fun `the volume root is not an importable project`() {
+        assertNull(FolderUriDecoder.primaryProjectPathFromTreeDocumentId("primary:"))
+        assertEquals(
+            "/storage/emulated/0/Test project folder",
+            FolderUriDecoder.primaryProjectPathFromTreeDocumentId("primary:Test project folder")
+        )
+    }
+
+    @Test
     fun `non-primary volumes are refused`() {
         assertNull(FolderUriDecoder.primaryPathFromTreeDocumentId("downloads:Test project folder"))
         assertNull(FolderUriDecoder.primaryPathFromTreeDocumentId("XXXX-usbstorage:code"))

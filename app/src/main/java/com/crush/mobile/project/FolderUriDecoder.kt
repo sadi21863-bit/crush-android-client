@@ -45,6 +45,18 @@ object FolderUriDecoder {
         }
     }
 
+    /**
+     * Same as [primaryPathFromTreeDocumentId], but refuses the volume root.
+     *
+     * A project is a folder the user chose, not the whole of shared storage.
+     * Importing `/storage/emulated/0` itself would make every file on the
+     * device a project workspace and is exactly the over-broad shape Play
+     * reviewers look for. The permission is still device-wide at the OS level;
+     * this is an app-level import boundary, not a sandbox.
+     */
+    fun primaryProjectPathFromTreeDocumentId(treeDocumentId: String?): String? =
+        primaryPathFromTreeDocumentId(treeDocumentId)?.takeIf { it != PRIMARY_ROOT }
+
     /** The user-facing label for a path this decoder produced. */
     fun displayNameFor(path: String): String =
         path.substringAfterLast('/').ifEmpty { path }

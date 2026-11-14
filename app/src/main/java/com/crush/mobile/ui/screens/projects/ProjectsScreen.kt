@@ -103,14 +103,24 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         val docId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
-        val path = FolderUriDecoder.primaryPathFromTreeDocumentId(docId)
-        if (path == null) {
-            importError =
-                "That location has no real folder path on this phone - " +
-                    "please pick a folder in internal storage."
-        } else {
-            importError = null
-            vm.importFolderAsProject(FolderUriDecoder.displayNameFor(path), path)
+        val mappedPath = FolderUriDecoder.primaryPathFromTreeDocumentId(docId)
+        val path = FolderUriDecoder.primaryProjectPathFromTreeDocumentId(docId)
+        when {
+            mappedPath == FolderUriDecoder.PRIMARY_ROOT -> {
+                // Importing the volume root would turn every file on the phone
+                // into a workspace; a project is a folder the user chose.
+                importError =
+                    "Pick a project folder, not the root of internal storage."
+            }
+            path == null -> {
+                importError =
+                    "That location has no real folder path on this phone - " +
+                        "please pick a folder in internal storage."
+            }
+            else -> {
+                importError = null
+                vm.importFolderAsProject(FolderUriDecoder.displayNameFor(path), path)
+            }
         }
     }
 
@@ -147,16 +157,19 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
         }
     }
 
+    // Explain All Files Access BEFORE sending the user to the system screen.
+    // The request is just-in-time (only when importing a project), never on
+    // launch, and the copy is deliberately honest about the grant being
+    // device-wide: the app-level boundary is the imported folder, not a
+    // sandbox the OS enforces.
+    var afaRationaleOpen by remember { mutableStateOf(false) }
+
     val importClick = {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (Environment.isExternalStorageManager()) {
                 pickTreeFolder.launch(null)
             } else {
-                val intent = Intent(
-                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                    Uri.parse("package:${context.packageName}")
-                )
-                askAllFilesAccess.launch(intent)
+                afaRationaleOpen = true
             }
         } else {
             val missing = storagePermissions.filter {
@@ -169,6 +182,48 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
                 askStoragePermission.launch(missing.toTypedArray())
             }
         }
+    }
+
+    if (afaRationaleOpen) {
+        AlertDialog(
+            onDismissRequest = { afaRationaleOpen = false },
+            title = { Text("All files access, explained") },
+            text = {
+                Text(
+                    "Crush runs a native coding engine inside the folder you " +
+                        "import. Android cannot give a native process a scoped " +
+                        "SAF folder, so the engine needs All files access to " +
+                        "edit that folder in place.\n\n" +
+                        "Android grants the permission device-wide. Crush uses " +
+                        "it only for the project folder you choose: it does " +
+                        "not browse, index, or scan your other files.\n\n" +
+                        "On the next screen, turn on All files access for " +
+                        "Crush, then return here."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        afaRationaleOpen = false
+                        // Re-checked here (not just in importClick) so lint sees
+                        // the API-30-gated constant inside its own guard, and so
+                        // this dialog can never launch the intent on API 29.
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                Uri.parse("package:${context.packageName}")
+                            )
+                            askAllFilesAccess.launch(intent)
+                        }
+                    }
+                ) { Text("Continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = { afaRationaleOpen = false }) {
+                    Text("Not now")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -197,6 +252,13 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
                 Spacer(Modifier.width(6.dp))
                 Text("Import folder")
             }
+            Text(
+                "Crush edits the folder you choose in place. It does not browse " +
+                    "or scan your other files.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp)
+            )
             importError?.let { err ->
                 Text(
                     err,

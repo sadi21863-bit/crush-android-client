@@ -95,6 +95,16 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   line, then extend `tools/engine-rails.ps1` with a `-ChatWallProbe` mode
   (guided, not unattended). Rail 4 stays OBSERVE unless a fake-provider
   harness is built.
+- **Result (2026-11-14):** rail 3 PASSES on device with the existing logging
+  (no new code needed). Chat pool `f512367f`: `35 ids denied` readback,
+  `engine Running after 4151ms`, a bash prompt produced only DSML prose; the
+  whole-process log carried **0** `tool_call observed instance=chat`, **0**
+  `permission requested`, **0** `chat deny-all`. Negative control on folder 2
+  (`pd871eee8`, session `7271d703`): the same prompt ran `bash`
+  (`run=db7ad506`, on-screen row 217 ms + `TOOL-RAN`). Rail 4 remains
+  OBSERVE (no outbound-`tools[]` capture). `-ChatWallProbe` was not built:
+  the three zeros plus the Code control decide the rail, so the scripted mode
+  would duplicate the gate cost without adding a verdict.
 
 ### B2. `sub_agent_report` render (rail 6)
 
@@ -261,3 +271,14 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   06:46:46, report card `cleo-live-ok` / `LIVE-OK` + parent `LIVE-DONE`
   on screen 06:47:04 without reopening, one replacement, then quiet.
   `LateReportRefreshTest` pins the decision.
+- **#5 rail 3 zero-tool wall (device, 2026-11-14):** chat pool
+  `f512367f` bound with `35 ids denied` readback in 4151 ms; a bash prompt
+  drew only DSML prose (plain bubble), and the whole-process log held
+  **0** `tool_call observed instance=chat`, **0** `permission requested`,
+  **0** `chat deny-all`. Negative control in folder 2 (`pd871eee8`,
+  session `7271d703`): `bash` ran (`run=db7ad506`, checked row 217 ms) and
+  the reply was `TOOL-RAN`. Rail 4 kept at OBSERVE — no harness captures
+  the outbound `tools[]`; the prose attempt executed nothing. The scripted
+  runner on the same process: `-ExpectedVersion 0.100.0 -MinDenied 35` ->
+  **8 PASS / 0 FAIL** (35 on-disk ids, MODE_ENUM, zero route failures, one
+  designed locked refusal, no FATAL).

@@ -620,6 +620,44 @@ reopening, and the log shows exactly one `late sub-agent report due for
 session 7271d703; replaying transcript`. Forty-five more seconds of polls
 produced no second replacement: the persisted state had gone quiet.
 
+### Zero-tool chat wall (rail 3) — device-proven 2026-11-14 07:00–07:07
+
+**Chat pool: no tool surface at all.** `+` bound the dedicated chat
+instance: `chat tool policy installed and readback-verified (35 ids
+denied)` and `[chat] engine Running after 4151ms`, chat session
+`f512367f`. The prompt asked for `bash` (`echo rail3`) and for an exact
+`NO-BASH-TOOL` reply otherwise. The model attempted the call only as
+prose (`< | DSML | invoke name="bash">` rendered as a plain bubble, no
+tool row). Whole-process counts in `files/app.log` (pid 10157):
+**0** `tool_call observed instance=chat`, **0** `permission requested`,
+**0** `chat deny-all`; the two `observed tool_call shape` lines present
+at that point were the earlier Code-pool `agent_dispatch` turn's (the
+negative control below adds two more). With the built-ins hidden there is no
+permission request to auto-deny, so all three zeros are the designed
+wall.
+
+**Code pool: negative control passes.** Switch to folder 2
+(`pd871eee8`, `engine Running after 3337ms`, session `7271d703`) and the
+same probe produced `observed tool_call shape … name=bash` at 07:07:36,
+`tool_call observed instance=pd871eee8 name=bash run=db7ad506`, the
+finished shape, and on screen the checked `bash` row
+(`echo rail3-code`, 217 ms) followed by `TOOL-RAN`. The same model that
+was walled in the chat pool executes tools in a Code pool, so the chat
+zeros are a policy effect, not a model refusal.
+
+**Rail 4 (fresh advertisement) stays OBSERVE:** `GET …/agent` exposes no
+tool list, and there is no fake-provider harness to capture the
+outbound `tools[]`; the DSML prose attempt above is the only observed
+evidence of stale-name advertising, and it executed nothing.
+
+The scripted runner agrees as a second source on the same process:
+`tools/engine-rails.ps1 -ExpectedVersion 0.100.0 -MinDenied 35` ->
+**8 PASS / 0 FAIL** (v0.100.0 bound; bootstrap attempts=3 failures=0
+with one designed locked refusal; `MODE_ENUM` / `open: normal`; zero
+permission-route failures; 35 on-disk ids; no FATAL). Its tool-wall
+section reports OBSERVE by design — attribution to the chat pool is the
+manual count above.
+
 ### Gate-1 device stress drive — E6 warm-switch + E5 back-nav, 2026-11-06 evening (device `bbf8ca69`, clean-rebuilt `app-debug`, same session's app pid `3053` throughout)
 
 **E6 warm-switch stress: PASS (within the two-row limitation below).**

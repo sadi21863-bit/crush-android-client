@@ -591,16 +591,34 @@ and rendered the dedicated card — `Sub-agent pepper-subagent-ok` with
 `opencode-go/deepseek-v4...` and monospace `SUBAGENT-OK` — followed by the
 parent `DONE` bubble.
 
-**LIMITATION FOUND (live append missing).** The report arrived ~6 s after
-dispatch, while the screen was still open, but the transcript did NOT
-append it: the turn's event stream had already closed on `end_turn`, and
-the app only re-reads messages on session (re)open. The screen said
-"waiting for its report" for ~4 minutes until the session was reopened.
-The session list's message count did refresh (2 -> 8 msg), so metadata
-updates but the open transcript does not. Follow-up: consume
-engine-initiated wake runs (or a bounded post-dispatch re-fetch) so
-detached reports append live; this is the one behavior the optional
-device run exposed beyond replay.
+**LIVE APPEND — fix shipped and proven 2026-11-14 06:46 (`dc45c78`).** The
+first device run exposed the gap: the report arrived ~6 s after dispatch,
+while the screen was open, but the transcript did NOT append it - the
+turn's event stream had already closed on `end_turn`, and the event router
+only forwards to registered run ids, so the later engine frames had nowhere
+to go. The screen stayed on "waiting for its report" until a reopen; the
+session list's message count did refresh (2 -> 8 msg), so only the open
+transcript was stale.
+
+The fix marks a turn that observed `agent_dispatch` / `agent_send` on its
+stream (`RunHandle.dispatchedSubAgent`), then schedules a bounded post-turn
+re-read of the accepted session (first at 10 s, then every 20 s, 15 polls
+max). Each poll re-attaches the workspace, fetches `messages`, and applies
+the same `replayRow` replay a reopen uses - only when the replay contains a
+report AND differs from the screen, and only if the bound engine instance,
+active session and idle state all still match and the on-screen transcript
+is unchanged since the fetch began. A turn with no report, or an identical
+replay, is never written; the parent's post-report wake reply refreshes on a
+later poll. Pinned by `LateReportRefreshTest`.
+
+Device proof on this build, folder 2, same open chat session `7271d703`,
+prompt asking for `agent_dispatch` -> `LIVE-OK` -> `LIVE-DONE`:
+`tool_call observed ... name=agent_dispatch run=bbadd146` at 06:46:46; the
+card `Sub-agent cleo-live-ok` / `opencode-go/deepseek-v4.1-flash` /
+`LIVE-OK` and the parent `LIVE-DONE` were on screen at 06:47:04 WITHOUT
+reopening, and the log shows exactly one `late sub-agent report due for
+session 7271d703; replaying transcript`. Forty-five more seconds of polls
+produced no second replacement: the persisted state had gone quiet.
 
 ### Gate-1 device stress drive — E6 warm-switch + E5 back-nav, 2026-11-06 evening (device `bbf8ca69`, clean-rebuilt `app-debug`, same session's app pid `3053` throughout)
 

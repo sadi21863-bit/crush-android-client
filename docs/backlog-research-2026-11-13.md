@@ -252,5 +252,12 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   **Live append gap found:** the report arrived ~6 s after dispatch but
   the open transcript stayed on "waiting for its report" until the
   session was reopened; the turn stream closes at `end_turn`, and only
-  session (re)open re-reads messages. Follow-up: consume engine-initiated
-  wake runs or bounded post-dispatch re-fetch.
+  session (re)open re-reads messages.
+  **Fixed 2026-11-14 (`dc45c78`):** a delegating turn now schedules a
+  bounded post-turn re-read (10 s + 20 s x15) and applies the reopen
+  replay when a report is present and the transcript changed, guarded by
+  bound instance/session/idle state and an unchanged on-screen list.
+  Device-proven on a clean install in the same open session: dispatch
+  06:46:46, report card `cleo-live-ok` / `LIVE-OK` + parent `LIVE-DONE`
+  on screen 06:47:04 without reopening, one replacement, then quiet.
+  `LateReportRefreshTest` pins the decision.

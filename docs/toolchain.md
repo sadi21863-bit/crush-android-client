@@ -44,8 +44,8 @@ a reasonable de-risking step, but it is a **change to be made deliberately**, no
 a bug to be fixed: the build was green across 401 unit tests and repeated signed
 release builds on AGP 9.4.1 / Gradle 9.8 with the split in place. (The suite has
 grown since: 455 `@Test` methods in 39 files as of 2026-10-31, 594 in
-57 files as of 2026-11-08, and **689 tests across 74 suites** by the
-runner-verified per-XML census of 2026-11-12.) If aligning,
+57 files as of 2026-11-08, and **716 tests across 76 suites** by the
+runner-verified per-XML census of 2026-11-14.) If aligning,
 change both to 2.4.20 in one commit and re-run the full suite.
 
 ## The AGP 10 problem
@@ -65,7 +65,9 @@ AGP 10 removes both. When it arrives:
 ## Backup plan (in priority order)
 
 ### Step 0 — Do nothing yet
-AGP 10 is not released. Latest stable is 9.4.1. There is nothing to action today.
+AGP 10 is not released. This project is on 9.4.1; Google Maven listed 9.5.0
+stable on 2026-10-31 (see the re-check note below), so the project's patch
+line is deliberately not the newest stable. There is nothing to action today.
 This document exists so the next agent does not rediscover it from scratch.
 
 > **2026-10-31 re-check:** still nothing to action. Google Maven (metadata

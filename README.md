@@ -12,17 +12,20 @@ Crush ships for macOS, Linux, Windows and BSD. **Android is not one of those pla
 
 ## Status
 
-> **Last verified:** 2026-11-12 — the **Crush engine v0.100.0** upgrade merged
-> as `6800c0e` (CI run 43227604396 green) after the full T3 device-rail pass on
-> `bbf8ca69` (scripted rails 8/0, F04 fresh consent, cold-boot resume, E6
-> switch stress, same-destination dispatch, and the rollback drill proving
-> v0.99 opens v0.100 session data unchanged). The follow-up ratchet `7346e20`
-> makes the fetch default track the Kotlin pin (`FetchScriptPinTest`, CI run
-> 43244539199 green). The current capability ledger is
-> [docs/capabilities.md](docs/capabilities.md); the commit chain and the
-> acceptance kit live in
+> **Last verified:** 2026-11-14 — the tool-call timeline now completes rows on
+> the engine's `tool_result` frame with engine-supplied durations (#9,
+> `b7b4ae5`; device-proven on `bbf8ca69`: a `sleep 8` row stayed spinning
+> through the permission dialog, then showed `8.0s` only after
+> `tool_result observed … duration=8031ms`). The repo-root plaintext test key
+> is closed (`decisions-open.md` §3: rotated at the provider and removed
+> 2026-11-14). The **Crush engine v0.100.0** remains the engine of record
+> (merged as `6800c0e` after the T3 device-rail pass and rollback drill); the
+> current capability ledger is [docs/capabilities.md](docs/capabilities.md);
+> the commit chain and the acceptance kit live in
 > [docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md)
-> and [docs/engine-acceptance-kit.md](docs/engine-acceptance-kit.md).
+> and [docs/engine-acceptance-kit.md](docs/engine-acceptance-kit.md). The Play
+> release is **deferred by the owner**; the AFA-first submission package and
+> the import-flow review hardening are prepared, not submitted.
 
 Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / API 29):
 
@@ -35,15 +38,15 @@ Verified end-to-end on a physical arm64 device (Redmi Note 7 Pro, Android 10 / A
 | Markdown rendering | ✅ verified — code blocks, inline code, emphasis, lists |
 | Live model discovery with probing | ✅ verified — never hardcoded |
 | Long-lived workspace SSE | ✅ verified — no ~30s reap between turns |
-| Tool-call visibility | ✅ built — wire format CONFIRMED 2026-10-25 (D3): tool_call parts carry data {id, name, input (args as a JSON string), finished (bool)}; parser reads data first, pinned by unit tests |
-| File diffs | ✅ built and JVM-tested — a real edited-file turn rendered on device 2026-10-29 (z6/z7: `diff-created(+1/-0)`, diff-edit routes, `snapKeys=[4 files]`, `0 unreadable` after the `readNBytes` API-33 defect was fixed); a multi-file, real-code-edit turn is still untested |
+| Tool-call visibility | ✅ built — wire format CONFIRMED 2026-10-25 (D3): tool_call parts carry data {id, name, input (args as a JSON string), finished (bool)}; parser reads data first, pinned by unit tests. Completion is **not** `finished:true` (part-final): rows complete on the live `role=tool` result (or run/turn end) and show engine-supplied durations (`metadata.start_time` → `end_time`), device-proven 2026-11-14 (`b7b4ae5`) |
+| File diffs | ✅ built and JVM-tested — a real edited-file turn rendered on device 2026-10-29 (z6/z7: `diff-created(+1/-0)`, diff-edit routes, `snapKeys=[4 files]`, `0 unreadable` after the `readNBytes` API-33 defect was fixed); the multi-file, real-code-edit prong is device-proven in the P4 Gate-2 drives (2026-11-07: two files edited in one turn, hunks on screen, byte-identical revert) |
 | Permission prompts (ask / auto-approve) | ✅ both modes device-proven on v0.100.0 (2026-11-13): ASK renders the card and grants end-to-end; AUTO-APPROVE ran a read-only `ls` turn with zero asks (`permissionWire=yolo`), then the setting was restored to ASK (`permissionWire=normal`). There is no third "never" mode in the code — `PermissionMode` is ASK or AUTO_APPROVE |
 | In-app diagnostics + crash reports | ✅ screen device-walked 2026-11-13: status block (app/API/device/ABIs, engine installed+running+responding via `GET /v1/version`), 95-line log tail, **Copy verified by pasting the report**, **Share opens the system chooser**. A real crash-archive entry was not manufactured (the screen correctly reported "No crash recorded") |
 | Review screen (revert + export) | ✅ device-proven 2026-11-07 ([capabilities.md](docs/capabilities.md) Gate-2): reverting restores the workspace record, and the "Export a copy" no-op found live in the first drive was fixed same-day (`bf5019a`) |
 | Chat save/copy surface | ✅ device-proven 2026-11-08 (`fe9e7e8`): code-block Copy/Save chips plus per-message "Copy message" / "Save as Markdown" through the SAF `CreateDocument` picker (`ChatExport.kt`) |
 | Chat tool policy (deny all) | ✅ shipped 2026-11-05 (S-01): `EngineConfigInjector.injectChatToolPolicy` writes `options.disabled_tools` and readback-verifies; the `chatPolicyGate` fails closed (`CrushEngine.kt`, pinned by unit tests). The on-disk list is engine-version sized: 31 ids on v0.99.0, **35 ids on v0.100.0** (measured 2026-11-12) |
 | Engine v0.100.0 + version-aware permission adapter | ✅ device-proven 2026-11-12 (`6800c0e`): v0.100.0 boots and streams; the wire family follows the bound engine's own version (`SKIP_FLAG`/`yolo` on 0.99, `MODE_ENUM`/`permission_mode` on 0.100+); the rollback drill proved v0.99 opens v0.100 session data unchanged |
-| Projects mode (import-only) | ✅ built — an imported folder becomes its own keyed engine instance (`crush-<key>.sock`); the runtime registry caps liveness at two live engines, chat + one project (`AppContainer.kt`, `EngineInstanceRegistry.kt`) |
+| Projects mode (import-only) | ✅ built — an imported folder becomes its own keyed engine instance (`crush-<key>.sock`); the runtime registry caps liveness at two live engines, chat + one project (`AppContainer.kt`, `EngineInstanceRegistry.kt`). Import asks for All Files Access **just in time** behind a rationale dialog (Android 11+; never at launch) and refuses the volume root, so the workspace is a chosen folder rather than all of shared storage. The dialog/root-refusal path (`af178f8`) is compile/unit-pinned only — the API 29 test device cannot exercise the API 30+ flow |
 
 `minSdk 29` · `targetSdk 36` · `compileSdk 37` · arm64-v8a only
 
@@ -253,12 +256,17 @@ App-side mitigations:
   `build/d12-evidence/`), and the `question_batch_request` handler shipped
   in `3235f7e`. A parked prompt is bounded by `PROMPT_WAIT_MS` = 10 minutes
   (docs/decisions-open.md item 8). See docs/project-analysis.md D12.
-- **Tool-call wire format — CONFIRMED (D3, 2026-10-25).** `tool_call` parts
-  arrive as `{"type":"tool_call","data":{"id","name","input","finished"}}`,
-  where `input` is the tool arguments as a JSON string and `finished` is a
-  boolean (absent while streaming). The parser reads `data` first, claims
-  COMPLETED only on `finished:true`, and mines `file_path` from `input`; unit
-  tests pin the captured shapes. See docs/capabilities.md.
+- **Tool-call wire format — CONFIRMED (D3, 2026-10-25); completion semantics
+  corrected 2026-11-14.** `tool_call` parts arrive as
+  `{"type":"tool_call","data":{"id","name","input","finished"}}`, where
+  `input` is the tool arguments as a JSON string and `finished` is a
+  boolean. The parser reads `data` first and mines `file_path` from `input`.
+  `finished:true` is **part-final, not execution-final** — it was measured
+  ~274 ms into a turn, before the permission gate — so a live row stays
+  RUNNING through it and completes on the engine's live `role=tool` result
+  (or run/turn end); a turn-end fallback settles leftovers without inventing
+  a duration. Unit tests pin the captured shapes. See docs/capabilities.md
+  and `b7b4ae5`.
 - **Engine API has no HTTP-level authentication.** See [Security](#security).
   Not fixable in the app layer: the engine offers no auth to enable. The
   transport, however, is now a kernel-enforced app-private Unix-domain socket,
@@ -277,8 +285,9 @@ App-side mitigations:
 - **Tool activity is now a turn-long timeline; per-turn cost is still
   drawer-only.** Tool rows accumulate by call id across every LLM step of a
   turn (step 2 used to erase step 1), keep first-seen order, and show
-  app-observed elapsed time where both edges were seen. There is no
-  step-grouped view or per-turn cost in the transcript.
+  **engine-supplied** durations (`metadata.start_time`/`end_time`) once the
+  live `tool_result` arrives — not an app-side guess from frame timing. There
+  is no step-grouped view or per-turn cost in the transcript.
 - **File diffs: the real-turn prong is now checked (2026-10-29).** The whole
   path is built and JVM-tested (snapshot → tracked files → diff → render),
   and the first measured device turn tracked zero files. The 10-29 pass then
@@ -288,8 +297,9 @@ App-side mitigations:
   `N file(s) not shown (unreadable…)` for healthy files (deep-analysis-2026-10-27.md
   §9 Defect B). After the portable 512-byte read fix, verification turn z7
   closed the loop: `diff-created(+1/-0)`, diff-edit routes on the earlier
-  files, `snapKeys=[4 files]`, `0 unreadable`. Still untested: a multi-file
-  turn editing real code.
+  files, `snapKeys=[4 files]`, `0 unreadable`. The multi-file, real-code-edit
+  prong is device-proven in the P4 Gate-2 drives (2026-11-07: two files edited
+  in one turn, unified hunks on screen, byte-identical revert).
 - **A slow turn can still strand a bubble, but the watchdog now asks first.**
   `streamSend`'s `finally` finalises the live bubble. On an idle expiry the
   frame loop now probes the engine's run state and extends a demonstrably
@@ -313,7 +323,7 @@ App-side mitigations:
   hardcoded id is fed to the provider any more (that guess was the "large model
   not found in provider" a friend hit on a fresh install). Discovery-first
   bootstrap probes a live id before the app reports ready.
-- **Multi-provider plumbing is in; three providers verified to varying degrees.** See [docs/providers.md](docs/providers.md). Thirteen Catwalk ids are offered and the provider is chosen in Settings; `opencode-zen` and `openrouter` have completed handshakes on a device, `groq` was probe-verified but is parked as a test target after a key rotation - everything else is labelled unverified rather than claimed working.
+- **Multi-provider plumbing is in; four providers are verified to varying degrees.** See [docs/providers.md](docs/providers.md). Thirteen Catwalk ids are offered and the provider is chosen in Settings; `opencode-zen`, `openrouter` and `opencode-go` have completed real turns on a device (`groq` was probe-verified but is parked as a test target after a key rotation), and `hyper` has a verified key that stops at its $0 credit ceiling. The `isKnown` badge stays a narrower claim — only providers whose default handshake path is known-good — so `opencode-go` is device-proven yet deliberately unbadged (its catalogue/chat wiring is plan-dependent). Everything else is labelled unverified rather than claimed working.
 - **OAuth is not implemented.** Crush exposes /config/refresh-oauth and a Copilot import; the app calls neither. The endpoint that *initiates* an OAuth flow is not in the spec at all, so the redirect capture would have to be built from scratch.
 - **`WorkspaceLease` and the force-retry paths are NOT dead scaffolding.** An
   earlier revision of this README called them redundant relics of the
@@ -343,12 +353,13 @@ App-side mitigations:
   "No issues found."), and signed release-R8 ran on device 2026-11-02 — the
   `r8probe` signed minified buildType (release signing + R8) completed a
   real streaming turn with a 28.92 MB APK (triage row "R8 minified release:
-  runtime unproven" — closed). Still parked: a plaintext test key file sits
-  at the repo root (decisions-open item 3), and a few other human-gated
-  trades are catalogued with their evidence in
-  [docs/decisions-open.md](docs/decisions-open.md) — whose own "keystore +
-  credentials.properties are missing" note (item 2, OPEN) now predates the
-  evidence above.
+  runtime unproven" — closed). The repo-root plaintext test key is also
+  closed: the owner rotated it at the provider and removed the file on
+  2026-11-14 (`decisions-open.md` §3). The remaining human-gated trades —
+  the store-level no-lock fail-closed batch and the Play storage declaration
+  — are catalogued with their evidence in
+  [docs/decisions-open.md](docs/decisions-open.md); the Play release itself is
+  deferred by the owner.
 
 ## Toolchain
 
@@ -369,7 +380,7 @@ See [`docs/toolchain.md`](docs/toolchain.md) for the contingency plan.
 
 > An external audit flagged the 2.4.10 / 2.4.20 split as a compatibility
 > hazard and suggested matching them. That is worth considering, but the build
-> is green across 689 JVM unit tests and repeated release builds, so it is a
+> is green across 716 JVM unit tests and repeated release builds, so it is a
 > real risk to weigh rather than a demonstrated fault. Aligning to 2.4.20 is
 > the safer change if made deliberately.
 
@@ -401,7 +412,7 @@ compiled into the binary but unreachable from Compose.
 ## Testing
 
 ```powershell
-./gradlew :app:testDebugUnitTest :app:assembleRelease   # 689 JVM tests across 74 suites (per-XML census 2026-11-12)
+./gradlew :app:testDebugUnitTest :app:assembleRelease   # 716 JVM tests across 76 suites (per-XML census 2026-11-14)
 ```
 
 Coverage is broad for pure logic — protocol details, model probing and pricing,
@@ -502,6 +513,9 @@ Bring-up facts (measured 2026-11-01, first green recorded 2026-11-02):
 | [`docs/v0100-ladder-plan-2026-11-12.md`](docs/v0100-ladder-plan-2026-11-12.md) | The v0.100.0 execution ladder: adapter, rails, evidence, decisions |
 | [`docs/research-engine-v0100-2026-11-12.md`](docs/research-engine-v0100-2026-11-12.md) | v0.100.0 engine research: API deltas, permission wire, SSE shapes |
 | [`docs/backlog-research-2026-11-13.md`](docs/backlog-research-2026-11-13.md) | Standing-backlog research: store blockers, rails 3/4/6, sysadmin/piped permissions, timeline, attachments |
+| [`docs/storage-strategy-research-2026-11-14.md`](docs/storage-strategy-research-2026-11-14.md) | All Files Access vs narrow SAF vs the two-flavor split; why a live sync is not equivalent |
+| [`docs/play-afa-submission-2026-11-14.md`](docs/play-afa-submission-2026-11-14.md) | Prepared (NOT submitted) Play submission package: declaration, listing, demo script, reviewer access, honest limits |
+| [`docs/decisions-open.md`](docs/decisions-open.md) | Human-gated decisions and their current status (key rotation, app lock, storage, release) |
 | [`docs/adr-0001-project-workspace-identity.md`](docs/adr-0001-project-workspace-identity.md) | Project identity: path-keyed workspaces, one engine instance per project |
 | [`docs/chat-code-modes-plan-2026-11-04.md`](docs/chat-code-modes-plan-2026-11-04.md) | Chat/Code mode split: decisions, shipped slices, verification matrix |
 | [`docs/toolchain.md`](docs/toolchain.md) | Versions, AGP 10 contingency, backup plan |
@@ -588,6 +602,7 @@ Spot-checked against the current tree; items not listed above were found accurat
 
 - Engine of record updated again 2026-11-12: **v0.100.0** (published
   2026-11-05) after the T3 device rails, the same-destination dispatch and
-  the rollback drill all passed; the gate is runner-verified at **689 tests
-  across 74 suites** (per-XML census). See
+  the rollback drill all passed; the post-merge gate was runner-verified at
+  **689 tests across 74 suites**, and the current tree is at **716 tests
+  across 76 suites** (per-XML census 2026-11-14). See
   [docs/v0100-ladder-plan-2026-11-12.md](docs/v0100-ladder-plan-2026-11-12.md).

@@ -1,10 +1,12 @@
 # Engine acceptance kit — testing any future Crush engine version (2026-11-12)
 
-Status: **THE SYSTEM, SHIPPED IN CODE** — manifest + ratchet + fetch pins live
-in `main`; the v0.100.0 row is pre-staged (strings-CONFIRMED out-of-tree) and
-its device rails are the owner-gated next step. This document is the runbook
-every future engine version follows, and the v0.100.0-specific execution plan
-is [`v0100-ladder-plan-2026-11-12.md`](v0100-ladder-plan-2026-11-12.md).
+Status: **THE SYSTEM, SHIPPED IN CODE, AND v0.100.0 PROVEN** — manifest +
+ratchet + fetch pins live in `main`; the v0.100.0 row was promoted on
+2026-11-12 (merge `6800c0e`) after its T3 device rails (**8 PASS / 0 FAIL**)
+and the rollback drill (v0.99.0 opened the v0.100 engine state DB unchanged).
+This document is the runbook every future engine version follows; the
+v0.100.0-specific execution record is
+[`v0100-ladder-plan-2026-11-12.md`](v0100-ladder-plan-2026-11-12.md).
 
 An engine is an **executable artifact we ship and exec**: provenance, catalogue,
 and runtime behavior are the three axes, and each has a tier below. The kit's

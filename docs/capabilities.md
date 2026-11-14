@@ -41,6 +41,7 @@ surfaced on a phone.
 | Settings | Key replace/delete, permission mode, diagnostics entry point |
 | Prewarm | Eager engine start when enabled; lazy on first keystroke otherwise |
 | Handoff resume path (P6 Batch D) | RESUME sheet surface for an approved-but-undispatched row dispatches on the existing approval; explicit discard writes ABANDONED (DISPATCHED traces refuse it); no-alias replace; Open in Code jump; F04 dialog rewired in; gate green (`20e8347`); device-proven in the P5 drive (`b8cb2f12` resume dispatch — no insert, stamp unchanged) and the same-destination dispatch re-checked on v0.100.0 (2026-11-12) |
+| Import-folder AFA hardening (store-review prep, 2026-11-14, `af178f8`) | The All-Files-Access request is just-in-time behind an "All files access, explained" dialog on Android 11+ — never at launch; "Not now" exits without a request. The importer refuses the volume root (`primary:` alone) as a project (`FolderUriDecoder.primaryProjectPathFromTreeDocumentId`, unit-pinned), so the workspace is a folder the user chose, not all of shared storage. Compile/unit-level only: the test device is API 29, so the API 30+ dialog path cannot be exercised there. These are app-level boundaries and data-minimization, not an OS sandbox |
 
 ## Not implemented
 
@@ -116,14 +117,20 @@ on `crush-p536fa26e.sock` with the honest capped retry ladder during the
 engine-down window and ZERO app-PID ENOENT (the one trace ENOENT was MIUI
 system noise, PID 18108). CI green on `349bad3` (gate + MODE-25).
 
-**Residual, non-blocking, suspected for the post-v1 hardening (review Gate 7
-shape):** (1) a stale ViewModel's connection survives navigation
-(projects↔chat round trip keeps the old entry's reader alive) and retries
-honestly with capped backoff until reclaim — same family as the runtime-map
-backlog item, needs the VM/connection registry; (2) the engine respawn after
-stop-on-switch took ~55–60 s from re-bind to `exec` (00:05:18 bind → 00:06:14
-spawn) — supervisor start latency after a manual stop deserves its own probe
-before the next release.
+**Residual runtime-resource items (review Gate 7 shape), corrected
+2026-11-14:** (1) **the stale-viewer half is CLOSED IN CODE** (`d818a9c`,
+Gate-7 phase 2, 2026-11-05): the container's `ConnectionRegistry` owns one
+reader per instance key — owner-epoch supersession, revoke-only-if-own,
+stop deferred while a run is in flight, and the stale VM consults
+`isSuperseded` at the reader-retry seam before re-entering the reconnect
+ladder (`ChatViewModel.kt:1519–1537`, `onCleared` `:1648–1659`); the
+registry invariants are pinned by `ConnectionRegistryTest`. An overlapping
+back-stack entry is therefore retired rather than left retrying, although a
+dedicated device drive of that exact navigation overlap is still worth
+recording. (2) **OPEN — supervisor start latency after a manual stop** took
+~55–60 s from re-bind to `exec` (00:05:18 bind → 00:06:14 spawn, measured
+2026-11-05); this needs its own probe before the runtime-resource work is
+called done.
 
 ### S3/S4 mode split — BUILT AND DEVICE-DRIVEN 2026-11-05 (builds `4058588` + `22fbe28`)
 

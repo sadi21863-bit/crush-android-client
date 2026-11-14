@@ -46,9 +46,11 @@
 > with five owner decisions listed there and nothing proceeding without
 > them.
 
-Status: PLAN with user decisions RECORDED (§5) and the independent review
-FOLDED IN (§7, user-approved "fold fully") — no code written, implementation
-awaits the user's explicit go. This distills the roadmap's
+Status (2026-11-04; **superseded — see the header note above**): PLAN with user
+decisions RECORDED (§5) and the independent review FOLDED IN (§7, user-approved
+"fold fully"). No code existed on this date; S0–S5 shipped 2026-11-05 and the
+Gate 0–4 work that superseded the slice ordering is recorded in the status hub.
+This distills the roadmap's
 Chat/Code phases ([`crush-plan-2026-11-02.md`](crush-plan-2026-11-02.md) §6, §7,
 P4/P5/P6, §21) against what the app actually has on device today (2026-11-04,
 import-only decision landed in `5ef70f5` + `4a59b68`), and lays out slices,

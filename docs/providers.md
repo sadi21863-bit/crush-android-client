@@ -56,7 +56,7 @@ offer an id this engine's pinned Catwalk does not know.
 | `opencode-zen` | **no** (as of 2026-10-11) | verified end to end; free tier withdrawn |
 | `hyper` | **no** | approved accounts see no free tier or credits (first-hand 2026-10-17); prepaid from $5 |
 | `openrouter` | **yes** — `:free` models | **verified end to end (2026-10-17)** — probe → turn streamed, finish `end_turn`. 50 req/day free below $10 of purchased credit, 1000/day at ≥$10; no card needed |
-| `opencode-go` | no | subscription, $10/mo |
+| `opencode-go` | no | subscription, $10/mo; **verified end to end 2026-11-02** on its paid lanes (`deepseek-v4.1-flash`, `glm-5.3-flash`, `deepseek-v4-pro`); kept `isKnown=false` because its split catalogue/chat wiring is plan-dependent |
 | `groq` | **yes** | probe-verified but **parked as a test target**: free tier caps every model at 8,000 tokens/min (per-TOKEN) and no agent shape fits — coder ~11.4K, plan ~8.6K on-device. See `providers/groq.md` |
 | `cerebras` | **$5 once** | one-time credit after adding a payment card; 30-day expiry |
 | `deepseek` | **no** | cheap, not free; no free tier confirmed (2026-10-17) |
@@ -71,14 +71,18 @@ Deep-dive research for every row: [`providers/`](providers/) — one .md per
 provider, sourced from official pages on 2026-10-17. The ranking and the
 Cross-provider summary live in [provider-research-2026-10-17.md](provider-research-2026-10-17.md).
 
-`isKnown` is true for exactly three entries: `opencode-zen` (the original), and
+`isKnown` is true for exactly three entries: `opencode-zen` (the original),
 `openrouter` (full agent turn streamed on device 2026-10-17 — note its first
 probe id, `google/gemma-4-31b-it:free`, failed and the fallback order is
-load-bearing), plus `groq` (probes answered, but no agent shape fits its 8K-TPM
-free cap, so it is parked as a test target rather than offered as one).
-Everything else is labelled unverified because no key has completed a handshake
-against it on a device. A row labelled available that 500s on first use is worse
-than one labelled unverified, because the user pays the key-setup cost first.
+load-bearing), plus `groq` (probes answered, but no agent shape fits its
+8K-TPM free cap, so it is parked as a test target rather than offered as one).
+`opencode-go` is deliberately **not** in that set even though it has completed
+real paid turns on device (2026-11-02): its catalogue and chat endpoints are
+plan-dependent split wiring (`Providers.kt` comment), so the badge stays the
+narrower "default handshake known-good" claim. Everything else is labelled
+unverified because no key has completed a handshake against it on a device. A
+row labelled available that 500s on first use is worse than one labelled
+unverified, because the user pays the key-setup cost first.
 
 ### Charm Hyper, specifically
 
@@ -106,10 +110,12 @@ on 2026-10-16 — not from inference:
   here: it is the one auth path that does not need an app link or a claimed
   loopback scheme, which is exactly what blocked OAuth for every other provider.
 
-Not verified: a key has not yet completed a chat turn on-device. Until one does,
-`Providers.kt` keeps the row `isKnown = false`, as it does for every provider
-that has not completed a handshake — only `opencode-zen`, `openrouter` and
-`groq` are verified today.
+Not verified for Hyper specifically: a key has not yet completed a chat turn
+on-device. Its approved real key authenticated and listed 23 live models, but
+every call returned `402 authentic-but-unfunded` (the account sits at $0), so
+`Providers.kt` keeps the row `isKnown = false`. That is a funding ceiling, not
+a handshake defect; see the provider verification matrix in
+[capabilities.md](capabilities.md) for what each id has actually proven.
 
 ## Testing without a paid plan
 

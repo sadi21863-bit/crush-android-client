@@ -7,17 +7,18 @@ pointers — it never copies long sections; each claim links the ledger
 that owns it. Facts that moved after the pack's pin are restated here
 from the repo's own records, with what was re-verified live marked.
 
-Last verified: code HEAD `7346e20` (2026-11-12). The v0.100.0 merge
-`6800c0e` is CI-green (run 43227604396); the post-merge `7346e20` (the
-fetch-default ratchet + `FetchScriptPinTest`) carries a local gate of
-**689/0/0 across 74 suites** and CI run **43244539199 GREEN**. Only docs
-commits collect above it.
+Last verified: code HEAD `af178f8` (2026-11-14). The v0.100.0 merge
+`6800c0e` remains CI-green (run 43227604396); `7346e20` (the fetch-default
+ratchet + `FetchScriptPinTest`) carries a local gate of **689/0/0 across 74
+suites** and CI run **43244539199 GREEN**; the #9 fix `b7b4ae5` and the AFA
+review-hardening `af178f8` carry local gates of 715/76 and **716/0/0 across
+76 suites** (lint 0 errors / 1 warning). Only docs commits collect above it.
 
 ---
 
-## 1. Commit chain (exact, sha-verified; rows added through 2026-11-12)
+## 1. Commit chain (exact, sha-verified; rows added through 2026-11-14)
 
-| SHA (2026-11-05 → 2026-11-12) | What | CI |
+| SHA (2026-11-05 → 2026-11-14) | What | CI |
 |---|---|---|
 | `8da8d66` (19:20) | docs parallel batch: Gate-7 runtime-registry design memo; live wedge **shape 2** captured (loss of delivery, not death); S6 ask-for-shell recon map; 3 upstream issue drafts | not recorded |
 | `42536e8` (19:40) | docs: S5 no-card mystery RESOLVED in upstream source (v0.99.0 bash safe-read-only prefix bypass); `kill`/`killall` flagged as upstream-notable | not recorded |
@@ -75,12 +76,26 @@ commits collect above it.
 | (docs row, 2026-11-12 late) | **T3 DEVICE-RAILS FOLD + RAIL 7b CLOSED (the last merge blocker)**: acceptance kit §5 records the scripted + interactive results and the legacy-row F04 correction (row tap bypasses by design since `4058588`; the Nov 5 proof was project row `536fa26e`); ladder plan gains step 4c; capabilities gains the v0.100.0 T3 paragraph. The reinstalled candidate re-ran the scripted rails **8/0** and the **same-destination dispatch** closed live on the owner's finger: from Legacy chat `b894b36f` → Legacy `077dc19e`, ONE insert `eb78ea9d`, consent `1794488827189` → APPROVED `1794488827242` → DISPATCHED `18:37:07.936` to engine session `755fcfd0`, first turn completed on v0.100 (zero 404/FATAL); full-row diff = one new row, all nine prior rows byte-identical (`65770c54` untouched), only `077dc19e.consented_at_ms` re-stamped; Legacy engine DB 2→3 sessions / 25→41 messages. Chain rows added for `8365481`/`79c3815`/`b0939f6`/`d60f7c9` with CI run IDs; branch-state paragraph moved to `d60f7c9` + the `engine-v0100` candidate stack | — docs closure record; merge next |
 | `6800c0e` (2026-11-12) | **THE v0.100.0 MERGE — the engine of record is now v0.100.0**: `engine-v0100` merged into `main` (main's extra commits were docs-only; the merge tree's code is byte-identical to the gated branch tip `84d4bfa`). `EngineCatalogues.PINNED_VERSION` = `0.100.0`; `EngineApiContracts.IMPLEMENTED` stays `0.99.0` (RAILS-PROVEN remains the stricter claim and promotes only on a future rails pass). Device proof on `bbf8ca69`: scripted rails **8/0**; F04 fresh consent (Cancel inert; Allow stamps consent before the attach, DB fingerprint == pulled SHA-256); project cold-boot gate + resume `9c17ad6a`; Batch G cold boot resumed `b894b36f` (25 msgs) with `65770c54` untouched; E6 switch stress (children ≤2); same-destination dispatch `eb78ea9d` → engine session `755fcfd0`, first turn completed; rollback drill: main `d60f7c9` + engine 0.99.0 opened the v0.100 engine state DB unchanged (goose 13 / sessions 2 / messages 25) — **no one-way door**. Local gate on the merged tree 3m41s, per-XML **687/0/0 across 73 suites**; CI run **43227604396 GREEN** | ✅ completed-success — merge commit; CI GREEN |
 | `7346e20` (2026-11-12) | **THE FETCH-DEFAULT RATCHET**: the merge exposed that `main` pinned 0.100.0 while `tools/fetch-crush.ps1` still defaulted to 0.99.0 — the binary is gitignored, so a fresh clone would have silently built against the previous engine (the adapter speaks both families, so nothing else failed). The default advances to 0.100.0 (the 0.99.0 checksum branch stays for the rollback drill), and `FetchScriptPinTest` pins BOTH halves: default == `PINNED_VERSION` and the matching 64-hex release checksum branch. Also folds the docs-audit pass (README status/pins/test counts, toolchain count, providers' engine trail, project-analysis scorecard, BASELINE snapshot warnings, the egress-bridge security note) | ✅ completed-success — local gate 689/0/0 across 74 suites; CI run **43244539199 GREEN** |
+| `b7b4ae5` (2026-11-14) | **#9 — TOOL-ROW COMPLETION ON `tool_result` (real durations)**: the assistant frame's part-final `finished:true` is **not** execution-final (measured ~274 ms, before the permission gate), so live rows stay RUNNING through it; `RunHandle.completeTool` completes them on the live `role=tool` message, and the turn `finally` only settles leftovers without inventing a duration. Durations are engine-supplied (`metadata.start_time` → `end_time`, epoch ms) and render as e.g. `8.0s`. Device proof (session `7271d703`, `sleep 8`): the dialog showed a spinner with no check/chip, still spinning 1.5 s after Allow, check + `8.0s` only after `tool_result observed … duration=8031ms` (first probe `8037ms`) | ✅ completed-success — local gate green per-XML 715 tests / 76 suites / 0 failures; lint 0 errors / 1 warning |
+| `3bd9107` (2026-11-14) | docs fold: #1 closed (owner rotated the key and removed the repo-root file; date only recorded) and the #9 device proof + capabilities/README/status rows folded | docs-only |
+| `022ca46` (2026-11-14) | docs: storage-strategy research — AFA vs narrow SAF vs the two-flavor split, primary sources S1–S14; direct answer: live bidirectional sync is not equivalent to AFA (SAF is `content://` provider access; the native engine needs a POSIX cwd) | docs-only |
+| `1581a37` (2026-11-14) | docs: **AFA-first decision** — attempt All Files Access on the first Play submission (declaration + demo video + review instructions; Document-management category), with the two-flavor SAF-mirror fallback pre-scoped. **The owner then deferred the release: no submission is in flight** | docs-only |
+| `af178f8` (2026-11-14) | **AFA REVIEW HARDENING (prepared, not submitted)**: the Android 11+ AFA request now sits behind a just-in-time "All files access, explained" dialog (never at launch; "Not now" exits cleanly), and the importer refuses the volume root as a project (`FolderUriDecoder.primaryProjectPathFromTreeDocumentId`, unit-pinned) with a specific error. App-level boundary, not an OS sandbox; API 29 device cannot exercise the dialog, so proof is compile/unit-level | ✅ completed-success — local gate green per-XML 716 tests / 76 suites / 0 failures; lint 0 errors / 1 warning |
 
 **GATE 0 = CLOSED on both halves.** Code: `7ec34ed` (S-01), `3a3a233`
 (S-02), `f5d24dc` (S-04), wording-honesty in S-03's ledger row. Device:
 A03 restore-trust drive PASSED 2026-11-06. Residuals ride the E6 stress
 pass: 4 JVM-only A03 variants (cancel / changed-crushrc / noConfig-flip
 / real-install migration), REST boot-window row, S-01 Failed-badge row.
+
+Branch state truth (2026-11-14): code rows above the 2026-11-12 line are
+`b7b4ae5` (#9 tool-row completion; local gate 715 tests / 76 suites /
+0 failures, lint 0 errors / 1 warning), `3bd9107` (docs: #1 closed + #9 device
+proof), `022ca46` (docs: storage-strategy research), `1581a37` (docs:
+AFA-first decision). `af178f8` is the AFA review-hardening code commit (local
+gate 716 tests / 76 suites / 0 failures; lint 0 errors / 1 warning); the doc
+sweep and submission draft collect above it. The 2026-11-12 chain below is
+retained as the v0.100.0 merge record.
 
 Branch state truth (2026-11-12, post-merge): code HEAD = `7346e20` (the
 fetch-default ratchet + `FetchScriptPinTest`; local gate 689/0/0, CI run
@@ -237,7 +252,7 @@ mirrored locally with their full reasoning in the plan doc
 
 ## 5. Gate roadmap (owner-pack gate numbering; STATUS is the row's truth)
 
-| Gate | Content | STATUS (2026-11-05, at `1d229de`) |
+| Gate | Content | STATUS (last refreshed 2026-11-14) |
 |---|---|---|
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
@@ -246,7 +261,8 @@ mirrored locally with their full reasoning in the plan doc
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
-| 7 | release | QUEUED |
+| 7 | release | **DEFERRED by the owner (2026-11-14) — no Play submission is in flight.** The AFA-first submission package is prepared (`docs/play-afa-submission-2026-11-14.md`) and the import-flow review hardening is shipped (`af178f8`); the store-level app-lock batch (#3) stays parked with the release. Decision record: `decisions-open.md` §11 |
+| 8 | runtime-resource hardening (#4) | OBSERVE — the stale-reader half is closed in code by the Gate-1 registry (`d818a9c`); the supervisor start-latency probe after a manual stop is the remaining measured gap (capabilities §residual) |
 
 Numbering caution: the plan doc §7's "G1≈S0 … G9≈Termux" is the older
 review-fold mapping, a DIFFERENT family. Use the pack's Gate 0–7 rows

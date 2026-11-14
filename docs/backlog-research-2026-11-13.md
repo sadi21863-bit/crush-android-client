@@ -6,7 +6,9 @@ recommendation, and the decision it needs. Nothing here is implemented unless
 the row says so.
 
 Device context: `bbf8ca69`, app 1.0.0 (1), engine v0.100.0, Android 10 /
-API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
+API 29. Gate baseline at writing: 689 tests / 74 suites, 0 failures
+(re-measured 2026-11-14 after #9 and the AFA hardening: **716 tests /
+76 suites, 0 failures**).
 
 ---
 
@@ -64,6 +66,8 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   a specialized developer tool. If Play rejects/removes it, switch to the
   pre-scoped **D** fallback (Play = B-MVP, sideload = AFA). No mirror code
   until the response. Recorded in `decisions-open.md` §11.
+  **Release itself is deferred by the owner (2026-11-14): no submission is in
+  flight; the decision and package are parked until a release date is set.**
 
 ### A3. No-lockscreen fail-open (store build)
 
@@ -83,6 +87,12 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   devices / credential removal).
 - **Recommendation:** S (~1 day + device pass) when the store build is real;
   not now. Owner call.
+- **Decision 2026-11-14 (parked with the release):** device credential
+  primary, app PIN fallback on no-lock devices — a salted verifier (never the
+  PIN itself), attempt throttling, ONE shared key-write guard used by
+  onboarding and Settings, and a recovery path that survives credential
+  removal. No code while the Play release stays deferred; recorded in
+  `decisions-open.md` §5.
 
 ---
 
@@ -132,6 +142,10 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
 - **Recommendation:** retain non-text user parts + add a `SubAgentReport`
   accessor/renderer + synthetic fixture tests (CI-able); one optional real
   `agent_dispatch` run in a Code pool.
+- **Result (2026-11-14):** the renderer shipped and the live-append gap is
+  fixed (`dc45c78`: a bounded post-turn re-read applies the reopen replay when
+  a report is present and the transcript changed). Device proof — replay card
+  plus same-session live append — is in §E, item #6.
 
 ---
 
@@ -226,7 +240,8 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   runtime review store, handoff rows referencing deleted chats, and must stop
   the engine first. Q4 chose to keep history and forbade a silent wipe; a
   disclosed “delete chats” feature remains unbuilt.
-- **ChatViewModel extraction (25):** the file is **4,284 lines** (not ~3k).
+- **ChatViewModel extraction (25):** the file is **4,445 lines** (re-measured
+  2026-11-14; it was 4,284 when this note was written).
   Candidates: RunCoordinator (`send`/`streamSend`/`awaitStream`/stop, highest
   payoff/risk), HandoffController (~879 lines), ChatBootstrap/ModelDiscovery
   (~490 lines). Shared mutable state is the hazard; no integration-level

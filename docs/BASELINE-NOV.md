@@ -11,8 +11,8 @@ contained and what had been proven at the time of writing. The P0 sibling task
 > 2026-11-01/02. The engine of record has since advanced: v0.99.0
 > (2026-11-01) → **v0.100.0** (merged 2026-11-12 as `6800c0e`). The v0.99.0
 > measurements below remain the historical baseline; the current pin, the
-> runner-verified census (**689 tests across 74 suites**) and the device
-> evidence live in [capabilities.md](capabilities.md),
+> runner-verified census (**716 tests across 76 suites**, per-XML 2026-11-14)
+> and the device evidence live in [capabilities.md](capabilities.md),
 > [CRUSH-MOBILE-STATUS-AND-DECISIONS.md](CRUSH-MOBILE-STATUS-AND-DECISIONS.md)
 > and [engine-acceptance-kit.md](engine-acceptance-kit.md).
 

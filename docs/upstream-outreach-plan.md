@@ -20,6 +20,12 @@ not the repo name). The app is **unofficial and independent**; the bundled engin
 is upstream Crush **v0.99.0** (published 2026-10-29, promoted in-tree 2026-11-01)
 running as a child process over an app-private Unix-domain socket.
 
+> **2026-11-14 note — engine of record advanced.** The bundled engine is now
+> **v0.100.0** (`PINNED_VERSION`, merged 2026-11-12 as `6800c0e` after the T3
+> device rails and the rollback drill). The outreach evidence below was
+> measured on v0.99.0 and stays labelled as such; re-run any device claim
+> before filing it against the current engine.
+
 ## Evidence honesty rules
 
 Same grading as the roadmap, applied to every claim below:

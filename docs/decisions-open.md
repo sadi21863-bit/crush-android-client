@@ -30,8 +30,8 @@ Two recorded numbers from the same day's analysis:
   92.7 MB raw, **14 `classes*.dex` totalling 66.95 MB raw** (the debug DEX
   carries the debug-only Compose tooling at 12.4 + 10.2 MB). The recorded
   "engine dominates, R8 has no size win" rationale is therefore numerically
-  STALE for the debug artifact; a release-DEX measurement (pending, from an
-  unsigned `assembleRelease`) supplies the honest R8 ceiling. The reflection
+  STALE for the debug artifact; the release-DEX measurement below (unsigned
+  `assembleRelease`, same day) supplies the honest R8 ceiling. The reflection
   risk half of the rationale (junixsocket/Gson) is untouched and still the
   hard part.
 
@@ -155,23 +155,25 @@ runtime unproven" row in external-review-triage.md closed same day). The
 
 ## 3. Rotate/delete the plaintext test key file at repo root
 
-**Status: OPEN — key is live, file re-confirmed present 2026-10-31.**
+**Status: CLOSED 2026-11-14 — owner rotated the key at the provider and
+removed the repo-root file. Only the closure date is recorded; no key
+material is kept here.**
 
 **2026-11-13:** the rotation/deletion runbook (Console → create replacement
 with expiry → paste on device → verify a turn → revoke old → confirm 401 →
 delete file → hunt copies) is in
-[backlog-research-2026-11-13.md](backlog-research-2026-11-13.md) §A1. Still
-owner-only; deletion alone is not remediation.
+[backlog-research-2026-11-13.md](backlog-research-2026-11-13.md) §A1.
+**2026-11-14:** the owner executed it.
 
-`"opencode api key for testing.txt"` sits at the repo root. It is gitignored
-(`*key*.txt`, `.gitignore:15`) so it will never be committed, but the key
-itself is real and live. The old world-readable `/sdcard/zenkey.txt` fallback
-was deliberately removed from the spike harness (`FullE2ETest.kt` comment);
-this repo-root paste-file is what remains of that workflow.
+`"opencode api key for testing.txt"` used to sit at the repo root (removed
+2026-11-14). It was gitignored (`*key*.txt`, `.gitignore:15`), so it was
+never committed; deletion alone would not have been remediation. The old
+world-readable `/sdcard/zenkey.txt` fallback was deliberately removed from
+the spike harness (`FullE2ETest.kt` comment).
 
-**The decision:** rotate the OpenCode Zen key at the provider, delete the
-file, and pick a stated key-transfer procedure (paste directly into Settings)
-instead of relying on a gitignore to make an on-disk key safe.
+**The decision (executed):** rotate the OpenCode Zen key at the provider,
+delete the file, and use a stated key-transfer procedure (paste directly into
+Settings) instead of relying on a gitignore to make an on-disk key safe.
 
 ## 4. Injector-vs-engine concurrent `crush.json` write needs a design
 
@@ -223,6 +225,14 @@ is false (nothing is stored yet), and Onboarding runs its own prompt when it
 creates the key; every later cold start with a stored key prompts. No code
 change. The store-level fail-closed requirement is backlog item 3 (§A3),
 which covers the distinct no-device-credential branch.
+
+**2026-11-14 (decision package, parked with the release):** the chosen shape
+for the store build is **device credential primary, app PIN fallback on
+no-lock devices** — a salted verifier (never the PIN itself), attempt
+throttling, ONE shared key-write guard used by onboarding and Settings, and a
+recovery path that does not brick a device whose credential was removed. No
+code is written while the Play release stays deferred (§11); this note records
+the design choice so it does not have to be re-litigated.
 
 With no lock configured, the app opens without any lock prompt
 (`DeviceAuth.kt:54–62`; README "First-launch app lock bypass", D9). This is
@@ -322,9 +332,11 @@ delete — the legacy row itself stays.
 
 ## 10. Chat/Code modes — navigation, tool policy, default mode, legacy history
 
-**Status: DECIDED 2026-11-04 (user) — folded into
-[`chat-code-modes-plan-2026-11-04.md`](chat-code-modes-plan-2026-11-04.md) §5;
-implementation NOT started, awaiting the user's explicit go.**
+**Status: DECIDED 2026-11-04 (user) and SHIPPED 2026-11-08 — folded into
+[`chat-code-modes-plan-2026-11-04.md`](chat-code-modes-plan-2026-11-04.md)
+§5. The original "implementation NOT started, awaiting go" header was true on
+2026-11-04 only; the shipped-state section at the bottom of this item is the
+current truth.**
 
 - **Navigation (Q1) → choose-at-creation:** mode picked in the new-session
   flow; Chats grouped separately from project sessions. Two-tab restructure
@@ -386,9 +398,11 @@ is superseded by that plan's 2026-11-08 addendum.
 ## 11. Import storage-access strategy (All Files Access vs narrow SAF)
 
 **Status: DECIDED 2026-11-14 — attempt All Files Access on the first Play
-submission; keep the two-flavor SAF-mirror fallback pre-scoped. Not needed
-while the app is beta-installed via adb; REQUIRED before any store listing
-(Google Play policy). Raised by the independent review (F05).**
+submission; keep the two-flavor SAF-mirror fallback pre-scoped. Release is
+DEFERRED by the owner (2026-11-14): no submission is scheduled yet, and the
+decision + submission package are parked until a release date is set. Not
+needed while the app is beta-installed via adb; REQUIRED before any store
+listing (Google Play policy). Raised by the independent review (F05).**
 
 **2026-11-13:** current Play policy research (AFA's permitted categories do
 not include "developer tool"; the narrow-SAF + mirror option) is in
@@ -409,6 +423,14 @@ artifact, switch to the two-flavor split researched in
 — Play = narrow SAF + app-private mirror + explicit Save/Reload (B-MVP);
 sideload/dev = AFA direct. No mirror code is written until the Play response
 makes it necessary.
+
+**Submission package:** [play-afa-submission-2026-11-14.md](play-afa-submission-2026-11-14.md)
+— declaration answers, listing copy, demo-video script, reviewer access, and
+the honest limits. Code hardening shipped with it (`af178f8`): the AFA request
+is just-in-time behind a rationale dialog (never at launch), and the importer
+refuses the volume root. Those are app-level boundaries and data-minimization
+measures; they do not turn the OS grant into a sandbox, and the declaration
+must not claim that they do.
 
 Today's import flow asks for All Files Access (MANAGE_EXTERNAL_STORAGE)
 before the SAF tree picker, then decodes the picked `primary:` document ID

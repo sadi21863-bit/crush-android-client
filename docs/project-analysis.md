@@ -33,6 +33,18 @@ Architecture, the defects that shaped it, and what is left.
 > `7346e20`); the bare scorecard rows below are updated where they state a
 > count. The rest of the 2026-11-08 note stands.
 
+> **2026-11-14 correction — tool-row completion, imports, and the census.**
+> #9 (`b7b4ae5`): tool rows complete on the engine's live `tool_result` with
+> engine-supplied durations; `finished:true` is part-final only
+> (device-proven, session `7271d703`). The import flow now requests All Files
+> Access just-in-time behind a rationale dialog (Android 11+) and refuses the
+> volume root (`af178f8`) — an app-level boundary, not an OS sandbox; the API
+> 29 device cannot exercise the dialog, so that path is compile/unit-pinned. The
+> repo-root plaintext test key is closed (`decisions-open.md` §3: rotated and
+> removed 2026-11-14). The test row is now **716 tests across 76 suites**,
+> runner-verified (per-XML census 2026-11-14). The earlier notes stand as
+> written.
+
 ## 1. Scorecard
 
 | Area | State |
@@ -47,7 +59,7 @@ Architecture, the defects that shaped it, and what is left.
 | Tool-call visibility | Built; wire shape confirmed on the wire 2026-10-25 (D3 closed) - parser pinned by tests |
 | File diffs | Built and JVM-tested; a real edited-file turn rendered on device 2026-10-29 (z6/z7, after the `readNBytes` API-33 fix); the multi-file real-code turn is device-proven in the P4 Gate-2 drives (2026-11-07) |
 | Security | Key encrypted; engine transport app-private UDS (cross-app reach closed); HTTP layer still unauthenticated; the one loopback listener is the app's relay-only egress bridge |
-| Test coverage | **689 JVM tests across 74 suites** (per-XML census 2026-11-12); 8 instrumentation tests device-verified 2026-11-01 and compiled by CI |
+| Test coverage | **716 JVM tests across 76 suites** (per-XML census 2026-11-14); 8 instrumentation tests device-verified 2026-11-01 and compiled by CI |
 
 ## 1a. The Zen free tier is gone (measured 2026-10-11)
 
@@ -161,7 +173,7 @@ carried forward.
 |---|---|---|
 | D1 | `deleteSession` treats transport failure as success, so a failed delete reappears | **Fixed** — `DeleteOutcome` (Failed → banner, local state untouched; Deleted/AlreadyGone → confirmed) + force-retry; pinned by `DeleteOutcomeTest` |
 | D2 | Engine API unauthenticated and reachable from another app's UID | **Closed by architecture** — UDS-only transport (2026-10-18): the engine binds `files/crush.sock` `srwx------`, so `connect()` requires the app UID. Evidence and limits in [`p1-attack-surface.md`](p1-attack-surface.md) §8 |
-| D3 | Tool-call field names unconfirmed against a real engine turn | **Closed 2026-10-25 - captured on the wire (SSE + persisted messages, engine v0.98.1): part = {"type":"tool_call","data":{"id","name","input":<args-JSON-string>,"finished":<bool>}}; ToolActivityParser reads data first with the part as fallback, resolves state from the finished boolean (COMPLETED only when true), mines file_path from input; pinning tests added. Spin-off finding: in ASK mode engine v0.98.1 never broadcasts permission_request on any route - mutating tool turns hang until cancelled; see D12 |
+| D3 | Tool-call field names unconfirmed against a real engine turn | **Closed 2026-10-25 - captured on the wire (SSE + persisted messages, engine v0.98.1): part = {"type":"tool_call","data":{"id","name","input":<args-JSON-string>,"finished":<bool>}}; ToolActivityParser reads data first with the part as fallback, mines file_path from input; pinning tests added. **2026-11-14 correction (#9, `b7b4ae5`):** `finished:true` is PART-final, not execution-final (measured ~274 ms, before the permission gate); live rows stay RUNNING through it and complete on the engine's live `role=tool` result (or run/turn end), with engine-supplied `metadata.start_time`/`end_time` durations. The field capture remains accurate; the state inference was superseded. Spin-off finding: in ASK mode engine v0.98.1 never broadcasts permission_request on any route - mutating tool turns hang until cancelled; see D12 |
 | D4 | `DynamicPolicy` hysteresis off by one — relaxes after 2 calm samples, not 3 | **Fixed** — caller passes `priorCalm` so `calmRun + 1` is not applied twice; pinned by `SupervisorHysteresisTest` |
 | D5 | `AppLog` rewrites the whole file on a 2s heartbeat and clears rather than rotating | **Fixed** — `rotateKeepingTail` keeps the newest half, archive gets the evicted head. **Upgraded 2026-10-25:** the standalone-usage audit showed only 2 files ever survived (init roll deleted `app-prev.log`; mid-run rotation deleted it again to store an evicted head), erasing the Oct-23 standalone evidence. Evicted heads + each run's roll now append to dated `app-archive-<day>.log` files retained **30 days** (pruned past retention + at a 20MB total cap, oldest first); pinned by `RetentionPruneTest` |
 | D6 | `AppLog` writes are unsynchronised across threads | **Fixed** — `writeLock`; size cached instead of stat'd per line |

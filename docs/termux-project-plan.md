@@ -27,6 +27,12 @@ against `app/src/main/jniLibs/arm64-v8a/libcrush.so` finds `v0.99.0`
 alongside `go1.27.1` in the Go buildinfo, and no `0.98.x` string at all
 (the same tell BASELINE-NOV.md §4 used to separate 0.99.0 from 0.98.2).
 
+> **2026-11-14 note — the identity fact drifted once more.** The engine of
+> record advanced to **v0.100.0** on 2026-11-12 (merge `6800c0e`; the fetch
+> pin defaults to 0.100.0 and `FetchScriptPinTest` keeps it aligned). This
+> file remains **PLAN ONLY** — no Termux code exists in the tree — and its
+> §2 Crush-lineage facts are engine-version independent.
+
 ---
 
 ## 1. Why this exists

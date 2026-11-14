@@ -51,6 +51,15 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   grant, mirror, explicit “Sync to folder”, honest “imported copy” wording).
   Keep AFA in a sideload/dev flavor. B-full is a product change, not a
   permission tweak. Needs the owner's product call.
+- **Result (2026-11-14):** full primary-source pass in
+  [`storage-strategy-research-2026-11-14.md`](storage-strategy-research-2026-11-14.md).
+  Direct answer: live bidirectional sync is **not** equivalent to AFA — SAF is
+  `content://` provider access, the native engine needs a POSIX cwd, so B-full
+  is an eventual-consistency mirror that still cannot supply POSIX locks,
+  atomic rename, symlinks, modes, or inotify. Recommendation upgraded to the
+  explicit **two-flavor split (D)**: Play = B-MVP mirror, sideload = AFA
+  direct. Decision pending on D, B-MVP semantics, and the sideload
+  applicationId strategy.
 
 ### A3. No-lockscreen fail-open (store build)
 

@@ -168,6 +168,35 @@ internal fun liveRowsForOpenSession(
     if (currentlyViewedSession == targetSession && runInFlight) onScreen else emptyList()
 
 /**
+ * Whether a post-turn history fetch should replace the on-screen transcript.
+ *
+ * Detached sub-agent reports are persisted AFTER the dispatching turn's run
+ * closed (measured on device 2026-11-14), so the live screen stays on
+ * "waiting for its report" until the session is reopened. The bounded refresh
+ * reads the session a few times; this decides whether what came back is worth
+ * writing:
+ *
+ *  - a transcript with NO report must never be replaced - a normal turn that
+ *    happens to poll (it should not, but the guard is cheap) keeps its own
+ *    live rows;
+ *  - an identical replay is a no-op. Equality covers the continuing wake
+ *    reply too: the engine persists the parent's post-report answer (DONE) as
+ *    a new assistant row, so a later poll differing only by that row (or by
+ *    its streamed text) refreshes and the final poll goes quiet.
+ */
+internal fun lateReportRefreshDue(
+    current: List<ChatMessage>,
+    replayed: List<ChatMessage>
+): Boolean = replayed.any { it.reports.isNotEmpty() } && replayed != current
+
+/**
+ * Engine tool ids that create or feed a detached sub-agent run (v0.100.0).
+ * `agent_status` / `agent_stop` observe or end one but never produce the
+ * report this refresh exists for.
+ */
+private val DELEGATION_TOOLS = setOf("agent_dispatch", "agent_send")
+
+/**
  * The S-4 "smart transfer" denial note (decisions-open §10 P5).
  *
  * When a Chat (conversation-only, S-4 auto-deny) turn visibly attempts a
@@ -3444,6 +3473,12 @@ class ChatViewModel(
         // restart the engine underneath the stream.
         engineSupervisorFor.setWorkActive(true)
 
+        // Where the accepted attempt actually posted. A retry can move the
+        // session (a genuinely lost session is replaced), so the late
+        // detached-report reader must use this - not the preflight's frozen
+        // handle target. Null until an attempt was accepted.
+        var acceptedSid: String? = null
+
         try {
             val api = crushApi(p)
             var targetWs = ws
@@ -3534,6 +3569,7 @@ class ChatViewModel(
                 if (msg == null) {
                     accepted = true
                     failure = null
+                    acceptedSid = targetSid
                     try {
                         awaitStream(events, runId, handle)
                     } finally {
@@ -3714,6 +3750,18 @@ class ChatViewModel(
             // lose the measurement above. The run has already been abandoned,
             // so setProvider's own "is a turn in flight" check passes.
             applyPendingProviderIfIdle()
+
+            // A detached sub-agent report is persisted only AFTER this turn's
+            // run closed (device 2026-11-14: report 6 s after dispatch, parent
+            // reply later still), so no run is registered when it arrives and
+            // the event router has nowhere to deliver it. The accepted attempt
+            // knows the session that holds the report; a bounded re-read is the
+            // live path to it. Scheduled here, after the turn is fully settled,
+            // so the refresh cannot race this turn's own finalisation.
+            if (handle.dispatchedSubAgent && !handle.isStopped) {
+                val reportSid = acceptedSid
+                if (reportSid != null) scheduleLateReportRefresh(reportSid, p)
+            }
         }
     }
 
@@ -4006,6 +4054,9 @@ class ChatViewModel(
                                     // which cannot prove "a second bash call
                                     // never executed". Content-free by design.
                                     merge.added.forEach { t ->
+                                        if (t.name in DELEGATION_TOOLS) {
+                                            handle.dispatchedSubAgent = true
+                                        }
                                         AppLog.i(
                                             TAG,
                                             "tool_call observed instance=$instanceKey " +
@@ -4228,6 +4279,68 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Bounded post-turn refresh for detached sub-agent reports.
+     *
+     * WHY THE LIVE STREAM CANNOT DO THIS: the dispatching turn's run ends at
+     * its own `run_complete` (`end_turn`) while the sub-agent keeps running.
+     * The engine then persists the report and the primary agent's wake reply
+     * as ordinary session messages, but publishes them under no run this
+     * client registered - the router only forwards to registered run ids, so
+     * they are dropped. Reopening the session re-reads it and renders them;
+     * this performs the same read a few times so a reopen is not required.
+     *
+     * Bounded on purpose (15 polls, ~5 minutes): a sub-agent that never
+     * reports must leave nothing polling. Every iteration re-checks the three
+     * things that make the transcript someone else's to write - bound engine,
+     * active session, and a run in flight - and the state write re-checks
+     * them plus "the transcript did not change since this fetch began", so a
+     * brand-new turn's rows can never be replaced by a stale replay.
+     */
+    private fun scheduleLateReportRefresh(sid: String, port: Int) {
+        val boundKey = instanceKey
+        viewModelScope.launch {
+            repeat(LATE_REPORT_POLLS) { attempt ->
+                delay(
+                    if (attempt == 0) LATE_REPORT_FIRST_DELAY_MS else LATE_REPORT_POLL_MS
+                )
+                if (instanceKey != boundKey) return@launch
+                val st = _state.value
+                if (st.activeSessionId != sid || st.isStreaming || activeRun != null) {
+                    return@repeat
+                }
+                val mgr = workspaces ?: return@launch
+                // The workspace is an attachment handle that reaps (~30 s) even
+                // though the session persists under the project's cwd, so every
+                // poll re-attaches first - the same contract as openSession.
+                if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+                    return@repeat
+                }
+                val ws = mgr.currentWorkspaceId ?: return@repeat
+                val history = runCatching { crushApi(port).messages(ws, sid) }
+                    .onFailure { AppLog.w(TAG, "late report refresh failed: ${it.message}") }
+                    .getOrNull() ?: return@repeat
+                val replayed = history.mapNotNull { m -> replayRow(m) }
+                if (!lateReportRefreshDue(st.messages, replayed)) return@repeat
+                AppLog.i(
+                    TAG,
+                    "late sub-agent report due for session ${sid.take(8)}; replaying transcript"
+                )
+                _state.update { cur ->
+                    if (cur.activeSessionId == sid &&
+                        !cur.isStreaming &&
+                        activeRun == null &&
+                        cur.messages == st.messages
+                    ) {
+                        cur.copy(messages = replayed)
+                    } else {
+                        cur
+                    }
+                }
+            }
+        }
+    }
+
     /** Stop button: cancels the stream without tearing the engine down. */
     /**
      * Stops the in-flight run.
@@ -4380,6 +4493,18 @@ class ChatViewModel(
          * forever. Extensions are per turn and reset with the handle.
          */
         const val IDLE_EXTENSIONS_MAX = 3
+
+        /**
+         * Bounded post-turn detached-report refresh (2026-11-14 device
+         * finding): the report landed ~6 s after `agent_dispatch` but after the
+         * turn's own stream had closed, so the open transcript stayed on
+         * "waiting for its report" until a reopen. First look at 10 s, then
+         * every 20 s for 15 polls (~5 minutes) - long enough for a slow
+         * sub-agent, short enough that a lost report leaves nothing polling.
+         */
+        const val LATE_REPORT_FIRST_DELAY_MS = 10_000L
+        const val LATE_REPORT_POLL_MS = 20_000L
+        const val LATE_REPORT_POLLS = 15
 
         /**
          * Ceiling for ONE parked prompt - the ask/question dialog the user is

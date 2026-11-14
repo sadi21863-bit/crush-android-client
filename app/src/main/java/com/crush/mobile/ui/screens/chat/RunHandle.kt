@@ -89,6 +89,21 @@ internal class RunHandle(val turnId: String) {
     @Volatile
     var idleExtensions: Int = 0
 
+    /**
+     * True when this turn's stream showed a detached sub-agent dispatch
+     * (`agent_dispatch` / `agent_send`, engine v0.100.0).
+     *
+     * The sub-agent runs OUTSIDE this turn's run: its report and the primary
+     * agent's wake reply are persisted only AFTER the dispatching run's stream
+     * has closed (measured on device 2026-11-14: dispatch at :08, report at
+     * :14, parent reply at :38). No run is registered by then, so the live
+     * event router has nowhere to deliver those frames. The flag tells the
+     * view model a bounded post-turn history refresh is worth scheduling -
+     * every other turn would only re-read state that is already on screen.
+     */
+    @Volatile
+    var dispatchedSubAgent: Boolean = false
+
     val isStopped: Boolean get() = stoppedFlag.get()
 
     /**

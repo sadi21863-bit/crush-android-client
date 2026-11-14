@@ -10,6 +10,7 @@ Device context: Android 10 / API 29 (`bbf8ca69`), app 1.0.0 (1), engine v0.100.0
 - **A alone does not reliably unblock the store.** Play has no "developer tool" category, the declaration requires a demo video and extended review, and rejection blocks publication. The exception is discretionary and weak when a SAF-based alternative exists.
 - **B-MVP is a bounded feature, not a product rewrite.** The engine already takes a POSIX cwd (`ProjectRef.kt:30-34`); pointing it at `filesDir/projects/<uuid>/repo` needs no engine change. The work is import/copy, grant persistence, baseline tracking, conflict reporting, and honest UI.
 - **Do not build B-full on the critical path.** Revisit only if users show a concrete need for continuous two-way sync; treat it as a separate product bet.
+- **Owner decision (2026-11-14): test A first on Play.** Submit with AFA and the declaration/video; adopt D only if Play rejects or removes the artifact. See §8.
 
 ## 1. What SAF provides, and what it does not
 
@@ -215,6 +216,17 @@ All accessed 2026-11-14.
 Repo evidence: `app/src/main/AndroidManifest.xml:20-28,32,38`; `app/src/main/java/com/crush/mobile/ui/screens/projects/ProjectsScreen.kt:94-172`; `app/src/main/java/com/crush/mobile/project/FolderUriDecoder.kt:37-46`; `app/src/main/java/com/crush/mobile/project/ProjectRef.kt:30-34`; `app/src/main/java/com/crush/mobile/data/project/ProjectEntity.kt:31-42`; `app/src/main/java/com/crush/mobile/data/project/ProjectDatabase.kt:22`; `app/build.gradle.kts:44,58-59`; `docs/adr-0001-project-workspace-identity.md` §6(c).
 
 ## 8. Decision needed
+
+**Owner decision 2026-11-14:** attempt **A (AFA) first** on the store
+submission — declaration, demo video, and review instructions, positioned as
+a specialized AI coding agent / developer tool. If Play rejects or removes
+the artifact, adopt **D** (Play = B-MVP, sideload = AFA). The B-MVP design
+below stays as the pre-scoped fallback; no mirror code is written until the
+Play response makes it necessary. Recorded in `decisions-open.md` §11.
+
+The research recommendation remains **D**; the owner is deliberately testing
+the discretionary AFA outcome first because it preserves the current
+in-place workflow and avoids the mirror cost unless the store forces it.
 
 1. **Approve D** (Play = B-MVP, sideload = AFA) and record it in `docs/decisions-open.md` §11.
 2. **Approve B-MVP semantics:** the private mirror is the working copy; the source is updated only by explicit "Save changes to folder"; "Reload from folder" replaces the mirror only after confirmation; deletions are never propagated automatically in the first release.

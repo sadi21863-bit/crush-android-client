@@ -385,23 +385,37 @@ is superseded by that plan's 2026-11-08 addendum.
 
 ## 11. Import storage-access strategy (All Files Access vs narrow SAF)
 
-**Status: OPEN — not needed while the app is beta-installed via adb;
-REQUIRED before any store listing (Google Play policy). Raised by the
-independent review (F05).**
+**Status: DECIDED 2026-11-14 — attempt All Files Access on the first Play
+submission; keep the two-flavor SAF-mirror fallback pre-scoped. Not needed
+while the app is beta-installed via adb; REQUIRED before any store listing
+(Google Play policy). Raised by the independent review (F05).**
 
 **2026-11-13:** current Play policy research (AFA's permitted categories do
 not include "developer tool"; the narrow-SAF + mirror option) is in
 [backlog-research-2026-11-13.md](backlog-research-2026-11-13.md) §A2, with
 the recommended B-MVP. Owner decision needed.
 
+**2026-11-14 decision (owner):** submit the store build with
+`MANAGE_EXTERNAL_STORAGE` and test the policy outcome, rather than paying the
+B-MVP cost up front. The Play artifact keeps the current in-place POSIX
+workflow; the submission positions the app as a specialized AI coding agent /
+developer tool (not a file manager), completes the Permissions Declaration
+Form, and supplies review instructions plus the required demo video showing
+the core import-and-edit flow. The owner accepts that AFA review is
+discretionary, can take weeks, and can block or remove the listing.
+**Fallback (pre-scoped, no code yet):** if Play rejects or removes the AFA
+artifact, switch to the two-flavor split researched in
+[storage-strategy-research-2026-11-14.md](storage-strategy-research-2026-11-14.md)
+— Play = narrow SAF + app-private mirror + explicit Save/Reload (B-MVP);
+sideload/dev = AFA direct. No mirror code is written until the Play response
+makes it necessary.
+
 Today's import flow asks for All Files Access (MANAGE_EXTERNAL_STORAGE)
 before the SAF tree picker, then decodes the picked `primary:` document ID
 back into a `/storage/emulated/0/<folder>` POSIX path — the picker serves
 as a path selector, not a narrow storage grant. Understood, accepted
 consequences while in beta: access far broader than the selected project,
-and a store-distribution blocker unless justified (a developer-tool
-category may qualify, but requires policy review and a narrow alternative
-offered).
+and a store-distribution blocker unless justified.
 
 **The decision:** (A) keep direct POSIX access with a carefully explained
 All Files Access grant, positioning the app as a specialized developer

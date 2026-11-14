@@ -58,8 +58,12 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   is an eventual-consistency mirror that still cannot supply POSIX locks,
   atomic rename, symlinks, modes, or inotify. Recommendation upgraded to the
   explicit **two-flavor split (D)**: Play = B-MVP mirror, sideload = AFA
-  direct. Decision pending on D, B-MVP semantics, and the sideload
-  applicationId strategy.
+  direct.
+- **Owner decision 2026-11-14:** try **A (AFA) first** on the store
+  submission — declaration + demo video + review instructions, positioned as
+  a specialized developer tool. If Play rejects/removes it, switch to the
+  pre-scoped **D** fallback (Play = B-MVP, sideload = AFA). No mirror code
+  until the response. Recorded in `decisions-open.md` §11.
 
 ### A3. No-lockscreen fail-open (store build)
 

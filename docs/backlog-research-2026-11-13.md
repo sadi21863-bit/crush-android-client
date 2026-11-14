@@ -28,6 +28,8 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   (optional curl) → delete the file → hunt copies in backups/other machines.
 - **Recommendation:** do it, XS effort, no code. Record closure with date +
   key prefix only, never the key.
+- **CLOSED 2026-11-14 (owner-confirmed):** key rotated and the repo-root file
+  removed by the owner. No key material recorded here.
 
 ### A2. Import storage strategy (All Files Access vs narrow SAF)
 
@@ -159,6 +161,19 @@ API 29. Gate baseline: 689 tests / 74 suites, 0 failures.
   times, show elapsed + spinner. Do not interleave text (part order is creation
   order, not chronology) and do not claim engine timings.
 - Full step-grouped timeline with text anchors = M, needs step identity.
+- **Result (2026-11-14, `b7b4ae5`):** shipped with the `tool_result` correction.
+  The assistant frame's part-final `finished:true` is PART-final, not
+  execution-final (measured at ~274 ms, before the permission gate), so live
+  rows stay RUNNING through it; `RunHandle.completeTool` completes them on a
+  live `role=tool` message, and the turn `finally` only settles leftovers
+  without inventing a duration. Durations are engine-supplied
+  (`metadata.start_time` → `end_time`, epoch ms) — the earlier "wire carries no
+  timing" note above is superseded. Device proof (session `7271d703`,
+  `sleep 8`): permission dialog up with the row spinning and **no** check or
+  chip; still spinning 1.5 s after Allow; check + `8.0s` only after
+  `tool_result observed … duration=8031ms` (prior probe `8037ms`); logcat
+  confirms the live `role=tool` delivery rather than turn-end settlement.
+  Remaining scope is step-grouped anchors only.
 
 ### C4. Attachments / image input (staged, M)
 

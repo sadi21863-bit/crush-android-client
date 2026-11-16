@@ -1,0 +1,13 @@
+# flow 19 attempt 1 trace (projects.db pulled 2026-11-16 21:51)
+
+TestProject3 row: label=TestProject3 dir=/storage/emulated/0/TestProject3 trust_fingerprint=None consented_at_ms=1794846006343
+  consent stamp 1794846006343 is 4 ms BEFORE userApprovedAt 1794846006347 -> the gate returned Allow (confirmAtGate), no dialog interlude
+
+handoffId=022454ee-a184-4647-a1a1-846f713cc542
+sourceChatId=7271d703-5f15-4837-8206-b469b5e9d545
+targetProjectId=5ab508c3-46a8-411c-a9be-6d6dbf95f603
+targetCodeSessionId=c22de7a3-8eeb-4e67-9afe-bfccbe392934
+userApprovedAt=1794846006347
+status=DISPATCHED
+
+Attempt-1 staging was void for the dialog check: the app probes 'crushrc' (no dot), the folder carried only '.crushrc'.

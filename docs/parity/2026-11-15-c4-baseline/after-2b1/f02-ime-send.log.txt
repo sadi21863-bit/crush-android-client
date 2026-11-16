@@ -1,0 +1,9 @@
+# flow 2 send via IME (host clock 2026-11-16 19:03-19:16)
+# setting: Keyboard -> Enter sends; IME action key in Gboard tapped; composer emptied
+
+user b11b291a-ed10-4104-a524-c3f28d80a7ef created=1794836115 finished=None chars=20
+  first80='IME-SEND-POSTFIX-2B1'
+assistant 9dee4adf-1da1-4bf5-9216-6a40a7337714 created=1794836115 finished=None chars=13723
+  first80='1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30'
+
+user message text exactly: IME-SEND-POSTFIX-2B1

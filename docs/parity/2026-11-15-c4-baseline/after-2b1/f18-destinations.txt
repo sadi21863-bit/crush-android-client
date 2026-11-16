@@ -1,0 +1,7 @@
+# handoff destinations and recorded consent (2026-11-16 20:12)
+
+Legacy workspace | /data/user/0/com.crush.mobile/files/workspace | trust_fingerprint=None | consented_at_ms=1794756494322
+Test project folder | /storage/emulated/0/Test project folder | trust_fingerprint=None | consented_at_ms=1794725455071
+Test project folder 2 | /storage/emulated/0/Test project folder 2 | trust_fingerprint=None | consented_at_ms=1794723530383
+
+All three existing destinations carry a consent stamp; none is an unapproved project.

@@ -1,0 +1,6 @@
+﻿# flow 22 post-fix (prewarm On; host clock 2026-11-15 22:32)
+# composition started the supervisor; libcrush.so present
+
+11-15 22:32:07.087 I/Chat    (21303): starting supervisor for instance 'chat' (prewarm on)
+11-15 22:32:10.156 I/CrushEngine(21303): engine ready pid=-1 version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+11-15 22:32:10.160 I/EngineSupervisor(21303): [chat] engine Running after 3068ms

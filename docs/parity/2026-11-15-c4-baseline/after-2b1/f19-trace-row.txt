@@ -1,0 +1,18 @@
+# flow 19 trace row + consent record (projects.db pulled 2026-11-16 22:24)
+
+handoffId=75f1d8d7-6e0f-4c71-a227-2eb3803a06b2
+sourceChatId=c22de7a3-8eeb-4e67-9afe-bfccbe392934 (session c22de7a3, TestProject3)
+targetProjectId=d871eee8-4945-4c0e-acf2-a502d45ce622 (Test project folder 2)
+targetCodeSessionId=d59579a4-6bdf-4543-97f4-585913bcea2a
+userApprovedAt=1794848007429
+status=DISPATCHED
+
+project label=Test project folder 2
+project dir=/storage/emulated/0/Test project folder 2
+trust_fingerprint=1712a7a6ffa7507753f9e887b4f44a4db13eb120f3bddfdbac3c46301ad07392
+consented_at_ms=1794848007422
+
+crushrc bytes=17 sha256=1712a7a6ffa7507753f9e887b4f44a4db13eb120f3bddfdbac3c46301ad07392
+fingerprint matches the planted crushrc: True
+
+The trust dialog was raised before consent: app.log 22:23:24 'handoff blocked: consent required (crushrc present, no consent recorded)'.

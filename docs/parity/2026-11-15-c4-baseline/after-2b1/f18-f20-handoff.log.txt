@@ -1,0 +1,6 @@
+﻿# handoff owner rows 18/20 (host clock 2026-11-16 20:12-20:26)
+# flow 18: approved Legacy workspace, Confirm -> APPROVED -> DISPATCHED, no trust dialog
+
+18:54:59.132 I/Lifecycle: handoff resume deferred: active binding is 'chat', not 'Legacy workspace'
+20:24:48.734 I/ChatViewModel: handoff 4b301e82-97f9-43bd-a959-6c908cf52b24 APPROVED at 1794840888723; dispatching to 'Legacy workspace'
+20:24:56.186 I/ChatViewModel: handoff 4b301e82-97f9-43bd-a959-6c908cf52b24 DISPATCHED; target session dd947578-3563-4993-85b7-06db6181dda4

@@ -49,9 +49,29 @@ object SessionList {
      * showing, so the row can skip the line entirely instead of showing "0
      * messages / $0.00".
      */
-    fun detail(session: Session, nowMs: Long): String {
+    fun detail(session: Session, nowMs: Long): String =
+        detail(
+            messageCount = session.messageCount,
+            cost = session.cost,
+            isBusy = session.isBusy,
+            updatedAt = session.updatedAt,
+            nowMs = nowMs,
+        )
+
+    /**
+     * Phase 2b.1 overload for the COMPOSED row: `ChatContent` renders from
+     * [SessionItem], which carries the three facts this rule needs. Same rule,
+     * one source - the sheet's second line cannot drift from the session row's.
+     */
+    fun detail(
+        messageCount: Int,
+        cost: Double,
+        isBusy: Boolean,
+        updatedAt: Long,
+        nowMs: Long,
+    ): String {
         val bits = mutableListOf<String>()
-        val msg = session.messageCount
+        val msg = messageCount
         if (msg > 0) bits += "$msg msg"
 
         // cost is a Double and free models legitimately report exactly 0.0, so
@@ -61,11 +81,11 @@ object SessionList {
         // separator under the user's number formatting instead of the
         // invariant "$x.xx" the row always meant. (Lint DefaultLocale,
         // 2026-10-31 enablement batch.)
-        if (session.cost > 0.0) bits += "$" + String.format(Locale.US, "%.2f", session.cost)
+        if (cost > 0.0) bits += "$" + String.format(Locale.US, "%.2f", cost)
 
-        if (session.isBusy) bits += "running"
+        if (isBusy) bits += "running"
 
-        val when_ = relativeTime(session.updatedAt, nowMs)
+        val when_ = relativeTime(updatedAt, nowMs)
         if (when_.isNotEmpty()) bits += when_
 
         return bits.joinToString(" · ")

@@ -1,0 +1,84 @@
+﻿# flow 19 - attempt 1 (2026-11-16 21:50) and dotted-crushrc probe (22:18)
+# attempt 1: staged destination TestProject3 with .crushrc only -> gate probes 'crushrc' -> Allow, no trust dialog; APPROVED 1794846006347, DISPATCHED c22de7a3
+# 22:18: TestProject3 attached with only .crushrc present (30 B, echo dotted > .dotmarker); marker appeared -> engine executes the dotted file while the gate fingerprints only 'crushrc'
+
+19:21:59.319 D/App: alive t=1620812ms
+21:21:54.631 I/DeviceCredential: credential result ok=true
+21:21:54.689 I/LockOverlay: unlocked
+21:21:54.691 I/App: resume MainActivity@241791448
+21:21:54.692 I/Main: resume gate=OPEN coldStart=false away=0s ciphertext=true wasUnlocked=true verified=true freshUnlock=true
+21:50:03.001 D/App: alive t=10504494ms
+21:50:06.355 I/ChatViewModel: handoff 022454ee-a184-4647-a1a1-846f713cc542 APPROVED at 1794846006347; dispatching to 'TestProject3'
+21:50:06.361 I/Lifecycle: stopping project engine for instance 'pd871eee8' (no run in flight)
+21:50:06.362 I/EngineSupervisor: [pd871eee8] stop() requested
+21:50:06.570 D/EngineProxy: bridge stop
+21:50:06.571 I/CrushConnection: connection stopped
+21:50:06.572 D/ChatViewModel: bindEngine state=Stopped instance=p5ab508c3
+21:50:06.573 I/EngineSupervisor: [p5ab508c3] start() activeJob=null
+21:50:06.574 I/EngineSupervisor: [p5ab508c3] supervise loop start
+21:50:06.574 D/EngineSupervisor: [p5ab508c3] starting attempt 1
+21:50:06.582 D/EngineProxy: bridge up on 127.0.0.1:40815
+21:50:06.677 I/Chat: prewarm off; supervisor deferred to first input for p5ab508c3
+21:50:06.678 D/ChatViewModel: bindEngine state=Starting(attempt=1) instance=p5ab508c3
+21:50:07.393 D/EngineProxy: CONNECT hyper.charm.land:443 ok
+21:50:07.455 D/EngineProxy: CONNECT catwalk.charm.land:443 ok
+21:50:09.929 I/EngineSupervisor: [p5ab508c3] engine Running after 3355ms
+21:50:09.931 D/ChatViewModel: bindEngine state=Running(pid=-1, port=1, version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+21:50:09.933 D/ChatViewModel: bootstrap instance=p5ab508c3 workspacePath=/storage/emulated/0/TestProject3
+21:50:09.948 I/ChatViewModel: permissionMode=ASK providerId=opencode-go
+21:50:09.950 D/ChatViewModel: bootstrap permission wire: instance=p5ab508c3 engineVersion={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+21:50:09.952 D/WorkspaceManager: open: permissionWire=normal (null = v0.99 skip family) yolo=false
+21:50:09.954 D/ChatViewModel: bindEngine state=Running(pid=-1, port=1, version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+21:50:10.293 W/WorkspaceManager: agent/init failed on open(): HTTP 500 on /v1/workspaces/ed95bda0-a910-4f68-a298-15b44ff3e489/agent/init: {"message":"coder agent configuration is missing"}
+21:50:10.382 D/EngineProxy: CONNECT api.github.com:443 ok
+21:50:10.393 I/CrushSession: ensureAgentReady: key set for provider 'opencode-go'; model[large] = deepseek-v4.1-flash; model[small] = deepseek-v4.1-flash; agent/init ok; is_ready=true is_busy=false
+21:50:10.486 I/ChatViewModel: catalogue prices loaded for 33 models
+21:50:11.318 W/ChatViewModel: hiding 4 model(s) the engine no longer knows: beam-free,hy4-flash-free,iceman-contributor-free,longcat-2.5-free
+21:50:11.320 I/ChatViewModel: engine capabilities: 22/28 offered model(s) accept images
+21:50:12.495 I/ChatViewModel: probed 1 candidate(s), using deepseek-v4.1-flash (of 28 listed)
+21:50:12.586 I/CrushSession: ensureAgentReady: key set for provider 'opencode-go'; model[large] = deepseek-v4.1-flash; model[small] = deepseek-v4.1-flash; agent/init ok; is_ready=true is_busy=false
+21:50:12.613 I/ChatViewModel: no prior session with content; creating one
+21:50:12.636 I/ChatViewModel: event transport identity change -> <datadir>/com.crush.mobile/files/crush-p5ab508c3.sock; rebuilding connection
+21:50:12.639 I/ChatViewModel: long-lived event stream attached to ed95bda0-a910-4f68-a298-15b44ff3e489
+21:50:12.651 I/CrushConnection: connected to workspace ed95bda0-a910-4f68-a298-15b44ff3e489
+21:50:12.680 I/ChatViewModel: current-session reported: acbfbd22
+21:50:13.028 I/ChatViewModel: handoff 022454ee-a184-4647-a1a1-846f713cc542 DISPATCHED; target session c22de7a3-8eeb-4e67-9afe-bfccbe392934
+21:50:13.159 I/ChatViewModel: current-session reported: c22de7a3
+21:50:13.237 D/EngineProxy: CONNECT opencode.ai:443 ok
+21:50:13.242 D/EngineProxy: CONNECT opencode.ai:443 ok
+21:50:13.326 W/ChatViewModel: picker: hiding 4 model(s) the engine no longer knows: beam-free,hy4-flash-free,iceman-contributor-free,longcat-2.5-free
+21:50:20.066 I/ChatViewModel: tool_call observed instance=p5ab508c3 name=bash run=ed92998a
+21:50:20.383 I/ToolActivity: observed tool_call shape: keys=[data,type] data=[id,input,name] name=agent_status
+21:50:20.385 I/ChatViewModel: tool_call observed instance=p5ab508c3 name=agent_status run=ed92998a
+21:50:20.456 I/ToolActivity: observed tool_call shape: keys=[data,type] data=[finished,id,input,name] name=agent_status
+21:50:20.459 I/ChatViewModel: permission requested: bash (id=45621616); pendingPermission SET for run 58344ebe-129b-4d21-aebe-990103f997d7
+21:50:20.461 W/ChatViewModel: prompt-wait: entering (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:21.952 W/ChatViewModel: prompt-wait: frame received; loop resumes (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:21.953 W/ChatViewModel: prompt-wait: entering (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:21.954 W/ChatViewModel: prompt CLOSED (grant ok; id=45621616); pendingPermission cleared
+21:50:22.014 W/ChatViewModel: prompt-wait: frame received; loop resumes (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:22.015 I/ChatViewModel: tool_result observed instance=p5ab508c3 call=call_cd32004 failed=false duration=57ms
+21:50:22.017 I/ChatViewModel: tool_result observed instance=p5ab508c3 call=call_674adc2 failed=false duration=0ms
+21:50:29.843 I/ChatViewModel: tool_call observed instance=p5ab508c3 name=bash run=ed92998a
+21:50:30.588 I/ChatViewModel: tool_call observed instance=p5ab508c3 name=bash run=ed92998a
+21:50:30.910 I/ChatViewModel: permission requested: bash (id=e9dcd05d); pendingPermission SET for run 58344ebe-129b-4d21-aebe-990103f997d7
+21:50:30.912 W/ChatViewModel: prompt-wait: entering (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:32.570 D/WorkspaceManager: open: permissionWire=normal (null = v0.99 skip family) yolo=false
+21:50:32.604 W/CrushConnection: events: unknown engine event type "permission_mode_changed"; frame skipped, further frames of this type drop silently
+21:50:32.633 W/ChatViewModel: prompt-wait: frame received; loop resumes (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:32.634 W/ChatViewModel: prompt-wait: entering (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:32.635 W/ChatViewModel: prompt CLOSED (grant ok; id=e9dcd05d); pendingPermission cleared
+21:50:32.764 W/ChatViewModel: prompt-wait: frame received; loop resumes (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:32.766 I/ChatViewModel: tool_result observed instance=p5ab508c3 call=call_f2feaae failed=false duration=121ms
+21:50:32.768 I/ChatViewModel: permission requested: bash (id=37abf48e); pendingPermission SET for run 58344ebe-129b-4d21-aebe-990103f997d7
+21:50:32.768 W/ChatViewModel: prompt-wait: entering (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:33.005 D/App: alive t=10534499ms
+21:50:34.353 W/ChatViewModel: prompt-wait: frame received; loop resumes (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:34.355 W/ChatViewModel: prompt-wait: entering (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:34.356 W/ChatViewModel: prompt CLOSED (grant ok; id=37abf48e); pendingPermission cleared
+21:50:34.396 W/ChatViewModel: prompt-wait: frame received; loop resumes (run ed92998a-cee7-40ef-9f48-2faf8784078a)
+21:50:34.397 I/ChatViewModel: tool_result observed instance=p5ab508c3 call=call_f8c69cb failed=false duration=38ms
+21:50:56.002 I/ChatViewModel: file changes: +0 -0 across 0 file(s), 0 unreadable
+21:51:03.008 D/App: alive t=10564502ms
+21:51:33.016 D/App: alive t=10594509ms
+21:52:03.022 D/App: alive t=10624516ms

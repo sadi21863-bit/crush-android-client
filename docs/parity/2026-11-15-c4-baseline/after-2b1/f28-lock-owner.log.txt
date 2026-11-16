@@ -1,0 +1,31 @@
+﻿# flow 28 lock, owner-performed (host clock 2026-11-16 18:54:58-18:55:12)
+# cold start with the lock engaged: no engine start, no bootstrap; owner unlocked at 18:55:12
+
+18:54:58.507 I/App: app started pid=12679 log=/data/user/0/com.crush.mobile/files/app.log
+18:54:58.551 I/App: create MainActivity@241791448
+18:54:58.555 I/Main: onCreate
+18:54:58.556 I/Main: engine compatible (bundled=true)
+18:54:58.585 I/App: start MainActivity@241791448
+18:54:58.587 I/App: resume MainActivity@241791448
+18:54:58.590 I/Main: resume gate=PROMPT coldStart=true away=-1s ciphertext=true wasUnlocked=false verified=false freshUnlock=false
+18:54:58.990 I/Lifecycle: restoring last binding: chat pool
+18:54:59.079 I/App: pause MainActivity@241791448
+18:54:59.132 I/Lifecycle: handoff resume deferred: active binding is 'chat', not 'Legacy workspace'
+18:54:59.353 I/ChatViewModel: lock engaged; refusing to bootstrap
+18:54:59.358 D/ChatViewModel: bindEngine state=Stopped instance=chat
+18:54:59.359 D/ChatViewModel: bindEngine state=Stopped instance=chat
+18:54:59.455 I/Chat: prewarm off; supervisor deferred to first input for chat
+18:55:12.181 I/DeviceCredential: credential result ok=true
+18:55:12.185 I/LockOverlay: no stored key for provider=opencode-zen; opening without a cached key
+18:55:12.186 I/LockOverlay: unlocked
+18:55:12.195 I/App: resume MainActivity@241791448
+18:55:12.197 I/Main: resume gate=OPEN coldStart=false away=0s ciphertext=true wasUnlocked=false verified=true freshUnlock=true
+19:03:24.590 I/ChatViewModel: probed 1 candidate(s), using deepseek-v4.1-flash (of 28 listed)
+19:03:24.723 I/CrushSession: ensureAgentReady: key set for provider 'opencode-go'; model[large] = deepseek-v4.1-flash; model[small] = deepseek-v4.1-flash; agent/init ok; is_ready=true is_busy=false
+19:03:24.762 I/ChatViewModel: resuming session 4475a1d3-d93e-4af0-89fc-e719c9820a47 (8 msgs)
+19:03:24.766 I/ChatViewModel: event transport identity change -> <datadir>/com.crush.mobile/files/crush-chat.sock; rebuilding connection
+19:03:24.770 I/ChatViewModel: long-lived event stream attached to f374fc7b-73b6-4fca-bef9-02ce26b54a33
+19:03:24.811 I/CrushConnection: connected to workspace f374fc7b-73b6-4fca-bef9-02ce26b54a33
+19:03:24.832 I/ChatViewModel: current-session reported: 4475a1d3
+19:03:24.954 I/ChatViewModel: current-session reported: 4475a1d3
+19:17:22.358 I/Main: resume gate=OPEN coldStart=false away=35s ciphertext=true wasUnlocked=false verified=true freshUnlock=false

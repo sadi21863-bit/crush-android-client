@@ -1,0 +1,41 @@
+﻿# flow 11 post-fix (project -> sheet New chat; host clock 2026-11-15 21:18-21:23)
+# UI: New chat / Chat - no tools - engine stopped, empty; after typing: chat / Chat - no tools - ready
+# fresh session minted: 57d2acca; no project transcript bleed
+
+21:18:41.975 I/Lifecycle: stopping project engine for instance 'p077dc19e' (no run in flight)
+21:18:41.978 I/EngineSupervisor: [p077dc19e] stop() requested
+21:18:42.191 D/EngineProxy: bridge stop
+21:18:42.194 I/CrushConnection: connection stopped
+21:18:42.199 D/ChatViewModel: bindEngine state=Stopped instance=chat
+21:18:42.311 I/Chat: prewarm off; supervisor deferred to first input for chat
+21:18:42.312 D/ChatViewModel: bindEngine state=Stopped instance=chat
+21:18:43.334 D/App: alive t=1230586ms
+21:23:03.703 I/EngineSupervisor: [chat] start() activeJob=null
+21:23:03.706 I/EngineSupervisor: [chat] supervise loop start
+21:23:03.708 D/EngineSupervisor: [chat] starting attempt 1
+21:23:03.741 I/CrushEngine: [chat] chat tool policy installed (readback-verified, 35 ids denied); spawning with the deny-all toolset
+21:23:03.742 D/EngineProxy: bridge up on 127.0.0.1:40395
+21:23:03.811 D/ChatViewModel: bindEngine state=Starting(attempt=1) instance=chat
+21:23:04.607 D/EngineProxy: CONNECT catwalk.charm.land:443 ok
+21:23:04.614 D/EngineProxy: CONNECT hyper.charm.land:443 ok
+21:23:06.985 I/EngineSupervisor: [chat] engine Running after 3277ms
+21:23:07.007 D/ChatViewModel: bindEngine state=Running(pid=-1, port=1, version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+21:23:07.010 D/ChatViewModel: bootstrap instance=chat workspacePath=/data/user/0/com.crush.mobile/files/workspace
+21:23:07.034 I/ChatViewModel: permissionMode=ASK providerId=opencode-go
+21:23:07.036 D/ChatViewModel: bootstrap permission wire: instance=chat engineVersion={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+21:23:07.038 D/WorkspaceManager: open: permissionWire=normal (null = v0.99 skip family) yolo=false
+21:23:07.279 D/EngineProxy: CONNECT api.github.com:443 ok
+21:23:07.308 I/CrushSession: ensureAgentReady: key set for provider 'opencode-go'; model[large] = deepseek-v4.1-flash; model[small] = deepseek-v4.1-flash; agent/init ok; is_ready=true is_busy=false
+21:23:07.428 I/ChatViewModel: catalogue prices loaded for 32 models
+21:23:08.104 W/ChatViewModel: hiding 3 model(s) the engine no longer knows: beam-free,iceman-contributor-free,longcat-2.5-free
+21:23:08.105 I/ChatViewModel: engine capabilities: 21/27 offered model(s) accept images
+21:23:10.284 I/ChatViewModel: probed 1 candidate(s), using deepseek-v4.1-flash (of 27 listed)
+21:23:10.348 I/CrushSession: ensureAgentReady: key set for provider 'opencode-go'; model[large] = deepseek-v4.1-flash; model[small] = deepseek-v4.1-flash; agent/init ok; is_ready=true is_busy=false
+21:23:10.352 I/ChatViewModel: new chat: minting a fresh session on 'chat'
+21:23:10.544 I/ChatViewModel: event transport identity change -> <datadir>/com.crush.mobile/files/crush-chat.sock; rebuilding connection
+21:23:10.548 I/ChatViewModel: long-lived event stream attached to e10f837a-2613-4109-ab6d-0ef6e038c4d7
+21:23:10.587 I/CrushConnection: connected to workspace e10f837a-2613-4109-ab6d-0ef6e038c4d7
+21:23:10.724 I/ChatViewModel: current-session reported: 57d2acca
+21:23:11.256 W/ChatViewModel: picker: hiding 3 model(s) the engine no longer knows: beam-free,iceman-contributor-free,longcat-2.5-free
+21:23:13.370 D/App: alive t=1500623ms
+21:23:43.373 D/App: alive t=1530626ms

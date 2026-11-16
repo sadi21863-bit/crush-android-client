@@ -182,6 +182,34 @@ buildFeatures {
         // used where real Android behaviour matters; it supplies a real Context,
         // which returnDefaultValues cannot.
         unitTests.isReturnDefaultValues = true
+
+        // Phase 2b.1 (V2 plan §6.2/§6.3): the Compose tests launch the
+        // ComponentActivity that `ui-test-manifest` (debugImplementation)
+        // contributes. Without merged resources/manifest Robolectric falls
+        // back to package `org.robolectric.default`, where that activity is
+        // undeclared, and every createComposeRule() test dies at
+        // RoboMonitoringInstrumentation before its body runs.
+        unitTests.isIncludeAndroidResources = true
+
+        // Robolectric 4.17 on the JDK 25 build runtime: API 36's
+        // ApplicationSharedMemory reaches into `jdk.internal.access` through
+        // SharedSecrets, which the module system does not export by default.
+        // This is the argument list Robolectric's own Getting Started page
+        // prescribes for Java 17+; without it every Robolectric test fails in
+        // environment setup, before the test body runs.
+        unitTests.all {
+            it.jvmArgs(
+                "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                "--add-opens=java.base/java.util=ALL-UNNAMED",
+                "--add-opens=java.base/java.io=ALL-UNNAMED",
+                "--add-opens=java.base/java.net=ALL-UNNAMED",
+                "--add-opens=java.base/java.security=ALL-UNNAMED",
+                "--add-opens=java.base/java.text=ALL-UNNAMED",
+                "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+                "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
+                "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+            )
+        }
     }
 
     // LintEnabled 2026-10-31 (decision item 1): the historical

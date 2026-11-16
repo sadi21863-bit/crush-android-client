@@ -61,6 +61,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -620,6 +621,123 @@ class ChatViewModel(
     )
 
     /**
+     * Phase 2a (V2 plan §5.2.1): one coherent host snapshot for the future
+     * `ChatContent` seam.
+     *
+     * The binding/key pair rides [AppContainer.bindingSnapshot], and the
+     * engine state rides [AppContainer.engineStateForKey], so a collector can
+     * never combine a new binding with the previous engine's state. The seed
+     * is [ChatHostState.initial] (`snapshotReady = false`), which projects as
+     * `Starting`, never `Ready`.
+     */
+    val hostState: StateFlow<ChatHostState> = combine(
+        _state,
+        container.bindingSnapshot,
+        container.engineStateForKey,
+        container.settingsRepository.settings,
+        // Key availability is an invalidation source, not a projected fact:
+        // an unlock can change what this snapshot is allowed to say, so the
+        // first coherent emission must pair it with the rest. ChatHostInputs
+        // deliberately grows only `snapshotReady` (Appendix C.1).
+        container.keyAvailable,
+    ) { chat, snapshot, engine, settings, _ ->
+        val binding = snapshot.binding
+        ChatHostState(
+            chat = chat,
+            inputs = ChatHostInputs(
+                binding = binding.toBindingKind(),
+                projectLabel = (binding as? AppContainer.EngineBinding.Project)?.ref?.label,
+                instanceKey = snapshot.instanceKey,
+                engineStateKey = engine.instanceKey,
+                engineState = engine.state,
+                snapshotReady = true,
+                prewarm = container.settingsRepository.resolvedTuning(settings).prewarmEngine,
+                enterSendMode = if (settings.enterSendMode == "send") {
+                    EnterSendMode.Send
+                } else {
+                    EnterSendMode.Newline
+                },
+                providerDisplayName = Providers.byId(chat.providerId)?.displayName ?: chat.providerId,
+            ),
+        )
+    }.stateIn(
+        viewModelScope,
+        kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+        ChatHostState.initial(),
+    )
+
+    private fun AppContainer.EngineBinding.toBindingKind(): BindingKind = when (this) {
+        is AppContainer.EngineBinding.Legacy -> BindingKind.Legacy
+        is AppContainer.EngineBinding.ChatPool -> BindingKind.ChatPool
+        is AppContainer.EngineBinding.Project -> BindingKind.Project
+    }
+
+    /**
+     * Phase 2a action seam. Exhaustive by construction: every [ChatAction]
+     * either mutates through an existing public ViewModel method or returns an
+     * explicit host continuation. There is no `else` and no silent no-op.
+     */
+    fun dispatch(action: ChatAction): ChatHostEffect {
+        ChatDispatch.permissionDecision(action)?.let { decision ->
+            val requestId = when (action) {
+                is ChatAction.AllowOnce -> action.requestId
+                is ChatAction.AllowForSession -> action.requestId
+                is ChatAction.DenyPermission -> action.requestId
+                else -> ""
+            }
+            if (_state.value.pendingPermission?.id == requestId) {
+                resolvePermission(decision.allow, decision.forSession)
+            } else {
+                AppLog.w(TAG, "permission decision dropped: request '$requestId' is no longer pending")
+            }
+            return ChatHostEffect.None
+        }
+
+        ChatDispatch.hostEffect(action)?.let { return it }
+
+        when (action) {
+            is ChatAction.DraftChanged -> setInput(action.text)
+            ChatAction.Send -> send()
+            ChatAction.Stop -> stopStreaming()
+
+            ChatAction.NewChat -> startChatSession()
+            ChatAction.OpenSessions -> loadSessions()
+            ChatAction.OpenModels -> loadModels()
+
+            is ChatAction.SelectModel -> setModel(action.id)
+            ChatAction.ReloadModels -> loadModels()
+
+            is ChatAction.SelectSession -> openSession(action.id)
+            is ChatAction.DeleteSession -> deleteSession(action.id)
+
+            ChatAction.ReleaseQuestion -> resolveQuestion()
+
+            is ChatAction.Retry -> {
+                setInput(action.text)
+                send()
+            }
+            is ChatAction.UsePlanInCode -> openHandoffSheet(action.messageIndex)
+
+            ChatAction.DiscardHandoff -> discardHandoff()
+            ChatAction.CloseHandoffSheet -> closeHandoffSheet()
+
+            // Host-owned and permission actions returned above. Kept explicit
+            // so the compiler still enforces exhaustiveness if the sealed set
+            // grows later.
+            ChatAction.OpenSettings,
+            ChatAction.OpenProjects,
+            ChatAction.OpenReview,
+            is ChatAction.ConfirmHandoff,
+            ChatAction.OpenHandoffInCode,
+            is ChatAction.GrantHandoffTrust,
+            is ChatAction.AllowOnce,
+            is ChatAction.AllowForSession,
+            is ChatAction.DenyPermission -> Unit
+        }
+        return ChatHostEffect.None
+    }
+
+    /**
      * The turn currently claimed by send(), or null when none is in flight.
      *
      * This is Stop's ONLY input (audit P1-05). Stop used to read the mutable
@@ -750,6 +868,16 @@ class ChatViewModel(
     @Volatile
     private var reclaimedBySupersession: Boolean = false
     private var workspaces: WorkspaceManager? = null
+
+    /**
+     * The instance key whose bootstrap must mint a fresh chat instead of
+     * resuming the last session. Set by [startChatSession] and by
+     * [newThread]'s bootstrap fallback; consumed by [doBootstrap] only when
+     * that boot lands on the same instance, so a switch that overtakes the
+     * intent cannot mint a chat in the wrong workspace.
+     */
+    private var pendingNewChatKey: String? = null
+
     private var port: Int? = null
 
     /**
@@ -916,6 +1044,9 @@ class ChatViewModel(
         val (key, phaseText) = derivation
         if (key == instanceKey) return
         instanceKey = key
+        // A New chat intent belongs to the instance that asked for it; an
+        // overtaking binding change retires it.
+        pendingNewChatKey = null
         // An instance switch invalidates every engine-derived handle: the
         // new engine owns its own workspace/session id space (the same reset
         // bindEngine does on an engine replacement - here the switch IS the
@@ -1456,11 +1587,18 @@ class ChatViewModel(
         wsId = wsNow
         workspaces = mgr
 
+        // A New chat intent is consumed only by the boot that landed on the
+        // instance that requested it. This is the cold-boot half of the fix:
+        // the old path resumed the last session here, which could leave a
+        // project transcript under a chat-pool binding.
+        val mintFresh = consumesPendingNewChat(pendingNewChatKey, instanceKey)
+        if (mintFresh) pendingNewChatKey = null
+
         // STEP 4 - resume the last real conversation instead of minting another
         // empty chat. Do this LAST so the workspace is already claimed and
         // settled; an earlier attempt at this point was what allowed the reap.
         val wsForResume = wsId
-        val resumable: String? = if (wsForResume == null) {
+        val resumable: String? = if (mintFresh || wsForResume == null) {
             null
         } else {
             runCatching { findSessionToResume(wsForResume) }
@@ -1468,10 +1606,19 @@ class ChatViewModel(
                 .getOrNull()
         }
 
-        sessionId = resumable ?: run {
-            AppLog.i(TAG, "no prior session with content; creating one")
+        sessionId = if (mintFresh) {
+            AppLog.i(TAG, "new chat: minting a fresh session on '$instanceKey'")
             runCatching { mgr.newSession("chat").id }.getOrNull()
+        } else {
+            resumable ?: run {
+                AppLog.i(TAG, "no prior session with content; creating one")
+                runCatching { mgr.newSession("chat").id }.getOrNull()
+            }
         }
+        // A boot with nothing to resume is also a fresh surface: clear any
+        // transcript left by the previous binding instead of presenting it as
+        // this session's history.
+        val freshSession = resumable == null
 
         // Bootstrap also retires any prompt from the session it left behind:
         // a permission or question addressed to a pre-restart run can never be
@@ -1484,7 +1631,10 @@ class ChatViewModel(
                 selectedModel = chosen,
                 models = models,
                 pendingPermission = null,
-                pendingQuestion = null
+                pendingQuestion = null,
+                messages = if (freshSession) emptyList() else it.messages,
+                activeSessionId = if (freshSession) sessionId else it.activeSessionId,
+                fileChanges = if (freshSession) null else it.fileChanges
             )
         }
         loadModels()
@@ -1501,6 +1651,7 @@ class ChatViewModel(
         // resumable path re-reports inside openSession; this covers the
         // freshly minted session (no resume), where nothing else would.
         reportCurrentSession(sessionId)
+        if (freshSession) loadSessions()
         resumable?.let { openSession(it) }
         // The activity decided the session; the affordance follows the table
         // (the drive's UX enhancement - the cold-boot mint path nothing else
@@ -2127,18 +2278,43 @@ class ChatViewModel(
     fun startChatSession() {
         container.setActiveChatPool()
         bindProject()
+        // A cold chat-pool boot used to leave the outgoing project transcript
+        // on screen under a chat-pool subtitle: only newThread's warm path
+        // cleared the view, while the bootstrap fallback resumed the old
+        // session. Clear BEFORE the fallback; the pending mint below replaces
+        // the session id as soon as the chat-pool engine lands.
+        _state.update {
+            it.copy(
+                messages = emptyList(),
+                activeSessionId = null,
+                isStreaming = false,
+                fileChanges = null,
+                stopNotice = null,
+                pendingPermission = null,
+                pendingQuestion = null,
+                handoffResumeHint = null
+            )
+        }
+        pendingNewChatKey = instanceKey
         newThread()
     }
 
     /** Starts a fresh thread, leaving history intact and reachable. */
     fun newThread() {
-        val mgr = workspaces ?: run { bootstrap(); return }
+        val mgr = workspaces
+        if (mgr == null) {
+            pendingNewChatKey = instanceKey
+            bootstrap()
+            return
+        }
         val epoch = ++sessionViewEpoch
         viewModelScope.launch {
             if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+                pendingNewChatKey = instanceKey
                 bootstrap()
                 return@launch
             }
+            pendingNewChatKey = null
             val ws = mgr.currentWorkspaceId ?: return@launch
             val sid = runCatching { mgr.newSession("chat").id }.getOrNull() ?: return@launch
             // Same stale-switch contract as openSession: creating the engine
@@ -4592,6 +4768,15 @@ class ChatViewModel(
         const val HANDOFF_SETTLE_MS = 300L
     }
 }
+
+/**
+ * A New chat intent is bound to the instance that requested it. Only a
+ * bootstrap that lands on that same instance may consume it and mint; a boot
+ * for another instance leaves the intent alone, so a switch that overtakes the
+ * request cannot create a chat in the wrong workspace.
+ */
+internal fun consumesPendingNewChat(pendingKey: String?, instanceKey: String): Boolean =
+    pendingKey != null && pendingKey == instanceKey
 
 /**
  * The F04-Allow ordering the 2026-11-11 P5 drive's bug fixed (extracted so

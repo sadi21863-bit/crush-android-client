@@ -260,7 +260,7 @@ mirrored locally with their full reasoning in the plan doc
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | pack's **BLOCKED condition is lifted** — Gates 0+1 are closed (2026-11-06/07); not started beyond that (2026-11-08 refresh) |
+| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 code/test-complete and committed 2026-11-16** (ChatContent extraction + T2B1-01…04 + owner-authorized post-review fixes for flow 23/11). Targeted chat package 27 suites / 256 tests green; four-task gate green (789 tests / 86 suites, 0 failures; lint 0 errors / 1 standing warning). Device after-walk PARTIAL: Set A 10/10 (9 PASS + `a02` PARTIAL), Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 2/11/16/22/23 re-walked PASS on the post-review APK, flows 18/19/20/28 owner-performed PASS, and Prewarm restored Off. Finding 10 (dotted `.crushrc` executes outside the gate) is pinned, not fixed. Record: `docs/parity/2026-11-15-c4-baseline/after-2b1/MANIFEST.md`. Batch records: §5.1 (2a), §5.2 (2b.1), §5.3 (post-review fixes) |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
@@ -270,6 +270,336 @@ mirrored locally with their full reasoning in the plan doc
 Numbering caution: the plan doc §7's "G1≈S0 … G9≈Termux" is the older
 review-fold mapping, a DIFFERENT family. Use the pack's Gate 0–7 rows
 above for status; map back to slices only when reading the plan doc.
+
+### 5.1 V2 Phase 2a batch record (working tree, 2026-11-15)
+
+Design source: `crush-mobile-v2-design-brief-state-contract-test-plan-2026-11-14.md`
+Revision 3.1 (Appendix C). Phase 0 remains closed; this batch implements only
+the approved 2a seam.
+
+**Production (6 files, no UI change)**
+
+- New: `ChatHostInputs.kt` (host inputs, readiness precedence, initial
+  non-ready seed), `ChatAction.kt` (sealed action set and host effects),
+  `ChatDispatch.kt` (pure draft gate, permission mapping, host-effect table),
+  `ChatViewState.kt` (pure projection and view types).
+- Additive: `ChatViewModel.hostState` (one combine over state, binding
+  snapshot, key-tagged engine sample, settings, and key availability) and
+  exhaustive `ChatViewModel.dispatch(action): ChatHostEffect`.
+- Additive: `AppContainer.bindingSnapshot` (one atomic binding/key write in
+  `applyBinding`) and `AppContainer.engineStateForKey` (sample tagged at the
+  source). Existing flows and public APIs are unchanged.
+- `ChatScreen.kt` is untouched; `hostState` is not collected by the UI yet.
+
+**Tests (5 files, 36 tests: 9 / 7 / 6 / 6 / 8)**
+
+`ChatViewStateTest` (T2A-01), `ChatGateTest` (T2A-02),
+`ChatHostInputsTest` (T2A-03, including the 50-update sequence),
+`ChatModelMetadataTest` (T2A-04 / T2A-04a, plus the no-price-accessor pin),
+`ChatDispatchTest` (T2A-05, including the 37-row interaction ledger).
+All are plain JVM: no Robolectric runner, no Compose harness.
+
+**Gate evidence**
+
+- Targeted: 22 chat-package suites / 219 tests, 0 failures.
+- Full gate: `:app:testDebugUnitTest :app:assembleDebug
+  :app:assembleDebugAndroidTest :app:lintRelease` → BUILD SUCCESSFUL;
+  752 tests / 81 suites, 0 failures; lint 0 errors / 1 warning (the
+  standing warning, not introduced here).
+
+**Deviations recorded**
+
+1. `ChatHostEffect.ConfirmHandoff` is an explicit host continuation beyond
+   Appendix C.3's named set. Its `onTrustRequired` callback must open the
+   host's trust dialog; treating the action as ViewModel-owned would silently
+   drop the consent prompt.
+2. Tests live in `app/src/test/java/com/crush/mobile/ui/screens/chat/` (the
+   document's `ui/chat` is shorthand), matching the existing package.
+3. `NoticeView` carries `deleteError` only. `stopNoticeHandled` is not a fact
+   in `ChatUiState`, so projecting it would invent state; it stays
+   content-local in 2b.1.
+4. `ReloadModels` has no row of its own in the 37-row table. Today's model-chip
+   tap both opens the sheet and fetches the catalogue, so ledger row 3 carries
+   `OpenModels` and `ReloadModels`; this keeps every action subtype owned.
+5. `keyAvailable` is a combine input (invalidation source) but not a
+   `ChatHostInputs` field, per Appendix C.1's "gains only `snapshotReady`".
+
+**Not performed**
+
+- No device run and no screenshot/parity walk; C.4's pre-batch Set A/Set B
+  evidence is not attached by this batch.
+- T2B1-04 (`ChatHostCallbackTest`, Compose + Robolectric) is a 2b.1 artifact
+  and was not created here.
+
+### 5.2 V2 Phase 2b.1 batch record (working tree, 2026-11-15)
+
+Design source: same Rev 3.1 brief, §§5.6, 6.3, Appendix C.2. Phase 0 remains
+closed; this batch implements only the approved `ChatContent` seam.
+
+**Production (6 main files; one new content layer)**
+
+- New `ChatContent.kt` (~1,500 lines): the host-free Scaffold subtree extracted
+  from `ChatScreen.kt` — top bar, snackbar host, transcript (resume bar,
+  bubbles, tool rows, failed cards, file-changes rail), composer, session and
+  model sheets, handoff sheet, permission/question dialogs, and the root trust
+  dialog. Its signature is §5.6's fixed shape:
+  `(state, onAction, pendingTrust, onTrustConfirm, onTrustDismiss)`. No
+  `Context`, container, ViewModel, Activity or nav controller is passed in.
+- `ChatScreen.kt` rewritten as the host (1,444 lines removed): it owns the
+  ViewModel/state collection, `rememberDraftCallback` (the T2B1-04 freshness
+  seam), the private `TrustOrigin` table (`Resume`, `OpenInCode`,
+  `Confirm(summary, destinationId, mode)`), and the `ChatContent` call.
+- `ChatHostInputs.kt`: `PendingTrustUi.reason` is nullable; null renders the
+  plain first-consent shape, matching
+  `CrushrcTrustDialog(reasonNote: String?)`.
+- `ChatViewState.kt`: three additive projection fields —
+  `ComposerView.prewarm`, `RunView.engineReady`, and
+  `SessionItem.messageCount/cost/updatedAt` — so the content reads no
+  settings, clock or engine object.
+- `ChatDispatch.kt`: `permissionDismiss(requestId)` shares the Deny button's
+  deny-only path, so a dialog dismiss can never approve.
+- `SessionList.kt`: primitive `detail` overload keeps the projection
+  clock-free.
+
+The Compose/Robolectric harness change is test-scoped (`app/build.gradle.kts`:
+`unitTests.isIncludeAndroidResources`, Robolectric's official Java 17+
+`--add-opens` set; `app/src/test/resources/robolectric.properties`: plain
+`android.app.Application`). No new dependency.
+
+**Tests (4 files, 33 tests: 9 / 8 / 12 / 4)**
+
+- `ChatContentTranscriptTest` (T2B1-01, 9): empty cold start, both roles,
+  streaming Stop and no Send, running tool without a result, retry dispatch,
+  free/paid marker, resume-bar target gating.
+- `ChatContentGateTest` (T2B1-02, 8): all three permission decisions enabled
+  and tappable at >=48dp, dismiss = `DenyPermission` (never an approval),
+  question release with no option list, composer `canType`/`canSend`
+  following.
+- `ChatContentSheetsTest` (T2B1-03, 12): session sheet surface/rows/empty/
+  loading, pick, immediate-delete pin, model sheet selection/free badge/error,
+  handoff prefill + destination + Confirm payload, in-sheet refused notice,
+  trust dialog confirm-once/cancel.
+- `ChatHostCallbackTest` (T2B1-04, 4): the captured draft callback sees later
+  `canType`/`prewarm` values and starts/dispatches exactly once per send, in
+  both directions.
+
+**Gate evidence**
+
+- Four classes: 33 tests / 0 failures / 0 errors.
+- Targeted chat package: 26 suites / 252 tests / 0 failures / 0 errors
+  (2a's 22/219 plus 2b.1's 4/33).
+- Full gate: `:app:testDebugUnitTest :app:assembleDebug
+  :app:assembleDebugAndroidTest :app:lintRelease` → BUILD SUCCESSFUL in
+  19m46s; 785 tests / 85 suites, 0 failures / 0 errors; lint 0 errors /
+  1 standing warning (`NotShrinkingResources`, pre-existing).
+- Device after-walk (2b.1 APK, Redmi Note 7 Pro API 29, 2026-11-15): Set A
+  10/10 captured (9 PASS, `a02` PARTIAL; `a01` pixel-identical in the content
+  region, 0 changed pixels); the original Set B walk was 15 PASS / 2 FAIL /
+  7 NOT PERFORMED / 4 BLOCKED. Flow 23 (prewarm OFF) reproduced the
+  pre-existing cold-start race; flow 11 reproduced the pre-existing `+`
+  cross-binding variant. Both were then fixed and re-walked PASS, superseding
+  those two rows. Flows 2 (IME send), 16 (offline model error), and 22
+  (prewarm ON, then restored Off) also passed in the 2026-11-16 continuation,
+  and flow 28 passed owner-performed (the owner entered the lock credential).
+  The current Set B is 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED
+  (§5.3). Full record:
+  `docs/parity/2026-11-15-c4-baseline/after-2b1/MANIFEST.md`.
+
+**Deviations recorded**
+
+1. Resume-bar trust confirm deliberately preserves the pre-2b.1 sequence: it
+   re-calls the entry WITHOUT recording consent, pinning the known infinite
+   re-prompt defect. Sheet/jump origins record consent then re-call, matching
+   the old `pendingHandoffTrust` block. Fixing the resume loop is out of 2b.1.
+2. `PendingTrustUi.reason` is `String?` (null = plain first-consent), matching
+   the existing dialog contract instead of inventing copy.
+3. The three additive projection fields above (plus the primitive
+   `SessionList.detail` overload) extend §5.6's list. They keep `ChatContent`
+   free of settings/clock/engine state; each is derived by the host/projection,
+   never read by the content.
+4. Tests live in `ui/screens/chat/` (the brief's `ui/chat` is shorthand).
+5. The Compose/Robolectric harness needed `isIncludeAndroidResources`, the
+   official `--add-opens` set (including `jdk.internal.access`), and the plain
+   `Application` property. These are test-harness changes, not dependencies.
+6. `ChatContent` reaches `LocalContext` indirectly through
+   `MessageActionsRow`/`rememberChatTextSaver` for clipboard/SAF. No host
+   object crosses the content signature; recorded as a seam observation, not a
+   new defect.
+7. The refused handoff notice is rendered both inside the sheet and by the
+   screen snackbar (pre-existing host behaviour kept byte-for-byte). The test
+   scopes its assertion to the sheet's dialog.
+
+**Pinned pre-existing defects (not fixed in 2b.1)**
+
+- Flow 13: session delete dispatches immediately; the sheet's confirmation
+  dialog is unreachable (`ChatContentSheetsTest` pins the immediate delete).
+- The resume trust loop from deviation 1.
+- The question dialog exposes two release buttons ("Deny" and "Dismiss") where
+  the target says exactly one release action.
+- Active-session marking is colour-only; there is no selected semantics.
+- Bubbles carry no role semantics, and `MarkdownText(fillMaxWidth)` makes both
+  roles' text full-width, so position does not distinguish them either.
+  T2B1-01 pins the assistant-only actions row instead.
+- A blank catalogue model name falls back to the id via 2a's `displayName`.
+- The S-02 trust gate fingerprints `crushrc` only, but the engine also
+  executes a dotted `.crushrc`. A folder carrying only the dotted file gates
+  as "no config", records a no-crushrc consent, and then runs the file
+  unconsented on attach. Device probe 2026-11-16 22:18: `TestProject3` with a
+  30-byte `.crushrc` produced `.dotmarker` on bind (Finding 10 in the
+  MANIFEST; `f19-dotmarker.txt`). Security-relevant, pre-existing, and pinned
+  for an owner decision (gate both file names, or constrain the engine); not
+  changed in 2b.1.
+- Flow 23 and flow 11 were the two after-walk FAILs. Both were fixed after the
+  walk under an owner-authorized deviation; see §5.3.
+
+**Not performed**
+
+- The device after-walk is PARTIAL, not closed. Set A 10/10 captured (9 PASS
+  plus `a02` PARTIAL); Set B is now 24 PASS / 0 FAIL / 4 NOT PERFORMED /
+  0 BLOCKED after the post-review fixes and re-walk of flows 2, 11, 16, 22,
+  and 23; flows 18, 19, 20, and 28 are owner-performed PASS (§5.3).
+- Rows still open: 4 (stop unconfirmed), 13 (delete, not re-run - baseline FAIL
+  and the T2B1-03 pin stand), 14 (loading), and 27 (notices) were not re-run or
+  not reproducible. Flow 4's fault injection was attempted and blocked by
+  SELinux (see §5.3).
+- `a02` is PARTIAL: component styling matches, but the persisted session grew
+  and the captured scroll position differs, so only `a01` has exact pixel
+  parity.
+- API 29 cannot prove the AFA rationale, wide layouts, or API 30+ behaviour.
+
+### 5.3 Phase 2b.1 post-review fixes (committed 2026-11-16)
+
+The owner rejected the partial after-walk as a checkpoint and authorized a
+scope deviation: fix the two device failures instead of pinning them.
+
+**Flow 23 - prewarm cold-start race (pre-fix observation)**
+
+With Prewarm Off persisted, cold start still logged
+`starting supervisor for instance 'chat' (prewarm on)` and started the engine.
+Cause: `ChatScreen` collected `settings` with `initialValue = AppSettings()`,
+which resolves AUTO to prewarm on this device, and the
+`LaunchedEffect(activeInstanceKey)` read that first-frame value before the
+persisted Off arrived.
+
+Fix:
+
+- `ChatHostInputs.prewarmAtComposition` = `snapshotReady && prewarm`. The
+  `stateIn` seed is non-ready with prewarm false; the combine waits for the
+  persisted settings flow.
+- `ChatScreen` drops the separate `settings` collection and reads
+  `host.inputs.prewarmAtComposition`. The effect now keys on
+  `activeInstanceKey`, `snapshotReady`, and prewarm, and returns on the
+  non-ready seed. Persisted Off therefore never starts the engine at
+  composition; On starts once when the coherent snapshot lands.
+- Test: `ChatHostInputsTest` +1 (`prewarm cannot fire before the coherent
+  snapshot lands`), now 7 tests.
+
+**Flow 11 - New chat cross-binding (pre-fix observation)**
+
+`startChatSession()` called `setActiveChatPool()`, `bindProject()`, then
+`newThread()` synchronously. `bindProject()` nulls the outgoing `Workspaces`
+handle, so `newThread()` fell back to `bootstrap()`, which resumed the last
+session. On a project -> chat-pool switch this left the project transcript and
+title under a `Chat - no tools` subtitle.
+
+Fix:
+
+- `ChatViewModel.pendingNewChatKey` binds the intent to the instance that
+  requested it.
+- `startChatSession` clears the outgoing view (messages, active session, file
+  changes, pending prompts, stop notice, resume hint), sets the pending key,
+  and calls `newThread()`.
+- `newThread` and its reattach fallback keep the intent when they must
+  bootstrap.
+- `doBootstrap` consumes the intent only on the matching instance, skips the
+  last-session resume, mints a fresh chat session, and clears any old
+  transcript. `freshSession` also covers a boot with nothing to resume.
+- `bindProject` retires an intent when an overtaking binding switch changes the
+  instance.
+- Test: new `NewChatBootstrapTest` (3 rows) pins the instance-key matching.
+
+**Evidence**
+
+- Compile: `:app:compileDebugKotlin :app:compileDebugUnitTestKotlin` green.
+- Targeted chat package: 27 suites / 256 tests, 0 failures / 0 errors.
+- Full gate: `:app:testDebugUnitTest :app:assembleDebug
+  :app:assembleDebugAndroidTest :app:lintRelease` → BUILD SUCCESSFUL in
+  16m28s; 789 tests / 86 suites, 0 failures / 0 errors; lint 0 errors /
+  1 standing warning.
+- Device re-walk of flows 23 and 11 on the post-review APK (installed
+  2026-11-15 20:54:58): **PASS**.
+  - Flow 23, composition: `prewarm off; supervisor deferred to first input for
+    p077dc19e`; `ps` showed only `com.crush.mobile`, no `libcrush.so`. The
+    first keystroke started the engine:
+    `[p077dc19e] engine Running after 3420ms`.
+  - Flow 11: project `Handoff fingerprint mismatch audit` -> sheet New chat
+    produced `New chat` / `Chat - no tools - engine stopped` with an empty
+    transcript; typing started `[chat]` (Running after 3277 ms) and logged
+    `new chat: minting a fresh session on 'chat'`, then
+    `current-session reported: 57d2acca`. No project transcript survived.
+  - Flow 22: Prewarm On cold start logged
+    `starting supervisor for instance 'chat' (prewarm on)` and
+    `[chat] engine Running after 3068ms` (`f22-prewarm-on.log.txt`). The
+    setting was restored to Off (`f22-prewarm-restored-off.png`) and the next
+    cold start logged `prewarm off; supervisor deferred to first input`.
+- Device re-walk of flows 2 and 16 on 2026-11-16: **PASS**.
+  - Flow 2: Keyboard -> `Enter sends`; the Gboard IME send arrow cleared the
+    composer, started a turn, and persisted `IME-SEND-POSTFIX-2B1`
+    (`f02-ime-send.log.txt`, `f02-ime-typed.png`, `f02-ime-sent.png`,
+    `f02-ime-done.png`).
+  - Flow 16: airplane mode on; the model sheet rendered
+    `UnknownHostException: Unable to resolve host "opencode.ai"` in red
+    (`f16-offline-model-sheet-postfix.png`); airplane mode restored off.
+  - Flow 4 was attempted with an engine kill under a live turn, but SELinux
+    denies `runas_app` signalling `libcrush.so`, so the unconfirmed-stop
+    branch was not exercised; the plain Stop took the confirmed path. Flow 4
+    stays NOT PERFORMED.
+- Flow 28 (owner-performed, 2026-11-16 18:54-18:55): cold start logged
+  `lock engaged; refusing to bootstrap` with no engine start; the owner
+  entered the app-lock credential at 18:55:12 (`LockOverlay: unlocked`,
+  `resume gate=OPEN ... freshUnlock=true`). The agent entered no credential.
+- Flow 18 (owner-performed, 2026-11-16 20:24): the owner confirmed the
+  already-consented `Legacy workspace`; the log shows `APPROVED` then
+  `DISPATCHED; target session dd947578...`, with no trust dialog
+  (`f18-f20-handoff.log.txt`, `f18-after-dispatch.png`).
+- Flow 20 (owner-performed, 2026-11-16 20:48-20:50): a fresh sheet has no
+  Discard (nothing written yet), so the walk staged an APPROVED row with an
+  offline Confirm (bootstrap cannot become ready -> dispatch fails, row stays
+  resumable). The owner reopened the sheet, saw `Discard this handoff`, and
+  tapped it: `DISCARDED: the trace row is ABANDONED`; pulled row
+  `status=ABANDONED`, `targetCodeSessionId=null`. No DISPATCHED stamp was
+  written (`f20-discard.log.txt`, `f20-trace-row.txt`,
+  `f20-after-discard.png`).
+- Flow 19 (owner-performed, 2026-11-16 22:23): the first attempt (21:50) was
+  void staging - the destination carried only `.crushrc`, which the gate does
+  not probe, so it dispatched with no dialog. Re-staged with a 17-byte
+  `crushrc` in `Test project folder 2`, sheet opened from session `c22de7a3`;
+  the owner selected that different project and tapped Confirm. The gate
+  logged `handoff blocked: consent required (crushrc present, no consent
+  recorded)`; the owner tapped Allow, which recorded the file fingerprint
+  (`1712a7a6...`) and dispatched to session `d59579a4`
+  (`f19-consent-dialog.log.txt`, `f19-trace-row.txt`,
+  `f19-after-allow.png`). The dotted-file execution is Finding 10, pinned.
+
+**Evidence summary**: `f23-postfix-coldstart.png`,
+`f23-postfix-first-keystroke.png`, `f23-postfix-coldstart.log.txt`,
+`f11-postfix-new-chat.png`, `f11-postfix-minted.png`, `f11-postfix.log.txt`,
+`f22-prewarm-on3.png`, `f22-prewarm-on.log.txt`,
+`f22-prewarm-restored-off.png`, `f02-enter-sends.png`,
+`f02-ime-typed.png`, `f02-ime-sent.png`, `f02-ime-done.png`,
+`f02-ime-send.log.txt`, `f16-offline-model-sheet-postfix.png`,
+`f28-lock-owner.log.txt`, `f18-handoff-sheet-open.png`,
+`f18-after-dispatch.png`, `f18-f20-handoff.log.txt`,
+`f20-after-discard.png`, `f20-discard.log.txt`, `f20-trace-row.txt`,
+`f19-restage-sheet-open.png`, `f19-consent-dialog.log.txt`,
+`f19-trace-row.txt`, `f19-after-allow.png`, `f19-first-attempt.log.txt`,
+`f19-first-attempt-row.txt`, `f19-first-attempt-session.png`,
+`f19-dotmarker.txt`.
+
+**Deviation note**: this is a behavior fix, not extraction. It was explicitly
+authorized by the owner after the partial after-walk was rejected. It does not
+change the `ChatContent` signature or introduce new screen surfaces; the only
+visible change is the corrected prewarm/New-chat state.
 
 ## 6. Upstream filings
 

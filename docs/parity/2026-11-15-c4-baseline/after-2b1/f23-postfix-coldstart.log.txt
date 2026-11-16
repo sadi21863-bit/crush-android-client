@@ -1,0 +1,30 @@
+﻿# flow 23 post-fix cold start (prewarm Off; host clock 2026-11-15 20:58)
+# no libcrush.so process after launch; only com.crush.mobile
+
+11-15 20:58:12.852 I/Main    (14050): engine compatible (bundled=true)
+11-15 20:58:14.650 I/ChatViewModel(14050): lock engaged; refusing to bootstrap
+11-15 20:58:14.651 D/ChatViewModel(14050): bindEngine state=Stopped instance=
+11-15 20:58:14.773 D/ChatViewModel(14050): bindEngine state=Stopped instance=p077dc19e
+11-15 20:58:14.774 I/Chat    (14050): prewarm off; supervisor deferred to first input for p077dc19e
+
+# first keystroke (x typed at 21:05): engine started from the composer, not composition
+11-15 21:05:49.787 D/ChatViewModel(14050): bindEngine state=Starting(attempt=1) instance=p077dc19e
+11-15 21:05:53.136 I/CrushEngine(14050): engine ready pid=-1 version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+11-15 21:05:53.138 I/EngineSupervisor(14050): [p077dc19e] engine Running after 3420ms
+11-15 21:05:53.152 D/ChatViewModel(14050): bindEngine state=Running(pid=-1, port=1, version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+11-15 21:05:53.152 D/ChatViewModel(14050): , bootMs=3329) instance=p077dc19e
+11-15 21:05:53.160 D/ChatViewModel(14050): bootstrap instance=p077dc19e workspacePath=/data/user/0/com.crush.mobile/files/workspace
+11-15 21:05:53.182 I/ChatViewModel(14050): permissionMode=ASK providerId=opencode-go
+11-15 21:05:53.183 D/ChatViewModel(14050): state.providerId synced to the boot's provider: opencode-zen -> opencode-go
+11-15 21:05:53.186 D/ChatViewModel(14050): bootstrap permission wire: instance=p077dc19e engineVersion={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+11-15 21:05:53.186 D/ChatViewModel(14050):  wire=MODE_ENUM
+11-15 21:05:53.656 I/ChatViewModel(14050): catalogue prices loaded for 32 models
+11-15 21:05:54.437 W/ChatViewModel(14050): hiding 3 model(s) the engine no longer knows: beam-free,iceman-contributor-free,longcat-2.5-free
+11-15 21:05:54.439 I/ChatViewModel(14050): engine capabilities: 21/27 offered model(s) accept images
+11-15 21:05:56.962 I/ChatViewModel(14050): probed 1 candidate(s), using deepseek-v4.1-flash (of 27 listed)
+11-15 21:05:57.102 I/ChatViewModel(14050): resuming session 755fcfd0-0462-47e6-b27e-f4e3d0276061 (36 msgs; the handoff trace's target)
+11-15 21:05:57.107 I/ChatViewModel(14050): event transport identity change -> <datadir>/com.crush.mobile/files/crush-p077dc19e.sock; rebuilding connection
+11-15 21:05:57.109 I/ChatViewModel(14050): long-lived event stream attached to e5518a0d-a355-4447-bb68-e63181f59d72
+11-15 21:05:57.184 I/ChatViewModel(14050): current-session reported: 755fcfd0
+11-15 21:05:57.462 I/ChatViewModel(14050): current-session reported: 755fcfd0
+11-15 21:05:57.835 W/ChatViewModel(14050): picker: hiding 3 model(s) the engine no longer knows: beam-free,iceman-contributor-free,longcat-2.5-free

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -282,6 +283,17 @@ class AppContainer(context: Context) {
      */
     private val _activeInstanceKey = MutableStateFlow("")
     val activeInstanceKey: StateFlow<String> = _activeInstanceKey.asStateFlow()
+
+    /**
+     * Phase 2a (V2 plan §5.2.1): the binding and its instance key as ONE
+     * value. [activeBinding] and [activeInstanceKey] stay for compatibility,
+     * but a projection that pairs them itself can observe the frame between
+     * their two writes. This snapshot cannot.
+     */
+    private val _bindingSnapshot =
+        MutableStateFlow(BindingSnapshot(EngineBinding.Legacy, ""))
+
+    val bindingSnapshot: StateFlow<BindingSnapshot> = _bindingSnapshot.asStateFlow()
 
     @Volatile
     var activeProjectRef: com.crush.mobile.project.ProjectRef? = null
@@ -685,6 +697,10 @@ class AppContainer(context: Context) {
         activeProjectRef = (binding as? EngineBinding.Project)?.ref
         _activeBinding.value = binding
         val newKey = keyFor(binding)
+        // ONE write, after the key is resolved and BEFORE the same-key early
+        // return: a same-key binding update must still move the label, and a
+        // projection must never pair this binding with the previous key.
+        _bindingSnapshot.value = BindingSnapshot(binding, newKey)
         if (newKey == oldKey) return
         _activeInstanceKey.value = newKey
         // A11/A12: make the binding change durable the same moment it lands.
@@ -794,6 +810,22 @@ class AppContainer(context: Context) {
             containerScope,
             kotlinx.coroutines.flow.SharingStarted.Lazily,
             EngineState.Stopped
+        )
+
+    /**
+     * Phase 2a (V2 plan §5.2.1): the engine state tagged with the key it
+     * belongs to AT THE SOURCE. A consumer never has to infer the pairing, and
+     * a stale sample from the previous key can only ever project as
+     * `Switching`, never as the new key's readiness.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val engineStateForKey: StateFlow<EngineStateSample> =
+        _activeInstanceKey.flatMapLatest { key ->
+            runtimeFor(key).supervisor.state.map { state -> EngineStateSample(key, state) }
+        }.stateIn(
+            containerScope,
+            kotlinx.coroutines.flow.SharingStarted.Lazily,
+            EngineStateSample("", EngineState.Stopped)
         )
 
     /** Full runtime for an instance key; "" returns the legacy singleton. */
@@ -907,3 +939,20 @@ class AppContainer(context: Context) {
         s?.stop()
     }
 }
+
+/**
+ * Phase 2a: a binding and the exact key it resolved to, published together.
+ *
+ * Top-level (not nested) so the pure projection tests can use it without
+ * constructing the Android container.
+ */
+data class BindingSnapshot(
+    val binding: AppContainer.EngineBinding,
+    val instanceKey: String,
+)
+
+/** Phase 2a: an engine state carrying the instance key it belongs to. */
+data class EngineStateSample(
+    val instanceKey: String,
+    val state: EngineState,
+)

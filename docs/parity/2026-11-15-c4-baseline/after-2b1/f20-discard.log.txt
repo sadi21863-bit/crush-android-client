@@ -1,0 +1,37 @@
+﻿# flow 20 - owner tapped Discard on the staged APPROVED row (host clock 2026-11-16 20:48-20:50)
+# staging: airplane mode on; Confirm -> bind could not bootstrap (offline) -> row stayed APPROVED
+# owner reopened the sheet, saw Discard this handoff, tapped it -> ABANDONED; dispatch wait then timed out without a DISPATCHED stamp
+
+20:48:39.222 I/ChatViewModel: handoff ac185118-2472-46bb-bce5-ddd087999508 APPROVED at 1794842319210; dispatching to 'Test project folder 2'
+20:48:39.233 I/Lifecycle: stopping project engine for instance 'p077dc19e' (no run in flight)
+20:48:39.233 I/EngineSupervisor: [p077dc19e] stop() requested
+20:48:39.444 D/EngineProxy: bridge stop
+20:48:39.446 I/CrushConnection: connection stopped
+20:48:39.449 D/ChatViewModel: bindEngine state=Stopped instance=pd871eee8
+20:48:39.451 I/EngineSupervisor: [pd871eee8] start() activeJob=null
+20:48:39.452 I/EngineSupervisor: [pd871eee8] supervise loop start
+20:48:39.453 D/EngineSupervisor: [pd871eee8] starting attempt 1
+20:48:39.481 D/EngineProxy: bridge up on 127.0.0.1:42635
+20:48:39.515 I/Chat: prewarm off; supervisor deferred to first input for pd871eee8
+20:48:39.516 D/ChatViewModel: bindEngine state=Starting(attempt=1) instance=pd871eee8
+20:48:40.042 D/EngineProxy: CONNECT hyper.charm.land:443 failed: unresolvable
+20:48:40.085 D/EngineProxy: CONNECT catwalk.charm.land:443 failed: unresolvable
+20:48:40.302 I/EngineSupervisor: [pd871eee8] engine Running after 849ms
+20:48:40.305 D/ChatViewModel: bindEngine state=Running(pid=-1, port=1, version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+20:48:40.307 D/ChatViewModel: bootstrap instance=pd871eee8 workspacePath=/storage/emulated/0/Test project folder 2
+20:48:40.323 I/ChatViewModel: permissionMode=ASK providerId=opencode-go
+20:48:40.325 D/ChatViewModel: bootstrap permission wire: instance=pd871eee8 engineVersion={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+20:48:40.327 D/WorkspaceManager: open: permissionWire=normal (null = v0.99 skip family) yolo=false
+20:48:40.330 D/ChatViewModel: bindEngine state=Running(pid=-1, port=1, version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+20:48:40.431 D/EngineProxy: CONNECT api.github.com:443 failed: unresolvable
+20:48:40.578 I/CrushSession: ensureAgentReady: key set for provider 'opencode-go'; model[large] = deepseek-v4.1-flash; model[small] = deepseek-v4.1-flash; agent/init ok; is_ready=true is_busy=false
+20:48:40.689 I/ChatViewModel: catalogue prices loaded for 32 models
+20:48:40.700 W/ChatViewModel: catalogue fetch unusable (UnknownHostException: Unable to resolve host "opencode.ai": No address associated with hostname); retrying once
+20:48:41.909 I/ChatViewModel: engine capabilities: 0/0 offered model(s) accept images
+20:48:41.911 W/ChatViewModel: no usable model: UnknownHostException: Unable to resolve host "opencode.ai": No address associated with hostname
+20:49:01.576 D/App: alive t=6843070ms
+20:49:31.173 I/ChatViewModel: handoff ac185118-2472-46bb-bce5-ddd087999508 DISCARDED: the trace row is ABANDONED
+20:49:31.579 D/App: alive t=6873072ms
+20:50:01.582 D/App: alive t=6903076ms
+20:50:10.313 W/ChatViewModel: handoff: bootstrap wait failed on instance 'pd871eee8'
+20:50:10.318 I/ChatViewModel: handoff ac185118-2472-46bb-bce5-ddd087999508 dispatch failed; the row stays APPROVED and resumable

@@ -1,0 +1,39 @@
+﻿# flow 23 cold-start evidence (prewarm Off persisted; host clock 2026-11-15 11:42)
+# package com.crush.mobile 1.0.0 debug (2b.1 working tree, APK 11:13)
+# process after launch: com.crush.mobile + libcrush.so (engine child) present
+
+11-15 11:42:45.428 I/ChatViewModel( 7535): lock engaged; refusing to bootstrap
+11-15 11:42:45.439 D/ChatViewModel( 7535): bindEngine state=Stopped instance=chat
+11-15 11:42:45.439 I/Chat    ( 7535): starting supervisor for instance 'chat' (prewarm on)
+11-15 11:42:45.440 I/EngineSupervisor( 7535): [chat] start() activeJob=null
+11-15 11:42:45.441 I/EngineSupervisor( 7535): [chat] supervise loop start
+11-15 11:42:45.442 D/EngineSupervisor( 7535): [chat] starting attempt 1
+11-15 11:42:45.446 D/ChatViewModel( 7535): bindEngine state=Stopped instance=chat
+11-15 11:42:45.479 I/CrushEngine( 7535): provider catalogue override applied: 4 models
+11-15 11:42:45.484 I/CrushEngine( 7535): chat tool policy installed and readback-verified (35 ids denied)
+11-15 11:42:45.485 I/CrushEngine( 7535): [chat] chat tool policy installed (readback-verified, 35 ids denied); spawning with the deny-all toolset
+11-15 11:42:45.487 D/ChatViewModel( 7535): bindEngine state=Starting(attempt=1) instance=chat
+11-15 11:42:45.487 I/CrushEngine( 7535): egress bridge up port=40399
+11-15 11:42:45.488 I/CrushEngine( 7535): exec: /data/app/com.crush.mobile-faQWdYQIrM_Qi2qCKFSCOw==/lib/arm64/libcrush.so server -H unix://<datadir>/com.crush.mobile/files/crush-chat.sock -D <datadir>/com.crush.mobile/files/crush-chat/state
+11-15 11:42:48.565 I/CrushEngine( 7535): engine socket bound and 2xx after 3077ms (monotonic 3077ms)
+11-15 11:42:48.565 I/CrushEngine( 7535): engine ready pid=-1 version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+11-15 11:42:48.567 I/EngineSupervisor( 7535): [chat] engine Running after 3125ms
+11-15 11:42:48.584 D/ChatViewModel( 7535): bindEngine state=Running(pid=-1, port=1, version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+11-15 11:42:48.584 D/ChatViewModel( 7535): , bootMs=3078) instance=chat
+11-15 11:42:48.585 I/ChatViewModel( 7535): bootstrap refused: locked
+11-15 11:44:08.076 I/ChatViewModel( 7535): lock released; resuming
+11-15 11:44:08.085 D/ChatViewModel( 7535): bootstrap instance=chat workspacePath=/data/user/0/com.crush.mobile/files/workspace
+11-15 11:44:08.103 I/ChatViewModel( 7535): permissionMode=ASK providerId=opencode-go
+11-15 11:44:08.104 D/ChatViewModel( 7535): state.providerId synced to the boot's provider: opencode-zen -> opencode-go
+11-15 11:44:08.106 D/ChatViewModel( 7535): bootstrap permission wire: instance=chat engineVersion={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+11-15 11:44:08.106 D/ChatViewModel( 7535):  wire=MODE_ENUM
+11-15 11:44:08.565 I/ChatViewModel( 7535): catalogue prices loaded for 32 models
+11-15 11:44:09.772 W/ChatViewModel( 7535): hiding 3 model(s) the engine no longer knows: beam-free,iceman-contributor-free,longcat-2.5-free
+11-15 11:44:09.774 I/ChatViewModel( 7535): engine capabilities: 21/27 offered model(s) accept images
+11-15 11:44:11.370 I/ChatViewModel( 7535): probed 1 candidate(s), using deepseek-v4.1-flash (of 27 listed)
+11-15 11:44:11.490 I/ChatViewModel( 7535): resuming session 4475a1d3-d93e-4af0-89fc-e719c9820a47 (8 msgs)
+11-15 11:44:11.496 I/ChatViewModel( 7535): event transport identity change -> <datadir>/com.crush.mobile/files/crush-chat.sock; rebuilding connection
+11-15 11:44:11.499 I/ChatViewModel( 7535): long-lived event stream attached to e1f92e7b-c015-4b58-89c1-6cfebe97291e
+11-15 11:44:11.742 I/ChatViewModel( 7535): current-session reported: 4475a1d3
+11-15 11:44:12.080 I/ChatViewModel( 7535): current-session reported: 4475a1d3
+11-15 11:44:12.344 W/ChatViewModel( 7535): picker: hiding 3 model(s) the engine no longer knows: beam-free,iceman-contributor-free,longcat-2.5-free

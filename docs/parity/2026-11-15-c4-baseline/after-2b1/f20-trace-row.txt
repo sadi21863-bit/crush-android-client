@@ -1,0 +1,10 @@
+# flow 20 trace row after discard (projects.db, 2026-11-16 20:51)
+
+handoffId=ac185118-2472-46bb-bce5-ddd087999508
+sourceChatId=dd947578-3563-4993-85b7-06db6181dda4
+targetProjectId=d871eee8-4945-4c0e-acf2-a502d45ce622 (Test project folder 2)
+targetCodeSessionId=None  <- null: nothing dispatched
+userApprovedAt=1794842319210
+status=ABANDONED
+
+No DISPATCHED row was written for this handoff; app.log shows APPROVED then DISCARDED, and the dispatch wait timed out at 20:50:10 with no DISPATCHED line.

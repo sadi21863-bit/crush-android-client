@@ -161,7 +161,9 @@ and left the counts unchanged; flow 14's retry produced Finding 11.
     This is pre-existing S-02 scope, not a 2b.1 regression. Pinned for an
     owner decision - the gate must fingerprint every file the engine may
     execute, or the engine must be proven not to read `.crushrc`; not fixed
-    here. Evidence: `f19-dotmarker.txt`, `f19-first-attempt.log.txt`.
+    here. **Owner decision (2026-11-17): fix later** - the finding stays open
+    for a later batch. Evidence: `f19-dotmarker.txt`,
+    `f19-first-attempt.log.txt`.
 11. **The sessions sheet reports `No chats yet` while the engine is stopped,
     even when the workspace has sessions (flow-14 retry, 2026-11-17).** The
     TestProject3 chat after a prewarm-off start sat on `New chat` /
@@ -177,7 +179,8 @@ and left the counts unchanged; flow 14's retry produced Finding 11.
     asked the engine. A fresh-workspace retry (`F14Fresh2`, 2026-11-17 20:53)
     rendered the same empty copy correctly once the engine was live, so the
     defect is the early return, not the copy (`f14b-fresh-empty.png`).
-    Pre-existing, not a 2b.1 regression; pinned, not fixed.
+    Pre-existing, not a 2b.1 regression; pinned, not fixed. **Owner decision
+    (2026-11-17): fix later** - kept open for a later batch.
     Evidence: `f14-stopped-empty.png`, `f14-sheet-push-frame.png`,
     `f14-warm-list.png`, `f14-stopped-sheet.mp4`,
     `f14-stopped-empty.log.txt`.

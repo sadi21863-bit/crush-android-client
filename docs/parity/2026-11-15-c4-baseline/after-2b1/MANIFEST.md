@@ -16,6 +16,7 @@ The before half is `../MANIFEST.md`; this record does not modify it.
 | APK built | 2026-11-15 17:15 host time (post-review four-task gate) |
 | APK installed | 2026-11-15 20:54:58 host time (post-review build) |
 | Continuation walk | 2026-11-16 18:54-19:30 host time (flows 2, 22 restore, 16; flow 4 attempt) |
+| Continuation attempts | 2026-11-17 host time (flow 27 stop notice 17:44; flow 14 sheet loading/empty state 19:25-19:41; no row changes) |
 | Source | 2b.1 working tree on HEAD `6c21ff0` (uncommitted) |
 | Engine | Crush v0.100.0, contracts 0.99.0 |
 | Capture host | `aditya` Windows host; device clock drifts, so host file times are canonical |
@@ -62,7 +63,7 @@ difference only). a01 is the one exact pixel-parity proof.
 | 11 | New chat | PASS (post-fix) | `f11-postfix-sheet.png`, `f11-postfix-new-chat.png`, `f11-postfix-minted.png`; project -> sheet New chat gave `New chat` / `Chat - no tools - engine stopped` with an empty transcript; typing started the pool engine and minted session `57d2acca` with no project bleed. Log: `f11-postfix.log.txt`. The pre-fix cross-binding is `f11-after-project-new-chat.png`. |
 | 12 | Session open | PASS | Session sheet picks opened the selected session; project reopen restored `Reply Exactly OK`. |
 | 13 | Session delete | NOT PERFORMED | Destructive, so not re-run; the baseline FAIL (immediate delete) and T2B1-03's pin remain the evidence. |
-| 14 | Session empty/loading | NOT PERFORMED | `Loading chats...` is the `loading && sessions.isEmpty()` branch; it sits in a sub-second window between bootstrap and the first list. A cold start with the engine stopped instead rendered the explanatory `No chats yet` state immediately. Not captured; unchanged from baseline. |
+| 14 | Session empty/loading | NOT PERFORMED | `Loading chats...` is the `loading && sessions.isEmpty()` branch; it sits in a sub-second window between bootstrap and the first list. A cold start with the engine stopped instead rendered the explanatory `No chats yet` state immediately. Retried 2026-11-17 on the engine-stopped TestProject3 chat: a ~25 fps screen recording (`f14-stopped-sheet.mp4`) caught the sheet's first visible slide frame already showing `No chats yet / Start one and it will appear here.` (`f14-stopped-empty.png`, `f14-sheet-push-frame.png`); no `Loading chats...` frame exists in the recording. After the first keystroke started that workspace's engine, the same sheet listed two 21h-old sessions (`f14-warm-list.png`), so the workspace was never empty. The loading branch was not observable; the false empty state is Finding 11. |
 | 15 | Model pick | PASS | `f15-after-model-pick.png`, `f15-model-restored.png`; chip changed to `deepseek-v4-pro` and back to `deepseek-v4.1-flash`. |
 | 16 | Model error | PASS (post-fix) | `f16-offline-model-sheet-postfix.png`; airplane mode on, model sheet opened: `UnknownHostException: Unable to resolve host "opencode.ai": No address associated with hostname` rendered in red in-sheet, list not blank. Airplane mode restored off (`airplane_mode_on=0`). |
 | 17 | Handoff chip | PASS | `a08-after-handoff-sheet.png`; sheet opened with prefill and destinations. |
@@ -75,13 +76,14 @@ difference only). a01 is the one exact pixel-parity proof.
 | 24 | Nav Chat -> Review -> back | PASS | `f24-after-review.png`, `f24-after-review-back.png`; Review opened (empty history in chat pool) and Back returned to the same chat. |
 | 25 | Nav Chat -> Settings -> back | PASS | `f25-after-settings.png`, `f25-after-settings-back.png`; Back returned to the same chat and transcript. |
 | 26 | Nav Chat -> Projects -> open project -> back | PASS | `f26-after-projects.png`, `f26-after-open-project2.png`, `f26-after-project-back.png`; Back exited to the launcher, the documented single-chat-entry invariant. |
-| 27 | Notices | NOT PERFORMED | No stop/delete/handoff-failure snackbar was triggered in this walk. |
+| 27 | Notices | NOT PERFORMED | The only stop notice is `Stop requested. The agent may still be finishing.`, raised by `finalizeStoppedRun` when the server cancel is unconfirmed. A Stop on a live 3000-word turn in the flow-19 target session `d59579a4` (2026-11-17 17:44) truncated the reply and restored the send arrow with no snackbar; `app.log` carries no `stop: server cancel not confirmed` warning, so the engine confirmed the cancel (`f27-stop-live.png`, `f27-stop-after.png`, `f27-stop-settled.png`). Forcing the unconfirmed branch needs the local engine dead mid-turn, and SELinux denies `runas_app` signalling `libcrush.so` (the same wall as flow 4). The delete-error notice needs an unreachable engine during delete (destructive UI, not authorized), and the handoff failure notices come from a dispatch attempt or a discard - both owner-only sheet actions. No notice was raised; row unchanged. |
 | 28 | Lock | PASS (owner-performed) | Cold start 2026-11-16 18:54:58 logged `resume gate=PROMPT coldStart=true` and `lock engaged; refusing to bootstrap`; the engine did not start. The owner entered the app-lock credential at 18:55:12 (`LockOverlay: unlocked`; `resume gate=OPEN ... freshUnlock=true`), then the chat bootstrapped on the first turn. The agent entered no credential. |
 
 Set B result (post-fix): **24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED**.
 The original walk's 15 PASS / 2 FAIL counts are superseded by the post-review
 re-walk of flows 2, 11, 16, 22, and 23. Open rows: 4, 13, 14, 27
-(NOT PERFORMED).
+(NOT PERFORMED). The 2026-11-17 retries of flows 27 and 14 raised no new PASS
+and left the counts unchanged; flow 14's retry produced Finding 11.
 
 ## Findings
 
@@ -160,6 +162,22 @@ re-walk of flows 2, 11, 16, 22, and 23. Open rows: 4, 13, 14, 27
     owner decision - the gate must fingerprint every file the engine may
     execute, or the engine must be proven not to read `.crushrc`; not fixed
     here. Evidence: `f19-dotmarker.txt`, `f19-first-attempt.log.txt`.
+11. **The sessions sheet reports `No chats yet` while the engine is stopped,
+    even when the workspace has sessions (flow-14 retry, 2026-11-17).** The
+    TestProject3 chat after a prewarm-off start sat on `New chat` /
+    `engine stopped`; opening the sheet rendered `Project - TestProject3` and
+    the explanatory empty state immediately, with no loading frame in a
+    25 fps recording. The first keystroke started that workspace's engine
+    (`[p5ab508c3] engine Running after 6759ms`), the app resumed session
+    `c22de7a3` (8 msgs), and the same sheet then listed it plus `chat` (21h)
+    - so the workspace was never empty. Cause: `ChatViewModel.loadSessions()`
+    returns at `port ?: return` before setting `sessionsLoading`, so the
+    `loading && sessions.isEmpty()` branch cannot render and the explanatory
+    empty state claims the workspace is empty when the app has merely not
+    asked the engine. Pre-existing, not a 2b.1 regression; pinned, not fixed.
+    Evidence: `f14-stopped-empty.png`, `f14-sheet-push-frame.png`,
+    `f14-warm-list.png`, `f14-stopped-sheet.mp4`,
+    `f14-stopped-empty.log.txt`.
 
 ## Post-review fix addendum (2026-11-15 late)
 
@@ -235,7 +253,10 @@ instead of pinning them.
 - It does not close the not-reproduced rows (4, 13, 14, 27). Flow 13's
   baseline FAIL and its T2B1-03 pin remain the delete evidence. Flow 4's
   unconfirmed-stop branch could not be forced: `run-as` cannot signal
-  `libcrush.so` under SELinux, so a plain Stop took the confirmed path.
+  `libcrush.so` under SELinux, so a plain Stop took the confirmed path. The
+  2026-11-17 retries showed the same for flow 27's stop notice (a confirmed
+  Stop raises no snackbar by design) and flow 14's loading branch (the
+  engine-stopped sheet goes straight to a false empty state, Finding 11).
   Flow 28 is owner-performed: the owner entered the lock credential; no
   credential was entered by the agent.
 - Finding 10 is a pinned security gap, not a passing flow: the gate

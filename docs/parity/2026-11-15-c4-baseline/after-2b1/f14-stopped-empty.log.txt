@@ -1,0 +1,42 @@
+﻿19:21:42.974 I/Lifecycle: handoff resume: binding 'Test project folder 2' already restored; opening trace session d59579a4-6bdf-4543-97f4-585913bcea2a
+19:22:09.517 I/EngineSupervisor: [pd871eee8] start() activeJob=null
+19:22:09.518 I/EngineSupervisor: [pd871eee8] supervise loop start
+19:22:09.519 D/EngineSupervisor: [pd871eee8] starting attempt 1
+19:22:09.593 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:22:09.709 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:22:09.809 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:22:09.893 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:22:12.798 I/EngineSupervisor: [pd871eee8] engine Running after 3278ms
+19:22:12.847 D/WorkspaceManager: open: permissionWire=normal (null = v0.99 skip family) yolo=false
+19:22:16.749 I/ChatViewModel: resuming session d59579a4-6bdf-4543-97f4-585913bcea2a (24 msgs; the handoff trace's target)
+19:22:17.109 I/ChatViewModel: current-session reported: d59579a4
+19:22:17.362 I/ChatViewModel: current-session reported: d59579a4
+19:22:17.896 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:22:17.967 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:22:17.999 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:22:18.042 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:22:18.080 I/EngineSupervisor: [pd871eee8] start() activeJob=true
+19:28:05.095 I/EngineSupervisor: [p5ab508c3] start() activeJob=null
+19:28:05.098 I/EngineSupervisor: [p5ab508c3] supervise loop start
+19:28:05.100 D/EngineSupervisor: [p5ab508c3] starting attempt 1
+19:28:05.347 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:05.436 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:05.590 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:05.685 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:05.770 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:06.849 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:06.906 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:06.951 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:07.003 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:07.055 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:07.107 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:07.163 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:07.217 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:28:11.859 I/EngineSupervisor: [p5ab508c3] engine Running after 6759ms
+19:28:11.899 D/WorkspaceManager: open: permissionWire=normal (null = v0.99 skip family) yolo=false
+19:28:16.360 I/ChatViewModel: resuming session c22de7a3-8eeb-4e67-9afe-bfccbe392934 (8 msgs)
+19:28:16.400 I/ChatViewModel: current-session reported: c22de7a3
+19:28:16.500 I/ChatViewModel: current-session reported: c22de7a3
+19:38:57.037 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:40:20.473 I/EngineSupervisor: [p5ab508c3] start() activeJob=true
+19:41:27.093 D/WorkspaceManager: open: permissionWire=normal (null = v0.99 skip family) yolo=false

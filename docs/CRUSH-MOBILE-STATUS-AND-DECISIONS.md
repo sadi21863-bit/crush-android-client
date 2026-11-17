@@ -260,7 +260,7 @@ mirrored locally with their full reasoning in the plan doc
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 code/test-complete and committed 2026-11-16** (ChatContent extraction + T2B1-01…04 + owner-authorized post-review fixes for flow 23/11). Targeted chat package 27 suites / 256 tests green; four-task gate green (789 tests / 86 suites, 0 failures; lint 0 errors / 1 standing warning). Device after-walk PARTIAL: Set A 10/10 (9 PASS + `a02` PARTIAL), Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 2/11/16/22/23 re-walked PASS on the post-review APK, flows 18/19/20/28 owner-performed PASS, and Prewarm restored Off. Finding 10 (dotted `.crushrc` executes outside the gate) is pinned, not fixed. Record: `docs/parity/2026-11-15-c4-baseline/after-2b1/MANIFEST.md`. Batch records: §5.1 (2a), §5.2 (2b.1), §5.3 (post-review fixes) |
+| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 code/test-complete and committed 2026-11-16** (ChatContent extraction + T2B1-01…04 + owner-authorized post-review fixes for flow 23/11). Targeted chat package 27 suites / 256 tests green; four-task gate green (789 tests / 86 suites, 0 failures; lint 0 errors / 1 standing warning). Device after-walk PARTIAL: Set A 10/10 (9 PASS + `a02` PARTIAL), Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 2/11/16/22/23 re-walked PASS on the post-review APK, flows 18/19/20/28 owner-performed PASS, and Prewarm restored Off. Finding 10 (dotted `.crushrc` executes outside the gate) is pinned, not fixed; the 2026-11-17 retries of flows 27/14 changed no row and added Finding 11 (the sessions sheet claims `No chats yet` while the engine is stopped even when the workspace has sessions). Record: `docs/parity/2026-11-15-c4-baseline/after-2b1/MANIFEST.md`. Batch records: §5.1 (2a), §5.2 (2b.1), §5.3 (post-review fixes) |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
@@ -449,6 +449,13 @@ The Compose/Robolectric harness change is test-scoped (`app/build.gradle.kts`:
   MANIFEST; `f19-dotmarker.txt`). Security-relevant, pre-existing, and pinned
   for an owner decision (gate both file names, or constrain the engine); not
   changed in 2b.1.
+- The sessions sheet renders the explanatory `No chats yet` while the engine
+  is stopped, even when the workspace has sessions. `loadSessions()` returns
+  at `port ?: return` before setting `sessionsLoading`, so the loading branch
+  cannot render. Observed 2026-11-17 on `TestProject3` (Finding 11): the
+  engine-stopped sheet showed the empty state immediately, then listed two
+  21h-old sessions once the first keystroke started that workspace's engine.
+  Pre-existing, not a 2b.1 regression; pinned, not changed.
 - Flow 23 and flow 11 were the two after-walk FAILs. Both were fixed after the
   walk under an owner-authorized deviation; see §5.3.
 
@@ -461,7 +468,9 @@ The Compose/Robolectric harness change is test-scoped (`app/build.gradle.kts`:
 - Rows still open: 4 (stop unconfirmed), 13 (delete, not re-run - baseline FAIL
   and the T2B1-03 pin stand), 14 (loading), and 27 (notices) were not re-run or
   not reproducible. Flow 4's fault injection was attempted and blocked by
-  SELinux (see §5.3).
+  SELinux (see §5.3). The 2026-11-17 retries of flows 27 and 14 changed no row:
+  a confirmed Stop raises no snackbar by design, and the engine-stopped sheet
+  demonstrated Finding 11 instead of the loading state.
 - `a02` is PARTIAL: component styling matches, but the persisted session grew
   and the captured scroll position differs, so only `a01` has exact pixel
   parity.
@@ -580,6 +589,19 @@ Fix:
   (`1712a7a6...`) and dispatched to session `d59579a4`
   (`f19-consent-dialog.log.txt`, `f19-trace-row.txt`,
   `f19-after-allow.png`). The dotted-file execution is Finding 10, pinned.
+- 2026-11-17 retries (no row change):
+  - Flow 27: a Stop on a live 3000-word turn truncated the reply and restored
+    the send arrow with no snackbar (`f27-stop-live.png`,
+    `f27-stop-after.png`, `f27-stop-settled.png`). The `Stop requested...`
+    notice fires only when the server cancel is unconfirmed; forcing that
+    needs the local engine killed mid-turn, which SELinux blocks (the same
+    wall as flow 4).
+  - Flow 14: the engine-stopped `TestProject3` sheet rendered `No chats yet`
+    on its first visible slide frame, with no `Loading chats...` frame in a
+    25 fps recording (`f14-stopped-sheet.mp4`, `f14-stopped-empty.png`,
+    `f14-sheet-push-frame.png`); after the first keystroke started that
+    workspace's engine the same sheet listed two 21h-old sessions
+    (`f14-warm-list.png`, `f14-stopped-empty.log.txt`). Recorded as Finding 11.
 
 **Evidence summary**: `f23-postfix-coldstart.png`,
 `f23-postfix-first-keystroke.png`, `f23-postfix-coldstart.log.txt`,
@@ -594,7 +616,10 @@ Fix:
 `f19-restage-sheet-open.png`, `f19-consent-dialog.log.txt`,
 `f19-trace-row.txt`, `f19-after-allow.png`, `f19-first-attempt.log.txt`,
 `f19-first-attempt-row.txt`, `f19-first-attempt-session.png`,
-`f19-dotmarker.txt`.
+`f19-dotmarker.txt`, `f27-stop-live.png`, `f27-stop-after.png`,
+`f27-stop-settled.png`, `f14-stopped-empty.png`,
+`f14-sheet-push-frame.png`, `f14-warm-list.png`, `f14-stopped-sheet.mp4`,
+`f14-stopped-empty.log.txt`.
 
 **Deviation note**: this is a behavior fix, not extraction. It was explicitly
 authorized by the owner after the partial after-walk was rejected. It does not

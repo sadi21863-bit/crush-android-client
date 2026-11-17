@@ -602,6 +602,17 @@ Fix:
     `f14-sheet-push-frame.png`); after the first keystroke started that
     workspace's engine the same sheet listed two 21h-old sessions
     (`f14-warm-list.png`, `f14-stopped-empty.log.txt`). Recorded as Finding 11.
+    A further attempt on the genuinely fresh `F14Fresh2` import (20:53) opened
+    the sheet while its engine was live but `connecting to agent`: the first
+    visible sheet frame carried the full `No chats yet / Start one and it will
+    appear here.` copy (`f14b-fresh-empty.png`, `f14b-fresh-slide.png`), and
+    the app created its first session only afterwards (`no prior session with
+    content; creating one`; `f14b-fresh-workspace.log.txt`). The empty copy is
+    therefore correct with a live engine; Finding 11 is the stopped-engine
+    early return. No `Loading chats...` frame exists in that 151-frame ~9.5 fps
+    recording either (`f14b-fresh-workspace.mp4`, with a ~50 fps burst through
+    the sheet animation): the local listSessions round trip completes before
+    the first sheet frame, so the row stays NOT PERFORMED.
 
 **Evidence summary**: `f23-postfix-coldstart.png`,
 `f23-postfix-first-keystroke.png`, `f23-postfix-coldstart.log.txt`,
@@ -619,7 +630,9 @@ Fix:
 `f19-dotmarker.txt`, `f27-stop-live.png`, `f27-stop-after.png`,
 `f27-stop-settled.png`, `f14-stopped-empty.png`,
 `f14-sheet-push-frame.png`, `f14-warm-list.png`, `f14-stopped-sheet.mp4`,
-`f14-stopped-empty.log.txt`.
+`f14-stopped-empty.log.txt`, `f14b-fresh-empty.png`,
+`f14b-fresh-slide.png`, `f14b-fresh-workspace.mp4`,
+`f14b-fresh-workspace.log.txt`.
 
 **Deviation note**: this is a behavior fix, not extraction. It was explicitly
 authorized by the owner after the partial after-walk was rejected. It does not

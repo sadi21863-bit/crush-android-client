@@ -16,7 +16,7 @@ The before half is `../MANIFEST.md`; this record does not modify it.
 | APK built | 2026-11-15 17:15 host time (post-review four-task gate) |
 | APK installed | 2026-11-15 20:54:58 host time (post-review build) |
 | Continuation walk | 2026-11-16 18:54-19:30 host time (flows 2, 22 restore, 16; flow 4 attempt) |
-| Continuation attempts | 2026-11-17 host time (flow 27 stop notice 17:44; flow 14 sheet loading/empty state 19:25-19:41; no row changes) |
+| Continuation attempts | 2026-11-17 host time (flow 27 stop notice 17:44; flow 14 sheet loading/empty state 19:25-19:41; flow 14 fresh-workspace retry 20:52-20:53; no row changes) |
 | Source | 2b.1 working tree on HEAD `6c21ff0` (uncommitted) |
 | Engine | Crush v0.100.0, contracts 0.99.0 |
 | Capture host | `aditya` Windows host; device clock drifts, so host file times are canonical |
@@ -63,7 +63,7 @@ difference only). a01 is the one exact pixel-parity proof.
 | 11 | New chat | PASS (post-fix) | `f11-postfix-sheet.png`, `f11-postfix-new-chat.png`, `f11-postfix-minted.png`; project -> sheet New chat gave `New chat` / `Chat - no tools - engine stopped` with an empty transcript; typing started the pool engine and minted session `57d2acca` with no project bleed. Log: `f11-postfix.log.txt`. The pre-fix cross-binding is `f11-after-project-new-chat.png`. |
 | 12 | Session open | PASS | Session sheet picks opened the selected session; project reopen restored `Reply Exactly OK`. |
 | 13 | Session delete | NOT PERFORMED | Destructive, so not re-run; the baseline FAIL (immediate delete) and T2B1-03's pin remain the evidence. |
-| 14 | Session empty/loading | NOT PERFORMED | `Loading chats...` is the `loading && sessions.isEmpty()` branch; it sits in a sub-second window between bootstrap and the first list. A cold start with the engine stopped instead rendered the explanatory `No chats yet` state immediately. Retried 2026-11-17 on the engine-stopped TestProject3 chat: a ~25 fps screen recording (`f14-stopped-sheet.mp4`) caught the sheet's first visible slide frame already showing `No chats yet / Start one and it will appear here.` (`f14-stopped-empty.png`, `f14-sheet-push-frame.png`); no `Loading chats...` frame exists in the recording. After the first keystroke started that workspace's engine, the same sheet listed two 21h-old sessions (`f14-warm-list.png`), so the workspace was never empty. The loading branch was not observable; the false empty state is Finding 11. |
+| 14 | Session empty/loading | NOT PERFORMED | `Loading chats...` is the `loading && sessions.isEmpty()` branch; it sits in a sub-second window between bootstrap and the first list. A cold start with the engine stopped instead rendered the explanatory `No chats yet` state immediately. Retried 2026-11-17 on the engine-stopped TestProject3 chat: a ~25 fps screen recording (`f14-stopped-sheet.mp4`) caught the sheet's first visible slide frame already showing `No chats yet / Start one and it will appear here.` (`f14-stopped-empty.png`, `f14-sheet-push-frame.png`); no `Loading chats...` frame exists in the recording. After the first keystroke started that workspace's engine, the same sheet listed two 21h-old sessions (`f14-warm-list.png`), so the workspace was never empty. The loading branch was not observable; the false empty state is Finding 11. Retried again on the genuinely fresh `F14Fresh2` import (2026-11-17 20:53): the sheet was opened while its engine was live but still `connecting to agent`, and the first visible sheet frame already carried `Project - F14Fresh2` with the full `No chats yet / Start one and it will appear here.` copy (`f14b-fresh-empty.png`, `f14b-fresh-slide.png`); the app created that workspace's first session only afterwards (`no prior session with content; creating one`, 20:53:50; `f14b-fresh-workspace.log.txt`). So the explanatory empty state is correct on a fresh workspace once the engine can answer, and Finding 11 is specifically the stopped-engine early return. The `Loading chats...` copy still never rendered in the 151-frame ~9.5 fps recording (`f14b-fresh-workspace.mp4`), which includes a ~50 fps burst through the sheet animation; the local listSessions round trip completes before the first sheet frame. The loading half remains unobserved, so the row stays NOT PERFORMED. |
 | 15 | Model pick | PASS | `f15-after-model-pick.png`, `f15-model-restored.png`; chip changed to `deepseek-v4-pro` and back to `deepseek-v4.1-flash`. |
 | 16 | Model error | PASS (post-fix) | `f16-offline-model-sheet-postfix.png`; airplane mode on, model sheet opened: `UnknownHostException: Unable to resolve host "opencode.ai": No address associated with hostname` rendered in red in-sheet, list not blank. Airplane mode restored off (`airplane_mode_on=0`). |
 | 17 | Handoff chip | PASS | `a08-after-handoff-sheet.png`; sheet opened with prefill and destinations. |
@@ -174,7 +174,10 @@ and left the counts unchanged; flow 14's retry produced Finding 11.
     returns at `port ?: return` before setting `sessionsLoading`, so the
     `loading && sessions.isEmpty()` branch cannot render and the explanatory
     empty state claims the workspace is empty when the app has merely not
-    asked the engine. Pre-existing, not a 2b.1 regression; pinned, not fixed.
+    asked the engine. A fresh-workspace retry (`F14Fresh2`, 2026-11-17 20:53)
+    rendered the same empty copy correctly once the engine was live, so the
+    defect is the early return, not the copy (`f14b-fresh-empty.png`).
+    Pre-existing, not a 2b.1 regression; pinned, not fixed.
     Evidence: `f14-stopped-empty.png`, `f14-sheet-push-frame.png`,
     `f14-warm-list.png`, `f14-stopped-sheet.mp4`,
     `f14-stopped-empty.log.txt`.

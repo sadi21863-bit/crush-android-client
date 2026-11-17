@@ -1,0 +1,24 @@
+﻿20:52:33.067 I/EngineSupervisor: [p222ed19e] stop() requested
+20:52:33.398 D/ChatViewModel: bindEngine state=Stopped instance=pf3832c4e
+20:52:33.399 D/ChatViewModel: bindEngine state=Stopped instance=pf3832c4e
+20:53:41.920 I/EngineSupervisor: [pf3832c4e] start() activeJob=null
+20:53:41.921 I/EngineSupervisor: [pf3832c4e] supervise loop start
+20:53:41.922 D/EngineSupervisor: [pf3832c4e] starting attempt 1
+20:53:41.968 D/ChatViewModel: bindEngine state=Starting(attempt=1) instance=pf3832c4e
+20:53:45.045 I/EngineSupervisor: [pf3832c4e] engine Running after 3123ms
+20:53:45.057 D/ChatViewModel: bindEngine state=Running(pid=-1, port=1, version={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+20:53:45.061 D/ChatViewModel: bootstrap instance=pf3832c4e workspacePath=/storage/emulated/0/F14Fresh2
+20:53:45.066 I/ChatViewModel: permissionMode=ASK providerId=opencode-go
+20:53:45.068 D/ChatViewModel: state.providerId synced to the boot's provider: opencode-zen -> opencode-go
+20:53:45.072 D/ChatViewModel: bootstrap permission wire: instance=pf3832c4e engineVersion={"version":"v0.100.0","commit":"unknown","build_id":"2my2izixtou8","go_version":"go1.27.1","platform":"android/arm64"}
+20:53:45.075 D/WorkspaceManager: open: permissionWire=normal (null = v0.99 skip family) yolo=false
+20:53:45.360 W/WorkspaceManager: agent/init failed on open(): HTTP 500 on /v1/workspaces/5cb0ff7a-3af9-41e9-b569-2547a1ff7211/agent/init: {"message":"coder agent configuration is missing"}
+20:53:45.481 I/ChatViewModel: catalogue prices loaded for 33 models
+20:53:46.321 W/ChatViewModel: hiding 4 model(s) the engine no longer knows: beam-free,hy4-flash-free,iceman-contributor-free,longcat-2.5-free
+20:53:46.324 I/ChatViewModel: engine capabilities: 22/28 offered model(s) accept images
+20:53:50.278 I/ChatViewModel: probed 1 candidate(s), using deepseek-v4.1-flash (of 28 listed)
+20:53:50.410 I/ChatViewModel: no prior session with content; creating one
+20:53:50.430 I/ChatViewModel: event transport identity change -> <datadir>/com.crush.mobile/files/crush-pf3832c4e.sock; rebuilding connection
+20:53:50.434 I/ChatViewModel: long-lived event stream attached to 5cb0ff7a-3af9-41e9-b569-2547a1ff7211
+20:53:50.476 I/ChatViewModel: current-session reported: cd04be55
+20:53:51.200 W/ChatViewModel: picker: hiding 4 model(s) the engine no longer knows: beam-free,hy4-flash-free,iceman-contributor-free,longcat-2.5-free

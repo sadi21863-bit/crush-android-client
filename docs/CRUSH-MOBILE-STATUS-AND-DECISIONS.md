@@ -1071,6 +1071,12 @@ device `bbf8ca69`, API 29, owner unlock entered by the owner)
 - Observed, not fixed (owner's call): the API card reads "Add a OpenCode Zen
   key to start chatting." - wrong article; suggested "Add a key for OpenCode
   Zen to start chatting."
+- **End-to-end turn after the provider round-trip and a true cold start:
+  PASS** (`after-f12/13-typed.png`, `14-turn-streaming.png`,
+  `15-turn-reply.png`). Typed "Reply with exactly: ok"; the engine booted to
+  `ready` on the first keystroke, the reply was exactly "ok", the finish was
+  clean (`file changes: +0 -0`, no `finishError`), and the composer returned
+  to idle. A throwaway chat `db2554b6` remains in Recents.
 
 ## 6. Upstream filings
 

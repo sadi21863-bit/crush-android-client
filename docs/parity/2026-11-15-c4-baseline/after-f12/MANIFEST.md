@@ -21,6 +21,9 @@ All screenshots are `/sdcard` pulls, untouched apart from the rename of 08/09
 | 06 | `06-back-chat.png` | Back → same chat, header "connecting to agent" (provider change re-bootstraps). |
 | 07 | `07-chat-ready.png` | Chat `ready` with `deepseek-v4.1-flash`; the provider round-trip did not disturb the session stack. |
 | 12 | `12-unlocked-after-coldstart.png` | After the **true cold start** and the owner's unlock: Chat, header "New chat / engine stopped" (engine starts on first keystroke). Log: `gate=OPEN coldStart=true … verified=true`. This is the process-death route check. |
+| 13 | `13-typed.png` | Real turn, typed not pasted: the engine booted to `ready` on the first keystroke ("Engine starts when you begin typing"). |
+| 14 | `14-turn-streaming.png` | Sent: user bubble pinned at the top, "thinking…" placeholder, send became **Stop**. |
+| 15 | `15-turn-reply.png` | Reply **"ok"** - exactly what was asked - with message actions (Copy / Save as Markdown / Use this plan in Code); composer idle. Logs: `current-session reported: db2554b6`, `file changes: +0 -0 across 0 file(s)`, `CONNECT opencode.ai:443 ok`, no `finishError`. |
 
 Persistence check (no secret printed): `run-as … grep -a -o 'opencode-[a-z]*'
 files/datastore/settings.preferences_pb | sort -u` → `opencode-go` only.
@@ -77,3 +80,7 @@ chatting."
   intended stored-key exception, with its "unverified on this build" note.
 - Cold-start routing still truthful: **chat for a stored key** (00, 12), **PROMPT
   gate for a fresh process** (log).
+- End-to-end turn after the provider round-trip and the process death: **PASS**
+  (13-15) - typed input, engine booted on keystroke, streamed reply "ok",
+  clean finish, no `finishError`. Side effect: a throwaway chat `db2554b6`
+  remains in Recents.

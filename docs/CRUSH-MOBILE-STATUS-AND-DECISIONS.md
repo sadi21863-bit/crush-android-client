@@ -260,7 +260,7 @@ mirrored locally with their full reasoning in the plan doc
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 complete; Findings 10/11 fixed; Phase 2b.2 and 2b.3 code/test/device-complete; Phase 2b.4 code/test-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Finding 10 (dotted `.crushrc` outside the gate) and Finding 11 (stopped-engine false empty sessions sheet) are fixed in §5.4 after the owner reversed the same-day deferral. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests). Full four-task gate green: 834 tests / 89 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device re-walk PASS: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind and `.dotmarker3` appears only after consent + engine start; Projects top bands are pixel-identical to the 2b.1 baseline, remove dialog/cancel PASS, flow 26 open/back PASS; Review empty content is pixel-identical and flow 24 Back PASS (populated Review card not performed on device). Settings device parity is pending (device disconnected before install). Device records: `after-2b2/MANIFEST.md`, `after-2b3/MANIFEST.md`. |
+| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1–2b.5 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Findings 10/11 fixed in §5.4. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests), §5.8 Onboarding (`OnboardingContent` + 10 tests, T2B5-01). Full four-task gate green: 844 tests / 90 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind; Projects top bands pixel-identical, remove dialog/cancel PASS, flow 26 PASS; Review empty content pixel-identical, flow 24 Back PASS (populated card not performed); Settings pixel-identical to `f25-after-settings.png`, Back returns to the same chat with 0 changed pixels; Onboarding pixel-identical (old vs extracted), provider menu open/dismiss PASS. **Finding 12 (new, pre-existing):** selecting a key-less provider in Settings resets the root to Onboarding via the `hasApiKey`/`startDestination` recompute; owner provider restored through a verified DataStore rewrite, no credential touched. Device records: `after-2b2`, `after-2b3`, `after-2b4`, `after-2b5`. |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
@@ -859,9 +859,27 @@ Design source: same Rev 3.1 brief, §§5.6, 6.5 and the 2b.1 extraction rules.
 
 **Device evidence**
 
-- Pending. The device disconnected from USB before install. Planned: Settings
-  screenshot diff against `f22-after-settings.png`, provider switch, theme chip
-  state, permission switch copy, tuning AUTO/MANUAL labels, and Back.
+- Device `bbf8ca69` (API 29) returned after the extraction; the 2b.4 APK
+  (`app-debug.apk`, built 16:24 host clock, commit `89e294b` tree) was
+  installed without clearing app data.
+- Settings content region (y=100..2340) is **pixel-identical** to
+  `after-2b1/f25-after-settings.png`: 0 changed pixels. Only the status bar
+  differs.
+- Settings -> Back returns to the same chat: 0 changed pixels (y=100..2340)
+  between chat-before-Settings and chat-after-Back.
+- **Finding 12 (new, pre-existing host behavior, not 2b.4):** selecting a
+  provider with no stored key (Groq) in Settings persists
+  `provider_id=groq`, recomputes `hasApiKey`, and resets the root to
+  Onboarding, discarding the Settings stack (`MainActivity.kt:216-239`).
+  Reproduced on device: Settings `06` -> Onboarding `07`. The Settings
+  content still dispatches `onSelectProvider(id)` exactly as before the
+  split, so the extraction did not cause it; do not fix it inside an
+  extraction batch. The owner's `provider_id` was restored to
+  `opencode-go` by rewriting the DataStore preferences protobuf with the app
+  force-stopped (host/device md5 matched); no credential file was read or
+  modified. Evidence: `docs/parity/2026-11-15-c4-baseline/after-2b4/MANIFEST.md`.
+- Theme/keyboard/permission/tuning/About rows were not re-driven on device;
+  their render and dispatch are pinned by `SettingsContentTest`.
 
 **Deviation notes**
 
@@ -872,6 +890,79 @@ Design source: same Rev 3.1 brief, §§5.6, 6.5 and the 2b.1 extraction rules.
 - The content still computes the next `TuningPolicy.Overrides` from the current
   settings snapshot (a pure copy), because the host passes the snapshot in; the
   host owns the write.
+
+### 5.8 V2 Phase 2b.5 batch record (working tree, 2026-11-18)
+
+Design source: same Rev 3.1 brief, §§5.6, 6.5, 4.7.7 and the 2b.1 extraction rules.
+
+**Production (2 new, 1 rewritten; one new content layer)**
+
+- New `OnboardingContent.kt`: the host-free onboarding render tree - welcome
+  mark, title/subtitle, provider dropdown with the free-tier label and the
+  spoken "Provider: ..." phrase, per-provider key placeholder/hint, masked key
+  field with the reveal toggle, error live region, and the
+  Start chatting/Saving key button. The key draft, the provider-menu and
+  reveal toggles, the saving flag, and the failure text stay `remember`-scoped
+  here.
+- New `OnboardingViewState.kt`: the provider catalogue and the selected row
+  cross as plain domain values.
+- `OnboardingScreen.kt` rewritten as the host: `SettingsViewModel`, provider
+  selection, and the save coroutine (`saveApiKeyAwait`, then
+  `saveProviderId` only on success). `OnboardingScreen(onCompleted)` is
+  unchanged.
+- No Context, ViewModel, container, or Keystore enters the content. CORR-001
+  is preserved: no provider contact and no validation; the button reports only
+  what the host write returned.
+
+**Tests (`OnboardingContentTest`, 10, T2B5-01)**
+
+- Provider slot name; free-tier label in the slot and the menu; provider
+  selection dispatch; key hint and placeholder follow the selected provider;
+  blank/whitespace key keeps Start chatting disabled; trimmed submit dispatch;
+  saving state (disabled, "Saving key..."); a failed save surfaces the
+  existing copy and restores the button; a successful save advances exactly
+  once and restores the button; the reveal toggle flips the mask. No test
+  asserts key validation (CORR-001).
+
+**Gate evidence**
+
+- Targeted: 10 tests, 0 failures / 0 errors (3m51s incremental).
+- Full four-task gate: BUILD SUCCESSFUL in 9m43s; 844 tests / 90 suites,
+  0 failures / 0 errors; lint 0 errors / 1 standing warning
+  (`NotShrinkingResources`).
+
+**Device evidence**
+
+- Device `bbf8ca69` returned for the walk. The 2b.5 APK (built 17:07 host
+  clock) was installed without clearing app data. Onboarding was surfaced
+  through the Finding 12 path (Settings -> key-less Groq), which resets the
+  root to the start destination.
+- The extracted screen is **pixel-identical** to the old screen captured on
+  the 2b.4 APK: 0 changed pixels in y=100..2340
+  (`after-2b5/01-onboarding-2b5.png` vs
+  `after-2b4/07-settings-groq-selected.png`). Only the status bar differs.
+- The provider dropdown opens with every provider and the free-tier labels;
+  Back dismisses it and the screen returns to the initial render with 0
+  changed pixels (`02-onboarding-provider-menu.png`,
+  `03-onboarding-menu-dismissed.png`).
+- `provider_id` was restored to `opencode-go` by rewriting the DataStore
+  preferences protobuf (host/device md5 matched); the next cold start landed
+  on the working chat (`04-chat-restored.png`). No credential file was read
+  or modified.
+- Not performed: entering/saving a key on device (a real credential write);
+  the save/advance/failure branches are pinned by `OnboardingContentTest`.
+  API 29 only; no API 30+/AFA/wide claim. Record:
+  `docs/parity/2026-11-15-c4-baseline/after-2b5/MANIFEST.md`.
+
+**Deviation notes**
+
+- The submit outcome crosses back through `onResult(Boolean)` rather than a
+  suspend callback: the Keystore write is asynchronous and host-owned, and
+  the content may not hold a coroutine scope for it. This is also what keeps
+  "success advances" testable - the content calls `onCompleted` only after
+  the host reports `true`.
+- `SettingsViewModel` remains the onboarding host ViewModel; no new
+  ViewModel or repository was added.
 
 ## 6. Upstream filings
 

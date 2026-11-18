@@ -260,7 +260,7 @@ mirrored locally with their full reasoning in the plan doc
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 complete; Findings 10/11 fixed; Phase 2b.2 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Finding 10 (dotted `.crushrc` outside the gate) and Finding 11 (stopped-engine false empty sessions sheet) are fixed in §5.4 after the owner reversed the same-day deferral. Phase 2b.2 extracts `ProjectsContent` + `ProjectsContentTest` (§5.5). Targeted evidence: 25 trust + 14 session-sheet + 10 projection + 11 Projects = 60 tests, 0 failures / 0 errors. Full four-task gate green: 812 tests / 87 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning (22m09s). Device re-walk PASS: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind and `.dotmarker3` appears only after consent + engine start; Projects top bands are pixel-identical to the 2b.1 baseline, remove dialog/cancel PASS, flow 26 open/back PASS. Batch records: §5.1 (2a), §5.2 (2b.1), §5.3 (post-review fixes), §5.4 (findings), §5.5 (2b.2). Device record: `after-2b2/MANIFEST.md`. |
+| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 complete; Findings 10/11 fixed; Phase 2b.2 and 2b.3 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Finding 10 (dotted `.crushrc` outside the gate) and Finding 11 (stopped-engine false empty sessions sheet) are fixed in §5.4 after the owner reversed the same-day deferral. Phase 2b.2 extracts `ProjectsContent` + `ProjectsContentTest` (§5.5). Targeted evidence: 25 trust + 14 session-sheet + 10 projection + 11 Projects = 60 tests, 0 failures / 0 errors. Full four-task gate green: 824 tests / 88 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device re-walk PASS: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind and `.dotmarker3` appears only after consent + engine start; Projects top bands are pixel-identical to the 2b.1 baseline, remove dialog/cancel PASS, flow 26 open/back PASS; Review empty content is pixel-identical and flow 24 Back PASS (populated Review card not performed on device). Batch records: §5.1 (2a), §5.2 (2b.1), §5.3 (post-review fixes), §5.4 (findings), §5.5 (2b.2), §5.6 (2b.3). Device records: `after-2b2/MANIFEST.md`, `after-2b3/MANIFEST.md`. |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
@@ -763,6 +763,61 @@ Design source: same Rev 3.1 brief, §§5.6, 6.5 and the 2b.1 extraction rules.
   `docs/parity/2026-11-15-c4-baseline/after-2b2/MANIFEST.md`.
 - Not claimed: full-screen pixel parity (registry content changed), the
   destructive Remove tap (owner scope), and API 30+/AFA/wide layouts.
+
+### 5.6 V2 Phase 2b.3 batch record (working tree, 2026-11-18)
+
+Design source: same Rev 3.1 brief, §§5.6, 6.5 and the 2b.1 extraction rules.
+
+**Production (2 new, 1 rewritten; one new content layer)**
+
+- New `ReviewContent.kt`: the host-free Review render tree - header/Back,
+  process-scope copy, running-turn banner, export message, empty/list
+  branches, turn cards (header/counts, superseded/read-only, unreadable and
+  no-diff copy, per-file diff rows, revert/export actions), and the named
+  revert confirmation. The pending-revert row stays `remember`-scoped here.
+- New `ReviewViewState.kt`: `ReviewUiState` (cards, runInFlight,
+  exportMessage) crosses the seam as pure data.
+- `ReviewScreen.kt` rewritten as the host: container-scoped
+  `ReviewHistory`, coroutine scope, SAF `CreateDocument` launcher, byte copy,
+  export-message state, and the `ReviewContent` call. `ReviewRoute(onBack)`
+  is unchanged.
+- No engine, container, Context, or SAF launcher enters the content layer.
+  `FileDiffRow` is reused from the chat content (module-internal composable).
+
+**Tests**
+
+- New `ReviewContentTest` (10): empty state; populated header/counts/actions;
+  superseded read-only + disabled revert; running-turn banner + disabled
+  revert; unreadable/no-diff copy; reverted-labelled path; revert confirm,
+  naming, cancel and dispatch; export root/path dispatch; export message;
+  Back callback.
+- T2B3-01 extends `ReviewHistoryTest` (+2, now 14): `beginTurn` supersedes
+  existing cards before the next record; the newest-eight cap preserves
+  newest-first order.
+
+**Gate evidence**
+
+- Targeted Review content/store: 10 + 14 tests green.
+- Full four-task gate: BUILD SUCCESSFUL in 11m00s; 824 tests / 88 suites,
+  0 failures / 0 errors; lint 0 errors / 1 standing warning.
+
+**Device evidence**
+
+- Review empty state is **pixel-identical** to the 2b.1 baseline
+  `f24-after-review.png` outside the status bar: 0 changed pixels in
+  y=100..2340. Flow 24 (Chat -> Review -> Back to the same chat) PASS.
+- A populated card was NOT PERFORMED on device: the process had no completed
+  file-changing turn. The rows/actions are test-pinned in
+  `ReviewContentTest`. Record:
+  `docs/parity/2026-11-15-c4-baseline/after-2b3/MANIFEST.md`.
+
+**Deviation notes**
+
+- `timeLabel`/`SimpleDateFormat` moved with the cards into the content. It is
+  clock-dependent but free of Android/Context types, matching the existing
+  rendering contract; the tests assert structure, not pinned wall-clock text.
+- Export remains host-owned because it needs the SAF launcher and
+  `contentResolver`; the content only emits `(rootPath, path)`.
 
 ## 6. Upstream filings
 

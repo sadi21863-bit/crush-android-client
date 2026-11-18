@@ -161,6 +161,35 @@ class ReviewHistoryTest {
         assertEquals(listOf(200L, 100L), history.cards.value.map { it.startedAtMs })
     }
 
+    @Test
+    fun `beginTurn supersedes existing cards before the next record lands`() = runBlocking {
+        // T2B3-01: the read-only degradation is a BEGIN-TURN fact, not a
+        // side effect of recording the next card. Between beginTurn and the
+        // next record there must be no revertible card left behind.
+        val id = record(startedAtMs = 100L)
+        history.runSettled()
+        assertFalse(history.cards.value.first { it.id == id }.superseded)
+
+        history.beginTurn()
+
+        assertTrue(history.cards.value.first { it.id == id }.superseded)
+        assertEquals("beginTurn must not invent a card", 1, history.cards.value.size)
+    }
+
+    @Test
+    fun `the history keeps only the newest eight cards`() = runBlocking {
+        // T2B3-01: bounded memory, newest first, no silent reordering.
+        repeat(10) { index ->
+            record(startedAtMs = (index + 1) * 100L)
+        }
+
+        assertEquals(8, history.cards.value.size)
+        assertEquals(
+            (10 downTo 3).map { it * 100L },
+            history.cards.value.map { it.startedAtMs }
+        )
+    }
+
     // ---- revert outcomes on the card --------------------------------------
 
     @Test

@@ -260,7 +260,7 @@ mirrored locally with their full reasoning in the plan doc
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 complete; Findings 10/11 fixed; Phase 2b.2 and 2b.3 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Finding 10 (dotted `.crushrc` outside the gate) and Finding 11 (stopped-engine false empty sessions sheet) are fixed in §5.4 after the owner reversed the same-day deferral. Phase 2b.2 extracts `ProjectsContent` + `ProjectsContentTest` (§5.5). Targeted evidence: 25 trust + 14 session-sheet + 10 projection + 11 Projects = 60 tests, 0 failures / 0 errors. Full four-task gate green: 824 tests / 88 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device re-walk PASS: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind and `.dotmarker3` appears only after consent + engine start; Projects top bands are pixel-identical to the 2b.1 baseline, remove dialog/cancel PASS, flow 26 open/back PASS; Review empty content is pixel-identical and flow 24 Back PASS (populated Review card not performed on device). Batch records: §5.1 (2a), §5.2 (2b.1), §5.3 (post-review fixes), §5.4 (findings), §5.5 (2b.2), §5.6 (2b.3). Device records: `after-2b2/MANIFEST.md`, `after-2b3/MANIFEST.md`. |
+| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 complete; Findings 10/11 fixed; Phase 2b.2 and 2b.3 code/test/device-complete; Phase 2b.4 code/test-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Finding 10 (dotted `.crushrc` outside the gate) and Finding 11 (stopped-engine false empty sessions sheet) are fixed in §5.4 after the owner reversed the same-day deferral. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests). Full four-task gate green: 834 tests / 89 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device re-walk PASS: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind and `.dotmarker3` appears only after consent + engine start; Projects top bands are pixel-identical to the 2b.1 baseline, remove dialog/cancel PASS, flow 26 open/back PASS; Review empty content is pixel-identical and flow 24 Back PASS (populated Review card not performed on device). Settings device parity is pending (device disconnected before install). Device records: `after-2b2/MANIFEST.md`, `after-2b3/MANIFEST.md`. |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
@@ -818,6 +818,60 @@ Design source: same Rev 3.1 brief, §§5.6, 6.5 and the 2b.1 extraction rules.
   rendering contract; the tests assert structure, not pinned wall-clock text.
 - Export remains host-owned because it needs the SAF launcher and
   `contentResolver`; the content only emits `(rootPath, path)`.
+
+### 5.7 V2 Phase 2b.4 batch record (working tree, 2026-11-18)
+
+Design source: same Rev 3.1 brief, §§5.6, 6.5 and the 2b.1 extraction rules.
+
+**Production (2 new, 2 rewritten; one new content layer)**
+
+- New `SettingsContent.kt`: the host-free Settings render tree - top bar,
+  provider radios with stored-key badges, the API card (saved/hint, add/replace
+  form, delete), appearance and keyboard chips, the permission switch with its
+  safety copy, the tuning rows with AUTO/MANUAL truth and Reset, the About card,
+  and the error snackbar. The in-progress key text and the replace/cancel flags
+  stay `remember`-scoped here.
+- New `SettingsViewState.kt`: `SettingsViewState` carries the settings snapshot,
+  the provider list and selection, the vault ids, the error, the resolved tuning,
+  and the device profile. All are plain domain values - no repository, Context,
+  or coroutine scope crosses the seam.
+- `SettingsScreen.kt` rewritten as the host: ViewModel/state collection,
+  `Providers.resolve`, `resolvedTuning`, `deviceProfile`, and the write
+  callbacks. `SettingsScreen(onBack, onOpenDiagnostics)` is unchanged.
+- `SettingsViewModel.kt`: adds `saveTuning(overrides)` and `resetTuning()` so the
+  content can hand back a computed override set instead of holding the
+  repository. No other behavior change.
+
+**Tests (`SettingsContentTest`, 10)**
+
+- Provider rows (names, hints, unverified note, exactly one stored-key badge);
+  provider selection dispatch; saved-key hint plus Replace/Delete; add-key flow
+  with Save disabled until text and trimmed dispatch; theme and Enter-send chip
+  dispatch; permission switch dispatch; tuning AUTO/MANUAL truth, an override
+  dispatch, and Reset; About card diagnostics dispatch; error snackbar; Back.
+
+**Gate evidence**
+
+- Targeted: 10 tests, 0 failures / 0 errors.
+- Full four-task gate: BUILD SUCCESSFUL in 16m12s; 834 tests / 89 suites,
+  0 failures / 0 errors; lint 0 errors / 1 standing warning
+  (`NotShrinkingResources`).
+
+**Device evidence**
+
+- Pending. The device disconnected from USB before install. Planned: Settings
+  screenshot diff against `f22-after-settings.png`, provider switch, theme chip
+  state, permission switch copy, tuning AUTO/MANUAL labels, and Back.
+
+**Deviation notes**
+
+- The SettingsViewModel previously had no tuning writers: the tuning UI lived in
+  `SettingsScreen` and called `settingsRepository.saveTuningOverrides` directly
+  from a composable `rememberCoroutineScope`. The two ViewModel methods move that
+  write across the seam without changing what is persisted.
+- The content still computes the next `TuningPolicy.Overrides` from the current
+  settings snapshot (a pure copy), because the host passes the snapshot in; the
+  host owns the write.
 
 ## 6. Upstream filings
 

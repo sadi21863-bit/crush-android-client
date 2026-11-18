@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.domain.model.PermissionMode
+import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.util.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -138,6 +139,22 @@ class SettingsViewModel(
      */
     fun savePermissionMode(mode: PermissionMode) {
         viewModelScope.launch { settingsRepository.savePermissionMode(mode) }
+    }
+
+    /**
+     * Persists one tuning override set. The content computes the new
+     * [TuningPolicy.Overrides] from the current settings snapshot; the host owns
+     * the write and the scope, so no repository crosses the content seam.
+     */
+    fun saveTuning(overrides: TuningPolicy.Overrides) {
+        viewModelScope.launch { settingsRepository.saveTuningOverrides(overrides) }
+    }
+
+    /** Restores every tuning row to AUTO. */
+    fun resetTuning() {
+        viewModelScope.launch {
+            settingsRepository.saveTuningOverrides(TuningPolicy.Overrides())
+        }
     }
 
 /**

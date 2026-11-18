@@ -20,6 +20,7 @@ All screenshots are `/sdcard` pulls, untouched apart from the rename of 08/09
 | 05 | `05-go-restored.png` | Restored OpenCode Go **through the UI** (no DataStore surgery this time). Still in Settings, "API key saved", Replace/Delete shown. |
 | 06 | `06-back-chat.png` | Back → same chat, header "connecting to agent" (provider change re-bootstraps). |
 | 07 | `07-chat-ready.png` | Chat `ready` with `deepseek-v4.1-flash`; the provider round-trip did not disturb the session stack. |
+| 12 | `12-unlocked-after-coldstart.png` | After the **true cold start** and the owner's unlock: Chat, header "New chat / engine stopped" (engine starts on first keystroke). Log: `gate=OPEN coldStart=true … verified=true`. This is the process-death route check. |
 
 Persistence check (no secret printed): `run-as … grep -a -o 'opencode-[a-z]*'
 files/datastore/settings.preferences_pb | sort -u` → `opencode-go` only.
@@ -35,15 +36,21 @@ files/datastore/settings.preferences_pb | sort -u` → `opencode-go` only.
   `verified=true`), i.e. the `LaunchRouteState`/`LockState` process scope.
 - **True cold start repeated** with the process verified dead
   (`pidof` empty before launch, pid 21723 after). Logcat:
-  `resume gate=PROMPT coldStart=true away=-1s ciphertext=true wasUnlocked=false
-  verified=false` → the system biometric dialog auto-opened. Pixels for this
-  state could not be captured: the paused app sets `FLAG_SECURE`, and this ROM
-  returns **0-byte** screencaps for the protected window (confirmed: Home
-  captures fine at the same moment). The `PROMPT` decision is log-evidenced;
-  the route beneath it is evidenced by 00 (same predicate, same build).
-- Post-unlock states after that true cold start are likewise not photogenic on
-  this ROM (FLAG_SECURE is set for the window's life once the app pauses), so
-  the screenshots above come from the 23:32 session, before any pause.
+  `resume gate=PROMPT coldStart=true away=2s ciphertext=true wasUnlocked=false
+  verified=false` → the system biometric dialog auto-opened. Captures taken
+  during that window came back **0 bytes**; the first reading blamed
+  `FLAG_SECURE`, and that reading was **wrong** - see the next bullet.
+- **0-byte captures were a transient `screencap` failure, not FLAG_SECURE.**
+  `12-unlocked-after-coldstart.png` was captured from the same window after
+  the owner unlocked (`gate=OPEN … verified=true`) and renders normally, so the
+  protection theory is refuted. The correct statement is narrower: some
+  `screencap` calls on this ROM return an empty file (the same failure mode
+  seen earlier in this project), and a retry succeeds. What this capture adds:
+  after a TRUE cold start the app is on **Chat** (not Onboarding) with the
+  engine idle until typing - the launch route is truthful across a process
+  death.
+- Post-pause states are therefore capturable; the earlier session's good
+  captures simply predate the cold start.
 
 ## Not performed (honest scope)
 
@@ -68,5 +75,5 @@ chatting."
 - Finding 12: **FIXED on device** (04, and no navigation reset through 05/06/07).
 - Untested-provider gating: **confirmed on Settings**; Hyper's presence is the
   intended stored-key exception, with its "unverified on this build" note.
-- Cold-start routing still truthful: **chat for a stored key** (00), **PROMPT
+- Cold-start routing still truthful: **chat for a stored key** (00, 12), **PROMPT
   gate for a fresh process** (log).

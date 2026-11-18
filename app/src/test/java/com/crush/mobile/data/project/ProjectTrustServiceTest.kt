@@ -226,6 +226,167 @@ class ProjectTrustServiceTest {
         }
 
     // ---------------------------------------------------------------------------
+    // Finding 10: the dotted `.crushrc`. The pinned engine executes it on
+    // attach, so the gate must fingerprint it exactly like the plain file.
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun `a dotted crushrc alone is Required first-consent`() = runBlocking {
+        val dir = tmp.newFolder("dot-a")
+        File(dir, ".crushrc").writeText("hello")
+        val source = FakeTrustSource()
+        val verdict = serviceWith(source).gate(refFor(dir))
+        assertTrue(verdict is TrustVerdict.Required)
+        assertEquals(
+            "crushrc present, no consent recorded",
+            (verdict as TrustVerdict.Required).reason
+        )
+        assertEquals("the gate never writes", 0, source.writes)
+    }
+
+    @Test
+    fun `a dotted crushrc consents and then Allows`() = runBlocking {
+        val dir = tmp.newFolder("dot-b")
+        File(dir, ".crushrc").writeText("hello")
+        val ref = refFor(dir)
+        val source = FakeTrustSource()
+        val service = serviceWith(source)
+        val recorded = service.recordConsent(ref)
+        assertEquals(recorded, service.currentFingerprint(ref))
+        assertTrue(service.gate(ref) is TrustVerdict.Allow)
+        assertEquals(1, source.writes)
+    }
+
+    @Test
+    fun `the dotted and plain names do not share a fingerprint for identical bytes`() =
+        runBlocking {
+            // A script can branch on its own invocation path, so consent to
+            // `crushrc` must not silently cover `.crushrc` with the same bytes.
+            val plain = tmp.newFolder("dot-c1")
+            File(plain, "crushrc").writeText("hello")
+            val dotted = tmp.newFolder("dot-c2")
+            File(dotted, ".crushrc").writeText("hello")
+            val service = serviceWith(FakeTrustSource())
+            assertEquals(KnownSha.sha256OfHello, service.currentFingerprint(refFor(plain)))
+            val dottedFingerprint = service.currentFingerprint(refFor(dotted))
+            assertTrue(dottedFingerprint != null)
+            assertTrue(
+                "a dotted file must not reuse the plain single-file digest",
+                dottedFingerprint != KnownSha.sha256OfHello
+            )
+        }
+
+    @Test
+    fun `a pre-dotfile plain-crushrc consent keeps the legacy digest and Allows`() =
+        runBlocking {
+            // Backward compatibility: records written before Finding 10 carry
+            // SHA-256(crushrc bytes). A plain-only folder must keep matching
+            // that record; only states involving `.crushrc` use the composite.
+            val dir = tmp.newFolder("dot-d")
+            File(dir, "crushrc").writeText("hello")
+            val ref = refFor(dir)
+            val source = FakeTrustSource()
+            source.records[ref.id] = ProjectTrustRecord(
+                fingerprint = KnownSha.sha256OfHello,
+                consentedAtMs = 1L
+            )
+            val service = serviceWith(source)
+            assertEquals(KnownSha.sha256OfHello, service.currentFingerprint(ref))
+            assertTrue(service.gate(ref) is TrustVerdict.Allow)
+            assertEquals(0, source.writes)
+        }
+
+    @Test
+    fun `adding a dotted crushrc beside a consented plain file re-gates`() = runBlocking {
+        val dir = tmp.newFolder("dot-e")
+        File(dir, "crushrc").writeText("hello")
+        val ref = refFor(dir)
+        val service = serviceWith(FakeTrustSource())
+        service.recordConsent(ref)
+        assertTrue(service.gate(ref) is TrustVerdict.Allow)
+        File(dir, ".crushrc").writeText("dotted")
+        val verdict = service.gate(ref)
+        assertTrue(verdict is TrustVerdict.Required)
+        assertEquals(
+            "crushrc changed since consent (fingerprint moved)",
+            (verdict as TrustVerdict.Required).reason
+        )
+    }
+
+    @Test
+    fun `renaming the consented plain file to the dotfile re-gates`() = runBlocking {
+        val dir = tmp.newFolder("dot-f")
+        val plain = File(dir, "crushrc")
+        plain.writeText("hello")
+        val ref = refFor(dir)
+        val service = serviceWith(FakeTrustSource())
+        service.recordConsent(ref)
+        val renamed = File(dir, ".crushrc")
+        assertTrue(plain.renameTo(renamed))
+        val verdict = service.gate(ref)
+        assertTrue(verdict is TrustVerdict.Required)
+        assertTrue(service.currentFingerprint(ref) != KnownSha.sha256OfHello)
+    }
+
+    @Test
+    fun `one consent covers both configs and changing either re-gates`() = runBlocking {
+        val dir = tmp.newFolder("dot-g")
+        File(dir, "crushrc").writeText("hello")
+        File(dir, ".crushrc").writeText("dotted")
+        val ref = refFor(dir)
+        val service = serviceWith(FakeTrustSource())
+        service.recordConsent(ref)
+        assertTrue(service.gate(ref) is TrustVerdict.Allow)
+
+        // The dotted file is inside the consented surface now.
+        File(dir, ".crushrc").writeText("dotted-changed")
+        val dottedMoved = service.gate(ref)
+        assertTrue(dottedMoved is TrustVerdict.Required)
+        assertEquals(
+            "crushrc changed since consent (fingerprint moved)",
+            (dottedMoved as TrustVerdict.Required).reason
+        )
+
+        // Re-consent, then change the plain file: also re-gates.
+        service.recordConsent(ref)
+        assertTrue(service.gate(ref) is TrustVerdict.Allow)
+        File(dir, "crushrc").writeText("hello-changed")
+        assertTrue(service.gate(ref) is TrustVerdict.Required)
+    }
+
+    @Test
+    fun `removing the dotted file after a two-file consent re-gates`() = runBlocking {
+        val dir = tmp.newFolder("dot-h")
+        File(dir, "crushrc").writeText("hello")
+        File(dir, ".crushrc").writeText("dotted")
+        val ref = refFor(dir)
+        val service = serviceWith(FakeTrustSource())
+        service.recordConsent(ref)
+        assertTrue(File(dir, ".crushrc").delete())
+        val verdict = service.gate(ref)
+        assertTrue(verdict is TrustVerdict.Required)
+        // The remaining plain file hashes with the legacy digest, which is
+        // NOT the two-file consent record - so no stale consent leaks in.
+        assertEquals(KnownSha.sha256OfHello, service.currentFingerprint(ref))
+    }
+
+    @Test
+    fun `the allow-path record refuses a dotted crushrc that appeared in the window`() =
+        runBlocking {
+            val dir = tmp.newFolder("dot-i")
+            val ref = refFor(dir)
+            val source = FakeTrustSource()
+            val service = serviceWith(source)
+            val verdict = service.gate(ref) // no config: the Allow-by-absence
+            assertNull((verdict as TrustVerdict.Allow).observedFingerprint)
+            File(dir, ".crushrc").writeText("hello")
+            val outcome = service.confirmAtGate(ref, verdict.observedFingerprint)
+            assertEquals(TrustWriteOutcome.FileAppearedSinceGate, outcome)
+            assertEquals(0, source.writes)
+            assertTrue(service.gate(ref) is TrustVerdict.Required)
+        }
+
+    // ---------------------------------------------------------------------------
     // Finding A: the gate->record window. The Allow path records through
     // confirmAtGate(ref, Allow.observedFingerprint), which re-reads the REAL
     // file once: the interleavings below rewrite/delete/plant that file

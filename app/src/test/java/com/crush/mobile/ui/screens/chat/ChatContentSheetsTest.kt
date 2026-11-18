@@ -174,6 +174,36 @@ class ChatContentSheetsTest {
         compose.onNodeWithText("Loading chats...").assertIsDisplayed()
     }
 
+    @Test
+    fun `an unavailable session list does not claim the workspace is empty`() {
+        // Finding 11: with the engine stopped the app never asked for the
+        // list, so the explanatory empty state would be a false claim.
+        setContent(
+            ChatFixtures.view(sessions = emptyList(), sessionsUnavailable = true)
+        )
+        openSessionSheet()
+
+        compose.onNodeWithText("Chats aren't available").assertIsDisplayed()
+        compose.onAllNodesWithText("No chats yet").assertCountEquals(0)
+        compose.onAllNodesWithText("Start one and it will appear here.").assertCountEquals(0)
+    }
+
+    @Test
+    fun `a cached session list stays visible when the engine is unavailable`() {
+        setContent(
+            ChatFixtures.view(
+                sessions = listOf(
+                    SessionItem("s1", "Earlier chat", isActive = false, isBusy = false)
+                ),
+                sessionsUnavailable = true,
+            )
+        )
+        openSessionSheet()
+
+        compose.onNodeWithText("Earlier chat").assertIsDisplayed()
+        compose.onAllNodesWithText("Chats aren't available").assertCountEquals(0)
+    }
+
     // --------------------------------------------------------------- models
 
     @Test

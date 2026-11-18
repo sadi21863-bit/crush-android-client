@@ -36,6 +36,12 @@ data class SessionView(
 data class SessionListView(
     val loading: Boolean,
     val items: List<SessionItem>,
+    /**
+     * Finding 11: the last refresh could not reach the engine, so an empty
+     * [items] is "not listed", never "no chats". Defaulted so every existing
+     * construction stays source-compatible.
+     */
+    val unavailable: Boolean = false,
 )
 
 data class SessionItem(
@@ -193,6 +199,7 @@ fun ChatUiState.toViewState(inputs: ChatHostInputs): ChatViewState {
             surface = inputs.surfaceLabel,
             list = SessionListView(
                 loading = sessionsLoading,
+                unavailable = sessionsUnavailable,
                 items = sessions.map { session ->
                     SessionItem(
                         id = session.id,

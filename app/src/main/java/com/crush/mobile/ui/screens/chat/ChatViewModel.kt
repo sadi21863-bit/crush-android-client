@@ -431,6 +431,17 @@ val selectedModel: String = "",
     /** Sessions in the current workspace, newest first. See SessionList. */
     val sessions: List<Session> = emptyList(),
     val sessionsLoading: Boolean = false,
+    /**
+     * True when the last sheet refresh could not ask the engine for its
+     * session list (no live port, or the workspace pool is not built yet).
+     *
+     * Finding 11: this exists so an UNQUERIED list is never rendered as the
+     * explanatory "No chats yet" state. The sheet says the list is
+     * unavailable instead, and the flag clears on the next live query.
+     * It is ignored when [sessions] is non-empty - a cached list stays
+     * visible rather than being hidden by a stopped engine.
+     */
+    val sessionsUnavailable: Boolean = false,
     /** The session this chat is bound to. Survives re-attach via the session map. */
     val activeSessionId: String? = null,
     /**
@@ -1826,8 +1837,16 @@ class ChatViewModel(
             .getOrDefault(emptyList())
         if (list.isEmpty()) return null
 
-        // Publish the list so the drawer is populated before we pick.
-        _state.update { it.copy(sessions = list, sessionsLoading = false) }
+        // Publish the list so the drawer is populated before we pick. A live
+        // listing also clears Finding 11's unavailable state: the app HAS
+        // now asked the engine, so the list may be trusted again.
+        _state.update {
+            it.copy(
+                sessions = list,
+                sessionsLoading = false,
+                sessionsUnavailable = false
+            )
+        }
 
         // Batch G: a cold-boot DISPATCHED trace publishes its target session
         // BEFORE the binding lands; claim it here when this workspace really
@@ -2139,9 +2158,21 @@ class ChatViewModel(
      * which is the exact lie this project keeps hitting.
      */
     fun loadSessions() {
-        val mgr = workspaces ?: return
-        val p = port ?: return
-        _state.update { it.copy(sessionsLoading = true) }
+        val mgr = workspaces
+        val p = port
+        if (p == null || mgr == null) {
+            // Finding 11: settle the sheet in an HONEST unavailable state.
+            // The old early return left sessionsLoading=false and the list
+            // empty, so the sheet's empty branch claimed "No chats yet" for
+            // a workspace the app never asked about. The engine may simply
+            // be stopped (new chats start it on the first message) or the
+            // bootstrap may still be building the workspace pool.
+            _state.update {
+                it.copy(sessionsLoading = false, sessionsUnavailable = true)
+            }
+            return
+        }
+        _state.update { it.copy(sessionsLoading = true, sessionsUnavailable = false) }
         viewModelScope.launch {
             val ok = runCatching { mgr.reattachIfStale() }.getOrDefault(false)
             val ws = if (ok) mgr.currentWorkspaceId else null
@@ -2155,7 +2186,8 @@ class ChatViewModel(
             _state.update {
                 it.copy(
                     sessions = SessionList.sort(list),
-                    sessionsLoading = false
+                    sessionsLoading = false,
+                    sessionsUnavailable = false
                 )
             }
         }

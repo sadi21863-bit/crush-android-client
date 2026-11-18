@@ -14,7 +14,8 @@ import kotlinx.coroutines.withContext
  *
  * WHY: the embedded engine executes the project-root `crushrc` as a bash
  * script on EVERY workspace attach (S1b-measured: twice per attach cycle,
- * with the app's full UID). Consent for that is therefore a PER-CONTENT
+ * with the app's full UID), and Finding 10 proved it executes the dotted
+ * `.crushrc` the same way. Consent for that is therefore a PER-CONTENT
  * decision, and the F04 dialog must gate not just the interactive row tap
  * but also the cold `restoreLastBinding` path that previously called
  * `applyBinding(Project)` directly - a project whose crushrc was added or
@@ -50,11 +51,28 @@ class ProjectTrustService(
     private val stampNow: () -> Long = System::currentTimeMillis,
 ) {
 
-    // Trust-relevant file name: the ONE project-root file the pinned engine
-    // executes (S1b probe: `.crush.json`/`.crush/crush.json` did NOT execute
-    // in the paths probed - the shellconfig surface is `crushrc`).
+    // Trust-relevant file names: EVERY project-root file the pinned engine
+    // executes. S1b probed the plain `crushrc`; Finding 10 (2026-11-17) proved
+    // the SAME engine (v0.100.0) also executes the dotted `.crushrc` on
+    // attach, so a gate that probed only one name left the other ungated.
+    // `.crush.json`/`.crush/crush.json` did NOT execute in the paths probed.
     companion object {
+        /** The plain project-root config the engine executes. */
         const val CRUSHRC_FILE_NAME = "crushrc"
+
+        /**
+         * The dotted project-root config the engine ALSO executes (Finding 10
+         * device probe: a folder carrying only `.crushrc` ran it on bind with
+         * no consent). Hidden from most file pickers, so it must be gated.
+         */
+        const val CRUSHRC_DOTFILE_NAME = ".crushrc"
+
+        /** Canonical probe order; the composite digest encodes it too. */
+        internal val EXECUTABLE_CONFIG_NAMES =
+            listOf(CRUSHRC_FILE_NAME, CRUSHRC_DOTFILE_NAME)
+
+        /** Domain separator for the multi-file digest. */
+        private const val COMPOSITE_DOMAIN = "crush-mobile-trust-v2"
     }
 
     /**
@@ -149,24 +167,55 @@ class ProjectTrustService(
         }
 
     /**
-     * SHA-256 hex (lowercase) of the project folder's CURRENT crushrc bytes,
-     * or null when the folder carries none. Streams the file in 8 KiB chunks
-     * - a readBytes() on a planted multi-GB "crushrc" would be an OOM shaped
-     * like a security check failure.
+     * SHA-256 hex (lowercase) of the project folder's CURRENT executable
+     * config bytes, or null when the folder carries none.
+     *
+     * A folder with ONLY the plain `crushrc` keeps the exact single-file
+     * digest earlier records were written with, so upgrading does not
+     * invalidate existing consents for the common case. Any `.crushrc` -
+     * alone or beside the plain file - takes a COMPOSITE, name-bound digest
+     * over the whole present roster (names, declared sizes, bytes). That is
+     * what makes a byte-identical rename re-gate: the engine may execute
+     * either name, and a script can branch on its own path, so "same bytes"
+     * is not "same executed surface".
+     *
+     * Streams every file in 8 KiB chunks - a readBytes() on a planted
+     * multi-GB config would be an OOM shaped like a security check failure.
      */
     internal fun currentFingerprint(ref: ProjectRef): String? {
-        val file = File(ref.repoDir, CRUSHRC_FILE_NAME)
-        if (!file.isFile) return null
+        val present = EXECUTABLE_CONFIG_NAMES
+            .map { File(ref.repoDir, it) }
+            .filter { it.isFile }
+        if (present.isEmpty()) return null
+        if (present.size == 1 && present[0].name == CRUSHRC_FILE_NAME) {
+            return sha256Hex(present[0])
+        }
         val md = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { ins ->
-            val buf = ByteArray(8192)
-            var read = ins.read(buf)
-            while (read > 0) {
-                md.update(buf, 0, read)
-                read = ins.read(buf)
-            }
+        md.update("$COMPOSITE_DOMAIN\n".toByteArray(Charsets.UTF_8))
+        md.update(byteArrayOf(present.size.toByte()))
+        for (file in present) {
+            // Frame each entry with its name and declared size. The fixed
+            // probe order is part of the digest, so [plain, dotted] cannot
+            // collide with [dotted, plain] and the roster size is explicit.
+            md.update("${file.name}\n${file.length()}\n".toByteArray(Charsets.UTF_8))
+            file.inputStream().use { ins -> streamInto(md, ins) }
         }
         return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun sha256Hex(file: File): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { ins -> streamInto(md, ins) }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun streamInto(md: MessageDigest, ins: java.io.InputStream) {
+        val buf = ByteArray(8192)
+        var read = ins.read(buf)
+        while (read > 0) {
+            md.update(buf, 0, read)
+            read = ins.read(buf)
+        }
     }
 }
 

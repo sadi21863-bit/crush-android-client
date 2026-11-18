@@ -164,6 +164,16 @@ class ChatViewStateTest {
     }
 
     @Test
+    fun `the session list projects the unavailable query state`() {
+        // Finding 11: the sheet needs this fact to avoid rendering an
+        // unqueried empty list as "No chats yet".
+        val view = ChatUiState(sessionsUnavailable = true).toViewState(ChatHostInputs())
+        assertTrue(view.session.list.unavailable)
+        assertFalse(view.session.list.loading)
+        assertTrue(view.session.list.items.isEmpty())
+    }
+
+    @Test
     fun `session label follows the active title then falls back honestly`() {
         val active = ChatUiState(
             sessions = listOf(Session(id = "s1", title = "Plan chat")),

@@ -406,6 +406,7 @@ fun ChatContent(
             sessions = state.session.list.items,
             activeId = state.session.id,
             loading = state.session.list.loading,
+            unavailable = state.session.list.unavailable,
             surfaceLabel = state.session.surface,
             onPick = { id ->
                 showSessions = false
@@ -1208,6 +1209,7 @@ private fun SessionSheet(
     sessions: List<SessionItem>,
     activeId: String?,
     loading: Boolean,
+    unavailable: Boolean,
     surfaceLabel: String,
     onPick: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -1318,6 +1320,22 @@ private fun SessionSheet(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 16.dp)
+                )
+            } else if (unavailable && sessions.isEmpty()) {
+                // Finding 11: an empty list here is UNQUERIED, not empty. The
+                // engine is stopped (or still booting), so the app must not
+                // present "No chats yet" as a confirmed answer. A cached
+                // non-empty list skips this branch and stays visible.
+                Text(
+                    "Chats aren't available",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Text(
+                    "The engine isn't connected. Send a message to start it, " +
+                        "then reopen this sheet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else if (sessions.isEmpty()) {
                 // Say WHY it is empty. An unexplained empty list reads as data

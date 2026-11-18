@@ -261,13 +261,18 @@ internal object ChatFixtures {
         handoff: HandoffView = HandoffView(null, emptyList(), null, null),
         sessions: List<SessionItem> = emptyList(),
         sessionsLoading: Boolean = false,
+        sessionsUnavailable: Boolean = false,
         deleteError: String? = null,
     ): ChatViewState = ChatViewState(
         session = SessionView(
             id = sessionId,
             label = label,
             surface = surface,
-            list = SessionListView(loading = sessionsLoading, items = sessions),
+            list = SessionListView(
+                loading = sessionsLoading,
+                items = sessions,
+                unavailable = sessionsUnavailable,
+            ),
         ),
         binding = BindingView(kind = BindingKind.ChatPool, projectLabel = null),
         run = RunView(

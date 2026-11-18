@@ -1,0 +1,63 @@
+# Findings 10/11 + Phase 2b.2 device evidence (2026-11-18)
+# Device bbf8ca69, API 29, arm64-v8a, 1080x2340.
+# APK: versionName=1.0.0, installed 2026-11-18 00:23:40 host time.
+# Source: working tree with Findings 10/11 fixes and ProjectsContent extraction.
+# Device clock runs ahead of the host; host file times are canonical.
+
+## Finding 11 - stopped-engine sessions sheet (TestProject3)
+# Before: TestProject3 chat, engine stopped, workspace has two sessions.
+# Screenshot: f11b-stopped.png (sheet says "Chats aren't available").
+# One typed character started the engine; screenshot f11b-started.png,
+# then the reopened sheet (f11b-live-list.png) listed the two sessions.
+
+00:26:52.858 D/ChatViewModel: bindEngine state=Stopped instance=p5ab508c3
+00:26:52.890 I/Chat: prewarm off; supervisor deferred to first input for p5ab508c3
+00:27:51.696 I/EngineSupervisor: [p5ab508c3] start() activeJob=null
+00:27:51.699 D/EngineSupervisor: [p5ab508c3] starting attempt 1
+00:27:54.336 I/EngineSupervisor: [p5ab508c3] engine Running after 2637ms
+00:27:54.372 D/ChatViewModel: bootstrap instance=p5ab508c3 workspacePath=/storage/emulated/0/TestProject3
+
+## Finding 10 - dotted-only .crushrc trust gate (DottedTrust3)
+# Folder created with ONLY .crushrc (32 B):
+#   echo dotted-fixed > .dotmarker3
+# Import row before consent (projects.db):
+#   ('DottedTrust3', '/storage/emulated/0/DottedTrust3', None, None)
+# Before the first row tap, the folder contained only .crushrc:
+#   -rw-rw---- 1 root sdcard_rw 32 2026-11-18 00:10 .crushrc
+# Tap -> F04 dialog (f10-dotted-gate.png). No .dotmarker3 existed at this
+# point, proving the gate ran before any bind.
+# Cancel -> dialog closed; still no .dotmarker3 (f10-dotted-cancel.png).
+# Reopen -> Allow -> consent persisted; chat opened with engine still stopped
+# (f10-dotted-allowed-chat.png). The engine followed the first typed character:
+05:49:25.792 I/Lifecycle: stopping project engine for instance 'p5ab508c3' (no run in flight)
+05:49:26.291 D/ChatViewModel: bindEngine state=Stopped instance=p189601f3
+05:49:26.322 I/Chat: prewarm off; supervisor deferred to first input for p189601f3
+05:54:45.987 I/EngineSupervisor: [p189601f3] start() activeJob=null
+05:54:48.859 I/EngineSupervisor: [p189601f3] engine Running after 2870ms
+05:54:48.878 D/ChatViewModel: bootstrap instance=p189601f3 workspacePath=/storage/emulated/0/DottedTrust3
+
+## Trust record and digest after Allow
+# projects.db row:
+#   ('DottedTrust3', '9bc5fe2677170692d1ad708b01e6e9212a897d32afdc63d491e21d8c918eb78d', 1794961165733)
+# Pulled .crushrc was 32 bytes:
+#   plain SHA-256 = 2445e10676ee22914bbe5e2c40964aa756fdc6b6d8bf14bb860331d582865fc1
+# The recorded fingerprint is the composite, name-bound digest, NOT the plain
+# single-file hash - the dotted file is inside the gated surface.
+
+## Marker after the engine actually ran
+#   -rw-rw---- 1 root sdcard_rw 32 2026-11-18 00:10 .crushrc
+#   -rw-rw---- 1 root sdcard_rw 13 2026-11-18 05:54 .dotmarker3
+# Screenshot: f10-dotted-marker.png (chat ready, marker present).
+
+## Phase 2b.2 - Projects surface
+# Screenshot projects-top.png is the top of the list; compare against the 2b.1
+# baseline f26-after-projects.png:
+#   band y=100..620  changed pixels: 0
+#   band y=620..1200 changed pixels: 0
+# The header/import block and the first two project rows are pixel-identical.
+# Later rows differ because the registry now carries F14Fresh/F14Fresh2 and
+# DottedTrust3 (content delta, not layout).
+# Remove dialog on DottedTrust3: projects-remove-dialog.png; Cancel left the
+# row and the folder untouched: projects-remove-cancelled.png.
+# Row open -> chat -> system Back exited to launcher (flow 26 single-entry
+# invariant): f26-post2b2-open.png, resumed activity com.miui.home.

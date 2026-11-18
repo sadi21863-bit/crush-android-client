@@ -260,7 +260,7 @@ mirrored locally with their full reasoning in the plan doc
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 code/test-complete and committed 2026-11-16** (ChatContent extraction + T2B1-01…04 + owner-authorized post-review fixes for flow 23/11). Targeted chat package 27 suites / 256 tests green; four-task gate green (789 tests / 86 suites, 0 failures; lint 0 errors / 1 standing warning). Device after-walk PARTIAL: Set A 10/10 (9 PASS + `a02` PARTIAL), Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 2/11/16/22/23 re-walked PASS on the post-review APK, flows 18/19/20/28 owner-performed PASS, and Prewarm restored Off. Finding 10 (dotted `.crushrc` executes outside the gate) is pinned, not fixed; the 2026-11-17 retries of flows 27/14 changed no row and added Finding 11 (the sessions sheet claims `No chats yet` while the engine is stopped even when the workspace has sessions). Both findings are deferred to a later fix batch by owner decision 2026-11-17. Record: `docs/parity/2026-11-15-c4-baseline/after-2b1/MANIFEST.md`. Batch records: §5.1 (2a), §5.2 (2b.1), §5.3 (post-review fixes) |
+| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1 complete; Findings 10/11 fixed; Phase 2b.2 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Finding 10 (dotted `.crushrc` outside the gate) and Finding 11 (stopped-engine false empty sessions sheet) are fixed in §5.4 after the owner reversed the same-day deferral. Phase 2b.2 extracts `ProjectsContent` + `ProjectsContentTest` (§5.5). Targeted evidence: 25 trust + 14 session-sheet + 10 projection + 11 Projects = 60 tests, 0 failures / 0 errors. Full four-task gate green: 812 tests / 87 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning (22m09s). Device re-walk PASS: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind and `.dotmarker3` appears only after consent + engine start; Projects top bands are pixel-identical to the 2b.1 baseline, remove dialog/cancel PASS, flow 26 open/back PASS. Batch records: §5.1 (2a), §5.2 (2b.1), §5.3 (post-review fixes), §5.4 (findings), §5.5 (2b.2). Device record: `after-2b2/MANIFEST.md`. |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
@@ -431,10 +431,9 @@ The Compose/Robolectric harness change is test-scoped (`app/build.gradle.kts`:
 
 **Pinned pre-existing defects (not fixed in 2b.1)**
 
-Owner decision 2026-11-17: Findings 10 and 11 (the dotted `.crushrc` execution
-outside the trust gate, and the stopped-engine false empty sessions sheet) are
-accepted as known defects and deferred to a later fix batch. They stay pinned
-and are not fixed in 2b.1.
+Findings 10 and 11 were pinned after the 2b.1 walk, then the owner reversed the
+same-day deferral and asked for both fixes. They are fixed in §5.4 and are no
+longer pinned.
 
 - Flow 13: session delete dispatches immediately; the sheet's confirmation
   dialog is unreachable (`ChatContentSheetsTest` pins the immediate delete).
@@ -446,24 +445,10 @@ and are not fixed in 2b.1.
   roles' text full-width, so position does not distinguish them either.
   T2B1-01 pins the assistant-only actions row instead.
 - A blank catalogue model name falls back to the id via 2a's `displayName`.
-- The S-02 trust gate fingerprints `crushrc` only, but the engine also
-  executes a dotted `.crushrc`. A folder carrying only the dotted file gates
-  as "no config", records a no-crushrc consent, and then runs the file
-  unconsented on attach. Device probe 2026-11-16 22:18: `TestProject3` with a
-  30-byte `.crushrc` produced `.dotmarker` on bind (Finding 10 in the
-  MANIFEST; `f19-dotmarker.txt`). Security-relevant, pre-existing, and pinned;
-  **owner decision 2026-11-17: fix later** (gate both file names, or constrain
-  the engine); not changed in 2b.1.
-- The sessions sheet renders the explanatory `No chats yet` while the engine
-  is stopped, even when the workspace has sessions. `loadSessions()` returns
-  at `port ?: return` before setting `sessionsLoading`, so the loading branch
-  cannot render. Observed 2026-11-17 on `TestProject3` (Finding 11): the
-  engine-stopped sheet showed the empty state immediately, then listed two
-  21h-old sessions once the first keystroke started that workspace's engine.
-  Pre-existing, not a 2b.1 regression; pinned; **owner decision 2026-11-17:
-  fix later**; not changed in 2b.1.
 - Flow 23 and flow 11 were the two after-walk FAILs. Both were fixed after the
   walk under an owner-authorized deviation; see §5.3.
+- Findings 10 (dotted `.crushrc` outside the gate) and 11 (stopped-engine
+  false empty sheet) are no longer in this list: both are fixed in §5.4.
 
 **Not performed**
 
@@ -476,7 +461,7 @@ and are not fixed in 2b.1.
   not reproducible. Flow 4's fault injection was attempted and blocked by
   SELinux (see §5.3). The 2026-11-17 retries of flows 27 and 14 changed no row:
   a confirmed Stop raises no snackbar by design, and the engine-stopped sheet
-  demonstrated Finding 11 instead of the loading state.
+  demonstrated Finding 11 (fixed in §5.4) instead of the loading state.
 - `a02` is PARTIAL: component styling matches, but the persisted session grew
   and the captured scroll position differs, so only `a01` has exact pixel
   parity.
@@ -594,7 +579,8 @@ Fix:
   recorded)`; the owner tapped Allow, which recorded the file fingerprint
   (`1712a7a6...`) and dispatched to session `d59579a4`
   (`f19-consent-dialog.log.txt`, `f19-trace-row.txt`,
-  `f19-after-allow.png`). The dotted-file execution is Finding 10, pinned.
+  `f19-after-allow.png`). The dotted-file execution is Finding 10, fixed in
+  §5.4.
 - 2026-11-17 retries (no row change):
   - Flow 27: a Stop on a live 3000-word turn truncated the reply and restored
     the send arrow with no snackbar (`f27-stop-live.png`,
@@ -644,6 +630,139 @@ Fix:
 authorized by the owner after the partial after-walk was rejected. It does not
 change the `ChatContent` signature or introduce new screen surfaces; the only
 visible change is the corrected prewarm/New-chat state.
+
+### 5.4 Findings 10/11 fix (working tree, 2026-11-17/18)
+
+The owner reversed the 2026-11-17 deferral and asked for both findings to be
+fixed before continuing Phase 2.
+
+**Finding 10 - the dotted `.crushrc` was outside the trust gate**
+
+- `ProjectTrustService` now probes BOTH project-root names the pinned engine
+  executes: `crushrc` and `.crushrc`.
+- A folder carrying only the plain `crushrc` keeps the legacy single-file
+  SHA-256, so every consent recorded before this fix stays valid - the upgrade
+  does not force a re-consent for the common case.
+- Any state involving `.crushrc` (alone or beside the plain file) uses a
+  composite, NAME-BOUND digest: a domain tag, the roster size, and each
+  present file's name + declared size + bytes in canonical order. A
+  byte-identical rename from `crushrc` to `.crushrc` therefore re-gates,
+  because a shell script can branch on its own invocation path even when the
+  bytes are identical. Adding, changing, or removing either file moves the
+  fingerprint.
+- `confirmAtGate` still persists only the gate-observed state; its
+  appeared/changed/removed outcomes now cover the dotted file as well.
+- The F04 dialog keeps the measured A05 copy. "crushrc" there is the config
+  class name and covers `.crushrc`; no security claim was weakened.
+- Tests: `ProjectTrustServiceTest` 16 -> 25. New rows cover dotted-only first
+  consent and Allow, name distinction for identical bytes, pre-fix plain
+  consent compatibility, adding/renaming/both-file/removal transitions, and
+  a dotted file appearing inside the gate->record window.
+
+**Finding 11 - the sessions sheet claimed `No chats yet` without asking**
+
+- `ChatUiState.sessionsUnavailable` and `SessionListView.unavailable` carry
+  the new fact to the sheet.
+- `loadSessions()` no longer returns silently when `port` (or the workspace
+  pool) is absent. It settles `sessionsLoading = false,
+  sessionsUnavailable = true`, so the sheet can tell the truth: the list was
+  never queried.
+- An empty, unavailable list renders `Chats aren't available` plus
+  `The engine isn't connected. Send a message to start it, then reopen this
+  sheet.` instead of `No chats yet`. A cached NON-empty list still renders
+  normally, and the next live listing clears the flag.
+- The genuine empty state is preserved: a live engine that answers with an
+  empty list still renders `No chats yet / Start one and it will appear here.`
+- Tests: `ChatContentSheetsTest` 12 -> 14 (unavailable copy, cached-list
+  precedence) and `ChatViewStateTest` 9 -> 10 (projection).
+
+**Gate evidence**
+
+- Targeted: 25 trust + 14 session-sheet + 10 projection + 11 Projects = 60
+  tests, 0 failures / 0 errors.
+- Full four-task gate: `:app:testDebugUnitTest :app:assembleDebug
+  :app:assembleDebugAndroidTest :app:lintRelease` -> BUILD SUCCESSFUL in
+  22m09s; 812 tests / 87 suites, 0 failures / 0 errors; lint 0 errors /
+  1 standing warning (`NotShrinkingResources`).
+
+**Device evidence (2026-11-18, post-fix APK)**
+
+- Finding 11 PASS: `TestProject3` had two sessions and a stopped engine; its
+  sheet rendered `Chats aren't available` / `The engine isn't connected. Send
+  a message to start it, then reopen this sheet.` and no `No chats yet`
+  (`f11b-stopped.png`). One typed character started the engine; the reopened
+  sheet listed the 8-message session and `chat` (`f11b-started.png`,
+  `f11b-live-list.png`).
+- Finding 10 PASS: a fresh `DottedTrust3` folder carrying ONLY `.crushrc`
+  raised F04 before any bind and had no marker at that moment
+  (`f10-dotted-gate.png`). Cancel left no marker (`f10-dotted-cancel.png`).
+  Allow recorded the composite fingerprint `9bc5fe26...` (plain SHA-256 of
+  the same 32 bytes is `2445e106...`), and `.dotmarker3` appeared only after
+  the first typed character started the engine (`f10-dotted-allowed-chat.png`,
+  `f10-dotted-marker.png`).
+- Record: `docs/parity/2026-11-15-c4-baseline/after-2b2/MANIFEST.md` and
+  `findings-2b2.log.txt`.
+
+**Not changed**
+
+- Reason/log wording still says "crushrc" for both names. That is the config
+  class the gate and the measured dialog already name; the dotted file is a
+  crushrc-class config. A dotted-specific note is security-copy polish, not a
+  gate gap.
+
+### 5.5 V2 Phase 2b.2 batch record (working tree, 2026-11-18)
+
+Design source: same Rev 3.1 brief, §§5.6, 6.5 and the 2b.1 extraction rules.
+
+**Production (3 changed, 2 new; one new content layer)**
+
+- New `ProjectsContent.kt`: the host-free Projects render tree - top bar,
+  import button/copy, import and registry errors, loading/empty/list branches,
+  project rows, the named remove confirmation, and the shared trust dialog.
+  Local view state (the pending-remove row) stays `remember`-scoped here.
+- New `ProjectsViewState.kt`: `ProjectsUiState` (projects, loading, busy,
+  error) lifted out of the ViewModel so the content imports no Android/
+  ViewModel type.
+- `ProjectsScreen.kt` rewritten as the host: ViewModel/state collection,
+  `filesDir`-derived `legacyPath`/`internalRoot`, the SAF/storage/All-files
+  launchers and their rationale, row-open routing (legacy vs gated), and the
+  trust/remove callbacks. Its public signature is unchanged.
+- `ProjectsViewModel.kt`: state flow retyped to `ProjectsUiState`; no behavior
+  change.
+
+**Tests (`ProjectsContentTest`, 11)**
+
+- Empty registry explanation; loading copy; busy import disable; registry +
+  import errors; populated rows (label/path/environment); legacy row opens but
+  has no Remove; imported-row remove is named, confirmed, cancel-safe, and
+  fires once; internal-project copy names the workspace tree it deletes; busy
+  disables the remove confirm; import/back callbacks; shared trust dialog
+  confirm-once.
+- Targeted: 11 tests / 0 failures / 0 errors.
+
+**Deviations and scope notes**
+
+- The plan's Projects coverage list names a "current marker". The as-built
+  surface has none, and §4.7.2 assigns that target to the Phase 7 redesign.
+  2b.2 is an extraction, so the suite pins the actual surface and does not
+  invent the marker.
+- Import permission flows stay host-owned (they launch system UI); the content
+  receives only the decoded path result/error and the current state.
+
+**Gate and device evidence**
+
+- Full four-task gate: BUILD SUCCESSFUL in 22m09s; 812 tests / 87 suites,
+  0 failures / 0 errors; lint 0 errors / 1 standing warning.
+- Device parity (2026-11-18): the extracted screen's top band (header,
+  Import folder, explanatory copy) and the first two project rows are
+  **pixel-identical** to the 2b.1 baseline `f26-after-projects.png` (0 changed
+  pixels in y=100..1200; lower rows differ only because the registry gained
+  F14Fresh/F14Fresh2/DottedTrust3). The remove dialog names the folder and
+  cancel leaves it untouched; opening a row replaces the stack and Back exits
+  to the launcher (flow 26). Record:
+  `docs/parity/2026-11-15-c4-baseline/after-2b2/MANIFEST.md`.
+- Not claimed: full-screen pixel parity (registry content changed), the
+  destructive Remove tap (owner scope), and API 30+/AFA/wide layouts.
 
 ## 6. Upstream filings
 

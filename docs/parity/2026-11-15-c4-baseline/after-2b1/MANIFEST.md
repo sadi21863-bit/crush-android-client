@@ -63,12 +63,12 @@ difference only). a01 is the one exact pixel-parity proof.
 | 11 | New chat | PASS (post-fix) | `f11-postfix-sheet.png`, `f11-postfix-new-chat.png`, `f11-postfix-minted.png`; project -> sheet New chat gave `New chat` / `Chat - no tools - engine stopped` with an empty transcript; typing started the pool engine and minted session `57d2acca` with no project bleed. Log: `f11-postfix.log.txt`. The pre-fix cross-binding is `f11-after-project-new-chat.png`. |
 | 12 | Session open | PASS | Session sheet picks opened the selected session; project reopen restored `Reply Exactly OK`. |
 | 13 | Session delete | NOT PERFORMED | Destructive, so not re-run; the baseline FAIL (immediate delete) and T2B1-03's pin remain the evidence. |
-| 14 | Session empty/loading | NOT PERFORMED | `Loading chats...` is the `loading && sessions.isEmpty()` branch; it sits in a sub-second window between bootstrap and the first list. A cold start with the engine stopped instead rendered the explanatory `No chats yet` state immediately. Retried 2026-11-17 on the engine-stopped TestProject3 chat: a ~25 fps screen recording (`f14-stopped-sheet.mp4`) caught the sheet's first visible slide frame already showing `No chats yet / Start one and it will appear here.` (`f14-stopped-empty.png`, `f14-sheet-push-frame.png`); no `Loading chats...` frame exists in the recording. After the first keystroke started that workspace's engine, the same sheet listed two 21h-old sessions (`f14-warm-list.png`), so the workspace was never empty. The loading branch was not observable; the false empty state is Finding 11. Retried again on the genuinely fresh `F14Fresh2` import (2026-11-17 20:53): the sheet was opened while its engine was live but still `connecting to agent`, and the first visible sheet frame already carried `Project - F14Fresh2` with the full `No chats yet / Start one and it will appear here.` copy (`f14b-fresh-empty.png`, `f14b-fresh-slide.png`); the app created that workspace's first session only afterwards (`no prior session with content; creating one`, 20:53:50; `f14b-fresh-workspace.log.txt`). So the explanatory empty state is correct on a fresh workspace once the engine can answer, and Finding 11 is specifically the stopped-engine early return. The `Loading chats...` copy still never rendered in the 151-frame ~9.5 fps recording (`f14b-fresh-workspace.mp4`), which includes a ~50 fps burst through the sheet animation; the local listSessions round trip completes before the first sheet frame. The loading half remains unobserved, so the row stays NOT PERFORMED. |
+| 14 | Session empty/loading | NOT PERFORMED | `Loading chats...` is the `loading && sessions.isEmpty()` branch; it sits in a sub-second window between bootstrap and the first list. A cold start with the engine stopped instead rendered the explanatory `No chats yet` state immediately. Retried 2026-11-17 on the engine-stopped TestProject3 chat: a ~25 fps screen recording (`f14-stopped-sheet.mp4`) caught the sheet's first visible slide frame already showing `No chats yet / Start one and it will appear here.` (`f14-stopped-empty.png`, `f14-sheet-push-frame.png`); no `Loading chats...` frame exists in the recording. After the first keystroke started that workspace's engine, the same sheet listed two 21h-old sessions (`f14-warm-list.png`), so the workspace was never empty. The loading branch was not observable; the false empty state was Finding 11 (fixed 2026-11-18). Retried again on the genuinely fresh `F14Fresh2` import (2026-11-17 20:53): the sheet was opened while its engine was live but still `connecting to agent`, and the first visible sheet frame already carried `Project - F14Fresh2` with the full `No chats yet / Start one and it will appear here.` copy (`f14b-fresh-empty.png`, `f14b-fresh-slide.png`); the app created that workspace's first session only afterwards (`no prior session with content; creating one`, 20:53:50; `f14b-fresh-workspace.log.txt`). So the explanatory empty state is correct on a fresh workspace once the engine can answer, and Finding 11 is specifically the stopped-engine early return. The `Loading chats...` copy still never rendered in the 151-frame ~9.5 fps recording (`f14b-fresh-workspace.mp4`), which includes a ~50 fps burst through the sheet animation; the local listSessions round trip completes before the first sheet frame. The loading half remains unobserved, so the row stays NOT PERFORMED. |
 | 15 | Model pick | PASS | `f15-after-model-pick.png`, `f15-model-restored.png`; chip changed to `deepseek-v4-pro` and back to `deepseek-v4.1-flash`. |
 | 16 | Model error | PASS (post-fix) | `f16-offline-model-sheet-postfix.png`; airplane mode on, model sheet opened: `UnknownHostException: Unable to resolve host "opencode.ai": No address associated with hostname` rendered in red in-sheet, list not blank. Airplane mode restored off (`airplane_mode_on=0`). |
 | 17 | Handoff chip | PASS | `a08-after-handoff-sheet.png`; sheet opened with prefill and destinations. |
 | 18 | Handoff confirm - same destination | PASS (owner-performed) | `f18-handoff-sheet-open.png`, `f18-after-dispatch.png`, `f18-f20-handoff.log.txt`; the owner selected `Legacy workspace` (already consented), scrolled, and tapped Confirm: `handoff 4b301e82... APPROVED` -> `DISPATCHED; target session dd947578...`, no trust dialog. Source chat session `4475a1d3`; the dispatched target session is `dd947578`. |
-| 19 | Handoff confirm — new destination | PASS (owner-performed) | `f19-restage-sheet-open.png`, `f19-consent-dialog.log.txt`, `f19-trace-row.txt`, `f19-after-allow.png`. Source session `c22de7a3` (TestProject3); the owner selected a different project, `Test project folder 2`, and tapped Confirm. The gate blocked with `handoff blocked: consent required (crushrc present, no consent recorded)` (22:23:24), which raised the trust dialog; the owner tapped Allow (22:23:27). The Allow recorded `trust_fingerprint=1712a7a6...` (SHA-256 of the 17-byte `crushrc`) and the dispatch completed to session `d59579a4...` (22:23:33). First attempt was void staging: the destination carried only `.crushrc`, which the gate does not probe, so it allowed without a dialog (`f19-first-attempt-*`); see Finding 10. |
+| 19 | Handoff confirm — new destination | PASS (owner-performed) | `f19-restage-sheet-open.png`, `f19-consent-dialog.log.txt`, `f19-trace-row.txt`, `f19-after-allow.png`. Source session `c22de7a3` (TestProject3); the owner selected a different project, `Test project folder 2`, and tapped Confirm. The gate blocked with `handoff blocked: consent required (crushrc present, no consent recorded)` (22:23:24), which raised the trust dialog; the owner tapped Allow (22:23:27). The Allow recorded `trust_fingerprint=1712a7a6...` (SHA-256 of the 17-byte `crushrc`) and the dispatch completed to session `d59579a4...` (22:23:33). First attempt was void staging: the destination carried only `.crushrc`, which the gate does not probe, so it allowed without a dialog (`f19-first-attempt-*`); see Finding 10 (fixed 2026-11-18). |
 | 20 | Handoff discard | PASS (owner-performed) | `f20-after-discard.png`, `f20-discard.log.txt`, `f20-trace-row.txt`. Staging: airplane mode on, owner selected `Test project folder 2` and tapped Confirm; the bind could not bootstrap offline, so the row stayed APPROVED (`handoff ac185118... APPROVED`, `bootstrap wait failed`), giving a resumable row. The owner then reopened the sheet, which rendered `Discard this handoff`, and tapped it: `handoff ac185118... DISCARDED: the trace row is ABANDONED`. Pulled row: `status=ABANDONED`, `targetCodeSessionId=null` (no dispatch); the late dispatch wait timed out at 20:50:10 with no DISPATCHED stamp. Note: on a fresh draft the sheet has no Discard by design (nothing written); see Finding 9. |
 | 21 | Handoff resume | PASS | `f21-after-continue-in-code-plus5s.png`, `f21-after-continue-retry.png`; resume bar visible, Continue in Code jumped to the target `Handoff fingerprint` session and the bar disappeared. |
 | 22 | Prewarm ON | PASS (post-fix) | `f22-prewarm-on3.png`; cold start logged `starting supervisor for instance 'chat' (prewarm on)` and `[chat] engine Running after 3068ms` (`f22-prewarm-on.log.txt`). Restored to Off 2026-11-16 18:54 (`f22-prewarm-restored-off.png`); the next cold start logged `prewarm off; supervisor deferred to first input for chat`, so the persisted setting is Off again. |
@@ -158,12 +158,15 @@ and left the counts unchanged; flow 14's retry produced Finding 11.
     content, and the dispatched code session's tree walk independently
     flagged the side effect. The S1b probe established `crushrc` execution
     but did not test the dotted discovery path documented as priority 1.
-    This is pre-existing S-02 scope, not a 2b.1 regression. Pinned for an
-    owner decision - the gate must fingerprint every file the engine may
-    execute, or the engine must be proven not to read `.crushrc`; not fixed
-    here. **Owner decision (2026-11-17): fix later** - the finding stays open
-    for a later batch. Evidence: `f19-dotmarker.txt`,
-    `f19-first-attempt.log.txt`.
+    This is pre-existing S-02 scope, not a 2b.1 regression. **FIXED 2026-11-18**
+    (owner reversed the same-day deferral): `ProjectTrustService` now probes
+    both names, keeps the legacy single-file digest for a plain-only folder,
+    and uses a name-bound composite digest whenever `.crushrc` is present, so
+    adding, renaming, changing, or removing either file re-gates. Tests:
+    `ProjectTrustServiceTest` 16 -> 25, all green. Device re-proof PASSED on
+    2026-11-18 (`../after-2b2/f10-dotted-gate.png`,
+    `../after-2b2/f10-dotted-marker.png`); see status doc §5.4. Original
+    evidence: `f19-dotmarker.txt`, `f19-first-attempt.log.txt`.
 11. **The sessions sheet reports `No chats yet` while the engine is stopped,
     even when the workspace has sessions (flow-14 retry, 2026-11-17).** The
     TestProject3 chat after a prewarm-off start sat on `New chat` /
@@ -179,9 +182,14 @@ and left the counts unchanged; flow 14's retry produced Finding 11.
     asked the engine. A fresh-workspace retry (`F14Fresh2`, 2026-11-17 20:53)
     rendered the same empty copy correctly once the engine was live, so the
     defect is the early return, not the copy (`f14b-fresh-empty.png`).
-    Pre-existing, not a 2b.1 regression; pinned, not fixed. **Owner decision
-    (2026-11-17): fix later** - kept open for a later batch.
-    Evidence: `f14-stopped-empty.png`, `f14-sheet-push-frame.png`,
+    Pre-existing, not a 2b.1 regression. **FIXED 2026-11-18** (owner reversed
+    the same-day deferral): `sessionsUnavailable` now distinguishes an
+    unqueried list, and the sheet renders `Chats aren't available` instead of
+    `No chats yet`; a live empty listing still renders the genuine empty copy.
+    Tests: `ChatContentSheetsTest` 12 -> 14 and `ChatViewStateTest` 9 -> 10,
+    all green. Device re-proof PASSED on 2026-11-18
+    (`../after-2b2/f11b-stopped.png`, `../after-2b2/f11b-live-list.png`); see
+    status doc §5.4. Evidence: `f14-stopped-empty.png`, `f14-sheet-push-frame.png`,
     `f14-warm-list.png`, `f14-stopped-sheet.mp4`,
     `f14-stopped-empty.log.txt`.
 
@@ -262,13 +270,14 @@ instead of pinning them.
   `libcrush.so` under SELinux, so a plain Stop took the confirmed path. The
   2026-11-17 retries showed the same for flow 27's stop notice (a confirmed
   Stop raises no snackbar by design) and flow 14's loading branch (the
-  engine-stopped sheet goes straight to a false empty state, Finding 11).
-  Flow 28 is owner-performed: the owner entered the lock credential; no
-  credential was entered by the agent.
-- Finding 10 is a pinned security gap, not a passing flow: the gate
-  fingerprints `crushrc`, but the engine also executes a dotted `.crushrc`,
-  so a dotted-only folder is trusted as no-config. It needs an owner decision
-  (gate both names, or constrain the engine); 2b.1 leaves it unchanged.
+  engine-stopped sheet went straight to a false empty state, Finding 11, now
+  fixed). Flow 28 is owner-performed: the owner entered the lock credential;
+  no credential was entered by the agent.
+- Finding 10 was a pinned security gap, not a passing flow: the gate
+  fingerprinted `crushrc` only, while the engine also executes a dotted
+  `.crushrc`, so a dotted-only folder was trusted as no-config. It was fixed
+  on 2026-11-18 (both names gated); the device rows above are the pre-fix
+  evidence.
 - The pre-fix flow 23/11 findings are retained above as the before/after
   contrast; the post-review rows are the current result.
 - This record and the Phase 2a + 2b.1 tree it covers are committed together

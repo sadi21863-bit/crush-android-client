@@ -35,15 +35,8 @@ class ProjectsViewModel(
     private val container: AppContainer,
 ) : ViewModel() {
 
-    data class UiState(
-        val projects: List<ProjectRef> = emptyList(),
-        val loading: Boolean = true,
-        val busy: Boolean = false,
-        val error: String? = null,
-    )
-
-    private val _state = MutableStateFlow(UiState())
-    val state: StateFlow<UiState> = _state.asStateFlow()
+    private val _state = MutableStateFlow(ProjectsUiState())
+    val state: StateFlow<ProjectsUiState> = _state.asStateFlow()
 
     init {
         // The ADR's additive-migration invariant, exercised on entry: the

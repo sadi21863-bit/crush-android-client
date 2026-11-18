@@ -39,7 +39,9 @@ fun SettingsScreen(
     SettingsContent(
         state = SettingsViewState(
             settings = settings,
-            providers = Providers.ALL,
+            // Only providers tested on this build (plus any slot already in the
+            // vault, so a credential is never stranded behind a hidden row).
+            providers = Providers.offerable(uiState.vaultIds + settings.providerId),
             selectedProvider = provider,
             vaultIds = uiState.vaultIds,
             error = uiState.error,

@@ -127,11 +127,13 @@ fun SettingsContent(
             // encouraged exactly that.
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    // ALL (2026-10-31): the "Zen is dead" report was verified
-                    // false against official sources; every curated id stays
-                    // offered, and there is no silent default - the resolver
-                    // falls back to Zen for boot continuity only, and
-                    // onboarding/Settings always require an explicit choice.
+                    // The OFFER LIST (2026-11-18): only providers tested on
+                    // this build, plus any slot already in the vault - a
+                    // configured credential must stay selectable. The full
+                    // curated table remains in Providers.ALL for resolution, so
+                    // hiding a row never strands a persisted setting. There is
+                    // still no silent default: the resolver falls back to Zen
+                    // for boot continuity only, and the user picks explicitly.
                     state.providers.forEach { p ->
                         val selected = p.id == provider.id
                         Row(

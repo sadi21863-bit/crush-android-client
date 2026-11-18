@@ -20,6 +20,7 @@ import com.crush.mobile.engine.EnginePaths
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.engine.EngineSupervisor
 import com.crush.mobile.data.crush.ConnectionRegistry
+import com.crush.mobile.ui.LaunchRouteState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,6 +66,17 @@ class AppContainer(context: Context) {
      * could be forgotten within seconds - see [LockState].
      */
     val lockState: LockState = LockState()
+
+    /**
+     * The launch destination decision (Finding 12, 2026-11-18).
+     *
+     * Process-scoped for the same reason as [lockState]: Android recreates the
+     * Activity around credential-screen closure, and re-deciding the route would
+     * rebuild the NavHost around a different start destination - discarding the
+     * restored back stack. The DECISION is made once; everything after it is
+     * explicit navigation.
+     */
+    val launchRoute: LaunchRouteState = LaunchRouteState()
 
     private val settingsDataStore = SettingsDataStore(appContext, keySession)
 

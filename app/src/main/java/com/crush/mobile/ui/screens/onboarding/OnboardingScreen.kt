@@ -45,7 +45,9 @@ fun OnboardingScreen(
 
     OnboardingContent(
         state = OnboardingViewState(
-            providers = Providers.ALL,
+            // Tested providers only: an untested row would take a first-run user
+            // through key setup before discovering it does not work.
+            providers = Providers.AVAILABLE,
             selectedProvider = provider,
         ),
         onSelectProvider = { providerId = it },

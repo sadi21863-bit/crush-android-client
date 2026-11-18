@@ -95,12 +95,47 @@ class ProvidersTest {
     }
 
     @Test
-    fun `an unverified provider is not advertised as known`() {
-        // opencode-go came from Crush's own provider list, but no handshake has
-        // completed against it. Labelling it available would take the user
-        // through key setup before telling them it does not work.
-        val go = Providers.byId("opencode-go")!!
-        assertFalse("no key has completed a handshake against it", go.isKnown)
+    fun `opencode-go is known after the device-proven promotion`() {
+        // 2026-11-18: the owner's Go key runs against this build on device
+        // (engine 0.99.0) - chat boots straight to the bound workspace and
+        // turns stream. The old `false` described the pre-promotion build.
+        assertTrue("device-proven on engine 0.99.0", Providers.byId("opencode-go")!!.isKnown)
+    }
+
+    @Test
+    fun `the pickers offer only providers tested on this build`() {
+        // 2026-11-18 directive: the UI must not advertise an integration that
+        // has never completed a handshake - the user would pay the key-setup
+        // cost before finding out. isKnown is the gate; hidden rows stay in ALL
+        // so a persisted id still resolves and boots.
+        assertEquals(
+            listOf("opencode-zen", "openrouter", "opencode-go", "groq"),
+            Providers.AVAILABLE.map { it.id }
+        )
+        assertTrue(Providers.AVAILABLE.all { it.isKnown })
+        listOf(
+            "hyper", "cerebras", "deepseek", "openai", "anthropic",
+            "gemini", "vertexai", "xai", "copilot"
+        ).forEach { id ->
+            assertFalse(
+                "$id is untested and must stay hidden from pickers",
+                Providers.AVAILABLE.any { it.id == id }
+            )
+        }
+    }
+
+    @Test
+    fun `an untested provider with a stored key stays offerable`() {
+        // Hiding a row the user already configured would let one switch away
+        // strand that credential with no way back. Settings passes the vault
+        // ids (and the selected id); onboarding passes none.
+        assertTrue(Providers.offerable(emptySet()).none { it.id == "hyper" })
+        assertTrue(Providers.offerable(setOf("hyper")).any { it.id == "hyper" })
+        assertEquals(
+            "an unknown extra id must change nothing",
+            Providers.AVAILABLE.map { it.id },
+            Providers.offerable(setOf("nothing-stored")).map { it.id }
+        )
     }
 
     @Test

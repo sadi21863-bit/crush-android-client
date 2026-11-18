@@ -29,7 +29,16 @@ sealed class Screen(val route: String) {
 @Composable
 fun NavGraph(
     navController: NavHostController,
-    hasApiKey: Boolean,
+    /**
+     * Where this graph starts.
+     *
+     * DECIDED ONCE BY THE HOST at launch ([com.crush.mobile.ui.LaunchRouteState]),
+     * never derived from live settings: changing it rebuilds the NavHost and
+     * discards the back stack (Finding 12 - a provider switch in Settings used
+     * to eject the user to Onboarding). Everything after launch is explicit
+     * navigation between these routes.
+     */
+    startDestination: String,
     /**
      * True while the lock overlay demands authentication.
      *
@@ -39,7 +48,6 @@ fun NavGraph(
      * decrypts the key - so without this the lock was purely cosmetic.
      */
     isLocked: Boolean = false,
-    startDestination: String = if (hasApiKey) Screen.Chat.route else Screen.Onboarding.route
 ) {
     NavHost(
         navController = navController,

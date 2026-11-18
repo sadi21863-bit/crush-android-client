@@ -50,6 +50,10 @@ data class Provider(
      * Conservative on purpose. A row labelled available that 500s on first use is
      * worse than one labelled unverified, because the user has already paid the
      * key-setup cost before finding out.
+     *
+     * This is ALSO the picker gate: [Providers.AVAILABLE] offers only these rows
+     * (plus any provider the user already configured), so a row added from
+     * Catwalk stays invisible until someone flips this with evidence.
      */
     val isKnown: Boolean,
     /** Where the user obtains a key. Shown in Settings so the flow is clear. */
@@ -67,7 +71,8 @@ data class Provider(
      * rebranded "Console" and Go added as a subscription tier — see
      * docs/providers/opencode-zen.md), so no row is inactive today, and
      * `Providers.DEFAULT` stays the first row. The mechanism stays for a real
-     * future sunset.
+     * future sunset. (Independently of this flag, [Providers.AVAILABLE] offers
+     * only rows with a completed handshake - see [isKnown].)
      */
     val isActive: Boolean = true,
     /**
@@ -156,8 +161,9 @@ object Providers {
      * that matter to someone without a budget, and every extra row is a chance to
      * offer an id this engine's pinned Catwalk does not recognise.
      *
-     * Ids are verbatim from Catwalk. [isKnown] is true only for the one that has
-     * actually completed a handshake on a device.
+     * Ids are verbatim from Catwalk. [isKnown] is true only for rows that have
+     * actually completed a handshake on a device; the pickers offer ONLY those
+     * (see [AVAILABLE]), so the untested rows below stay resolvable but hidden.
      */
     val ALL: List<Provider> = listOf(
         Provider(
@@ -227,7 +233,13 @@ object Providers {
         Provider(
             id = "opencode-go",
             displayName = "OpenCode Go",
-            isKnown = false,
+            // 2026-11-18: promoted to known. The id was device-proven in the
+            // v099-experiment lane on engine 0.99.0 (see the promotion note
+            // below), and it is the provider persisted on the owner's device.
+            // The earlier `false` was stale, not conservative - and since the
+            // pickers now gate on isKnown, leaving it false would have hidden
+            // the app's own working provider.
+            isKnown = true,
             keyHint = "opencode.ai/go",
             // 2026-11-01 PROMOTION (from the v099-experiment lane, device-
             // proven): the earlier "cannot fetch a catalogue" stance is
@@ -355,6 +367,28 @@ object Providers {
 
     fun byId(id: String?): Provider? =
         ALL.firstOrNull { it.id == id }
+
+    /**
+     * The rows the PICKERS offer (the onboarding dropdown, the Settings radios).
+     *
+     * Only providers with a handshake on this build are offered by default: an
+     * untested row would take the user through key setup before discovering it
+     * does not work. Hidden is not deleted - [ALL], [byId] and [resolve] keep
+     * every curated id, so settings persisted before a row was hidden still boot.
+     *
+     * [extraIds] keeps an ALREADY-CONFIGURED slot visible. Settings passes the
+     * vault's ids (and the selected id) here: hiding a provider the user has
+     * stored a key for would let a switch away strand that credential with no
+     * way back to it.
+     */
+    fun offerable(extraIds: Collection<String> = emptySet()): List<Provider> =
+        ALL.filter { it.isKnown || it.id in extraIds }
+
+    /**
+     * What a picker offers with no configured slots to preserve - onboarding's
+     * floor. Settings uses [offerable] with its vault ids instead.
+     */
+    val AVAILABLE: List<Provider> = offerable()
 
     /**
      * Resolves a stored id, falling back to [DEFAULT].

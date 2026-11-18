@@ -21,18 +21,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
-import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.engine.EngineCompatibility
 import com.crush.mobile.ui.CrushrcTrustDialog
 import com.crush.mobile.ui.crushrcTrustNote
 import com.crush.mobile.ui.navigation.NavGraph
+import com.crush.mobile.ui.navigation.Screen
 import com.crush.mobile.ui.screens.lock.LockOverlay
 import com.crush.mobile.ui.AppLockPolicy
 import com.crush.mobile.ui.StartRoute
@@ -189,33 +188,44 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         checkEngineCompatibility()
 
         setContent {
-            val settings by container.settingsRepository.settings.collectAsState(
-                initial = AppSettings()
+            // Nullable initial ON PURPOSE. `AppSettings()` names the RESOLVER
+            // default provider, while the persisted id may be a different one
+            // (the owner runs `opencode-go`); deciding the launch route against
+            // that placeholder is the same mirror-vs-persisted race that
+            // produced "no API key" for an intact key (2026-10-20). Wait for the
+            // first PERSISTED snapshot instead.
+            val settingsOrNull by container.settingsRepository.settings.collectAsState(
+                initial = null
             )
 
-            CrushMobileTheme(themeMode = settings.themeMode) {
+            CrushMobileTheme(themeMode = settingsOrNull?.themeMode ?: "system") {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    val settings = settingsOrNull
+                    if (settings == null) {
+                        // A DataStore read, usually a frame or two. Rendering a
+                        // route before it lands would decide - and PIN - the
+                        // wrong start destination.
+                        return@Surface
+                    }
+
                     // One store instance for the whole Activity.
                     val store = this.store
                     val navController = rememberNavController()
 
-                    // Routing keys off ciphertext presence alone. The key is no
-                    // longer auth-gated, so reading it cannot fail for want of a
-                    // prompt - there is exactly one reason to be here: either a
-                    // key is stored or one is not. Reading it before the user
-                    // unlocks would defeat the app lock, so we deliberately do not.
-                    //
-                    // Scoped to the SELECTED provider, and recomputed when it
-                    // changes: on this screen the question is "can the chat for
-                    // this provider start?", not "is any credential stored?" -
-                    // the latter would route a user with only a Zen key into a
-                    // chat that then reports "no API key" for Hyper.
-                    val hasApiKey = remember(store, settings.providerId) {
+                    // Finding 12 (2026-11-18): the start destination is a LAUNCH
+                    // decision, pinned for the process by LaunchRouteState. It
+                    // used to be derived from `settings.providerId`, so selecting
+                    // a provider with no stored key in Settings rebuilt the
+                    // NavHost and discarded the Settings stack. A settings write
+                    // may change the NEXT launch; it may not re-route this one.
+                    val startWithChat = container.launchRoute.startWithChat {
                         store.hasStoredCiphertext(settings.providerId)
                     }
+                    val startDestination =
+                        if (startWithChat) Screen.Chat.route else Screen.Onboarding.route
 
                     Box(Modifier.fillMaxSize()) {
                         // NavGraph is the ONLY thing that reaches ChatScreen,
@@ -232,7 +242,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                         } else {
                             NavGraph(
                                 navController = navController,
-                                hasApiKey = hasApiKey,
+                                startDestination = startDestination,
                                 // The chat tree must know the gate is closed, not
                                 // just render behind the overlay.
                                 isLocked = gateState.value == AppLockPolicy.Gate.PROMPT

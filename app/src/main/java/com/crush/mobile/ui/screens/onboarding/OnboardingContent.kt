@@ -144,9 +144,10 @@ fun OnboardingContent(
                 expanded = providerMenuOpen,
                 onDismissRequest = { providerMenuOpen = false }
             ) {
-                // ALL (2026-10-31): nothing is inactive - the "Zen is dead"
-                // report was verified false against official sources, and the
-                // registry keeps explicit user choice over auto-defaults.
+                // The offered set is Providers.AVAILABLE - providers tested on
+                // this build only (2026-11-18). Untested ids remain resolvable
+                // in Providers.ALL, but a first-run user is never sent through
+                // key setup for an integration nobody has verified.
                 state.providers.forEach { p ->
                     DropdownMenuItem(
                         text = {

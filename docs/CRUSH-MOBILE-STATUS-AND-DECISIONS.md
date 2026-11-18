@@ -260,7 +260,7 @@ mirrored locally with their full reasoning in the plan doc
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1–2b.5 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Findings 10/11 fixed in §5.4. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests), §5.8 Onboarding (`OnboardingContent` + 10 tests, T2B5-01). Full four-task gate green: 844 tests / 90 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind; Projects top bands pixel-identical, remove dialog/cancel PASS, flow 26 PASS; Review empty content pixel-identical, flow 24 Back PASS (populated card not performed); Settings pixel-identical to `f25-after-settings.png`, Back returns to the same chat with 0 changed pixels; Onboarding pixel-identical (old vs extracted), provider menu open/dismiss PASS. **Finding 12 (new, pre-existing):** selecting a key-less provider in Settings resets the root to Onboarding via the `hasApiKey`/`startDestination` recompute; owner provider restored through a verified DataStore rewrite, no credential touched. Device records: `after-2b2`, `after-2b3`, `after-2b4`, `after-2b5`. |
+| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1–2b.5 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Findings 10/11 fixed in §5.4. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests), §5.8 Onboarding (`OnboardingContent` + 10 tests, T2B5-01), §5.9 Finding 12 fix + provider offer list (`LaunchRouteState` + 4 tests, `ProvidersTest` +3). Full four-task gate green (2026-11-18, incl. §5.9): 850 tests / 91 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind; Projects top bands pixel-identical, remove dialog/cancel PASS, flow 26 PASS; Review empty content pixel-identical, flow 24 Back PASS (populated card not performed); Settings pixel-identical to `f25-after-settings.png`, Back returns to the same chat with 0 changed pixels; Onboarding pixel-identical (old vs extracted), provider menu open/dismiss PASS. **Finding 12 FIXED in §5.9:** the launch route is pinned per process by `LaunchRouteState`, `NavGraph` takes a `startDestination` instead of deriving one from live settings, and settings are awaited before the graph composes - selecting a key-less provider now keeps the user in Settings. §5.9 also trims every picker to tested providers (`Providers.AVAILABLE`: Zen, OpenRouter, OpenCode Go, Groq; Settings additionally keeps any row with a stored key so a credential is never stranded); hidden ids stay resolvable. **Device-verified 2026-11-18** (`after-f12/MANIFEST.md`): tapping key-less OpenCode Zen stays in Settings, provider restored through the UI, Back returns to the same chat. Owner provider was restored through a verified DataStore rewrite, no credential touched. Device records: `after-2b2`, `after-2b3`, `after-2b4`, `after-2b5`, `after-f12`. |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
@@ -874,10 +874,18 @@ Design source: same Rev 3.1 brief, §§5.6, 6.5 and the 2b.1 extraction rules.
   Reproduced on device: Settings `06` -> Onboarding `07`. The Settings
   content still dispatches `onSelectProvider(id)` exactly as before the
   split, so the extraction did not cause it; do not fix it inside an
-  extraction batch. The owner's `provider_id` was restored to
+  extraction batch. Fixed in §5.9 (2026-11-18): the launch route is now
+  pinned per process and `NavGraph` no longer derives a start destination
+  from live settings. The owner's `provider_id` was restored to
   `opencode-go` by rewriting the DataStore preferences protobuf with the app
   force-stopped (host/device md5 matched); no credential file was read or
   modified. Evidence: `docs/parity/2026-11-15-c4-baseline/after-2b4/MANIFEST.md`.
+  **Re-verified on the post-fix build** (`after-f12/04-zen-selected.png`): the
+  same tap now stays in Settings.
+- **Finding 13 (new, copy-only, open, 2026-11-18):** Settings' API card reads
+  "Add a OpenCode Zen key to start chatting." - wrong article before a vowel.
+  Observed at `after-f12/04-zen-selected.png`; owner chose to record rather
+  than rebuild. Suggested: "Add a key for OpenCode Zen to start chatting."
 - Theme/keyboard/permission/tuning/About rows were not re-driven on device;
   their render and dispatch are pinned by `SettingsContentTest`.
 
@@ -963,6 +971,103 @@ Design source: same Rev 3.1 brief, §§5.6, 6.5, 4.7.7 and the 2b.1 extraction r
   the host reports `true`.
 - `SettingsViewModel` remains the onboarding host ViewModel; no new
   ViewModel or repository was added.
+
+### 5.9 Finding 12 fix + provider offer list (2026-11-18)
+
+Owner directives: fix Finding 12, and hide every provider the build has not
+tested from the UI.
+
+**Finding 12 - the root no longer re-routes on a provider switch**
+
+- New `LaunchRouteState` (`ui/LaunchRouteState.kt`): the launch decision
+  (chat vs onboarding) is taken ONCE per process and memoised. A probe that
+  throws is not memoised, so an unreadable vault cannot pin a route.
+  `AppContainer.launchRoute` holds it, following the `LockState` precedent:
+  Android recreates the Activity around credential-screen closure, and a
+  re-decided route would rebuild the NavHost around a different start
+  destination and discard the restored back stack.
+- `MainActivity` now collects settings with a NULLABLE initial value and
+  waits for the first persisted snapshot before composing the graph. The old
+  `initial = AppSettings()` named the resolver default provider while the
+  real id was still in flight - the same mirror-vs-persisted race as the
+  2026-10-20 "no API key" bug.
+- `NavGraph` takes `startDestination` instead of `hasApiKey`; the old default
+  derived it from live settings, so any provider write could change it.
+  Explicit navigation after launch (onboarding -> chat, Projects row open)
+  is unchanged.
+
+Behaviour now: selecting a provider with no stored key keeps the user in
+Settings, where the API card targets that provider and a key can be pasted.
+A cold start with no key for the selected provider still lands on
+Onboarding; a key saved later is reached through the existing explicit
+navigate.
+
+**Provider offer list - untested integrations are hidden**
+
+- `Providers.offerable(extraIds)` returns `ALL.filter { isKnown || id in
+  extraIds }`; `Providers.AVAILABLE` is the no-extras floor.
+- Onboarding offers `AVAILABLE`. Settings offers
+  `offerable(vaultIds + selectedProviderId)`: a credential already stored,
+  or the provider the screen is currently configuring, can never be
+  stranded behind a hidden row.
+- `opencode-go` is now `isKnown = true`: the id was device-proven in the
+  v099-experiment lane on engine 0.99.0, and it is the provider persisted on
+  the owner's device. The old `false` was stale, not conservative - and once
+  the pickers gate on `isKnown`, leaving it false would have hidden the
+  provider the app actually runs.
+- Offered today: OpenCode Zen, OpenRouter, OpenCode Go, Groq. Hidden but
+  still resolvable, so a persisted id keeps booting: Hyper, Cerebras,
+  DeepSeek, OpenAI, Anthropic, Google Gemini, Vertex AI, xAI, GitHub
+  Copilot.
+- Groq stays offered because it has completed handshakes on this build. It
+  is NOT a viable free-tier target (8K TPM caps every agent shape - see
+  docs/providers/groq.md); a paid Groq key is unaffected.
+
+**Tests**
+
+- `LaunchRouteStateTest` (4): the first decision is pinned across a vault
+  change; onboarding pin; the vault is consulted exactly once; a failed
+  probe is not pinned.
+- `ProvidersTest` (+3): `opencode-go` is known; the pickers offer exactly
+  the four tested ids in `ALL` order; a stored-key extra stays offerable
+  and an unknown extra changes nothing.
+
+**Gate evidence**
+
+- Full four-task gate (`:app:testDebugUnitTest :app:assembleDebug
+  :app:assembleDebugAndroidTest :app:lintRelease`, log
+  `run-f12-gate.log`): **BUILD SUCCESSFUL in 20m 24s** - 850 tests / 91
+  suites, 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 standing
+  warning (`NotShrinkingResources`). Net +6 tests and +1 suite over the
+  2b.5 gate (844/90).
+
+**Device evidence** (`docs/parity/2026-11-15-c4-baseline/after-f12/`,
+device `bbf8ca69`, API 29, owner unlock entered by the owner)
+
+- Settings offered **Zen, Hyper, OpenRouter, Go, Groq**. The four tested rows
+  plus Hyper, which holds a stored key - the deliberate exception (hiding a
+  configured credential would strand it); it keeps its "unverified on this
+  build" note. Onboarding has no vault extras and so offers only the four
+  (unit-pinned; a device check needs a data wipe).
+- **Finding 12 fixed on device:** tapping key-less OpenCode Zen left the user
+  IN Settings - radio moved, API card switched to "No API key stored". Under
+  2b.4 the same tap replaced Settings with Onboarding
+  (`after-2b4/07-settings-groq-selected.png`).
+- Restored OpenCode Go **through the UI** (no DataStore rewrite needed now);
+  `settings.preferences_pb` contains `opencode-go` only; Back returned to the
+  same chat, which re-bootstrapped to `ready` on `deepseek-v4.1-flash`.
+- True cold start (process verified dead, pid changed): logcat
+  `gate=PROMPT coldStart=true … verified=false`, system biometric dialog
+  auto-opened; route is chat for a stored key (captured at launch). Pixels for
+  post-pause states are unavailable on this ROM - the paused app sets
+  FLAG_SECURE and screencap returns 0 bytes.
+- Methodology correction recorded: an earlier pair of captures labelled
+  "coldstart" were an Activity recreation in the SAME pid (`am force-stop` had
+  not taken effect). They were renamed rather than deleted; they now serve as
+  evidence that a recreation preserves the route and the unlock.
+- Observed, not fixed (owner's call): the API card reads "Add a OpenCode Zen
+  key to start chatting." - wrong article; suggested "Add a key for OpenCode
+  Zen to start chatting."
 
 ## 6. Upstream filings
 

@@ -147,10 +147,10 @@ Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21
 
 That was 15 red classes and 743 tests run / 15 failed on every push from
 2026-11-17 until the workflow was pinned to **Temurin 21** (bytecode target
-unchanged at 17). Lesson recorded because it generalises: a runtime parameter
-that differs between CI and the dev box (JDK, SDK, OS) can make CI the only
-place a green-looking suite fails — check the CI runtime first when local
-passes and CI does not.
+unchanged at 17). Verified green on run `44375409230` (2m37s). Lesson recorded
+because it generalises: a runtime parameter that differs between CI and the
+dev box (JDK, SDK, OS) can make CI the only place a green-looking suite fails
+— check the CI runtime first when local passes and CI does not.
 
 ## Regression gate after any toolchain change
 

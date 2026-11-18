@@ -75,8 +75,11 @@ sandbox: Android SDK 36 requires Java 21 (have Java 17)
 CI pinned Temurin **17**; the local build runtime is JBR **25**, which is why
 the suite looked green at every local gate. Robolectric 4.17 enforces a Java
 21 floor for API 36 sandboxes. Fixed by pinning Temurin **21** in
-`.github/workflows/android-ci.yml` (bytecode target stays 17). No product code
-and no test changed: the suites were never broken, CI's runtime was.
+`.github/workflows/android-ci.yml` (bytecode target stays 17). Verified on
+run `44375409230`: **BUILD SUCCESSFUL in 2m37s**, all gate tasks green,
+provenance manifest `sha256 acc56c6f…` for the engine-less gate APK. No
+product code and no test changed: the suites were never broken, CI's runtime
+was.
 
 Three green full-gate runs on 2026-11-02, machine-local PowerShell tees
 (`gate-zen-copy.txt` 47m57s, `gate-egress2.txt` 32m36s, `gate-sync.txt`

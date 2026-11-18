@@ -46,11 +46,17 @@ jobs:
       - name: Make the Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Set up JDK 17 (Temurin)
+      - name: Set up JDK 21 (Temurin)
+        # JDK 21, NOT 17 (2026-11-19). Robolectric 4.17 refuses to build an
+        # API 36 sandbox below Java 21: every Compose/Robolectric class fails
+        # with "Failed to create a Robolectric sandbox: Android SDK 36
+        # requires Java 21 (have Java 17)". That went green locally because the
+        # developer runtime is JBR 25, so CI was the only place the floor bit.
+        # 21 is the LTS floor; the bytecode target stays 17.
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Set up the Android SDK
         # The newer ubuntu runner images no longer ship a preinstalled

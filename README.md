@@ -60,7 +60,7 @@ The engine binary is **not committed** (95 MB; see [Fetching the engine](#fetchi
 # 1. Fetch the engine binary (~95 MB once; defaults to the pinned v0.100.0)
 ./tools/fetch-crush.ps1
 
-# 2. Build (JDK 17+ required for CLI builds)
+# 2. Build (JDK 21+ required: Robolectric 4.17 needs 21 for API 36; CI runs Temurin 21, the dev build uses JBR 25)
 ./gradlew :app:assembleDebug
 
 # 3. Install on a physical arm64 device

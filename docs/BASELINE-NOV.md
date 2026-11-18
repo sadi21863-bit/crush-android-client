@@ -61,6 +61,23 @@ message). CI checkouts build **without the embedded engine** (gitignored), so
 CI proves compile + JVM suites + lint + androidTest-compile only; runtime
 facts need real arm64 hardware (A — by construction).
 
+**2026-11-19 correction — "CI is green" above was stale.** Runs
+`44122639435` (2026-11-17) through `44369648536` (2026-11-18) all failed. The
+last genuine success is `43592540842` (2026-11-14), which predates the
+Compose/Robolectric UI suites, so those classes had **never** passed in CI —
+only locally. Every failure was one message, identical in all 15 red classes:
+
+```
+java.lang.UnsupportedOperationException: Failed to create a Robolectric
+sandbox: Android SDK 36 requires Java 21 (have Java 17)
+```
+
+CI pinned Temurin **17**; the local build runtime is JBR **25**, which is why
+the suite looked green at every local gate. Robolectric 4.17 enforces a Java
+21 floor for API 36 sandboxes. Fixed by pinning Temurin **21** in
+`.github/workflows/android-ci.yml` (bytecode target stays 17). No product code
+and no test changed: the suites were never broken, CI's runtime was.
+
 Three green full-gate runs on 2026-11-02, machine-local PowerShell tees
 (`gate-zen-copy.txt` 47m57s, `gate-egress2.txt` 32m36s, `gate-sync.txt`
 26m11s; each transcript ends `BUILD SUCCESSFUL`). What each compiled, read

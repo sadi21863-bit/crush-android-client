@@ -131,6 +131,27 @@ Kotlin can emit up to `JVM_26`, but raising this would shrink device support for
 **zero** build-speed gain. Verified empirically: moving the build JDK 17 -> 25
 produced a *faster* warm build (1m46s) with no bytecode change.
 
+## JDK floor for the test runtime: 21 (CI fix, 2026-11-19)
+
+The build JDK is not the only JDK constraint. **Robolectric 4.17 refuses to
+create an API 36 sandbox below Java 21.** CI pinned Temurin 17 while the dev
+machine runs JBR 25, so every Compose/Robolectric class passed locally and
+failed in CI with:
+
+```
+Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21
+(have Java 17)
+    at org.robolectric.plugins.DefaultSdkProvider$DefaultSdk.verifySupportedSdk
+    (DefaultSdkProvider.java:174)
+```
+
+That was 15 red classes and 743 tests run / 15 failed on every push from
+2026-11-17 until the workflow was pinned to **Temurin 21** (bytecode target
+unchanged at 17). Lesson recorded because it generalises: a runtime parameter
+that differs between CI and the dev box (JDK, SDK, OS) can make CI the only
+place a green-looking suite fails — check the CI runtime first when local
+passes and CI does not.
+
 ## Regression gate after any toolchain change
 
 ```powershell

@@ -16,6 +16,7 @@ the owner's trims.
 | `V2-0-baseline-lock-2026-11-19.md` | locked SHA/toolchain/source inventory, parity ledger re-read, device limits, research log |
 | `V2-0-reconciliation.md` | line-by-line reconciliation of the Rev 3.1 brief against the locked tree (task 4) |
 | `ADR-REGISTER.md` | accepted, open and parked V2 decisions |
+| `../parity/2026-11-19-v2-0-baseline/MANIFEST.md` | fresh task-6 phone capture set: device/build, 15 captures, findings F-A to F-G, corrections C1 to C3 |
 
 ## Scope
 
@@ -31,7 +32,7 @@ the owner's trims.
 
 | Package | Status | Entry condition |
 |---|---|---|
-| V2-0 | in progress | reconciliation sign-off by owner |
+| V2-0 | in progress | reconciliation sign-off by owner; task 6 evidence landed |
 | V2-1 | not started | V2-0 exit + owner approval of visual direction |
 | V2-2 | not started | V2-1 approved spec |
 | V2-3 | not started | V2-2 components |

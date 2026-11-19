@@ -55,23 +55,23 @@ Three gaps are visible in shipped surfaces and are not just "V2 polish":
 | 4.2 P1 permanent chrome <=56dp | PARTIAL | M3 `TopAppBar` in `ChatContent.kt`; no bottom bar exists |
 | 4.2 P2 real state or nothing | CODE | `ChatViewState.kt` projection |
 | 4.4/4.5 palette, spacing, shape, type, motion tokens | NOT DONE | `ui/theme/` has raw colors + type only; no token layer |
-| 4.6 three primary destinations | PARTIAL | 3 destinations exist; **no shell component** (`NavigationBar`/`Rail`/`Suite` absent from source) |
+| 4.6 three primary destinations | PARTIAL | 3 destinations exist; **no shell component** (`NavigationBar`/`Rail`/`Suite` absent from source). Device 2026-11-19: all three are sheet entries (`01-sessions-sheet-unavailable.png`) |
 | 4.6 Review/Diagnostics pushed, Lock overlay | CODE | `NavGraph.kt`; `LockOverlay.kt` |
 | 4.6 project row -> Chat replace + singleTop | CODE + DEVICE | `NavGraph.kt:96-105`; flow 26 PASS in `after-2b1` |
 | 4.6 Onboarding inclusive pop | CODE | `NavGraph.kt:56-63` |
 | 4.7.1 content tree | CODE + TEST | `ChatContent.kt:59`; `ChatScreen.kt:198-241`; T2B1-01/02/03 |
-| 4.7.1 top bar (truthful phase, no project chip) | CODE | `ChatContent.kt:106-118` |
+| 4.7.1 top bar (truthful phase, no project chip) | PARTIAL | `ChatContent.kt:106-118` renders a phase, but on 2026-11-19 it read `connecting to agent` for ~18 minutes while `bindEngine state=Stopped` and no engine process existed (`11-chat-empty-stale-phase.png`). A phase must come from the same snapshot as the binding |
 | 4.7.1 transcript rules + near-bottom guard | CODE | `ChatContent.kt:73-78,229-263` |
 | 4.7.1 tool rows, 3 decisions, dismiss-deny, composer gates | CODE + TEST | `ChatContent.kt`; `ChatGateTest`; T2A-02 |
 | 4.7.2 import-only, legacy openable, named Remove | CODE + TEST (+ device trust gate in `after-2b2`) | `ProjectsContent.kt`; `ProjectsContentTest` 11 |
-| 4.7.2 "Current" reflects `activeBinding` | NOT DONE | no current/active marker in `ProjectsContent.kt` or `ProjectsViewState.kt`; `activeBinding` not read |
+| 4.7.2 "Current" reflects `activeBinding` | NOT DONE | no current/active marker in `ProjectsContent.kt` or `ProjectsViewState.kt`; `activeBinding` not read. Device 2026-11-19: `DottedTrust3` is named as the active binding in the sessions sheet yet styled identically in Projects (`08-projects-lower.png`) |
 | 4.7.3 Review newest-first, cap, per-file revert, byte-exact export | CODE + TEST | `ReviewHistory.kt`, `ReviewContent.kt`; `ReviewHistoryTest` 14, `ReviewContentTest` 10 |
 | 4.7.4 Settings rows, no dead switches | CODE + TEST | `SettingsContent.kt`; `SettingsContentTest` 10 |
-| 4.7.4 About: version, build, engine pinned, contract | PARTIAL | About shows "Version 1.0.0" only (`SettingsContent.kt:381`) |
-| 4.7.5 Models sheet: name/id/free/selection/loading/error | PARTIAL | sheet CODE; `modelsError` exists, **no loading state**; free marker uses catalogue `isFree` in the sheet |
+| 4.7.4 About: version, build, engine pinned, contract | PARTIAL | About shows "Version 1.0.0" only (`SettingsContent.kt:381`); device 2026-11-19 `04-settings-performance-about.png` |
+| 4.7.5 Models sheet: name/id/free/selection/loading/error | PARTIAL | sheet CODE; `modelsError` exists, **no loading state**; free marker uses catalogue `isFree` in the sheet. Device 2026-11-19: subtitle says "OpenCode Zen" while Settings selects Go, and free-named rows show no badge (`02-settings-top.png`, `10-model-sheet.png`, `10b-model-sheet-lower.png`) |
 | 4.7.5 "not in current list" marker | NOT DONE | `presentInCatalogue` is declared/projected but never rendered |
 | 4.7.5 delete dead `Screen.Models` | NOT DONE | `NavGraph.kt:16`; 7 routes declared, 6 composables |
-| 4.7.6 Diagnostics groups + redaction | PARTIAL | `DiagnosticsScreen.kt`, `DiagnosticsReport.kt`; no pinned version/contract; no report-level redaction test |
+| 4.7.6 Diagnostics groups + redaction | PARTIAL | `DiagnosticsScreen.kt`, `DiagnosticsReport.kt`; no pinned version/contract; no report-level redaction test; device 2026-11-19 `05-diagnostics-status.png` reports only file installed / stopped / not checked |
 | 4.7.7 onboarding saves without implying validation | CODE + TEST | `OnboardingScreen.kt:56-60`; `OnboardingContentTest` 10 |
 | 4.7.8 lock policy, chat refuses bootstrap | CODE + TEST | `AppLockPolicy.kt`; `ChatViewModel` "bootstrap refused: locked"; `AppLockPolicyTest` 16, `LockStateTest` 9 |
 | 4.8 accessibility | PARTIAL | semantics and 48dp assertions exist; no 1.3x/2.0x or focus-audit evidence found |
@@ -221,7 +221,7 @@ Gaps that need a V2 work package:
 | Package | Gap |
 |---|---|
 | V2-3 | delete `Screen.Models`; build the 3-destination shell and breakpoints (no bar exists today); add `T3-01` |
-| V2-4 | Models-sheet loading state + "not in current list" marker; Projects "Current" marker from `activeBinding`; performance proof; resolve the second engine-state source before redesign |
+| V2-4 | Models-sheet loading state + "not in current list" marker; Projects "Current" marker from `activeBinding`; performance proof; resolve the second engine-state source before redesign; make the header phase derive from the same snapshot as the binding (F-E stale `connecting to agent`) |
 | V2-6 | Diagnostics pinned engine version + contract level; report-level redaction/tail test; About build/engine/contract; Finding 13 copy |
 | Test debt | container-level `applyBinding`/`bindingSnapshot` test; automated screenshot suite; instrumentation additions; `T6-01`/`T6-02` |
 
@@ -229,7 +229,8 @@ Gaps that need a V2 work package:
 
 V2-0 task 4 is complete: every brief area has a status and an evidence
 pointer, and the four earlier corrections are resolved (brief length,
-2b.4 parity, O11 harness, TOCTOU wording). Task 6 (fresh screenshots)
-remains NOT PERFORMED because no device was attached. Owner acceptance of
-this ledger is the remaining V2-0 exit step. No implementation is
-authorized by this document.
+2b.4 parity, O11 harness, TOCTOU wording). Task 6 landed later on
+2026-11-19 as `docs/parity/2026-11-19-v2-0-baseline/` (15 captures), which
+confirmed F-A, F-B and F-D on-device and added F-E, the stale header phase.
+Owner acceptance of this ledger is the remaining V2-0 exit step. No
+implementation is authorized by this document.

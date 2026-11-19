@@ -25,7 +25,7 @@ brief and it does not authorize implementation.
 | `origin/main` | same SHA at lock time |
 | CI | run `44542121606` at `3457a8b`, success; V2-0 docs runs green, one transient SDK-download failure rerun to green (section 1.1, section 7) |
 | Last local full gate | `run-f12-gate.log`, 2026-11-18 23:30, BUILD SUCCESSFUL 20m 24s |
-| Device | `bbf8ca69` **not connected at lock time** |
+| Device | `bbf8ca69` **not connected at lock time**; connected later the same day for the task-6 capture set |
 | Engine of record | Crush v0.100.0, contracts 0.99.0 (v0.99/v0.100 wire families) |
 
 `git diff 1c902eb..3457a8b` changes no `app/` source: it is the CI workflow,
@@ -227,10 +227,19 @@ Cannot be validated on this device, and must not be claimed:
 - Instrumentation suite execution (compiled only in CI).
 
 Existing capture set under `docs/parity/2026-11-15-c4-baseline/` is the
-phone baseline of record. **Fresh V2-0 screenshots were NOT PERFORMED on
-2026-11-19 because no device was attached.** Capture protocol when it is:
-full-resolution `screencap`, pull as file (never `adb exec-out > file` on
-this host), record device/API/build/engine, scale rendered->real about 1.17.
+parity baseline of record. The fresh V2-0 set is
+`docs/parity/2026-11-19-v2-0-baseline/` (15 captures, 22:00-22:30 on
+`bbf8ca69`), with `MANIFEST.md` recording device/build/engine, the capture
+method, seven findings (F-A to F-G) and three corrections (C1 to C3).
+Two corrections matter beyond this run: a screencap taken while a system
+credential window is up shows the app *beneath* it, so it cannot prove the
+absence of a lock prompt; and the cold start **did** prompt exactly once
+(`gate=PROMPT coldStart=true` -> credential result -> `freshUnlock=true`),
+with the credential entered on the device by the owner.
+
+Capture protocol remains: full-resolution `screencap`, pull as a file
+(never `adb exec-out > file` on this host), record device/API/build/engine,
+and scale rendered->real about 1.17 for coordinate work.
 
 ## 7. Gate and CI evidence
 
@@ -272,14 +281,16 @@ Compose-first V2-1 prototype.
 | 3 | Source inventory | DONE | section 4 |
 | 4 | Reconcile Rev 3.1 line by line | DONE (owner sign-off pending) | `V2-0-reconciliation.md` |
 | 5 | T3/A2UI/json-render/CopilotKit/adaptive research | DONE as reference refresh | section 8; no adoption |
-| 6 | Fresh phone screenshots + unsupported form factors | NOT PERFORMED (no device) / list DONE | section 6 |
+| 6 | Fresh phone screenshots + unsupported form factors | DONE for phone captures / list DONE; unsupported form factors remain unprovable on this device | `docs/parity/2026-11-19-v2-0-baseline/` |
 | 7 | ADR register for open owner decisions | DONE | `ADR-REGISTER.md` |
 
 Exit criteria: "no unresolved disagreement about what is already
 implemented" and "every V2 requirement has a source reference and an evidence
-label". Task 4 landed as `V2-0-reconciliation.md`; owner acceptance of that
-ledger is the remaining exit step. Task 6 stays NOT PERFORMED until a device
-is attached. V2-0 still requires owner acknowledgement before V2-1 work.
+label". Task 4 landed as `V2-0-reconciliation.md`; task 6 landed as
+`docs/parity/2026-11-19-v2-0-baseline/` once the device was attached. Owner
+acceptance of the reconciliation ledger is the remaining exit step; the
+unsupported form factors stay unprovable on this device. V2-0 still requires
+owner acknowledgement before V2-1 work.
 
 ## 10. Boundary
 

@@ -1211,7 +1211,11 @@ changed. No V2 implementation is authorized.
 
 **V2-0 (started 2026-11-19).** Baseline lock, source inventory, ADR
 register and the Rev 3.1 reconciliation live in `docs/v2/`; planning only,
-no implementation and no source change.
+no implementation and no source change. Task 6 phone evidence landed the
+same day in `docs/parity/2026-11-19-v2-0-baseline/` (15 captures): it
+confirmed the missing Current marker, the stale/mislabelled Models sheet
+and the missing engine version/contract on-device, and added F-E, a header
+phase that read `connecting to agent` while no engine process existed.
 
 ## 6. Upstream filings
 

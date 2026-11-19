@@ -98,8 +98,8 @@ The user bubble paints `primaryContainer` while `MarkdownText` defaulted to
 
 | Test | What it pins | Status |
 |---|---|---|
-| `CrushTokensTest` (JVM) | text/accent/status/diff/container contrast floors, scheme-role mapping, type scale, spacing monotonicity, 48dp targets, diff-colour theme selection | TEST: passed in gate attempts 2 and 3 |
-| `CrushComponentsTest` (Robolectric) | status label words, chip has no click action, 48dp icon/primary buttons, empty-state action, banner text, theme provider reaches composition | TEST: passed in gate attempts 2 and 3 (7 tests) |
+| `CrushTokensTest` (JVM) | text/accent/status/diff/container contrast floors, scheme-role mapping, type scale, spacing monotonicity, 48dp targets, diff-colour theme selection | TEST: passed in gate attempts 2-4 |
+| `CrushComponentsTest` (Robolectric) | status label words, chip has no click action, 48dp icon/primary buttons, empty-state action, banner text, theme provider reaches composition | TEST: passed in gate attempts 2-4 (7 tests) |
 
 ## 4. Gate
 

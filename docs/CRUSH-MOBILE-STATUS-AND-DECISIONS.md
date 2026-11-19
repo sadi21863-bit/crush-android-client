@@ -1122,6 +1122,21 @@ authorizes no implementation.
 3. **Finding 13 copy is folded into V2-6** (copy only; the owner already
    declined a standalone rebuild).
 
+**Package-level trims (the revision text itself is unchanged)**
+
+| Package | Status | Applied trim |
+|---|---|---|
+| V2-0 | ACTIVE | Baseline re-lock at `1679f25`; O11 is a harness task; no implementation. |
+| V2-1 | ACTIVE | Prototype within brief §4.6; no drawer-vs-tabs reopen. |
+| V2-2 | ACTIVE | Tokens/components; density is a rendering check, not a user preference. |
+| V2-3 | ACTIVE | 3 destinations; delete the dead `Screen.Models`; no 4th Code destination. |
+| V2-4 | ACTIVE | Drop pinned/follow (task 4) and cost/context (task 7); keep empty state, transcript, composer, session sheet, picker and actions. |
+| V2-5 | ACTIVE | Code is project-bound; phone-first; tablet panes only after phone acceptance. |
+| V2-6 | ACTIVE | Finding 13 copy; no new density/nav/response-rendering preferences; preserve Diagnostics; provider round-trip. |
+| V2-7 | PARKED | Deterministic intelligent UI; separate approval. |
+| V2-8 | PARKED | Structured model UI; separate approval. |
+| V2-9 | PARKED | Release/rollout; Gate 7 remains deferred. |
+
 **Corrections to Revision 4.0 (recorded here; the revision file is not edited)**
 
 1. §1.3/O13: the November 14 Rev 3.1 brief is on disk - 996 lines,

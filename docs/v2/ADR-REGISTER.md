@@ -38,7 +38,12 @@ Rules:
 | O10 | Deny-all relaxation for Chat | Chat tool policy | DEFERRED; deny-all stands |
 | O11 | Session-list loading evidence | parity closure | test-harness task: injected stall or instrumentation; manual retries exhausted |
 | O12 | Finding 13 copy ("Add a OpenCode Zen key...") | V2-6 polish | scheduled as copy only |
-| O13 | The revision's 1,319-line November 14 reference | strict reconciliation sign-off | local brief is 996 lines; owner to supply the file or correct the reference |
+
+Resolved during V2-0: **O13** - the November 14 brief is 1,319 lines
+(74,654 bytes) on disk. An earlier 996-line count was
+`Measure-Object -Line`, which counts non-blank lines only (996 non-blank +
+323 blank). Revision 4.0's 1,319-line reference is correct; no owner
+action remains.
 
 ## Parked
 

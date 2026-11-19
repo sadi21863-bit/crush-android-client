@@ -1085,7 +1085,7 @@ device `bbf8ca69`, API 29, owner unlock entered by the owner)
 Reviewed `Crush_Mobile_V2_Redesign_Plan_Revision_4_0_2026-11-19.md`
 (610 lines) against the local November 14 Rev 3.1 brief
 (`crush-mobile-v2-design-brief-state-contract-test-plan-2026-11-14.md`,
-996 lines including Appendix C) and the repository at `1679f25`
+1,319 lines including Appendix C) and the repository at `1679f25`
 (`main == origin/main`, clean). Revision 4.0 is planning-only; it
 authorizes no implementation.
 
@@ -1139,11 +1139,13 @@ authorizes no implementation.
 
 **Corrections to Revision 4.0 (recorded here; the revision file is not edited)**
 
-1. §1.3/O13: the November 14 Rev 3.1 brief is on disk - 996 lines,
-   74,654 bytes, including Appendix C. No file in Downloads matches the
-   1,319-line count. Either the revision refers to a different
-   document/version or the count is wrong; supply that file or correct the
-   reference. The line-by-line reconciliation can start now.
+1. §1.3/O13: **CORRECTED 2026-11-19 - the revision is right.** The
+   November 14 Rev 3.1 brief is on disk and is **1,319 lines / 74,654
+   bytes**, including Appendix C. An earlier note in this section said 996
+   lines; that figure came from `Measure-Object -Line`, which counts
+   non-blank lines only (996 non-blank + 323 blank). There is no missing
+   document and O13 is resolved. The line-by-line reconciliation runs
+   against the full 1,319-line file.
 2. §2.3: 2b.4 device parity was PERFORMED, not pending.
    `after-2b4/MANIFEST.md` records the Settings content region
    pixel-identical and Back returning to the same chat at `89e294b`. What
@@ -1183,7 +1185,7 @@ authorizes no implementation.
 | O10 | DEFERRED - deny-all remains |
 | O11 | NOT PERFORMED - needs instrumentation/injected stall |
 | O12 | SCHEDULED - V2-6, copy only |
-| O13 | IN PROGRESS - brief is local; 1,319-line reference unresolved |
+| O13 | RESOLVED - brief on disk is 1,319 lines; the earlier 996 figure counted non-blank lines only |
 
 **Accepted plan-wide rules from Revision 4.0 (no behavior change)**
 

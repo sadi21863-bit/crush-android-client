@@ -29,7 +29,7 @@ Rules:
 
 | ID | Question | Blocks | Current disposition |
 |---|---|---|---|
-| O2 | Visual direction, tokens and component catalogue | V2-2 integration | V2-1 proposal; owner approval required |
+| O2 | Visual direction, tokens and component catalogue | V2-2 integration | proposal in `V2-1-design-foundation.md` (2026-11-19): measured palette, type/spacing/shape/dimension/motion tokens, phone state catalogue, navigation decision sheet; owner must answer Q1-Q4 and approve sections 4-8 |
 | O3 | Tablet/foldable list-detail panes | any wide-window claim | after phone acceptance; not in V2.0 |
 | O4 | Tool-activity visibility level | Chat transcript design | backlog until usability evidence |
 | O5 | Any preference beyond existing Settings | V2-6 | backlog; no new preference batch |
@@ -45,6 +45,12 @@ Resolved during V2-0: **O13** - the November 14 brief is 1,319 lines
 `Measure-Object -Line`, which counts non-blank lines only (996 non-blank +
 323 blank). Revision 4.0's 1,319-line reference is correct; no owner
 action remains.
+
+Interpretation recorded with V2-1 (not a reopened decision): brief 4.2
+principle 1 budgets "permanent chrome <= 56dp on a 360dp phone" while
+brief 4.6 and V2-A2 require an 80dp phone bottom bar. The 56dp figure is
+read as the top-bar/transcript budget, with the bottom bar separate. If
+the owner intended total chrome, V2-A2 must be revisited before V2-3.
 
 ## Parked
 

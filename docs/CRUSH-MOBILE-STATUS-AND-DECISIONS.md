@@ -1217,6 +1217,20 @@ confirmed the missing Current marker, the stale/mislabelled Models sheet
 and the missing engine version/contract on-device, and added F-E, a header
 phase that read `connecting to agent` while no engine process existed.
 
+**V2-1 (started 2026-11-19).** `docs/v2/V2-1-design-foundation.md` proposes
+the token set and screen-state catalogue; it is not approved and changes
+no source. Measuring the shipped theme found live contrast defects rather
+than taste disputes: `tertiary` `#FD79A8` at **2.48:1** on white is used as
+text for "key stored", "MANUAL" and the Review revert notice; success green
+is **2.54:1**; warning amber is **1.51:1**; error red is **3.82:1**; and
+the dark background `#0F0F1A` is blue-black, which the brief rejects. The
+proposal keeps the existing diff pairs (7.87 / 6.57 light, 10.5 / 8.0 dark)
+and offers a measured warm-neutral palette plus spacing, shape, type,
+dimension and motion tokens. Four owner answers (Q1-Q4) and approval of
+sections 4-8 are the visual-direction sign-off (gate O2). Prototype tasks
+remain NOT PERFORMED because they add screens and need authorization;
+V2-1 is PARTIAL, not done.
+
 ## 6. Upstream filings
 
 - **2026-11-13: closed as NO ACTION.** The unfiled drafts (candidates 1–3 in

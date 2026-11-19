@@ -23,7 +23,7 @@ brief and it does not authorize implementation.
 | Commits above it | `2272d71` (CI JDK 21), `1679f25`, `96bf7ec`, `3457a8b`, then post-lock docs |
 | Working tree | clean before this record |
 | `origin/main` | same SHA at lock time |
-| CI | run `44542121606` at `3457a8b`, success |
+| CI | run `44542121606` at `3457a8b`, success; V2-0 docs runs green, one transient SDK-download failure rerun to green (section 1.1, section 7) |
 | Last local full gate | `run-f12-gate.log`, 2026-11-18 23:30, BUILD SUCCESSFUL 20m 24s |
 | Device | `bbf8ca69` **not connected at lock time** |
 | Engine of record | Crush v0.100.0, contracts 0.99.0 (v0.99/v0.100 wire families) |
@@ -33,6 +33,29 @@ docs and parity PNGs only. The app code under this lock is therefore the
 code that passed the 2026-11-18 gate. CI runs `96bf7ec` (`44541587089`)
 and `3457a8b` (`44542121606`) are both green. Docs commits after the lock
 change no code; the app baseline remains `1c902eb`.
+
+### 1.1 CI behaviour observed during V2-0
+
+The `gate` job installs only `platform-tools` in its SDK step
+(`.github/workflows/android-ci.yml`); AGP then auto-downloads Build-Tools 36
+and `platforms;android-37.0` on every run. The first attempt at `5d413f1`
+(run `44549231349`, attempt 1) failed in 18s before running any task:
+
+```
+Could not determine the dependencies of task ':app:testDebugUnitTest'.
+> Failed to install the following SDK components:
+      platforms;android-37.0 Android SDK Platform 37.0
+Warning: An error occurred while preparing SDK package Android SDK Platform
+37.0: Error reading Zip content from a SeekableByteChannel.
+```
+
+That is a corrupted/partial package download on the runner, not a tree
+defect: the rerun (attempt 2) passed, and runs at `4329d26`
+(`44547084785`) and `18c78ff` (`44549113032`) were green on attempt 1 with
+the same sources. A red gate of this shape is confirmed environment by a
+rerun plus a sibling SHA before any code is suspected. Hardening
+(pre-install the platform in the workflow and/or retry the SDK download) is
+recorded as O14; it edits a build file, so it needs its own authorization.
 
 ## 2. Toolchain and build
 
@@ -219,6 +242,10 @@ this host), record device/API/build/engine, scale rendered->real about 1.17.
 - CI, `3457a8b`: run `44542121606` success; `96bf7ec`: run `44541587089`
   success. CI builds an engine-less APK because `libcrush.so` is not
   committed; green CI is necessary, not sufficient.
+- CI on the V2-0 docs commits: `4329d26` run `44547084785` success,
+  `18c78ff` run `44549113032` success, `5d413f1` run `44549231349`
+  success on attempt 2 after the SDK-download failure described in
+  section 1.1. The failed attempt is kept in this record on purpose.
 - This V2-0 record changes Markdown only, so no gate was rerun for it.
 
 ## 8. Research log (V2-0 task 5, retrieved 2026-11-19)

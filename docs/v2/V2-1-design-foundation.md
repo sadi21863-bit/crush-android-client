@@ -99,7 +99,7 @@ Structural findings (no pixel claim, verified in source):
   14 call sites across `ChatContent.kt` and `MarkdownText.kt`.
 - `headlineMedium` (20sp) is used twice; `displayLarge` (32sp) is unused.
 
-## 4. Proposed tokens
+## 4. Tokens (approved)
 
 ### 4.1 Colour
 
@@ -184,12 +184,15 @@ interactive or selected state**. Therefore:
 - status always carries a **label**, with the dot/mark decorative.
 
 Every M3 role the app reads is specified, because an unspecified slot
-inherits the baseline purple-tinted defaults. The used set is
-`onSurfaceVariant` (73 call sites), `primary` (21), `error` (19),
-`surfaceVariant` (11), `onSurface` (4), `surface` (4), `tertiary` (3),
-`background` (3), `onBackground` (2), `secondaryContainer` (2),
-`primaryContainer` (2), `outlineVariant` (1), `onPrimaryContainer` (1),
-plus the container roles Material components read internally.
+inherits the baseline purple-tinted defaults. The pre-migration inventory
+(section 3) named `onSurfaceVariant` (73 call sites), `primary` (21),
+`error` (19), `surfaceVariant` (11), `onSurface` (4), `surface` (4),
+`tertiary` (3), `background` (3), `onBackground` (2),
+`secondaryContainer` (2), `primaryContainer` (2), `outlineVariant` (1) and
+`onPrimaryContainer` (1). After the V2-2 migration `tertiary` is 0, and
+`onPrimaryContainer` rose to 2 because the user bubble now reads the role
+it sits on. Container roles that Material components read internally are
+specified too, so no component falls back to a purple default.
 
 | M3 role | Light | Dark | Note |
 |---|---|---|---|
@@ -294,7 +297,7 @@ icon-only).
 
 ## 5. Migration map (V2-2, authorized 2026-11-19)
 
-| Current | Proposed | Action |
+| Current | Approved | Action |
 |---|---|---|
 | `OpenCodePrimary` `#6C5CE7` | `accent` `#3B3B36` | neutral graphite (V2-A8); dark uses `#D3D0C8` |
 | `LightBackground` `#F8F9FA` | `paper` `#FAF8F4` | warm the base |

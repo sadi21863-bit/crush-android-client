@@ -99,6 +99,9 @@ Four-task gate (`testDebugUnitTest`, `assembleDebug`,
 | 3 (2026-11-20 01:08) | `v2-2-gate-1120-010839.log` | **PASSED** in 27m37s: 871 / 0 / 0; lint 0 errors, 1 warning (pre-existing `NotShrinkingResources`). Component signatures reordered |
 | 4 (2026-11-20 02:10) | `v2-2-gate-1120-021050.log` | **PASSED** in 10m46s: 871 / 0 / 0; lint 0 errors, 1 warning (pre-existing). Includes the `CrushCard` hairline and the themed navigation bar found on device |
 
+CI: run `44618219274` on head `36e5189` - **success** (the same four-task
+gate on Temurin 21, engine-less APK by design).
+
 ## 5. Device evidence (2026-11-20)
 
 Device `bbf8ca69`, Redmi Note 7 Pro, API 29, arm64-v8a, 1080x2340 @440

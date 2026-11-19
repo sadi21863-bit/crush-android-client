@@ -1,9 +1,12 @@
 # V2-2 token integration and component pilot
 
-Status: **COMPLETE 2026-11-20** against the exit criteria in Revision 4.0
-(tokens compile and are used by a small pilot surface; component/a11y tests
-pass; existing screens behaviourally unchanged). The component set is
-deliberately not yet applied to every screen - that is V2-3/V2-4 work.
+Status: **COMPLETE against the Revision 4.0 exit criteria (2026-11-20)**:
+tokens compile and are used by a small pilot surface; component and
+accessibility tests pass; existing screens are behaviourally unchanged.
+Two task-list items are only partly performed and are labelled so below
+(screenshot tests, and the font-scale/reduced-motion/density checks).
+The component set is deliberately not yet applied to every screen - that
+is V2-3/V2-4 work.
 Authority: Revision 4.0 V2-2 task list; `V2-1-design-foundation.md` sections
 4-8 as approved by **V2-A8**; brief Rev 3.1 sections 4.5, 4.7, 4.8.
 
@@ -79,6 +82,17 @@ component; that remains V2-3/V2-4 work.
 The user bubble paints `primaryContainer` while `MarkdownText` defaulted to
 `onSurface`: **2.05:1** in light theme. The bubble now passes
 `onPrimaryContainer`. `CrushTokensTest` pins the pair.
+
+### 2.6 Revision 4.0 task check
+
+| Task | Status |
+|---|---|
+| 1. Semantic theme tokens and component styles | DONE |
+| 2. Typography / spacing / shape scales | DONE |
+| 3. Reusable buttons, icon buttons, cards, chips, sheets, dialogs, banners, empty states, loading states, section headers | DONE - all eleven exist in `CrushComponents.kt` |
+| 4. Accessible status/provenance labels | DONE - `CrushStatusLabel` always carries words; the dot is decorative |
+| 5. Screenshot/Compose tests for component variants | PARTIAL - Compose tests cover the variants; the repo has no screenshot-test harness, so device captures stand in for image comparison |
+| 6. Theme, font scale, reduced motion and density verification | PARTIAL - theme verified by tests and device (light/dark); font scale, reduced motion and density are NOT PERFORMED |
 
 ## 3. Tests
 
@@ -161,9 +175,10 @@ intermediates, not claims.
   PERFORMED** with the new palette (they need a real file-changing turn).
 - `03-settings.png` and `11-dark-settings-fixed.png` are cropped above the
   API card so no key hint is stored in the repo; nothing else was edited.
-- **NOT PERFORMED:** 2.0x font-scale rendering check; the spec forbids fixed
-  text heights and the components use `heightIn`/intrinsic sizing, but that
-  is a source argument, not an observation.
+- **NOT PERFORMED:** 2.0x font-scale rendering, reduced-motion behaviour and
+  density verification. The spec forbids fixed text heights, the components
+  contain no bespoke animation (Compose's platform duration scale applies),
+  and sizing is in dp - but those are source arguments, not observations.
 - **NOT PERFORMED:** wide-window layout checks. The only device is 393dp,
   API 29 (O3).
 - **NOT PERFORMED:** dynamic-colour comparison. The app does not enable

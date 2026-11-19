@@ -36,7 +36,7 @@ the owner's trims.
 |---|---|---|
 | V2-0 | in progress | reconciliation sign-off by owner; task 6 evidence landed |
 | V2-1 | partial (direction approved) | token spec, state catalogue and a11y spec approved 2026-11-19 (V2-A8); prototype/flow tasks 3-6 still NOT PERFORMED, so the V2-1 exit criteria are not met |
-| V2-2 | complete (2026-11-20) | tokens in `ui/theme/`, component set piloted on Diagnostics, 871 tests green, lint 0 errors, full gate passed on attempts 2-4 (attempt 1 failed on a test-fixture typo); device evidence in `docs/parity/2026-11-20-v2-2-tokens/` (two defects found and fixed: card hairline, dark navigation bar). F-J selection affordance is carried to V2-4 |
+| V2-2 | complete (exit criteria, 2026-11-20) | tokens in `ui/theme/`, component set piloted on Diagnostics, 871 tests green, lint 0 errors, full gate passed on attempts 2-4 (attempt 1 failed on a test-fixture typo), CI `44618219274` green; device evidence in `docs/parity/2026-11-20-v2-2-tokens/` (two defects found and fixed: card hairline, dark navigation bar). Partial task items: no screenshot-test harness; font-scale/reduced-motion/density NOT PERFORMED. F-J selection affordance is carried to V2-4 |
 | V2-3 | not started | V2-2 components |
 | V2-4 | not started | V2-3 shell |
 | V2-5 | not started | V2-3 shell |

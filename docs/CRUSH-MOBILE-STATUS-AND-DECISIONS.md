@@ -1282,6 +1282,12 @@ A third finding, F-J (selected segments distinguished only by a subtle
 fill under the neutral accent), is recorded for V2-4 rather than patched
 here.
 
+Task-list honesty: Revision 4.0's tasks 1-4 are done; task 5 is PARTIAL
+(Compose tests exist, but the repo has no screenshot-test harness, so
+device captures stand in); task 6 is PARTIAL (theme verified in tests and
+on device, font-scale/reduced-motion/density checks NOT PERFORMED). The
+V2-2 *exit* criteria are met, which is what "complete" means here.
+
 ## 6. Upstream filings
 
 - **2026-11-13: closed as NO ACTION.** The unfiled drafts (candidates 1–3 in

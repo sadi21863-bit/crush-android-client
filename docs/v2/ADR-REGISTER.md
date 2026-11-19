@@ -1,0 +1,58 @@
+# V2 ADR register (opened 2026-11-19)
+
+Purpose: one place that says which V2 decisions are settled, which are
+owner-gated, and what evidence backs each. It complements
+`../adr-0001-project-workspace-identity.md`; nothing here overrides ADR-0001
+or the Rev 3.1 state contract.
+
+Rules:
+
+- A V2 package may implement only ACCEPTED decisions.
+- An OPEN item is not a design choice to be settled in code; it needs an
+  owner answer, then an ADR entry here before implementation.
+- PARKED items are out of V2.0. Reopening one needs a new approval.
+- "Accepted" records direction, not shipped behavior.
+
+## Accepted
+
+| ID | Decision | Date | Evidence |
+|---|---|---|---|
+| V2-A1 | Hybrid authority: Revision 4.0 is the forward roadmap/design direction; the November 14 Rev 3.1 brief stays authoritative for the UI state contract, test registry, composer gates and parity standard | 2026-11-19 | status doc §5.10 |
+| V2-A2 | Shell: three primary destinations - Chat, Projects, Settings. Review and Diagnostics are pushed routes. Phone bottom bar below 600dp, rail 600-839dp, drawer/extended rail at 840dp+ (brief §4.6). No fourth "Code" destination | 2026-11-19 | §5.10; `NavGraph.kt`; Android adaptive navigation guide (retrieved 2026-11-19) |
+| V2-A3 | Code is project-bound: no global Code workspace, no cross-project session namespace; project identity stays visible | 2026-11-19 | §5.10; ADR-0001 |
+| V2-A4 | No brief deferral is reopened: pinned message/follow, cost/context-window display, new density/navigation/response-rendering preferences, structured model UI and release packaging stay backlog | 2026-11-19 | §5.10; package trims |
+| V2-A5 | Provider offer rule: offer tested providers only (`isKnown`), plus any provider whose key is already stored; hidden ids remain resolvable | 2026-11-18 | `Providers.offerable`, `1c902eb`, after-f12 manifest |
+| V2-A6 | Evidence labels (CODE/TEST/CI/DEVICE-RECORDED/DEVICE-VERIFIED/PARTIAL/PLANNED/NOT-PERFORMED/OWNER-DECISION) are mandatory in V2 reports | 2026-11-19 | Revision 4.0 §1.2; §5.10 accepted rules |
+| V2-A7 | V2.0 active scope is V2-0 to V2-6 only; V2-7, V2-8 and V2-9 are parked | 2026-11-19 | §5.10 package table |
+
+## Open (owner gate)
+
+| ID | Question | Blocks | Current disposition |
+|---|---|---|---|
+| O2 | Visual direction, tokens and component catalogue | V2-2 integration | V2-1 proposal; owner approval required |
+| O3 | Tablet/foldable list-detail panes | any wide-window claim | after phone acceptance; not in V2.0 |
+| O4 | Tool-activity visibility level | Chat transcript design | backlog until usability evidence |
+| O5 | Any preference beyond existing Settings | V2-6 | backlog; no new preference batch |
+| O8 | AFA/import-only policy change | project import | NO CHANGE; needs ADR + store review |
+| O9 | Release hardening/rollout | shipping | separate roadmap; V2-9 parked |
+| O10 | Deny-all relaxation for Chat | Chat tool policy | DEFERRED; deny-all stands |
+| O11 | Session-list loading evidence | parity closure | test-harness task: injected stall or instrumentation; manual retries exhausted |
+| O12 | Finding 13 copy ("Add a OpenCode Zen key...") | V2-6 polish | scheduled as copy only |
+| O13 | The revision's 1,319-line November 14 reference | strict reconciliation sign-off | local brief is 996 lines; owner to supply the file or correct the reference |
+
+## Parked
+
+| ID | Item | Note |
+|---|---|---|
+| V2-7 | Deterministic intelligent UI foundation | separate approval; A2UI is alpha (`1.0.0-alpha02`, 2026-10-21) |
+| V2-8 | Structured model UI experiment | same |
+| V2-9 | Release hardening and rollout | Gate 7 remains deferred |
+
+## Standing constraints (not decisions to revisit)
+
+- ADR-0001 identity chain and run-freeze invariants.
+- Chat deny-all policy is an engine boundary, not a visual toggle.
+- Host-owned trust, secrets, file grants, diffs and revert decisions.
+- No provider fallback that can surprise the user with cost.
+- Preserve user data: no silent history wipe or project migration.
+- Bytecode target 17; CI Temurin 21; minSdk 29.

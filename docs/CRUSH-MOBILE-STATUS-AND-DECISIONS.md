@@ -1209,6 +1209,10 @@ the stop conditions; performance budgets set after the V2-1 prototype.
 **Boundary.** This review moved docs only; no source, test or build file
 changed. No V2 implementation is authorized.
 
+**V2-0 (started 2026-11-19).** Baseline lock, source inventory, ADR
+register and the Rev 3.1 reconciliation live in `docs/v2/`; planning only,
+no implementation and no source change.
+
 ## 6. Upstream filings
 
 - **2026-11-13: closed as NO ACTION.** The unfiled drafts (candidates 1–3 in

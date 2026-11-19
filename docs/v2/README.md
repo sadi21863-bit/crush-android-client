@@ -14,7 +14,7 @@ the owner's trims.
 | File | Purpose |
 |---|---|
 | `V2-0-baseline-lock-2026-11-19.md` | locked SHA/toolchain/source inventory, parity ledger re-read, device limits, research log |
-| `V2-0-reconciliation.md` (pending) | line-by-line reconciliation of the Rev 3.1 brief against the locked tree (task 4) |
+| `V2-0-reconciliation.md` | line-by-line reconciliation of the Rev 3.1 brief against the locked tree (task 4) |
 | `ADR-REGISTER.md` | accepted, open and parked V2 decisions |
 
 ## Scope

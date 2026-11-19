@@ -19,8 +19,8 @@ brief and it does not authorize implementation.
 | Branch | `main` |
 | HEAD | `3457a8b2d9bd4235b702e7f37cc63387252a095a` |
 | HEAD tree | `58b9f0e3a166d5eebcbde07261adee4b0ade466b` |
-| Last code-bearing commit | `1679f25` (2026-11-18) |
-| Docs commits above it | `96bf7ec`, `3457a8b` |
+| Last app-code commit | `1c902eb` (2026-11-18, Finding 12 fix) |
+| Commits above it | `2272d71` (CI JDK 21), `1679f25`, `96bf7ec`, `3457a8b`, then post-lock docs |
 | Working tree | clean before this record |
 | `origin/main` | same SHA at lock time |
 | CI | run `44542121606` at `3457a8b`, success |
@@ -28,10 +28,12 @@ brief and it does not authorize implementation.
 | Device | `bbf8ca69` **not connected at lock time** |
 | Engine of record | Crush v0.100.0, contracts 0.99.0 (v0.99/v0.100 wire families) |
 
-`git diff 1679f25..3457a8b` is docs only, so the code under this lock is the
+`git diff 1c902eb..3457a8b` changes no `app/` source: it is the CI workflow,
+docs and parity PNGs only. The app code under this lock is therefore the
 code that passed the 2026-11-18 gate. CI runs `96bf7ec` (`44541587089`)
 and `3457a8b` (`44542121606`) are both green. Post-lock docs commits
-(`0345237`, `bbc309e`) change no code; the code baseline remains `1679f25`.
+(`0345237`, `bbc309e`, `4329d26`) change no code; the app baseline remains
+`1c902eb`.
 
 ## 2. Toolchain and build
 
@@ -242,15 +244,16 @@ Compose-first V2-1 prototype.
 | 1 | Record SHA, tree, toolchain, architecture, CI | DONE | sections 1-3, 7 |
 | 2 | Re-read all five 2b manifests, close outstanding parity | DONE (re-read) / OPEN items | section 5; closures need device, fault injection or instrumentation |
 | 3 | Source inventory | DONE | section 4 |
-| 4 | Reconcile Rev 3.1 line by line | IN PROGRESS | `V2-0-reconciliation.md` |
+| 4 | Reconcile Rev 3.1 line by line | DONE (owner sign-off pending) | `V2-0-reconciliation.md` |
 | 5 | T3/A2UI/json-render/CopilotKit/adaptive research | DONE as reference refresh | section 8; no adoption |
 | 6 | Fresh phone screenshots + unsupported form factors | NOT PERFORMED (no device) / list DONE | section 6 |
 | 7 | ADR register for open owner decisions | DONE | `ADR-REGISTER.md` |
 
 Exit criteria: "no unresolved disagreement about what is already
 implemented" and "every V2 requirement has a source reference and an evidence
-label" are only satisfied once task 4 lands and the owner accepts it. V2-0
-still requires owner acknowledgement before V2-1 work.
+label". Task 4 landed as `V2-0-reconciliation.md`; owner acceptance of that
+ledger is the remaining exit step. Task 6 stays NOT PERFORMED until a device
+is attached. V2-0 still requires owner acknowledgement before V2-1 work.
 
 ## 10. Boundary
 

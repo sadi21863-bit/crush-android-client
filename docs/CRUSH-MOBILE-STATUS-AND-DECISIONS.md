@@ -1175,7 +1175,7 @@ authorizes no implementation.
 | ID | Disposition |
 |---|---|
 | O1 | RESOLVED - brief §4.6; 3 destinations, adaptive breakpoints |
-| O2 | OPEN - V2-1 visual proposal; owner approval |
+| O2 | RESOLVED 2026-11-19 - owner chose the neutral graphite accent, 15sp body, platform monospace, and call-site reclassification; sections 4-8 approved (V2-A8). V2-2 authorized; V2-3 not |
 | O3 | OPEN - tablet panes only after phone acceptance |
 | O4 | BACKLOG - tool-activity visibility after usability evidence |
 | O5 | BACKLOG - no preference set beyond existing Settings |
@@ -1230,6 +1230,57 @@ dimension and motion tokens. Four owner answers (Q1-Q4) and approval of
 sections 4-8 are the visual-direction sign-off (gate O2). Prototype tasks
 remain NOT PERFORMED because they add screens and need authorization;
 V2-1 is PARTIAL, not done.
+
+**Owner answers (2026-11-19) and the V2-A8 decision.** Accent =
+**neutral graphite** `#3B3B36` light / `#D3D0C8` dark (10.62 / 12.17 on
+paper / bg), not the proposed violet; body = 15sp; code font = platform
+monospace for now; V2-2 scope = include the call-site reclassification.
+Because the graphite accent is only 1.53:1 from `ink` in light and 1.29:1
+in dark, interactive and selected state can no longer rely on hue:
+underline, fill, weight, filled icons and a 2dp focus outline carry it.
+Sections 4-8 are now binding on V2-2; V2-3 shell work is still not
+authorized.
+
+**A defect the approval uncovered.** Wiring the tokens found that the user
+bubble paints `primaryContainer` while `MarkdownText` defaults to
+`onSurface`, so the owner's own messages rendered at **2.05:1** in light
+theme. The fix passes `onPrimaryContainer` explicitly at the bubble call
+site; a JVM test pins the role pair.
+
+### 5.11 V2-2 token integration (working tree, 2026-11-19/20)
+
+V2-2 implements the approved section 4-8 contract: `ui/theme/Color.kt`
+(warm neutral palette, neutral graphite accent, semantic status colours),
+new `ui/theme/Tokens.kt` (`CrushColors`/`LocalCrushColors`, spacing, shape,
+dimensions, type), `Theme.kt` (every M3 role the app reads is specified;
+diff colours follow the compiled theme mode), `Type.kt` (Material slots
+mapped onto the new scale). `ui/components/CrushComponents.kt` adds the
+first shared component set, piloted on Diagnostics (read-only).
+
+Call-site reclassification (Q4): `bodySmall` 52 -> 8 (the 8 are deliberate
+metadata), `FontFamily.Monospace` 14 -> 1 (inside `CrushType.code`), and
+`colorScheme.tertiary` 3 -> 0 outside the theme. Tool/diff status now reads
+`toolRunning`/`toolSucceeded`/`toolFailed`/`pending` instead of overloading
+`primary`. The neutral accent cannot carry state by hue alone (1.53:1 from
+ink in light), so links stay underlined, selection uses a fill plus a
+filled icon, and status is always written as words.
+
+Evidence and open limits are tracked in `docs/v2/V2-2-token-integration.md`
+(JVM token/contrast tests, Robolectric component tests, the four-task gate,
+and the NOT PERFORMED device rows). No device visual claim is made in this
+batch.
+
+**Result (2026-11-20).** Four-task gate green on attempts 2-4 (871 tests,
+0 failures, 0 skipped; lint 0 errors, 1 pre-existing warning); attempt 1
+failed on a test-fixture typo ("Import a folder" vs "Import folder"), fixed.
+Device pass on `bbf8ca69` (API 29) captured the new palette in Chat,
+Settings (light and dark), About and the Diagnostics pilot. It found two
+defects the JVM tests could not: a fill-only card that read as no container
+(1.02:1 against paper) and a white system navigation bar in dark mode.
+Both were fixed in the component/theme layer and re-verified on device.
+A third finding, F-J (selected segments distinguished only by a subtle
+fill under the neutral accent), is recorded for V2-4 rather than patched
+here.
 
 ## 6. Upstream filings
 

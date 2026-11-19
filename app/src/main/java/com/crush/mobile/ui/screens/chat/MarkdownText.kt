@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.crush.mobile.ui.theme.CrushType
 
 /**
  * Hard cap on how many lines one code block may lay out (analysis §4 P0-1).
@@ -80,46 +81,46 @@ fun MarkdownText(
                 is MdBlock.Heading -> Text(
                     inlineAnnotated(block.inlines, color, block.level),
                     modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = CrushType.section,
                     fontWeight = FontWeight.SemiBold
                 )
                 is MdBlock.Paragraph -> Text(
                     inlineAnnotated(block.inlines, color),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = CrushType.body
                 )
                 is MdBlock.Bullet -> Row(Modifier.padding(start = (block.indent * 12).dp)) {
                     Text(
                         "•",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = CrushType.body,
                         color = color,
                         modifier = Modifier.width(14.dp)
                     )
                     Text(
                         inlineAnnotated(block.inlines, color),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = CrushType.body
                     )
                 }
                 is MdBlock.Numbered -> Row(Modifier.padding(start = (block.indent * 12).dp)) {
                     Text(
                         "${block.number}.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = CrushType.body,
                         color = color,
                         modifier = Modifier.width(20.dp)
                     )
                     Text(
                         inlineAnnotated(block.inlines, color),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = CrushType.body
                     )
                 }
                 is MdBlock.Quote -> Row {
                     Text(
                         "▏",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = CrushType.body,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         inlineAnnotated(block.inlines, color),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = CrushType.body,
                         modifier = Modifier.padding(start = 6.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -200,8 +201,7 @@ private fun CodeBlock(block: MdBlock.Code) {
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             Text(
                 text = lines.joinToString("\n"),
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
+                style = CrushType.code,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = CODE_MAX_LINES,
                 overflow = TextOverflow.Ellipsis
@@ -229,7 +229,8 @@ internal fun inlineAnnotated(
                 is MdInline.Code -> {
                     pushStyle(
                         SpanStyle(
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = CrushType.code.fontFamily,
+                            fontSize = CrushType.code.fontSize,
                             background = color.copy(alpha = 0.10f)
                         )
                     )

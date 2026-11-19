@@ -27,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +43,8 @@ import com.crush.mobile.domain.file.DiffLine
 import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.file.FileDiff
 import com.crush.mobile.ui.CrushrcTrustDialog
+import com.crush.mobile.ui.theme.CrushType
+import com.crush.mobile.ui.theme.LocalCrushColors
 import com.crush.mobile.ui.theme.LocalDiffColors
 
 /**
@@ -113,7 +116,7 @@ fun ChatContent(
                             if (state.binding.kind == BindingKind.ChatPool)
                                 "Chat - no tools - ${state.run.phase}" else state.run.phase,
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (state.run.engineReady) MaterialTheme.colorScheme.primary
+                            color = if (state.run.engineReady) LocalCrushColors.current.success
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -326,8 +329,7 @@ fun ChatContent(
                         Spacer(Modifier.height(6.dp))
                         Text(
                             req.path,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace
+                            style = CrushType.code
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -555,7 +557,7 @@ private fun Bubble(
     if (m.role == "system") {
         Text(
             m.text,
-            style = MaterialTheme.typography.bodySmall,
+            style = CrushType.body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier
@@ -629,7 +631,16 @@ private fun Bubble(
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         } else {
-                            MarkdownText(m.text, modifier = Modifier.fillMaxWidth())
+                            MarkdownText(
+                                m.text,
+                                modifier = Modifier.fillMaxWidth(),
+                                // User bubbles paint primaryContainer, so the
+                                // text must be onPrimaryContainer. The old
+                                // default (onSurface) measured 2.05:1 on the
+                                // light bubble.
+                                color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onSurface,
+                            )
                         }
                     }
                 }
@@ -698,8 +709,7 @@ private fun SubAgentReportCard(report: com.crush.mobile.data.crush.SubAgentRepor
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = report.output,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
+                    style = CrushType.code,
                     color = if (report.failed) scheme.onErrorContainer else scheme.onSecondaryContainer
                 )
             }
@@ -772,9 +782,8 @@ private fun FailedBubbleCard(
             Spacer(Modifier.height(6.dp))
             Text(
                 error,
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onErrorContainer,
-                fontFamily = FontFamily.Monospace
+                style = CrushType.code,
+                color = scheme.onErrorContainer
             )
             if (retryText != null) {
                 // The button stays VISIBLE but disabled when the engine cannot
@@ -918,7 +927,7 @@ internal fun FileDiffRow(diff: FileDiff) {
                 )
                 val tint = when {
                     diff.deleted -> MaterialTheme.colorScheme.error
-                    diff.created -> MaterialTheme.colorScheme.primary
+                    diff.created -> LocalCrushColors.current.success
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
                 Text(
@@ -956,13 +965,21 @@ internal fun FileDiffRow(diff: FileDiff) {
                             // Monospace, and each line keeps its own number. A diff
                             // without line numbers is decoration.
                             hunk.lines.forEach { line ->
-                                Row {
+                                val rowBg = when (line.kind) {
+                                    DiffLine.Kind.ADDED -> LocalDiffColors.current.addedBg
+                                    DiffLine.Kind.REMOVED -> LocalDiffColors.current.removedBg
+                                    DiffLine.Kind.CONTEXT -> Color.Transparent
+                                }
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .background(rowBg)
+                                ) {
                                     Text(
                                         (line.beforeLine ?: line.afterLine)?.toString() ?: "",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontFamily = FontFamily.Monospace,
+                                        style = CrushType.code,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.width(34.dp)
+                                        modifier = Modifier.width(40.dp)
                                     )
                                     val lineTint = when (line.kind) {
                                         DiffLine.Kind.ADDED -> LocalDiffColors.current.added
@@ -975,8 +992,7 @@ internal fun FileDiffRow(diff: FileDiff) {
                                             DiffLine.Kind.REMOVED -> "- ${line.text}"
                                             DiffLine.Kind.CONTEXT -> "  ${line.text}"
                                         },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontFamily = FontFamily.Monospace,
+                                        style = CrushType.code,
                                         color = lineTint
                                     )
                                 }
@@ -1004,9 +1020,10 @@ private fun ToolRow(tool: ToolActivity) {
     var expanded by remember(tool.id) { mutableStateOf(tool.isRunning) }
 
     val tint = when (tool.state) {
-        ToolState.FAILED -> MaterialTheme.colorScheme.error
-        ToolState.COMPLETED -> MaterialTheme.colorScheme.onSurfaceVariant
-        ToolState.RUNNING, ToolState.PENDING -> MaterialTheme.colorScheme.primary
+        ToolState.FAILED -> LocalCrushColors.current.toolFailed
+        ToolState.COMPLETED -> LocalCrushColors.current.toolSucceeded
+        ToolState.RUNNING -> LocalCrushColors.current.toolRunning
+        ToolState.PENDING -> LocalCrushColors.current.pending
         ToolState.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
@@ -1051,8 +1068,7 @@ private fun ToolRow(tool: ToolActivity) {
                 Spacer(Modifier.width(7.dp))
                 Text(
                     tool.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontFamily = FontFamily.Monospace,
+                    style = CrushType.code,
                     color = tint
                 )
                 Spacer(Modifier.width(7.dp))
@@ -1093,8 +1109,7 @@ private fun ToolRow(tool: ToolActivity) {
                     if (tool.args.isNotBlank()) {
                         Text(
                             tool.args,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
+                            style = CrushType.code,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         if (tool.output.isNotBlank() || tool.error != null) {
@@ -1104,16 +1119,14 @@ private fun ToolRow(tool: ToolActivity) {
                     tool.error?.let {
                         Text(
                             it,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
+                            style = CrushType.code,
                             color = MaterialTheme.colorScheme.error
                         )
                     }
                     if (tool.output.isNotBlank()) {
                         Text(
                             tool.output,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
+                            style = CrushType.code,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1328,13 +1341,13 @@ private fun SessionSheet(
                 // non-empty list skips this branch and stays visible.
                 Text(
                     "Chats aren't available",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = CrushType.section,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
                 Text(
                     "The engine isn't connected. Send a message to start it, " +
                         "then reopen this sheet.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else if (sessions.isEmpty()) {
@@ -1342,12 +1355,12 @@ private fun SessionSheet(
                 // loss, which is the failure mode this project keeps hitting.
                 Text(
                     "No chats yet",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = CrushType.section,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
                 Text(
                     "Start one and it will appear here.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
@@ -1382,7 +1395,7 @@ Row(verticalAlignment = Alignment.CenterVertically) {
                                 ) {
                                     Text(
                                         sess.label,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = CrushType.body,
                                         maxLines = 1
                                     )
                                     val detail = SessionList.detail(
@@ -1444,7 +1457,7 @@ private fun ModelSheet(
         )
         Text(
             "Live list from $providerName. Free models cost nothing.",
-            style = MaterialTheme.typography.bodySmall,
+            style = CrushType.body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
         )

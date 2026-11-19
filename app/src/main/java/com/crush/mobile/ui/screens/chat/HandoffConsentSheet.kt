@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crush.mobile.project.ProjectRef
+import com.crush.mobile.ui.theme.CrushType
 
 /**
  * The Chat->Code handoff consent sheet (P6 Batch C, plan §Batch C (c3) in
@@ -137,7 +138,7 @@ internal fun HandoffConsentSheet(
             notice?.let {
                 Text(
                     it,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = 6.dp)
                 )
@@ -157,13 +158,13 @@ internal fun HandoffConsentSheet(
                 Text(
                     CONSENT_RESUME_COPY + " Approved " +
                         handoffApprovalStamp(row.userApprovedAt ?: 0L) + ".",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     modifier = Modifier.padding(top = 8.dp)
                 )
                 Text(
                     if (!replacing) "Dispatching to \"$label\" on the existing approval."
                     else CONSENT_NO_ALIAS_COPY,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -173,18 +174,18 @@ internal fun HandoffConsentSheet(
                     ?: "its project"
                 Text(
                     DISPATCHED_TRACE_COPY,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     modifier = Modifier.padding(top = 8.dp)
                 )
                 Text(
                     "Session ${handoffSessionShort(row.targetCodeSessionId ?: "")} in \"$label\".",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
                 )
                 Text(
                     DISPATCHED_JUMP_COPY,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -281,48 +282,48 @@ internal fun HandoffConsentSheet(
                         HandoffSheetMode.DRAFT -> {
                             Text(
                                 CONSENT_RUN_COPY,
-                                style = MaterialTheme.typography.bodySmall
+                                style = CrushType.body
                             )
                             Text(
                                 CONSENT_FRESH_COPY,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = CrushType.body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 CONSENT_NO_ALIAS_COPY,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = CrushType.body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 CONSENT_ASK_CARDS_COPY,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = CrushType.body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         HandoffSheetMode.RESUME -> {
                             Text(
                                 CONSENT_RUN_COPY,
-                                style = MaterialTheme.typography.bodySmall
+                                style = CrushType.body
                             )
                             Text(
                                 CONSENT_NO_ALIAS_COPY,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = CrushType.body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 CONSENT_ASK_CARDS_COPY,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = CrushType.body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         HandoffSheetMode.DISPATCHED -> {
                             Text(
                                 DISPATCHED_TRACE_COPY,
-                                style = MaterialTheme.typography.bodySmall
+                                style = CrushType.body
                             )
                             Text(
                                 DISPATCHED_JUMP_COPY,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = CrushType.body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -406,7 +407,7 @@ private fun DestinationRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     ref.label,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = CrushType.body,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -456,7 +457,7 @@ internal fun HandoffResumeBar(
         ) {
             Text(
                 "Handed off to \"$label\".",
-                style = MaterialTheme.typography.bodySmall,
+                style = CrushType.body,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)

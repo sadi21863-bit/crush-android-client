@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crush.mobile.domain.file.TurnChanges
 import com.crush.mobile.ui.screens.chat.FileDiffRow
+import com.crush.mobile.ui.theme.LocalCrushColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -88,7 +89,7 @@ fun ReviewContent(
             Text(
                 "A turn is running; revert is disabled until the agent is idle.",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.tertiary,
+                color = LocalCrushColors.current.warning,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
             )
         }
@@ -274,7 +275,7 @@ private fun RevertRow(
                 else -> "restores what this turn measured"
             },
             style = MaterialTheme.typography.labelSmall,
-            color = if (note?.ok == true) MaterialTheme.colorScheme.primary
+            color = if (note?.ok == true) LocalCrushColors.current.success
             else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )

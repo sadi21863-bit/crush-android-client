@@ -24,12 +24,12 @@ Rules:
 | V2-A5 | Provider offer rule: offer tested providers only (`isKnown`), plus any provider whose key is already stored; hidden ids remain resolvable | 2026-11-18 | `Providers.offerable`, `1c902eb`, after-f12 manifest |
 | V2-A6 | Evidence labels (CODE/TEST/CI/DEVICE-RECORDED/DEVICE-VERIFIED/PARTIAL/PLANNED/NOT-PERFORMED/OWNER-DECISION) are mandatory in V2 reports | 2026-11-19 | Revision 4.0 §1.2; §5.10 accepted rules |
 | V2-A7 | V2.0 active scope is V2-0 to V2-6 only; V2-7, V2-8 and V2-9 are parked | 2026-11-19 | §5.10 package table |
+| V2-A8 | V2-1 visual direction approved (owner, 2026-11-19): neutral graphite accent (`#3B3B36` light / `#D3D0C8` dark, measured 10.62/12.17 on paper/bg), body text 15sp, platform monospace, V2-2 includes call-site reclassification. Because the accent is only 1.53:1 (light) / 1.29:1 (dark) from ink, interactive/selected state must never rely on hue alone: underline, fill, weight, filled icons and a 2dp focus outline carry it | 2026-11-19 | `V2-1-design-foundation.md` §4.1, §9; §5.11 |
 
 ## Open (owner gate)
 
 | ID | Question | Blocks | Current disposition |
 |---|---|---|---|
-| O2 | Visual direction, tokens and component catalogue | V2-2 integration | proposal in `V2-1-design-foundation.md` (2026-11-19): measured palette, type/spacing/shape/dimension/motion tokens, phone state catalogue, navigation decision sheet; owner must answer Q1-Q4 and approve sections 4-8 |
 | O3 | Tablet/foldable list-detail panes | any wide-window claim | after phone acceptance; not in V2.0 |
 | O4 | Tool-activity visibility level | Chat transcript design | backlog until usability evidence |
 | O5 | Any preference beyond existing Settings | V2-6 | backlog; no new preference batch |
@@ -45,6 +45,12 @@ Resolved during V2-0: **O13** - the November 14 brief is 1,319 lines
 `Measure-Object -Line`, which counts non-blank lines only (996 non-blank +
 323 blank). Revision 4.0's 1,319-line reference is correct; no owner
 action remains.
+
+Resolved 2026-11-19: **O2** - the owner answered Q1-Q4 (graphite accent,
+15sp body, platform monospace, include call-site reclassification) and
+approved sections 4-8 of `V2-1-design-foundation.md`. Recorded as **V2-A8**.
+This unblocks V2-2 only; V2-3 still needs section 7's navigation decision
+and an explicit go.
 
 Interpretation recorded with V2-1 (not a reopened decision): brief 4.2
 principle 1 budgets "permanent chrome <= 56dp on a 360dp phone" while

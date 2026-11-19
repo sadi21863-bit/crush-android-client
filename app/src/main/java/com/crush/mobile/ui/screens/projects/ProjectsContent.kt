@@ -41,6 +41,7 @@ import com.crush.mobile.data.project.PendingProjectTrust
 import com.crush.mobile.project.ProjectRef
 import com.crush.mobile.ui.CrushrcTrustDialog
 import com.crush.mobile.ui.crushrcTrustNote
+import com.crush.mobile.ui.theme.CrushType
 
 /**
  * Phase 2b.2 (V2 plan §§5.6, 6.5): the Projects surface, rendered only from
@@ -104,7 +105,7 @@ fun ProjectsContent(
             Text(
                 "Crush edits the folder you choose in place. It does not browse " +
                     "or scan your other files.",
-                style = MaterialTheme.typography.bodySmall,
+                style = CrushType.body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp)
             )
@@ -112,7 +113,7 @@ fun ProjectsContent(
                 Text(
                     err,
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     modifier = Modifier.padding(top = 6.dp)
                 )
             }
@@ -122,7 +123,7 @@ fun ProjectsContent(
                 Text(
                     "Registry error: $err",
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
@@ -173,7 +174,7 @@ fun ProjectsContent(
             Text(
                 "Tapping a project opens it in chat on its OWN engine instance; " +
                     "opening the legacy workspace returns to the shared engine.",
-                style = MaterialTheme.typography.bodySmall,
+                style = CrushType.body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
@@ -273,8 +274,7 @@ private fun ProjectRow(project: ProjectRef, onOpen: () -> Unit, onRemove: (() ->
             Spacer(Modifier.height(6.dp))
             Text(
                 project.repoDir.absolutePath,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
+                style = CrushType.code,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(

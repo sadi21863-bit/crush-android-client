@@ -30,6 +30,7 @@ import com.crush.mobile.data.local.DeviceAuth
 import com.crush.mobile.data.local.KeySession
 import com.crush.mobile.data.local.SecureKeyStore
 import com.crush.mobile.ui.AppLockPolicy
+import com.crush.mobile.ui.theme.CrushType
 import com.crush.mobile.util.AppLog
 
 private const val TAG = "LockOverlay"
@@ -171,7 +172,7 @@ fun LockOverlay(
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "Cannot prompt for authentication in this host.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center
                 )
@@ -183,7 +184,7 @@ fun LockOverlay(
                 // to stumble onto the fresh line.
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.semantics {

@@ -1,11 +1,17 @@
-# V2-1 design foundation (proposal)
+# V2-1 design foundation
 
-Status: **PROPOSED, not approved.** Owner gate **O2**. Date 2026-11-19.
+Status: **APPROVED 2026-11-19.** Owner gate **O2 resolved**; decision recorded
+as **V2-A8**. Date of proposal 2026-11-19.
 
-This document is the V2-1 deliverable that asks for a decision. It changes
-no product source, test, Gradle file or navigation code, adds no preference
-and touches no permission, persistence or engine semantics. V2-2 may not
-start until the owner answers section 9.
+The owner answered Q1-Q4 and approved sections 4-8, which authorizes **V2-2
+only**. V2-3 (shell and navigation) is still not authorized, and the
+prototype tasks 3-6 below remain NOT PERFORMED, so V2-1 as a *whole* stays
+PARTIAL even though its design direction is now binding.
+
+The proposal changed no product source, test, Gradle file or navigation code,
+adds no preference and touches no permission, persistence or engine
+semantics. Sections 4-8 are the contract V2-2 implements; section 9 records
+the owner's answers rather than asking again.
 
 Authority: Revision 4.0 V2-1 task list (design tokens, component states,
 navigation prototypes, theme/density), constrained by the November 14
@@ -16,8 +22,8 @@ Rev 3.1 brief sections 4.2-4.9 and by the accepted decisions in
 
 | Rev 4.0 task | Status after this document |
 |---|---|
-| 1. Color, type, spacing, shape, elevation, motion, icon tokens | DONE (proposal) |
-| 2. Shared components and state variants | PARTIAL: state catalogue only; no component mocks |
+| 1. Color, type, spacing, shape, elevation, motion, icon tokens | DONE, **APPROVED** |
+| 2. Shared components and state variants | PARTIAL: state catalogue only; component library lands in V2-2 |
 | 3. Phone navigation prototypes (drawer / bottom bar / switcher) | NOT PERFORMED: needs authorization, adds a screen |
 | 4. Tablet rail/sidebar and list-detail prototypes | NOT PERFORMED: O3, and no device above 393dp |
 | 5. Chat empty/populated/streaming/error prototypes | NOT PERFORMED (same reason as 3) |
@@ -26,9 +32,10 @@ Rev 3.1 brief sections 4.2-4.9 and by the accepted decisions in
 | 8. Validate flows against current app behavior | PARTIAL: device evidence for 15 surfaces, not a walkthrough of every flow |
 
 V2-1 exit requires an approved spec **and** screen-state catalogue **and**
-complete phone flows **and** specified tablet behavior. Three of those are
-met or partly met; the prototype tasks are honestly open. V2-1 is
-**PARTIAL**, not done.
+complete phone flows **and** specified tablet behavior. The spec and
+catalogue are approved; the prototype/flow tasks are honestly open. V2-1 is
+**PARTIAL, not done** — the approval unblocks V2-2 tokens and components,
+not a claim that the V2-1 exit criteria were met.
 
 ## 2. Method and limits
 
@@ -71,6 +78,12 @@ These are live defects, not hypotheticals:
   so any success text added later starts from a failing colour.
 - The dark background and surface are blue-black (`#0F0F1A`, `#1A1A2E`);
   brief 4.4 says near-black, **not blue**.
+- **Found during V2-2 implementation (not in the V2-0 captures):** the user
+  bubble paints `primaryContainer` (`#6C5CE7`) but `MarkdownText` defaults to
+  `onSurface` (`#2D3436`), which measures **2.05:1** — the user's own
+  messages are the least readable text in the app. Fixed by passing
+  `onPrimaryContainer` explicitly at the bubble call site; the mapping is
+  pinned in `CrushTokensTest`.
 
 Structural findings (no pixel claim, verified in source):
 
@@ -103,16 +116,18 @@ Light:
 | `muted` | `#5C5850` | 6.67 paper / 7.08 surface | secondary text |
 | `faint` | `#8A857B` | 3.46 paper / 3.67 surface | **disabled/large only**, never prose |
 | `separator` | `#E5E1D8` | 1.23 paper / 1.30 surface | decorative 1dp rule only |
-| `accent` | `#5A46D6` | 6.03 paper / 6.40 surface | actions, links, selected |
-| `onAccent` | `#FFFFFF` | 6.40 on accent | text on accent fills |
-| `accentSoft` | `#EDE9FB` | 14.47 with ink | selected row tint |
+| `accent` | `#3B3B36` | 10.62 paper / 11.26 surface | actions, links, selected (neutral graphite) |
+| `onAccent` | `#FFFFFF` | 11.26 on accent | text on accent fills |
+| `accentSoft` | `#E8E5DE` | 13.69 with ink, 5.63 with muted | selected row tint, chip fill |
 | `success` | `#1B6B4A` | 6.09 paper / 6.46 surface | succeeded, stored key |
 | `warning` | `#8A5A00` | 5.59 paper / 5.93 surface | running, revert-disabled notice |
 | `error` | `#B3261E` | 6.16 paper / 6.54 surface | failure, destructive |
-| `diffAdded` | `#1B5E20` | 7.87 on surface | added line text (kept) |
-| `diffRemoved` | `#B71C1C` | 6.57 on surface | removed line text (kept) |
+| `diffAdded` | `#1B5E20` | 7.87 on surface / 6.92 on own tint | added line text (kept) |
+| `diffRemoved` | `#B71C1C` | 6.57 on surface / 5.65 on own tint | removed line text (kept) |
 | `diffAddedBg` | `#E8F3EC` | 15.14 with ink | added line tint |
 | `diffRemovedBg` | `#FBEAEA` | 14.81 with ink | removed line tint |
+| `errorContainer` | `#F7E0DE` | 13.67 with ink | failed tool card fill |
+| `onErrorContainer` | `#5C1512` | 10.61 on errorContainer | text on that fill |
 
 Dark:
 
@@ -124,16 +139,18 @@ Dark:
 | `muted` | `#A8A49B` | 7.55 bg / 6.94 surface | secondary text |
 | `faint` | `#7E7A72` | 4.39 bg / 4.04 surface | disabled only |
 | `separator` | `#2A2A26` | 1.30 bg / 1.20 surface | decorative 1dp rule only |
-| `accent` | `#A99BFF` | 7.88 bg / 7.25 surface | actions, links, selected |
-| `onAccent` | `#1A1533` | 7.36 on accent | text on accent fills |
-| `accentSoft` | `#2A2545` | 12.16 with ink | selected row tint |
+| `accent` | `#D3D0C8` | 12.17 bg / 11.20 surface | actions, links, selected (neutral graphite) |
+| `onAccent` | `#1A1A17` | 11.32 on accent | text on accent fills |
+| `accentSoft` | `#2E2E29` | 11.45 with ink, 5.49 with muted | selected row tint, chip fill |
 | `success` | `#7BD3A8` | 10.47 bg / 9.64 surface | succeeded |
 | `warning` | `#F0B860` | 10.48 bg / 9.64 surface | running |
 | `error` | `#FF8A80` | 8.22 bg / 7.56 surface | failure |
-| `diffAdded` | `#A5D6A7` | 11.41 bg / 10.50 surface | added line text (kept) |
-| `diffRemoved` | `#EF9A9A` | 8.72 bg / 8.02 surface | removed line text (kept) |
+| `diffAdded` | `#A5D6A7` | 11.41 bg / 10.50 surface / 9.06 own tint | added line text (kept) |
+| `diffRemoved` | `#EF9A9A` | 8.72 bg / 8.02 surface / 7.39 own tint | removed line text (kept) |
 | `diffAddedBg` | `#1E2A22` | 12.50 with ink | added line tint |
 | `diffRemovedBg` | `#2E1E1E` | 13.34 with ink | removed line tint |
+| `errorContainer` | `#5C1A17` | 10.06 with onErrorContainer | failed tool card fill |
+| `onErrorContainer` | `#FFDAD6` | 10.06 on errorContainer | text on that fill |
 
 Semantic roles map onto the base colours but stay **separate fields** so
 they can diverge later without touching screens:
@@ -151,9 +168,44 @@ Delivery: one `LocalCrushColors` (`staticCompositionLocalOf`) provided by
 `CrushMobileTheme` next to the existing `LocalDiffColors`, selected by the
 same compiled `themeMode` decision. No per-screen colour literals.
 
-The accent stays the brand violet, darkened for contrast; the brief's
-"one restrained accent" is satisfied because success, warning and error
-are state roles, not decorative accents.
+**Owner decision Q1: neutral graphite, not violet.** The accent is
+`#3B3B36` light / `#D3D0C8` dark. The brief's "one restrained accent" is
+satisfied by restraint rather than a brand hue: success, warning and error
+become the only hues in the product, and they always appear next to words.
+
+Consequence, accepted with the decision: a neutral accent is only 1.53:1
+from `ink` in light and 1.29:1 in dark, so **colour alone cannot mark an
+interactive or selected state**. Therefore:
+
+- interactive text carries **underline** (inline links already do);
+- selection carries a **fill** (`accentSoft`) plus a **filled icon** and a
+  weight change, never a tint of the text alone;
+- focus carries a **2dp `accent` outline**, not a colour shift;
+- status always carries a **label**, with the dot/mark decorative.
+
+Every M3 role the app reads is specified, because an unspecified slot
+inherits the baseline purple-tinted defaults. The used set is
+`onSurfaceVariant` (73 call sites), `primary` (21), `error` (19),
+`surfaceVariant` (11), `onSurface` (4), `surface` (4), `tertiary` (3),
+`background` (3), `onBackground` (2), `secondaryContainer` (2),
+`primaryContainer` (2), `outlineVariant` (1), `onPrimaryContainer` (1),
+plus the container roles Material components read internally.
+
+| M3 role | Light | Dark | Note |
+|---|---|---|---|
+| `primary` / `onPrimary` | `#3B3B36` / white | `#D3D0C8` / `#1A1A17` | accent |
+| `primaryContainer` / `onPrimaryContainer` | `#3B3B36` / white | `#D3D0C8` / `#1A1A17` | user bubble; text is `onPrimaryContainer` |
+| `secondary` / `onSecondary` | `#5C5850` / white | `#A8A49B` / `#121210` | muted |
+| `secondaryContainer` / `onSecondaryContainer` | `#E8E5DE` / `#1C1B18` | `#2E2E29` / `#EDEBE5` | tool card fill |
+| `tertiary` / `onTertiary` | `#5C5850` / white | `#A8A49B` / `#121210` | **no status use**; retained so no slot is left at a purple default |
+| `background` / `onBackground` | `#FAF8F4` / `#1C1B18` | `#121210` / `#EDEBE5` | window |
+| `surface` / `onSurface` | `#FFFFFF` / `#1C1B18` | `#1B1B18` / `#EDEBE5` | cards, sheets |
+| `surfaceVariant` / `onSurfaceVariant` | `#F1EFE9` / `#5C5850` | `#232320` / `#A8A49B` | muted panel + muted text |
+| `surfaceContainer*` / `surfaceDim` / `surfaceBright` | warm neutrals | warm neutrals | Material component defaults |
+| `outline` / `outlineVariant` | `#8A857B` / `#E5E1D8` | `#7E7A72` / `#2A2A26` | focus/decorative rules |
+| `error` / `onError` | `#B3261E` / white | `#FF8A80` / `#3B0A08` | failure |
+| `errorContainer` / `onErrorContainer` | `#F7E0DE` / `#5C1512` | `#5C1A17` / `#FFDAD6` | failed tool card |
+| `inverseSurface` / `inverseOnSurface` | `#2E2E29` / `#F4F1EA` | `#EDEBE5` / `#1B1B18` | snackbar |
 
 ### 4.2 Spacing
 
@@ -190,7 +242,7 @@ per screen.
 | `body` | 15 / 22 / Regular | `bodyLarge` | transcript, prose, empty-state sentences |
 | `secondary` | 13 / 18 / Regular | `bodyMedium` | supporting prose, sheet descriptions |
 | `metadata` | 12 / 16 / Regular | `bodySmall` | timestamps, counts, ids, labels |
-| `code` | 13 / 20 / Regular, `FontFamily.Monospace` | `LocalCrushType.code` | code blocks, diffs, tool payloads |
+| `code` | 13 / 20 / Regular, `FontFamily.Monospace` | `CrushType.code` | code blocks, diffs, tool payloads |
 | `control` | 14 / 20 / Medium | `labelLarge` | buttons and clickable labels |
 
 Rules:
@@ -240,11 +292,11 @@ card dashboards, no hero empty states, no decorative charts (brief 4.4).
 variant **and** colour **and** its always-visible label (brief 4.6: never
 icon-only).
 
-## 5. Migration map (V2-2, only after approval)
+## 5. Migration map (V2-2, authorized 2026-11-19)
 
 | Current | Proposed | Action |
 |---|---|---|
-| `OpenCodePrimary` `#6C5CE7` | `accent` `#5A46D6` | value change; dark uses `#A99BFF` |
+| `OpenCodePrimary` `#6C5CE7` | `accent` `#3B3B36` | neutral graphite (V2-A8); dark uses `#D3D0C8` |
 | `LightBackground` `#F8F9FA` | `paper` `#FAF8F4` | warm the base |
 | `LightSurface` `#FFFFFF` | `surface` `#FFFFFF` | unchanged |
 | `LightOnBackground` `#1A1A2E`, `LightOnSurface` `#2D3436` | `ink` `#1C1B18` | one text colour, not two |
@@ -265,9 +317,19 @@ icon-only).
   warning. Note the current emphasis is inverted: AUTO takes `primary`
   while MANUAL takes the pink caution colour.
 
-`bodySmall` has 52 call sites and is not a mechanical rename: prose moves
-to `body` (15), true metadata stays at 12. Section 9 Q4 asks whether that
-reclassification is in V2-2 scope.
+**Implementation status (V2-2):** all three sites are migrated, and
+`MaterialTheme.colorScheme.tertiary` now has **zero** call sites in
+`ui/screens/`; the slot is mapped to `muted` so an unspecified default can
+never resurface as the 2.48:1 pink.
+
+`bodySmall` had 52 call sites and is not a mechanical rename: prose moves
+to `body` (15), true metadata stays at 12. Section 9 Q4 put that
+reclassification in V2-2 scope. **Implementation status (V2-2):** 44 sites
+migrated; the 8 that remain are deliberate metadata (Diagnostics status
+label/value pairs and log count, Settings key hints, version line,
+engine attribution, device-profile line). Chat, Review, Projects, Lock,
+Onboarding and the handoff sheet contain no `bodySmall` prose.
+`FontFamily.Monospace` now appears once, in `CrushType.code` itself.
 
 ## 6. Screen-state catalogue (phone, 393dp)
 
@@ -398,24 +460,27 @@ or foldable claim may cite this document.
   live regions announce once, not per token.
 - **Motion:** system animator scale 0 disables overlay animation.
 
-## 9. Open questions (blocking V2-1 exit)
+## 9. Owner decisions (answered 2026-11-19)
 
-| # | Question | Recommended answer |
+| # | Question | Decision |
 |---|---|---|
-| Q1 | Accent hue: brand violet, darkened to `#5A46D6` (light) / `#A99BFF` (dark), or a neutral graphite accent? | Keep the violet: it is the only brand signal and now clears 6.0:1 |
-| Q2 | Body text: 15sp per brief, or keep the current dominant 12-14sp? | 15sp. It costs lines per screen; legibility and the brief both win |
-| Q3 | Code font: platform `Monospace`, or bundle a font? | Platform monospace: offline, no APK growth, no licence surface |
-| Q4 | V2-2 scope: theme/token files only, or also the mechanical call-site reclassification (52 `bodySmall`, 3 `tertiary`, 14 inline monospace)? | Include it, reviewed screen by screen; otherwise the new scale is cosmetic and prose stays at 12sp |
+| Q1 | Accent hue: brand violet `#5A46D6` / `#A99BFF`, or a neutral graphite accent? | **Neutral graphite** — `#3B3B36` light, `#D3D0C8` dark. No brand hue; selection is carried by fill, weight, filled icons and underline |
+| Q2 | Body text: 15sp per brief, or keep the current dominant 12-14sp? | **15sp** (`CrushType.body`). Prose moves off 12sp; metadata stays 12sp |
+| Q3 | Code font: platform `Monospace`, or bundle a font? | **Platform `Monospace` for now.** May be revisited with a measured legibility comparison, not as part of V2-2 |
+| Q4 | V2-2 scope: theme/token files only, or also the mechanical call-site reclassification (52 `bodySmall`, 3 `tertiary`, 14 inline monospace)? | **Include it**, reviewed screen by screen. Prose `bodySmall` -> 15sp body; true metadata stays 12sp; the 3 `tertiary` text sites move to success/warning/accent; monospace sites use the `code` token |
 
-Answering Q1-Q4 and approving sections 4-8 is the V2-1 visual-direction
-sign-off. It authorizes V2-2 token work, not V2-3 shell work.
+The owner also approved sections 4-8 as written (with Q1 amended to
+graphite). This authorizes **V2-2** token and component work. It does not
+authorize V2-3 shell/navigation work, which still needs the navigation
+decision in section 7 and an explicit go.
 
 ## 10. Boundary
 
-Proposal only. No source, test, Gradle or navigation change; no preference,
-permission, persistence or engine semantics change; no prototype built; no
-device claim beyond the 2026-11-19 captures. Nothing here may be cited as
-approved or implemented.
+Sections 4-8 are approved and bind V2-2. The V2-1 document itself still
+makes no implemented claim: everything in section 1's PARTIAL rows and the
+prototype tasks 3-6 is unchanged, and no device evidence is added here.
+Implementation evidence lives in the V2-2 record, not this file. Items in
+sections 4-8 that V2-2 has not reached yet must not be described as shipped.
 
 ## Appendix: reproduce the measurements
 
@@ -430,6 +495,8 @@ function C([string]$a,[string]$b) {
   $la=L $a; $lb=L $b; $hi=[Math]::Max($la,$lb); $lo=[Math]::Min($la,$lb)
   [Math]::Round((($hi+0.05)/($lo+0.05)),2)
 }
-C '#FD79A8' '#FFFFFF'   # 2.48 - current tertiary on white
-C '#5A46D6' '#FAF8F4'   # 6.03 - proposed accent on paper
+C '#FD79A8' '#FFFFFF'   # 2.48 - old tertiary on white
+C '#2D3436' '#6C5CE7'   # 2.05 - old user bubble text on its own fill
+C '#3B3B36' '#FAF8F4'   # 10.62 - approved light accent on paper
+C '#D3D0C8' '#121210'   # 12.17 - approved dark accent on bg
 ```

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.crush.mobile.domain.provider.Provider
+import com.crush.mobile.ui.theme.CrushType
 
 /**
  * Phase 2b.5 (V2 plan §§5.6, 6.5): the onboarding surface, rendered only from
@@ -199,7 +200,7 @@ fun OnboardingContent(
                 // once, without the reader having to hunt the screen for it.
                 Text(
                     it,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier
                         .fillMaxWidth()

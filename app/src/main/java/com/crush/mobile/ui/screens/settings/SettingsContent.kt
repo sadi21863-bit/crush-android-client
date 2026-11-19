@@ -48,6 +48,8 @@ import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.PermissionMode
 import com.crush.mobile.domain.model.TuningPolicy
+import com.crush.mobile.ui.theme.CrushType
+import com.crush.mobile.ui.theme.LocalCrushColors
 import kotlinx.coroutines.launch
 
 /**
@@ -147,7 +149,7 @@ fun SettingsContent(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     p.displayName,
-                                    style = MaterialTheme.typography.bodyLarge
+                                    style = CrushType.body
                                 )
                                 Text(
                                     buildString {
@@ -170,7 +172,7 @@ fun SettingsContent(
                                 Text(
                                     "key stored",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.tertiary,
+                                    color = LocalCrushColors.current.success,
                                     modifier = Modifier.padding(start = 8.dp)
                                 )
                             }
@@ -180,7 +182,7 @@ fun SettingsContent(
                         "Changing provider re-runs the whole handshake and clears the " +
                             "model choice: a model id from one provider's catalogue is " +
                             "meaningless to another.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = CrushType.body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -198,7 +200,7 @@ fun SettingsContent(
                         if (stored) {
                             Text(
                                 "API key saved",
-                                style = MaterialTheme.typography.bodyLarge
+                                style = CrushType.body
                             )
                             if (settings.apiKeyHint.isNotBlank()) {
                                 Text(
@@ -210,11 +212,11 @@ fun SettingsContent(
                         } else {
                             Text(
                                 "No API key stored",
-                                style = MaterialTheme.typography.bodyLarge
+                                style = CrushType.body
                             )
                             Text(
                                 "Add a ${provider.displayName} key to start chatting.",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = CrushType.body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -341,7 +343,7 @@ fun SettingsContent(
                         "In \"Enter sends\" the keyboard action button sends the " +
                             "message; the key stops inserting newlines. Switch back " +
                             "to write multi-line drafts.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = CrushType.body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -477,7 +479,7 @@ private fun PermissionSection(
                     "The agent stops and asks before it reads, changes or deletes files " +
                         "or runs a command."
                 },
-                style = MaterialTheme.typography.bodySmall,
+                style = CrushType.body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (auto) {
@@ -485,7 +487,7 @@ private fun PermissionSection(
                 Text(
                     "Only turn this on for a task you trust. Blast radius is limited to " +
                         "this app's private storage, but nothing else is asking first.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = CrushType.body,
                     color = MaterialTheme.colorScheme.error
                 )
             }
@@ -596,13 +598,13 @@ private fun TuningRow(
             Text(
                 if (isAuto) "AUTO" else "MANUAL",
                 style = MaterialTheme.typography.labelSmall,
-                color = if (isAuto) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.tertiary
+                color = if (isAuto) MaterialTheme.colorScheme.onSurfaceVariant
+                else LocalCrushColors.current.accent
             )
         }
         Text(
             help,
-            style = MaterialTheme.typography.bodySmall,
+            style = CrushType.body,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Row(

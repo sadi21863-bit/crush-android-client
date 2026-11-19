@@ -53,6 +53,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crush.mobile.ui.components.CrushCard
+import com.crush.mobile.ui.components.CrushSectionHeader
+import com.crush.mobile.ui.components.CrushStatusLabel
+import com.crush.mobile.ui.components.CrushTone
+import com.crush.mobile.ui.theme.CrushType
 import com.crush.mobile.util.AppLog
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -121,7 +126,7 @@ fun DiagnosticsScreen(
             Text(
                 "If the app is misbehaving, copy the block below and send it to " +
                     "the developer. It contains no API key.",
-                style = MaterialTheme.typography.bodyMedium,
+                style = CrushType.body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
@@ -222,30 +227,23 @@ fun DiagnosticsScreen(
 @Composable
 private fun CrashSection(crash: RecordedCrash?) {
     if (crash == null) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+        CrushCard {
+            Text("No crash recorded", style = CrushType.section)
+            Spacer(Modifier.height(4.dp))
+            // Deliberately does NOT claim "nothing has crashed". Crash
+            // archiving is installed the first time this screen opens, so a
+            // blank section honestly means "nothing recorded since we
+            // started watching", not "nothing went wrong". Overstating it
+            // would send a developer looking for a crash that the app simply
+            // never had the chance to write down.
+            Text(
+                "Nothing has been recorded since this screen was last opened. " +
+                    "If the app seems stuck, closes itself, or stops responding, " +
+                    "that is a different problem - send this page anyway, the log " +
+                    "below is what matters.",
+                style = CrushType.body,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text("No crash recorded", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                // Deliberately does NOT claim "nothing has crashed". Crash
-                // archiving is installed the first time this screen opens, so a
-                // blank section honestly means "nothing recorded since we
-                // started watching", not "nothing went wrong". Overstating it
-                // would send a developer looking for a crash that the app simply
-                // never had the chance to write down.
-                Text(
-                    "Nothing has been recorded since this screen was last opened. " +
-                        "If the app seems stuck, closes itself, or stops responding, " +
-                        "that is a different problem - send this page anyway, the log " +
-                        "below is what matters.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
         return
     }
@@ -279,9 +277,7 @@ private fun CrashSection(crash: RecordedCrash?) {
             SelectionContainer {
                 Text(
                     crash.text,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = FontFamily.Monospace
-                    )
+                    style = CrushType.code
                 )
             }
         }
@@ -290,54 +286,51 @@ private fun CrashSection(crash: RecordedCrash?) {
 
 @Composable
 private fun StatusSection(report: DiagnosticsReport) {
-    Text(
-        "Status",
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary
-    )
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+    CrushSectionHeader("Status")
+    CrushCard {
+        StatusRow("App version", "${report.appVersionName} (${report.versionCode})")
+        StatusRow(
+            "Android",
+            "${report.androidRelease} (API ${report.sdkInt})"
         )
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            StatusRow("App version", "${report.appVersionName} (${report.versionCode})")
-            StatusRow(
-                "Android",
-                "${report.androidRelease} (API ${report.sdkInt})"
+        StatusRow("Device", "${report.manufacturer} ${report.model}")
+        StatusRow("Processor ABIs", report.abis.joinToString(", ").ifBlank { "none" })
+        StatusRow(
+            "Engine file",
+            if (report.engineBinaryPresent) "installed" else "MISSING"
+        )
+        StatusRow("Engine", report.engineStateLabel)
+        // The tone dot is decorative; the sentence is the signal, so a reader
+        // who cannot see colour still gets the answer.
+        CrushStatusLabel(
+            text = when (report.engineResponding) {
+                null -> "Engine responding: not checked"
+                true -> "Engine responding: yes"
+                false -> "Engine responding: no"
+            },
+            tone = when {
+                !report.engineBinaryPresent -> CrushTone.Error
+                report.engineResponding == true -> CrushTone.Success
+                report.engineResponding == false -> CrushTone.Warning
+                else -> CrushTone.Neutral
+            },
+            modifier = Modifier.padding(vertical = 3.dp),
+        )
+        report.engineProbeNote?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            StatusRow("Device", "${report.manufacturer} ${report.model}")
-            StatusRow("Processor ABIs", report.abis.joinToString(", ").ifBlank { "none" })
-            StatusRow(
-                "Engine file",
-                if (report.engineBinaryPresent) "installed" else "MISSING"
+        }
+        // A silent gap is worse than a stated one: an uncollected field reads
+        // as a healthy one.
+        report.notes.forEach {
+            Text(
+                "! $it",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error
             )
-            StatusRow("Engine", report.engineStateLabel)
-            StatusRow(
-                "Engine responding",
-                when (report.engineResponding) {
-                    null -> "not checked"
-                    true -> "yes"
-                    false -> "no"
-                }
-            )
-            report.engineProbeNote?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            // A silent gap is worse than a stated one: an uncollected field reads
-            // as a healthy one.
-            report.notes.forEach {
-                Text(
-                    "! $it",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
         }
     }
 }
@@ -364,52 +357,39 @@ private fun StatusRow(label: String, value: String) {
 
 @Composable
 private fun LogSection(report: DiagnosticsReport) {
-    Text(
-        "Recent log",
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary
-    )
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                if (report.logTotalLines == 0) {
-                    "Nothing recorded yet"
-                } else {
-                    "Last ${report.logTail.size} of ${report.logTotalLines} lines"
-                },
-                style = MaterialTheme.typography.bodySmall
-            )
+    CrushSectionHeader("Recent log")
+    CrushCard {
+        Text(
             if (report.logTotalLines == 0) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "This is normal on a fresh install. The log starts writing as " +
-                        "soon as the app does anything.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
+                "Nothing recorded yet"
             } else {
-                Spacer(Modifier.height(8.dp))
-                SelectionContainer {
-                    Text(
-                        // Monospace because AppLog is fixed-width columns and
-                        // proportional glyphs turn a stack trace into mush.
-                        text = report.logTail.joinToString("\n"),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace
-                        ),
-                        // Stack frames are wider than a phone. Scrolling
-                        // horizontally beats wrapping, which destroys the
-                        // alignment that makes a trace readable.
-                        modifier = Modifier.horizontalScroll(rememberScrollState())
-                    )
-                }
+                "Last ${report.logTail.size} of ${report.logTotalLines} lines"
+            },
+            style = MaterialTheme.typography.bodySmall
+        )
+        if (report.logTotalLines == 0) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "This is normal on a fresh install. The log starts writing as " +
+                    "soon as the app does anything.",
+                style = CrushType.body,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis
+            )
+        } else {
+            Spacer(Modifier.height(8.dp))
+            SelectionContainer {
+                Text(
+                    // Monospace because AppLog is fixed-width columns and
+                    // proportional glyphs turn a stack trace into mush.
+                    text = report.logTail.joinToString("\n"),
+                    style = CrushType.code,
+                    // Stack frames are wider than a phone. Scrolling
+                    // horizontally beats wrapping, which destroys the
+                    // alignment that makes a trace readable.
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                )
             }
         }
     }

@@ -14,7 +14,9 @@ fetch-default ratchet + `FetchScriptPinTest`) carries a local gate of
 `b7b4ae5` and the AFA review-hardening `af178f8` carry local gates of 715/76
 and **716/0/0 across 76 suites** (lint 0 errors / 1 warning). CI run
 **43592253901 GREEN** (3m12s) covers the `2fef885` push. Only docs commits
-collect above the code HEAD.
+collect above the code HEAD. Later record: §5.10 (2026-11-19) re-verifies
+the repository at code HEAD `1679f25`; the 2026-11-14 figures above remain
+that baseline.
 
 ---
 
@@ -260,7 +262,7 @@ mirrored locally with their full reasoning in the plan doc
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1–2b.5 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Findings 10/11 fixed in §5.4. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests), §5.8 Onboarding (`OnboardingContent` + 10 tests, T2B5-01), §5.9 Finding 12 fix + provider offer list (`LaunchRouteState` + 4 tests, `ProvidersTest` +3). Full four-task gate green (2026-11-18, incl. §5.9): 850 tests / 91 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind; Projects top bands pixel-identical, remove dialog/cancel PASS, flow 26 PASS; Review empty content pixel-identical, flow 24 Back PASS (populated card not performed); Settings pixel-identical to `f25-after-settings.png`, Back returns to the same chat with 0 changed pixels; Onboarding pixel-identical (old vs extracted), provider menu open/dismiss PASS. **Finding 12 FIXED in §5.9:** the launch route is pinned per process by `LaunchRouteState`, `NavGraph` takes a `startDestination` instead of deriving one from live settings, and settings are awaited before the graph composes - selecting a key-less provider now keeps the user in Settings. §5.9 also trims every picker to tested providers (`Providers.AVAILABLE`: Zen, OpenRouter, OpenCode Go, Groq; Settings additionally keeps any row with a stored key so a credential is never stranded); hidden ids stay resolvable. **Device-verified 2026-11-18** (`after-f12/MANIFEST.md`): tapping key-less OpenCode Zen stays in Settings, provider restored through the UI, Back returns to the same chat. Owner provider was restored without touching any credential (2b.4 walk: verified DataStore rewrite; §5.9 walk: through the UI). Device records: `after-2b2`, `after-2b3`, `after-2b4`, `after-2b5`, `after-f12`. |
+| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1–2b.5 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Findings 10/11 fixed in §5.4. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests), §5.8 Onboarding (`OnboardingContent` + 10 tests, T2B5-01), §5.9 Finding 12 fix + provider offer list (`LaunchRouteState` + 4 tests, `ProvidersTest` +3). Full four-task gate green (2026-11-18, incl. §5.9): 850 tests / 91 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind; Projects top bands pixel-identical, remove dialog/cancel PASS, flow 26 PASS; Review empty content pixel-identical, flow 24 Back PASS (populated card not performed); Settings pixel-identical to `f25-after-settings.png`, Back returns to the same chat with 0 changed pixels; Onboarding pixel-identical (old vs extracted), provider menu open/dismiss PASS. **Finding 12 FIXED in §5.9:** the launch route is pinned per process by `LaunchRouteState`, `NavGraph` takes a `startDestination` instead of deriving one from live settings, and settings are awaited before the graph composes - selecting a key-less provider now keeps the user in Settings. §5.9 also trims every picker to tested providers (`Providers.AVAILABLE`: Zen, OpenRouter, OpenCode Go, Groq; Settings additionally keeps any row with a stored key so a credential is never stranded); hidden ids stay resolvable. **Device-verified 2026-11-18** (`after-f12/MANIFEST.md`): tapping key-less OpenCode Zen stays in Settings, provider restored through the UI, Back returns to the same chat. Owner provider was restored without touching any credential (2b.4 walk: verified DataStore rewrite; §5.9 walk: through the UI). Device records: `after-2b2`, `after-2b3`, `after-2b4`, `after-2b5`, `after-f12`. **Revision 4.0 reviewed 2026-11-19 (§5.10):** hybrid authority - Revision 4.0 is the forward roadmap/design direction; the Rev 3.1 brief stays authoritative for the state contract, test registry, composer gates and parity standard. Active packages V2-0 to V2-6 are trimmed (Code stays project-bound with 3 destinations; pinned/follow, cost/context, new density/nav/response preferences deferred; V2-7/8/9 parked). No implementation authorized. |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
 | 5 | intelligent UI | QUEUED |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
@@ -1077,6 +1079,118 @@ device `bbf8ca69`, API 29, owner unlock entered by the owner)
   `ready` on the first keystroke, the reply was exactly "ok", the finish was
   clean (`file changes: +0 -0`, no `finishError`), and the composer returned
   to idle. A throwaway chat `db2554b6` remains in Recents.
+
+### 5.10 V2 Revision 4.0 review - owner decisions (2026-11-19)
+
+Reviewed `Crush_Mobile_V2_Redesign_Plan_Revision_4_0_2026-11-19.md`
+(610 lines) against the local November 14 Rev 3.1 brief
+(`crush-mobile-v2-design-brief-state-contract-test-plan-2026-11-14.md`,
+996 lines including Appendix C) and the repository at `1679f25`
+(`main == origin/main`, clean). Revision 4.0 is planning-only; it
+authorizes no implementation.
+
+**Authority (owner, 2026-11-19): hybrid**
+
+- Revision 4.0 is the forward roadmap and design direction.
+- Rev 3.1 remains authoritative for the UI state contract (§5), the test
+  registry (§6), the composer gates (§5.5.1) and the parity evidence
+  standard (§8.5). A V2 package links those sections; it does not restate
+  or silently replace them.
+- Active V2.0 roadmap, design direction only: **V2-0 to V2-6**, trimmed as
+  below.
+- Parked, not in V2.0: **V2-7** deterministic intelligent UI, **V2-8**
+  structured model UI, **V2-9** release/rollout. Each needs its own
+  approval; Gate 7 remains deferred by the owner (2026-11-14).
+
+**Owner decisions that trim Revision 4.0**
+
+1. **Code stays project-bound.** Three primary destinations - Chat,
+   Projects, Settings. Review and Diagnostics stay pushed routes. Brief
+   §4.6 is the shell authority: phone bottom bar below 600dp, rail
+   600-839dp, drawer/extended rail at 840dp+. Revision O1 is therefore
+   RESOLVED by the brief's shell plus the 3-destination decision, not an
+   open prototype choice; the phone is not "drawer/overlay only when
+   requested". V2-1's navigation prototype is narrowed to validating the
+   brief's breakpoints, not choosing a different pattern.
+2. **No brief deferral is reopened.** Pinned message + follow mode (brief
+   decisions #3/#4), cost/context-window display (#8/#9), new
+   density/navigation/response-rendering preferences, structured model UI,
+   and release packaging stay backlog. V2-4 tasks 4 and 7 and V2-6 task 2
+   are trimmed accordingly; V2-7/V2-8/V2-9 are parked. Theme remains the
+   existing setting; reduced-motion behavior stays with the V2-2
+   accessibility work, not a new preference batch.
+3. **Finding 13 copy is folded into V2-6** (copy only; the owner already
+   declined a standalone rebuild).
+
+**Corrections to Revision 4.0 (recorded here; the revision file is not edited)**
+
+1. §1.3/O13: the November 14 Rev 3.1 brief is on disk - 996 lines,
+   74,654 bytes, including Appendix C. No file in Downloads matches the
+   1,319-line count. Either the revision refers to a different
+   document/version or the count is wrong; supply that file or correct the
+   reference. The line-by-line reconciliation can start now.
+2. §2.3: 2b.4 device parity was PERFORMED, not pending.
+   `after-2b4/MANIFEST.md` records the Settings content region
+   pixel-identical and Back returning to the same chat at `89e294b`. What
+   was not device-driven: the theme/keyboard/permission/tuning/About rows
+   (unit-pinned); provider selection was Finding 12, fixed in §5.9.
+3. §2.3/O11: the fresh-workspace session-list row stays NOT PERFORMED.
+   Another manual pass will not close it - the loading half is a
+   sub-second window and already survived two retries (2b.1 row 14). It
+   needs an injected stall/fault or instrumentation.
+4. §2.2: "hardened against TOCTOU" overstates the service's contract.
+   `ProjectTrustService` says check-at-bind is the practical contract,
+   "not a TOCTOU impossibility proof". Use "gate-observed recording; no
+   TOCTOU-free claim".
+
+**Gaps carried into the active roadmap**
+
+- V2-3: delete the dead `Screen.Models` object (`NavGraph.kt:16`; it has
+  no `composable`). The brief's Phase 5 cleanup is otherwise lost.
+- V2-6: explicitly preserve/redesign Diagnostics; the Models sheet is
+  covered by V2-4's picker work.
+- V2-0: O11 is a test-harness task (injected stall or instrumentation), not
+  another manual parity attempt; it may not close inside V2-0's no-change
+  boundary.
+
+**Open-decision dispositions**
+
+| ID | Disposition |
+|---|---|
+| O1 | RESOLVED - brief §4.6; 3 destinations, adaptive breakpoints |
+| O2 | OPEN - V2-1 visual proposal; owner approval |
+| O3 | OPEN - tablet panes only after phone acceptance |
+| O4 | BACKLOG - tool-activity visibility after usability evidence |
+| O5 | BACKLOG - no preference set beyond existing Settings |
+| O6/O7 | PARKED with V2-7/V2-8 |
+| O8 | NO CHANGE - import-only/AFA stands; any policy change needs an ADR and store review |
+| O9 | SEPARATE ROADMAP - not a V2 prerequisite |
+| O10 | DEFERRED - deny-all remains |
+| O11 | NOT PERFORMED - needs instrumentation/injected stall |
+| O12 | SCHEDULED - V2-6, copy only |
+| O13 | IN PROGRESS - brief is local; 1,319-line reference unresolved |
+
+**Accepted plan-wide rules from Revision 4.0 (no behavior change)**
+
+Evidence labels; baseline re-lock at the current SHA; build on the 2b
+content/host seams; the `Project -> WorkspaceBinding -> Session -> Run`
+identity chain and run-freeze invariants; the state-contract checklist;
+the stop conditions; performance budgets set after the V2-1 prototype.
+
+**What the revision gets right, verified locally**
+
+- The 2b.1-2b.5 commit sequence and scope; Finding 12 fixed; the provider
+  offer rule and `opencode-go` known state.
+- The four-task CI gate on Temurin 21 with bytecode 17; CI builds an
+  engine-less APK because only `libjunixsocket-native.so` is tracked in
+  `jniLibs`.
+- The session-list loading half and the populated Review card are honestly
+  NOT PERFORMED; Finding 13 is open.
+- Deny-all, trust, registry, handoff and Review statements match the
+  ledger, subject to correction 4 above.
+
+**Boundary.** This review moved docs only; no source, test or build file
+changed. No V2 implementation is authorized.
 
 ## 6. Upstream filings
 

@@ -31,9 +31,8 @@ brief and it does not authorize implementation.
 `git diff 1c902eb..3457a8b` changes no `app/` source: it is the CI workflow,
 docs and parity PNGs only. The app code under this lock is therefore the
 code that passed the 2026-11-18 gate. CI runs `96bf7ec` (`44541587089`)
-and `3457a8b` (`44542121606`) are both green. Post-lock docs commits
-(`0345237`, `bbc309e`, `4329d26`) change no code; the app baseline remains
-`1c902eb`.
+and `3457a8b` (`44542121606`) are both green. Docs commits after the lock
+change no code; the app baseline remains `1c902eb`.
 
 ## 2. Toolchain and build
 

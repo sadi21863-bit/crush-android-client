@@ -7,9 +7,9 @@ early set and OpenCode Go in the later set; the sheet subtitle follows the
 provider live, which is the F-B behaviour under test.
 
 Captures `01`-`13` use the gate-3 APK (F-L fixed, F-M not). Captures `14`-`27`
-use the final gate-4 APK (F-L and F-M fixed). The device was unlocked by the
-owner for each secure-window session; no credentials were entered by the
-agent.
+use the gate-4 APK (F-L and F-M fixed). Captures `28`-`31` use the gate-5 APK
+(F-N 2.0x chip wrapping fixed). The device was unlocked by the owner for each
+secure-window session; no credentials were entered by the agent.
 
 ## Captures
 
@@ -32,6 +32,8 @@ agent.
 | 15 | `15-final-transcript.png` | Final build: white user prose, and the tool-only `agent_dispatch` row has no empty bubble beneath it (F-M). |
 | 16-22 | model selection set | `17` shows the live provider as OpenCode Go with DeepSeek V4.1 Flash selected; `21` shows the optimistic switch to Claude Haiku; `22` shows the model reverted to Flash after the probe (the honest revert path). `16`, `18`-`20` are intermediates. |
 | 23-27 | Retry set | `23`/`24`: failed turn ("This reply failed / no reply received"); `25`: Retry button; `26`: Retry re-ran the turn and the ASK permission dialog gated the agent's `bash` call; `27`: Deny settled the run, failed pair retained above. |
+| 28-30 | 2.0x font scale | `28`: chat transcript at 2.0x (ellipsis in header/model, failed card and Retry readable, composer/nav fit); `29`: session sheet with current marker; `30`: model sheet with wrapped provenance and rows. |
+| 31 | `31-fontscale-2x-settings.png` | Settings chips at 2.0x after the `FlowRow` fix (appearance and performance rows wrap instead of clipping). |
 | - | `_crop-user-bubble.png` | Before-state crop of F-L: near-black prose on graphite, kept as evidence, not a product surface. |
 
 ## Findings from this pass
@@ -43,6 +45,10 @@ agent.
 - **F-M (fixed):** a tool-only assistant row rendered an empty filled bubble
   below its tool rows. Fixed by skipping the bubble when there is no text and
   no streaming placeholder. Re-captured in `15`.
+- **F-N (fixed, DEVICE-VERIFIED `31-fontscale-2x-settings.png`):** at 2.0x
+  font scale the Settings Keyboard and tuning chip rows clipped off the right
+  edge. Migrated to `FlowRow`; chat, session sheet and model sheet held at
+  2.0x (`28`-`30`), and the Settings re-capture is `31`.
 - **Observed, not a defect:** the provider shown in the sheet changed from
   OpenCode Zen to OpenCode Go during the pass and the subtitle followed it.
   Model selection optimistically showed Claude Haiku, then reverted to the
@@ -52,8 +58,9 @@ agent.
 
 - Frame timing: no pre-change baseline was captured, so no before/after
   numbers are claimed.
-- 2.0x font scale, reduced motion, density overrides, wide/tablet and API 30+:
-  NOT PERFORMED.
+- 2.0x font scale was checked on chat, session sheet, model sheet and Settings;
+  the Settings chip overflow it found is fixed (F-N). Reduced motion, density
+  overrides, wide/tablet and API 30+ remain NOT PERFORMED.
 - Provider switching (Settings) and instrumented tests: NOT PERFORMED.
 - Model-sheet loading and "not in current list" states are covered by JVM
   tests but were not captured on device (the fetch completed too quickly, and

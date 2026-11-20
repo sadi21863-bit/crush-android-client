@@ -164,7 +164,7 @@ surfacing them is a visibility decision, not a visual redesign.
 | Chat surface | `ChatContent.kt` | header status + picker label; empty state; role labels/spacing; tool-only bubble skip; composer max lines; session/model sheet states |
 | Markdown | `MarkdownText.kt` | heading span inheritance + 12sp floor; the passed colour reaches every prose block |
 | Components | `CrushComponents.kt` | `CrushChoiceChip` |
-| Settings | `SettingsContent.kt` | FilterChip -> `CrushChoiceChip` (F-J) |
+| Settings | `SettingsContent.kt` | FilterChip -> `CrushChoiceChip` (F-J); chip rows -> `FlowRow` for 2.0x wrapping (F-N) |
 | Tests | `ChatViewStateTest`, `ChatContentTranscriptTest`, `ChatContentSheetsTest`, `CrushComponentsTest` | new pins listed below |
 
 Unchanged on purpose: `ChatAction.kt`, `ChatDispatch.kt`, `ChatScreen.kt`,
@@ -188,10 +188,10 @@ Unchanged on purpose: `ChatAction.kt`, `ChatDispatch.kt`, `ChatScreen.kt`,
 
 | Claim | Evidence | Status |
 |---|---|---|
-| Four-task gate (final) | `v2-4-gate-1120-4.log`: `BUILD SUCCESSFUL in 15m 43s` | PASS (attempt 4) |
+| Four-task gate (final) | `v2-4-gate-1120-5.log`: `BUILD SUCCESSFUL in 14m 59s` | PASS (attempt 5) |
 | Unit-test count / failures | 899 tests, 95 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
-| CI | run `44725769114` on `c8c476a`: completed success 2026-11-20T11:17Z; earlier `ff3fef9` run `44715709979` also green | PASS |
+| CI | run `44725769114` on `c8c476a`: green; docs-close run `44727630308` on `d655d63`: green | PASS |
 | Chat empty state, ready status, picker visible | `01-launch.png`, `04-ready-empty-draft.png` | PASS on device |
 | Streaming + Stop | `05-streaming.png`, `06-stopped.png` | PASS on device |
 | Retry | `23-retry-failure.png` ... `27-retry-settled.png` (network toggle with owner consent; tool denied) | PASS on device |
@@ -201,14 +201,15 @@ Unchanged on purpose: `ChatAction.kt`, `ChatDispatch.kt`, `ChatScreen.kt`,
 | Model selection | `18`-`22` (optimistic switch, then probe revert to the persisted model) | PASS on device |
 | Model sheet loading / "not in current list" | source + JVM tests only | NOT PERFORMED on device |
 | Settings F-J selected chip | `13-settings-chips.png` | PASS on device |
+| 2.0x font scale | `28`-`31`: chat, session sheet, model sheet, Settings chip wrapping | PASS on device |
 | Process recreation / session reload | reinstall/force-stop -> launch -> engine start -> session selected (`10`-`15`) | PASS on device |
 | Frame timing baseline vs post-change | `dumpsys gfxinfo` numbers | NOT PERFORMED; no pre-change baseline was captured |
 
 Device pass environment: `bbf8ca69`, API 29, 393dp portrait, app
 `com.crush.mobile`, debug APK. Captures `01`-`13` used the gate-3 APK (F-L
-fixed, F-M not); `14`-`27` used the final gate-4 APK. Capture `09` (Settings
-top) was deleted before commit because it showed the masked key chip; it was
-an intermediate, not a claim.
+fixed, F-M not); `14`-`27` used the gate-4 APK; `28`-`31` used the gate-5 APK
+(F-N fixed). Capture `09` (Settings top) was deleted before commit because it
+showed the masked key chip; it was an intermediate, not a claim.
 
 Retry method: with the owner's permission the phone's airplane mode was
 enabled for one turn, producing "This reply failed / no reply received". The
@@ -230,14 +231,20 @@ PC's tethering for about two minutes; it was restored immediately.
 - **F-M (fixed, DEVICE-VERIFIED `15-final-transcript.png`):** a tool-only
   assistant row drew an empty filled bubble below its tool rows. Fixed by
   skipping the bubble when there is no text and no streaming placeholder.
+- **F-N (fixed, DEVICE-VERIFIED `31-fontscale-2x-settings.png`):** at 2.0x
+  font scale the Settings Keyboard and tuning chip rows clipped off the right
+  edge because they were non-wrapping `Row`s. Migrated to `FlowRow`; the
+  re-capture shows both groups wrapping, and chat/session/model sheets held at
+  2.0x (`28`-`30`).
 
 Gate history: attempt 1 (`v2-4-gate-1120-1.log`) failed one test because the
 session-sheet current-row assertion used `hasAnyAncestor` on a clickable row
 whose text is merged into the state-description node; the test was corrected.
 Attempt 2 was the first green run. Attempt 3 was green after the F-L colour fix,
-and the final attempt 4 was green after the F-M empty-bubble fix. A main-source
-compile failure before attempt 1 (`gutter` read from `CrushSpacing` instead of
-`CrushDimens`) is also recorded rather than hidden.
+attempt 4 after the F-M empty-bubble fix, and the final attempt 5 after the
+F-N 2.0x chip-wrapping fix. A main-source compile failure before attempt 1
+(`gutter` read from `CrushSpacing` instead of `CrushDimens`) is also recorded
+rather than hidden.
 
 The docs-close commit `9bcde52` run `44726529058` failed attempt 1 with 17
 Robolectric class setups erroring on a Maven artifact fetch
@@ -250,9 +257,9 @@ defect.
 - API 29 cannot prove API 30+ behaviour, instrumented-test execution, or
   wide/tablet layouts. The 640dp bubble cap is a source rule, not an
   observation.
-- 2.0x font scale, reduced motion and density overrides are **NOT PERFORMED**
-  on device. The source uses sp type, no fixed text heights and wrapping rows,
-  and the repo has no screenshot-test harness.
+- 2.0x font scale is checked on device (`28`-`31`); reduced motion and
+  density overrides are **NOT PERFORMED**. The source uses sp type, no fixed
+  text heights and wrapping rows, and the repo has no screenshot-test harness.
 - Frame timing is **NOT PERFORMED**: no pre-change baseline was captured on
   this device, so no before/after numbers are claimed.
 - Model **selection** was exercised on device (including the probe revert).

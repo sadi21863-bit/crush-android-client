@@ -1368,28 +1368,30 @@ Changes in the working tree:
 - **Composer:** growth uses `CrushDimens.composerMaxLines` (8); the §5.5.1
   gates and the always-enabled streaming Stop are unchanged.
 
-Evidence: the final four-task gate (attempt 4,
-`v2-4-gate-1120-4.log`) is green: 899 tests, 95 suites, 0 failures, 0 errors,
+Evidence: the final four-task gate (attempt 5,
+`v2-4-gate-1120-5.log`) is green: 899 tests, 95 suites, 0 failures, 0 errors,
 0 skipped; lint 0 errors / 1 pre-existing `NotShrinkingResources` warning.
-Attempts 2 and 3 were also green; attempt 1 failed one test because a
+Attempts 2-4 were also green; attempt 1 failed one test because a
 merged-semantics assertion used `hasAnyAncestor` on a clickable row, and the
 assertion was corrected.
 
 The device pass (`bbf8ca69`, API 29, 393dp) captured the empty state, ready
 header, picker, model sheet, session states, streaming/Stop, session
-switching, F-J chips, process recreation and Retry in
-`docs/parity/2026-11-20-v2-4-chat/` (27 captures plus a before-crop). Retry
-needed an owner-approved brief airplane-mode cut; after restore, Retry started
-a new turn and the ASK dialog gated the tool, which was denied. The pass found
-two real defects the tests could not see: **F-L**, user-bubble prose was
-near-black on graphite because `MarkdownText` ignored its colour for prose
-blocks, and **F-M**, a tool-only row drew an empty filled bubble. Both were
-fixed and re-captured (`12`, `15`). CI is green on both `ff3fef9`
-(`44715709979`) and the final `c8c476a` (`44725769114`).
+switching, F-J chips, 2.0x font scale, process recreation and Retry in
+`docs/parity/2026-11-20-v2-4-chat/` (30 stored captures plus a before-crop;
+capture 09 was deleted because it showed the masked key chip). Retry needed
+an owner-approved brief airplane-mode cut; after restore, Retry started a new
+turn and the ASK dialog gated the tool, which was denied. The pass found three
+real defects the tests could not see: **F-L**, user-bubble prose was near-black
+on graphite because `MarkdownText` ignored its colour for prose blocks;
+**F-M**, a tool-only row drew an empty filled bubble; and **F-N**, the Settings
+chip rows clipped at 2.0x. All were fixed and re-captured (`12`, `15`, `31`).
+CI is green on `ff3fef9` (`44715709979`) and `c8c476a` (`44725769114`); the
+F-N commit's run is recorded in the V2-4 document.
 
-NOT PERFORMED on device: frame timing (no baseline), 2.0x font scale, reduced
-motion, density, wide/tablet, API 30+, provider switch (model selection was
-exercised), and instrumented tests. These stay open, not claimed.
+NOT PERFORMED on device: frame timing (no baseline), reduced motion, density,
+wide/tablet, API 30+, provider switch (model selection was exercised), and
+instrumented tests. These stay open, not claimed.
 
 ## 6. Upstream filings
 

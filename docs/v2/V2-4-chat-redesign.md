@@ -191,7 +191,7 @@ Unchanged on purpose: `ChatAction.kt`, `ChatDispatch.kt`, `ChatScreen.kt`,
 | Four-task gate (final) | `v2-4-gate-1120-5.log`: `BUILD SUCCESSFUL in 14m 59s` | PASS (attempt 5) |
 | Unit-test count / failures | 899 tests, 95 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
-| CI | run `44725769114` on `c8c476a`: green; docs-close run `44727630308` on `d655d63`: green | PASS |
+| CI | `44725769114` on `c8c476a`, `44727630308` on `d655d63`, and `44733288902` on `e12750c`: all green | PASS |
 | Chat empty state, ready status, picker visible | `01-launch.png`, `04-ready-empty-draft.png` | PASS on device |
 | Streaming + Stop | `05-streaming.png`, `06-stopped.png` | PASS on device |
 | Retry | `23-retry-failure.png` ... `27-retry-settled.png` (network toggle with owner consent; tool denied) | PASS on device |

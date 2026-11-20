@@ -1386,8 +1386,8 @@ real defects the tests could not see: **F-L**, user-bubble prose was near-black
 on graphite because `MarkdownText` ignored its colour for prose blocks;
 **F-M**, a tool-only row drew an empty filled bubble; and **F-N**, the Settings
 chip rows clipped at 2.0x. All were fixed and re-captured (`12`, `15`, `31`).
-CI is green on `ff3fef9` (`44715709979`) and `c8c476a` (`44725769114`); the
-F-N commit's run is recorded in the V2-4 document.
+CI is green on `ff3fef9` (`44715709979`), `c8c476a` (`44725769114`),
+`d655d63` (`44727630308`) and the F-N commit `e12750c` (`44733288902`).
 
 NOT PERFORMED on device: frame timing (no baseline), reduced motion, density,
 wide/tablet, API 30+, provider switch (model selection was exercised), and

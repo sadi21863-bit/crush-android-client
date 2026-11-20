@@ -239,6 +239,12 @@ and the final attempt 4 was green after the F-M empty-bubble fix. A main-source
 compile failure before attempt 1 (`gutter` read from `CrushSpacing` instead of
 `CrushDimens`) is also recorded rather than hidden.
 
+The docs-close commit `9bcde52` run `44726529058` failed attempt 1 with 17
+Robolectric class setups erroring on a Maven artifact fetch
+(`MavenArtifactFetcher` / `FileNotFoundException`); the rerun (attempt 2)
+passed with no code change. It is recorded as infrastructure, not a product
+defect.
+
 ## 6. Honest limits
 
 - API 29 cannot prove API 30+ behaviour, instrumented-test execution, or

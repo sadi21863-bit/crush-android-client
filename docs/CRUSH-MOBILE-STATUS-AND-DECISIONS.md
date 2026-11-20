@@ -1384,9 +1384,8 @@ a new turn and the ASK dialog gated the tool, which was denied. The pass found
 two real defects the tests could not see: **F-L**, user-bubble prose was
 near-black on graphite because `MarkdownText` ignored its colour for prose
 blocks, and **F-M**, a tool-only row drew an empty filled bubble. Both were
-fixed and re-captured (`12`, `15`). CI for the earlier `ff3fef9` commit is
-green (`44715709979`); the F-L/F-M commit's run is recorded in the V2-4
-document once it lands.
+fixed and re-captured (`12`, `15`). CI is green on both `ff3fef9`
+(`44715709979`) and the final `c8c476a` (`44725769114`).
 
 NOT PERFORMED on device: frame timing (no baseline), 2.0x font scale, reduced
 motion, density, wide/tablet, API 30+, provider switch (model selection was

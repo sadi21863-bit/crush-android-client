@@ -191,7 +191,7 @@ Unchanged on purpose: `ChatAction.kt`, `ChatDispatch.kt`, `ChatScreen.kt`,
 | Four-task gate (final) | `v2-4-gate-1120-4.log`: `BUILD SUCCESSFUL in 15m 43s` | PASS (attempt 4) |
 | Unit-test count / failures | 899 tests, 95 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
-| CI | run `44715709979` on `ff3fef9` green (2026-11-20T10:05:09Z); the F-L/F-M commit is newer | PARTIAL: pre-fix commit green, final commit CI pending |
+| CI | run `44725769114` on `c8c476a`: completed success 2026-11-20T11:17Z; earlier `ff3fef9` run `44715709979` also green | PASS |
 | Chat empty state, ready status, picker visible | `01-launch.png`, `04-ready-empty-draft.png` | PASS on device |
 | Streaming + Stop | `05-streaming.png`, `06-stopped.png` | PASS on device |
 | Retry | `23-retry-failure.png` ... `27-retry-settled.png` (network toggle with owner consent; tool denied) | PASS on device |
@@ -255,5 +255,5 @@ compile failure before attempt 1 (`gutter` read from `CrushSpacing` instead of
 - The extended-rail branch remains unobservable on this phone (V2-3 F-K).
 - Tool-activity visibility (O4), delete confirmation (flow 13) and the
   redundant pre-key `agent/init` stay open; this record does not claim them.
-- The final F-L/F-M commit's CI is recorded separately once the push completes;
-  the green run in this table belongs to the earlier `ff3fef9` commit.
+- The final F-L/F-M commit's CI is green (`44725769114` on `c8c476a`); the
+  earlier `ff3fef9` run (`44715709979`) is also green.

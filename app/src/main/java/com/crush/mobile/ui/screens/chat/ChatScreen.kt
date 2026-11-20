@@ -1,6 +1,8 @@
 package com.crush.mobile.ui.screens.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -104,6 +106,20 @@ fun ChatScreen(
     // The content projection is built once per coherent host snapshot.
     val view = remember(host) { host.chat.toViewState(host.inputs) }
 
+    // V2-5 IA: the Chat/Code routes are list-first. The same projected state
+    // and action seam serve the list; a conversation is one selection away.
+    var showList by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(activeInstanceKey) { showList = true }
+    LaunchedEffect(showList, view.run.engineReady, activeInstanceKey) {
+        if (showList && view.run.engineReady) {
+            vm.dispatch(ChatAction.OpenSessions)
+        }
+    }
+    // Back from a conversation returns to the list (the route itself is a
+    // primary destination, so there is no nav entry to pop). While a turn is
+    // streaming, leave Back alone rather than hiding a prompt behind it.
+    BackHandler(enabled = !showList && !view.run.streaming) { showList = true }
+
     // The F04 trust request stays a DOMAIN object here; content only ever sees
     // [PendingTrustUi]. The origin remembers which entry raised the gate so an
     // Allow can re-call it, mode and arguments included.
@@ -140,6 +156,9 @@ fun ChatScreen(
     )
 
     val onAction: (ChatAction) -> Unit = { action ->
+        if (action is ChatAction.SelectSession || action is ChatAction.NewChat) {
+            showList = false
+        }
         if (action is ChatAction.DraftChanged) {
             onDraft(action.text)
         } else {
@@ -191,16 +210,19 @@ fun ChatScreen(
         }
     }
 
-    ChatContent(
-        state = view,
-        onAction = onAction,
-        pendingTrust = pendingTrust?.let { request ->
-            PendingTrustUi(
-                folderLabel = request.ref.label,
-                reason = crushrcTrustNote(request.kind),
-                flow = if (host.chat.handoffSheet != null) TrustFlow.Handoff else TrustFlow.Resume,
-            )
-        },
+    if (showList) {
+        ChatListContent(state = view, onAction = onAction)
+    } else {
+        ChatContent(
+            state = view,
+            onAction = onAction,
+            pendingTrust = pendingTrust?.let { request ->
+                PendingTrustUi(
+                    folderLabel = request.ref.label,
+                    reason = crushrcTrustNote(request.kind),
+                    flow = if (host.chat.handoffSheet != null) TrustFlow.Handoff else TrustFlow.Resume,
+                )
+            },
         onTrustConfirm = {
             val request = pendingTrust
             val origin = trustOrigin
@@ -234,7 +256,8 @@ fun ChatScreen(
             pendingTrust = null
             trustOrigin = null
         },
-    )
+        )
+    }
 }
 
 /**

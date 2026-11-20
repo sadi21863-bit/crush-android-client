@@ -151,7 +151,14 @@ fun ChatContent(
                 },
                 actions = {
                     IconButton(onClick = { onAction(ChatAction.NewChat) }) {
-                        Icon(Icons.Default.Add, contentDescription = "New chat (conversation-only)")
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = if (state.binding.kind == BindingKind.Project) {
+                                "New session"
+                            } else {
+                                "New chat (Crush Chat)"
+                            }
+                        )
                     }
                     // Model picker: only models the provider actually serves are
                     // listed. The label always has a value - display name, then
@@ -458,6 +465,11 @@ fun ChatContent(
             loading = state.session.list.loading,
             unavailable = state.session.list.unavailable,
             surfaceLabel = state.session.surface,
+            newLabel = if (state.binding.kind == BindingKind.Project) {
+                "New session"
+            } else {
+                "New chat"
+            },
             onPick = { id ->
                 showSessions = false
                 onAction(ChatAction.SelectSession(id))
@@ -1290,6 +1302,7 @@ private fun SessionSheet(
     loading: Boolean,
     unavailable: Boolean,
     surfaceLabel: String,
+    newLabel: String,
     onPick: (String) -> Unit,
     onDelete: (String) -> Unit,
     onNew: () -> Unit,
@@ -1343,7 +1356,7 @@ private fun SessionSheet(
             Button(onClick = onNew, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text("New chat")
+                Text(newLabel)
             }
             Spacer(Modifier.height(8.dp))
             // Review stays in the sheet: it is contextual to the conversation,

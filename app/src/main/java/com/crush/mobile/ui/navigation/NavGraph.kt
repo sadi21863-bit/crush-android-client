@@ -99,7 +99,12 @@ fun NavGraph(
                         popUpTo(Screen.Chat.route) { inclusive = true }
                         launchSingleTop = true
                     }
-                }
+                },
+                // V2-5 D10: Review changes from a project home binds the
+                // project through the same trust gate, then pushes Review.
+                // Back returns to Projects; the project remains the active
+                // binding for the next Code chat.
+                onOpenReview = { navController.navigate(Screen.Review.route) },
             )
         }
 

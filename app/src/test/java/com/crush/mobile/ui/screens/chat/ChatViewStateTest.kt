@@ -261,8 +261,8 @@ class ChatViewStateTest {
             ChatHostInputs(binding = BindingKind.ChatPool, snapshotReady = true)
         )
 
-        assertEquals("Chat - no tools \u00b7 ready", view.run.statusLabel(BindingKind.ChatPool))
-        assertEquals("Chat - no tools \u00b7 ready", view.binding.headerStatus(view.run))
+        assertEquals("Crush Chat - no tools \u00b7 ready", view.run.statusLabel(BindingKind.ChatPool))
+        assertEquals("Crush Chat - no tools \u00b7 ready", view.binding.headerStatus(view.run))
     }
 
     @Test

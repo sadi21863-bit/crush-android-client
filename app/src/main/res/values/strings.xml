@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Crush Mobile</string>
     <!-- V2 shell: three primary destinations, never icon-only (brief 4.6). -->
-    <string name="nav_chat">Chat</string>
-    <string name="nav_projects">Projects</string>
+    <string name="nav_chat">Crush Chat</string>
+    <string name="nav_projects">Crush Code</string>
     <string name="nav_settings">Settings</string>
 </resources>

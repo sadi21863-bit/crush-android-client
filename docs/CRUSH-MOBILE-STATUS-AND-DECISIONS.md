@@ -1427,13 +1427,34 @@ Implementation batch 1:
 - **Rail:** the changed-files panel uses the shared card, says "not measured"
   when appropriate, and the diff hunk header now reports separate before/after
   counts instead of the same line count.
+- **Shell IME (F-O, owner-reported):** the phone bottom bar was staying between
+  the composer and the keyboard. `CrushShell` now hides it while the IME is
+  visible and restores it on close; rails stay. Device re-verification is part
+  of the pending pass.
 
-The four-task gate is green on attempt 1 (`v2-5-gate-1120-1.log`,
-`BUILD SUCCESSFUL in 20m 45s`): 910 tests, 95 suites, 0 failures, 0 errors,
-0 skipped; lint 0 errors / 1 pre-existing warning. The device pass and CI are
-**NOT PERFORMED** at the time of writing; they are recorded in the V2-5
-document. Explore, tablet panes, Review history persistence and a test runner
-stay out of scope.
+**Owner IA correction (2026-11-20, V2-A11/A12).** The notebook makes the split
+explicit: three tabs **Crush Chat / Crush Code / Settings**; Crush Chat uses
+the legacy workspace and is Q&A-only; Crush Code contains projects and every
+project has its own sessions. The implementation now:
+
+- labels the tabs Crush Chat and Crush Code (Projects is the project list
+  inside Crush Code, not a peer tab);
+- binds Crush Chat to the legacy instance and applies the same readback-verified
+  deny-all tool policy there (ChatPool is compatibility/archival);
+- makes the Chat and Code routes list-first: Crush Chat shows chats, a Code
+  project shows its own sessions, "New chat" mints a legacy chat and "New
+  session" stays on the project engine;
+- keeps the project home (identity, trust, latest measured turn, Open Code
+  chat, Review) as the bridge into a project's sessions.
+
+The IME bar fix (F-O) is included. The final gate on this corrected tree is
+green: `v2-5-gate-1120-5.log`, 915 tests / 96 suites / 0 failures, lint 0
+errors / 1 pre-existing warning. The device pass and CI are still pending; the
+package is not complete until they are recorded.
+
+Explore, tablet panes, Review history persistence and a test runner stay out of
+scope. ChatPool sessions created before V2-A11 are archival, not migrated or
+listed.
 
 ## 6. Upstream filings
 

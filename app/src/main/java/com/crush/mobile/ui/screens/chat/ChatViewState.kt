@@ -97,21 +97,23 @@ fun RunView.statusLabel(kind: BindingKind): String {
             phase.takeIf { it.isNotBlank() }
                 ?: if (readiness == EngineReadiness.Failed) "engine failed" else "starting agent"
     }
-    return if (kind == BindingKind.ChatPool) "Chat - no tools \u00b7 $status" else status
+    return if (kind == BindingKind.ChatPool) {
+        "Crush Chat - no tools \u00b7 $status"
+    } else {
+        status
+    }
 }
 
 /**
- * V2-5 D6: project identity stays visible on a populated Code chat.
- *
- * The binding, not the session title, is the durable project fact. ChatPool
- * keeps its no-tools hint (V2-4); Legacy stays status-only because it has no
- * project identity to name.
+ * V2-5 D4: the user-facing IA names the conversation mode "Crush Chat".
+ * Project identity still wins on a Code chat; ChatPool is the compatibility
+ * key for sessions created before Chat moved to the legacy instance.
  */
 fun BindingView.headerStatus(run: RunView): String = when (kind) {
     BindingKind.Project ->
         "${projectLabel ?: "Project"} \u00b7 ${run.statusLabel(kind)}"
-    BindingKind.ChatPool,
-    BindingKind.Legacy -> run.statusLabel(kind)
+    BindingKind.ChatPool -> run.statusLabel(kind)
+    BindingKind.Legacy -> "Crush Chat \u00b7 ${run.statusLabel(kind)}"
 }
 
 data class ModelView(
@@ -219,7 +221,7 @@ fun ChatViewState.emptyCopy(): EmptyChatCopy {
                 BindingKind.Project ->
                     "Ask about ${binding.projectLabel ?: "this project"}, plan a change, or run a command."
                 BindingKind.Legacy ->
-                    "Ask about the code, plan a change, or run a command."
+                    "Ask a question, brainstorm, or plan something. Crush Chat answers only; it cannot run tools or edit files."
             },
         )
         run.readiness == EngineReadiness.Switching -> EmptyChatCopy(

@@ -43,15 +43,21 @@ import com.crush.mobile.data.project.PendingProjectTrust
 import com.crush.mobile.project.ProjectRef
 import com.crush.mobile.ui.CrushrcTrustDialog
 import com.crush.mobile.ui.components.CrushBanner
+import com.crush.mobile.ui.components.CrushButton
+import com.crush.mobile.ui.components.CrushButtonVariant
 import com.crush.mobile.ui.components.CrushCard
 import com.crush.mobile.ui.components.CrushEmptyState
 import com.crush.mobile.ui.components.CrushLoadingRow
+import com.crush.mobile.ui.components.CrushSheet
 import com.crush.mobile.ui.components.CrushStatusLabel
 import com.crush.mobile.ui.components.CrushTone
 import com.crush.mobile.ui.crushrcTrustNote
 import com.crush.mobile.ui.theme.CrushSpacing
 import com.crush.mobile.ui.theme.CrushType
 import com.crush.mobile.ui.theme.LocalCrushColors
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Phase 2b.2 (V2 plan §§5.6, 6.5): the Projects surface, rendered only from
@@ -75,6 +81,7 @@ fun ProjectsContent(
     pendingTrust: PendingProjectTrust?,
     onImport: () -> Unit,
     onOpen: (ProjectRef) -> Unit,
+    onReviewProject: (ProjectRef) -> Unit,
     onRemove: (ProjectRef) -> Unit,
     onTrustConfirm: () -> Unit,
     onTrustDismiss: () -> Unit,
@@ -84,11 +91,13 @@ fun ProjectsContent(
     // confirmation. Local to the content, exactly as the sheet/dialog state
     // stayed local in 2b.1.
     var pendingRemove by remember { mutableStateOf<ProjectRef?>(null) }
+    // V2-5 D10: a row opens a home, not a chat.
+    var pendingHome by remember { mutableStateOf<ProjectRef?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Projects") }
+                title = { Text("Crush Code") }
             )
         }
     ) { padding ->
@@ -130,17 +139,22 @@ fun ProjectsContent(
                 )
             }
 
+            // V2-A10: the legacy workspace is Chat history, not a Code
+            // project. It stays out of this list entirely.
+            val codeProjects = state.projects.filterNot {
+                it.repoDir.absolutePath == legacyPath
+            }
             when {
                 state.loading -> CrushLoadingRow(
                     text = "Loading projects...",
                     modifier = Modifier.padding(vertical = CrushSpacing.lg)
                 )
 
-                state.projects.isEmpty() -> CrushEmptyState(
+                codeProjects.isEmpty() -> CrushEmptyState(
                     // Say WHY, per the house rule on empty states.
-                    title = "No projects yet",
-                    body = "Import a folder to create a project. The legacy " +
-                        "workspace appears here after migration.",
+                    title = "No Code projects yet",
+                    body = "Import a folder to create a Code project. Chat " +
+                        "keeps its own separate history.",
                     modifier = Modifier.padding(vertical = CrushSpacing.md)
                 )
 
@@ -148,33 +162,24 @@ fun ProjectsContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    items(state.projects, key = { it.id }) { project ->
-                        // Opening a row = binding the chat to that row's OWN
-                        // engine instance (ADR-0001 slice 2). The legacy row
-                        // is the host's routing exception; this layer only
-                        // reports the tap. It likewise never gets a Remove
-                        // affordance: it hosts every existing chat, and the
-                        // entry migration would re-create its row anyway.
-                        val isLegacy = project.repoDir.absolutePath == legacyPath
-                        val removable = !isLegacy
-                        // F-A/V2-5 D4: the current row is the container's
-                        // active binding, not a remembered UI choice.
-                        val current = project.id == state.activeProjectId ||
-                            (isLegacy && state.legacyActive)
-                        val identity = when {
-                            isLegacy -> "App history workspace"
-                            project.repoDir.absolutePath.startsWith(internalRoot) ->
-                                "App-managed workspace"
-                            else -> "Imported folder"
+                    items(codeProjects, key = { it.id }) { project ->
+                        // V2-5 D10: a row opens the project home; the home's
+                        // action performs the trust-gated bind, not this layer.
+                        val current = project.id == state.activeProjectId
+                        val identity = if (
+                            project.repoDir.absolutePath.startsWith(internalRoot)
+                        ) {
+                            "App-managed workspace"
+                        } else {
+                            "Imported folder"
                         }
                         ProjectRow(
                             project = project,
                             current = current,
                             identityLabel = identity,
-                            onOpen = { onOpen(project) },
-                            onRemove = if (removable) {
-                                { pendingRemove = project }
-                            } else null
+                            activity = state.activityByPath[project.repoDir.absolutePath],
+                            onOpen = { pendingHome = project },
+                            onRemove = { pendingRemove = project }
                         )
                     }
                 }
@@ -182,13 +187,37 @@ fun ProjectsContent(
 
             Spacer(Modifier.height(8.dp))
             Text(
-                "Tapping a project opens it in chat on its OWN engine instance; " +
-                    "opening the legacy workspace returns to the shared engine.",
+                "A project opens its home. Open Code chat binds that project " +
+                    "to its own engine instance.",
                 style = CrushType.body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
         }
+    }
+
+    // V2-5 D10: the project home. It is read-only about the project: the two
+    // actions perform the trust-gated bind/destination choice in the host.
+    pendingHome?.let { project ->
+        val identity = if (project.repoDir.absolutePath.startsWith(internalRoot)) {
+            "App-managed workspace"
+        } else {
+            "Imported folder"
+        }
+        ProjectHomeSheet(
+            project = project,
+            identityLabel = identity,
+            activity = state.activityByPath[project.repoDir.absolutePath],
+            onOpenChat = {
+                pendingHome = null
+                onOpen(project)
+            },
+            onReview = {
+                pendingHome = null
+                onReviewProject(project)
+            },
+            onDismiss = { pendingHome = null },
+        )
     }
 
     // Removal confirmation (2026-11-04): the wording is type-honest so the
@@ -255,14 +284,16 @@ fun ProjectsContent(
  * affordance - it hosts the app's existing history and the entry migration
  * would resurrect it anyway).
  *
- * V2-5 D4/D5: the current row carries a filled check plus the word "Current"
- * and a spoken state; trust is a written status, never a colour-only badge.
+ * V2-5 D4/D5/D10: the current row carries a filled check plus the word
+ * "Current" and a spoken state; trust and the latest measured turn are written
+ * status, never colour-only badges.
  */
 @Composable
 private fun ProjectRow(
     project: ProjectRef,
     current: Boolean,
     identityLabel: String,
+    activity: ProjectActivity?,
     onOpen: () -> Unit,
     onRemove: (() -> Unit)? = null,
 ) {
@@ -317,10 +348,80 @@ private fun ProjectRow(
         Spacer(Modifier.height(CrushSpacing.xs))
         Text(identityLabel, style = CrushType.metadata, color = colors.muted)
         Spacer(Modifier.height(CrushSpacing.xs))
+        Text(
+            activityLabel(activity),
+            style = CrushType.metadata,
+            color = colors.muted
+        )
+        Spacer(Modifier.height(CrushSpacing.xs))
         CrushStatusLabel(
-            text = if (project.trusted) "Configuration approved"
-            else "No approved configuration",
-            tone = if (project.trusted) CrushTone.Success else CrushTone.Neutral,
+            text = trustText(project),
+            tone = trustTone(project),
         )
     }
 }
+
+@Composable
+private fun ProjectHomeSheet(
+    project: ProjectRef,
+    identityLabel: String,
+    activity: ProjectActivity?,
+    onOpenChat: () -> Unit,
+    onReview: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    CrushSheet(title = project.label, onDismiss = onDismiss) {
+        Text(
+            project.repoDir.absolutePath,
+            style = CrushType.code,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(CrushSpacing.xs))
+        Text(
+            identityLabel,
+            style = CrushType.metadata,
+            color = LocalCrushColors.current.muted
+        )
+        Spacer(Modifier.height(CrushSpacing.xs))
+        CrushStatusLabel(text = trustText(project), tone = trustTone(project))
+        Spacer(Modifier.height(CrushSpacing.md))
+        Text("Latest measured turn", style = CrushType.section)
+        Spacer(Modifier.height(CrushSpacing.xs))
+        Text(
+            activityLabel(activity),
+            style = CrushType.secondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(CrushSpacing.lg))
+        CrushButton(
+            text = "Open Code chat",
+            onClick = onOpenChat,
+            modifier = Modifier.fillMaxWidth(),
+            variant = CrushButtonVariant.Primary,
+        )
+        Spacer(Modifier.height(CrushSpacing.sm))
+        CrushButton(
+            text = "Review changes",
+            onClick = onReview,
+            modifier = Modifier.fillMaxWidth(),
+            variant = CrushButtonVariant.Secondary,
+        )
+    }
+}
+
+private fun trustText(project: ProjectRef): String =
+    if (project.trusted) "Configuration approved" else "No approved configuration"
+
+private fun trustTone(project: ProjectRef): CrushTone =
+    if (project.trusted) CrushTone.Success else CrushTone.Neutral
+
+private fun activityLabel(activity: ProjectActivity?): String = when {
+    activity == null -> "No changes measured in this app run."
+    activity.notMeasured -> "Latest turn: changes were not measured."
+    activity.changeCount == 0 -> "Latest turn: no file changes."
+    else -> "Latest turn: ${activity.changeCount} file(s) " +
+        "+${activity.added} -${activity.removed} at " +
+        HOME_TIME.format(Date(activity.startedAtMs)) + "."
+}
+
+private val HOME_TIME = SimpleDateFormat("HH:mm", Locale.US)

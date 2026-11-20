@@ -22,6 +22,18 @@ data class ProjectsUiState(
      * projected by the host. Null means no project binding.
      */
     val activeProjectId: UUID? = null,
-    /** The legacy row is current when the active binding is Legacy. */
-    val legacyActive: Boolean = false,
+    /**
+     * V2-5 D10: the latest measured turn per project root. The host derives
+     * this from ReviewHistory; the content never reads the container.
+     */
+    val activityByPath: Map<String, ProjectActivity> = emptyMap(),
+)
+
+/** The latest measured Code activity for a project, as shown in its home. */
+data class ProjectActivity(
+    val changeCount: Int,
+    val added: Int,
+    val removed: Int,
+    val startedAtMs: Long,
+    val notMeasured: Boolean,
 )

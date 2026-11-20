@@ -2312,22 +2312,40 @@ class ChatViewModel(
     }
 
     /**
-     * S4: the session surface's "+ New chat" button = a CHAT-pool session
-     * (Q1(a) choose-at-creation; the chat choice is the Chat default, Q3).
-     * Binds the dedicated conversation instance first - its switch contract
-     * stops the outgoing engine unless a run is in flight - then mints a
-     * fresh session there. newThread falls back to bootstrap when the pool's
-     * WorkspaceManager is not handed out yet, so either path lands a real
-     * chat-pool session.
+     * V2-5 IA: the list's new-chat action.
+     *
+     * - Crush Chat: binds the legacy workspace (the Chat engine) and mints a
+     *   fresh chat there.
+     * - Crush Code: mints a fresh session on the ACTIVE project's engine; it
+     *   never jumps to Chat.
+     *
+     * Existing history stays intact and reachable through the list.
      */
     fun startChatSession() {
-        container.setActiveChatPool()
+        // V2-5 IA: Crush Chat is the legacy workspace. A "+" inside a Code
+        // project must instead mint a session on that project's engine (the
+        // sketch: every project has its own chats/sessions).
+        val active = container.activeBinding.value
+        if (active is com.crush.mobile.di.AppContainer.EngineBinding.Project) {
+            // A fresh Code session stays on this project's engine. If the
+            // project engine is cold (prewarm off), start it here; the pending
+            // mint is consumed by bootstrap once the port lands.
+            if (workspaces == null) startEngine()
+            clearForNewThread()
+            pendingNewChatKey = instanceKey
+            newThread()
+            return
+        }
+        container.setActiveProject(null)
         bindProject()
-        // A cold chat-pool boot used to leave the outgoing project transcript
-        // on screen under a chat-pool subtitle: only newThread's warm path
-        // cleared the view, while the bootstrap fallback resumed the old
-        // session. Clear BEFORE the fallback; the pending mint below replaces
-        // the session id as soon as the chat-pool engine lands.
+        if (workspaces == null) startEngine()
+        clearForNewThread()
+        pendingNewChatKey = instanceKey
+        newThread()
+    }
+
+    /** Clears the view before a new thread, including a cold bootstrap fallback. */
+    private fun clearForNewThread() {
         _state.update {
             it.copy(
                 messages = emptyList(),
@@ -2340,8 +2358,6 @@ class ChatViewModel(
                 handoffResumeHint = null
             )
         }
-        pendingNewChatKey = instanceKey
-        newThread()
     }
 
     /** Starts a fresh thread, leaving history intact and reachable. */

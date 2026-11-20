@@ -60,7 +60,7 @@ class ChatHostInputsTest {
 
         assertEquals("New chat", view.session.label)
         assertEquals(BindingKind.Legacy, view.binding.kind)
-        assertEquals("Workspace (legacy)", view.session.surface)
+        assertEquals("Crush Chat", view.session.surface)
     }
 
     @Test

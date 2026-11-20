@@ -2,7 +2,9 @@ package com.crush.mobile.ui.navigation
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -38,11 +40,20 @@ class ShellNavigationTest {
 
     private lateinit var nav: NavHostController
 
-    private fun setContent(start: String = "chat") {
+    private fun setContent(
+        start: String = "chat",
+        codeActive: Boolean = false,
+        onSelectChat: (() -> Unit)? = null,
+    ) {
         compose.setContent {
             nav = rememberNavController()
             CrushMobileTheme(themeMode = "light") {
-                CrushShell(navController = nav, fallbackRoute = start) {
+                CrushShell(
+                    navController = nav,
+                    fallbackRoute = start,
+                    codeActive = codeActive,
+                    onSelectChat = onSelectChat,
+                ) {
                     NavHost(navController = nav, startDestination = start) {
                         composable("chat") { StubDestination("chat") }
                         composable("projects") { StubDestination("projects") }
@@ -62,11 +73,30 @@ class ShellNavigationTest {
 
     @Test
     @Config(qualifiers = "w411dp-h1600dp")
+    fun `a project chat highlights Crush Code and Chat resets the binding`() {
+        var chatSelections = 0
+        setContent(
+            start = "chat",
+            codeActive = true,
+            onSelectChat = { chatSelections += 1 },
+        )
+
+        compose.onNodeWithText("Crush Code").assertIsSelected()
+        compose.onNodeWithText("Crush Chat").assertIsNotSelected()
+
+        compose.onNodeWithText("Crush Chat").performClick()
+        compose.waitForIdle()
+
+        assertEquals(1, chatSelections)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
     fun `phone shows the bottom bar and opens each destination`() {
         setContent()
         compose.onNodeWithTag("shell-bottom-bar").assertIsDisplayed()
 
-        compose.onNodeWithText("Projects").performClick()
+        compose.onNodeWithText("Crush Code").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("projects-content").assertIsDisplayed()
         assertEquals("projects", nav.currentDestination?.route)
@@ -82,7 +112,7 @@ class ShellNavigationTest {
     fun `switching destinations never duplicates and back returns to chat`() {
         setContent()
 
-        compose.onNodeWithText("Projects").performClick()
+        compose.onNodeWithText("Crush Code").performClick()
         compose.waitForIdle()
         // Chat stays at the root: back from a secondary destination lands there.
         assertEquals("chat", nav.previousBackStackEntry?.destination?.route)
@@ -92,7 +122,7 @@ class ShellNavigationTest {
         // Projects was replaced, not stacked: Settings' parent is still Chat.
         assertEquals("chat", nav.previousBackStackEntry?.destination?.route)
 
-        compose.onNodeWithText("Chat").performClick()
+        compose.onNodeWithText("Crush Chat").performClick()
         compose.waitForIdle()
         assertEquals("chat", nav.currentDestination?.route)
         // Nothing is left to pop: no duplicate chat entry was pushed.
@@ -115,7 +145,7 @@ class ShellNavigationTest {
         // so a detour to Settings must not recreate the conversation.
         assertEquals(chatEntry!!.id, nav.previousBackStackEntry?.id)
 
-        compose.onNodeWithText("Chat").performClick()
+        compose.onNodeWithText("Crush Chat").performClick()
         compose.waitForIdle()
         assertEquals(chatEntry.id, nav.currentBackStackEntry?.id)
     }
@@ -125,7 +155,7 @@ class ShellNavigationTest {
     fun `rapid destination taps leave exactly one entry above chat`() {
         setContent()
 
-        compose.onNodeWithText("Projects").performClick()
+        compose.onNodeWithText("Crush Code").performClick()
         // Deliberately no waitForIdle between the taps: a stale callback that
         // navigated after the shell recomposed would stack two destinations.
         compose.onNodeWithText("Settings").performClick()
@@ -164,7 +194,7 @@ class ShellNavigationTest {
         compose.onNodeWithTag("shell-rail").assertIsDisplayed()
         compose.onNodeWithTag("shell-bottom-bar").assertDoesNotExist()
 
-        compose.onNodeWithText("Projects").performClick()
+        compose.onNodeWithText("Crush Code").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("projects-content").assertIsDisplayed()
     }

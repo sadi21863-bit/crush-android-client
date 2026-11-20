@@ -23,6 +23,8 @@ the owner's trims.
 | `V2-3-app-shell.md` | V2-3 adaptive shell record: three primary destinations, 600/840dp breakpoints, `navigatePrimary` back-stack rule, sheet de-duplication, test list, device evidence and honest limits |
 | `V2-4-chat-redesign.md` | V2-4 chat record: scope/trims, F-B/F-C/F-E/F-J decisions, code map, test plan, evidence (complete) |
 | `V2-5-code-projects-review.md` | V2-5 Code/Projects/Review record: V2-A9 Explore deferral, Review scoping, Projects current marker, provenance, evidence (in progress) |
+| `V2-5-chat-code-ia-plan.md` | Corrected Chat/Code IA from the owner notebook: Crush Chat on legacy, Crush Code project sessions, list-first (V2-A11/A12) |
+| `V2-5-chat-code-split-research.md` | Source-plan research for the Chat/Code split, drift list and legacy-history consequence |
 | `../parity/2026-11-19-v2-0-baseline/MANIFEST.md` | fresh task-6 phone capture set: device/build, 15 captures, findings F-A to F-G, corrections C1 to C3 |
 
 ## Scope
@@ -44,7 +46,7 @@ the owner's trims.
 | V2-2 | complete (exit criteria, 2026-11-20) | tokens in `ui/theme/`, component set piloted on Diagnostics, 871 tests green, lint 0 errors, full gate passed on attempts 2-4 (attempt 1 failed on a test-fixture typo), CI `44618219274` green; device evidence in `docs/parity/2026-11-20-v2-2-tokens/` (two defects found and fixed: card hairline, dark navigation bar). Partial task items: no screenshot-test harness; font-scale/reduced-motion/density NOT PERFORMED. F-J selection affordance is carried to V2-4 |
 | V2-3 | complete (2026-11-20) | adaptive shell: bottom bar `<600dp`, rail `600-839dp`, extended rail `>=840dp` (extended rail not on hardware), single `navigatePrimary` rule, primary-only chrome; 885 tests green, lint 0 errors, CI run `44669754612` green; device pass in `docs/parity/2026-11-20-v2-3-shell/` (12 captures: bar, sheet, Back, IME, landscape rail, rotation). Limits: extended rail, API 30+, wide/tablet and instrumented tests NOT PERFORMED |
 | V2-4 | complete (2026-11-20) | chat empty/transcript/composer/sheets/picker redesign plus F-B/F-C/F-E/F-J; tasks 4 and 7-cost/context trimmed by V2-A4; final gate 899 tests / 0 failures, lint 0 errors / 1 pre-existing warning; 30-capture device pass found and fixed F-L (user-prose contrast), F-M (empty tool-only bubble) and F-N (2.0x chip clipping); Retry verified after an owner-approved network cut; 2.0x font scale checked; CI `44734151566` green. Limits: frame timing, reduced motion, density, wide/tablet, provider switch and model loading/not-in-list device states NOT PERFORMED |
-| V2-5 | in progress (2026-11-20) | Build + Review (Explore deferred, V2-A9); Projects current marker/trust/states, persistent project identity in Code chat, project-scoped Review with per-root run flags and cap, not-measured cards, provenance, rail polish; gate green (910 tests, 0 failures; lint 0 errors / 1 pre-existing warning); CI and device pass pending |
+| V2-5 | in progress (2026-11-20) | corrected IA V2-A11/A12: Crush Chat on legacy with deny-all policy, Crush Code project list → project home → project sessions, list-first tabs, Code-tab shell selection; Project-scoped Review, not-measured cards, IME bar; gate 5 green (915 tests, 0 failures; lint 0 errors / 1 pre-existing warning); CI and device pass pending |
 | V2-6 | not started | V2-2 components |
 | V2-7/8/9 | parked | separate owner approval |
 

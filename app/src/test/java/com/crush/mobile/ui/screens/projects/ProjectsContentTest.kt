@@ -60,8 +60,13 @@ class ProjectsContentTest {
     private fun project(
         label: String,
         path: String,
-        environment: ProjectRef.EnvironmentLevel = ProjectRef.EnvironmentLevel.L0_EMBEDDED,
-    ): ProjectRef = ProjectRef(UUID.randomUUID(), label, File(path), environment)
+        trusted: Boolean = false,
+    ): ProjectRef = ProjectRef(
+        UUID.randomUUID(),
+        label,
+        File(path),
+        trusted = trusted,
+    )
 
     private fun setContent(
         state: ProjectsUiState = ProjectsUiState(loading = false),
@@ -69,6 +74,7 @@ class ProjectsContentTest {
         pendingTrust: PendingProjectTrust? = null,
         onImport: () -> Unit = {},
         onOpen: (ProjectRef) -> Unit = {},
+        onReviewProject: (ProjectRef) -> Unit = {},
         onRemove: (ProjectRef) -> Unit = {},
         onTrustConfirm: () -> Unit = {},
         onTrustDismiss: () -> Unit = {},
@@ -82,6 +88,7 @@ class ProjectsContentTest {
                 pendingTrust = pendingTrust,
                 onImport = onImport,
                 onOpen = onOpen,
+                onReviewProject = onReviewProject,
                 onRemove = onRemove,
                 onTrustConfirm = onTrustConfirm,
                 onTrustDismiss = onTrustDismiss,
@@ -93,9 +100,9 @@ class ProjectsContentTest {
     fun `an empty registry explains what the list is for`() {
         setContent()
 
-        compose.onNodeWithText("No projects yet").assertIsDisplayed()
+        compose.onNodeWithText("No Code projects yet").assertIsDisplayed()
         compose.onNodeWithText(
-            "Import a folder to create a project.",
+            "Import a folder to create a Code project.",
             substring = true,
         ).assertIsDisplayed()
     }
@@ -127,19 +134,14 @@ class ProjectsContentTest {
 
     @Test
     fun `populated rows carry label path identity and trust`() {
-        val imported = project(
-            "Notes",
-            importedPath,
-            ProjectRef.EnvironmentLevel.L1_TERMUX_TOOLS,
-        )
+        val imported = project("Notes", importedPath)
         setContent(
             state = ProjectsUiState(
                 loading = false,
-                projects = listOf(project("Legacy workspace", legacyPath), imported),
+                projects = listOf(imported),
             )
         )
 
-        compose.onNodeWithText("Legacy workspace").assertIsDisplayed()
         compose.onNodeWithText("Notes").assertIsDisplayed()
         // Path/tail rows can sit below the tall card fold in the test
         // viewport; existence is the parity fact here, the labels carry the
@@ -148,14 +150,13 @@ class ProjectsContentTest {
         // V2-5: the raw environment enum is gone; identity and trust are
         // written status, not an implementation detail.
         compose.onNodeWithText("Imported folder").assertExists()
-        compose.onNodeWithText("App history workspace").assertExists()
-        compose.onAllNodesWithText("No approved configuration").assertCountEquals(2)
-        compose.onAllNodesWithText("L1_TERMUX_TOOLS workspace").assertCountEquals(0)
+        compose.onNodeWithText("No approved configuration").assertExists()
+        compose.onAllNodesWithText("L0_EMBEDDED workspace").assertCountEquals(0)
     }
 
     @Test
     fun `a trusted project says its configuration is approved`() {
-        val trusted = project("Notes", importedPath).copy(trusted = true)
+        val trusted = project("Notes", importedPath, trusted = true)
         setContent(
             state = ProjectsUiState(loading = false, projects = listOf(trusted))
         )
@@ -181,34 +182,80 @@ class ProjectsContentTest {
     }
 
     @Test
-    fun `the legacy row is current when the legacy binding is active`() {
+    fun `the legacy workspace is not listed among Code projects`() {
         val legacy = project("Legacy workspace", legacyPath)
+        val imported = project("Notes", importedPath)
         setContent(
             state = ProjectsUiState(
                 loading = false,
-                projects = listOf(legacy),
-                legacyActive = true,
+                projects = listOf(legacy, imported),
             )
         )
 
-        compose.onNodeWithText("Current").assertExists()
-        compose.onAllNodes(currentState()).assertCountEquals(1)
+        compose.onAllNodesWithText("Legacy workspace").assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Remove Legacy workspace").assertCountEquals(0)
+        compose.onNodeWithText("Notes").assertIsDisplayed()
     }
 
     @Test
-    fun `the legacy row opens but never offers remove`() {
-        val legacy = project("Legacy workspace", legacyPath)
+    fun `a project row opens a home with identity and both Code actions`() {
+        val target = project("Notes", importedPath, trusted = true)
         val opened = mutableListOf<ProjectRef>()
+        val reviewed = mutableListOf<ProjectRef>()
         setContent(
-            state = ProjectsUiState(loading = false, projects = listOf(legacy)),
+            state = ProjectsUiState(loading = false, projects = listOf(target)),
             onOpen = { opened += it },
+            onReviewProject = { reviewed += it },
         )
 
-        compose.onAllNodesWithContentDescription("Remove Legacy workspace").assertCountEquals(0)
-        compose.onNodeWithText("Legacy workspace").performClick()
+        // The row is a home entry, not a chat launch.
+        compose.onNodeWithText("Notes").performClick()
         compose.waitForIdle()
 
-        assertEquals(listOf(legacy), opened)
+        compose.onNodeWithText("Open Code chat").assertIsDisplayed()
+        compose.onNodeWithText("Review changes").assertIsDisplayed()
+        compose.onAllNodesWithText("Configuration approved").assertCountEquals(2)
+        compose.onAllNodesWithText("No changes measured in this app run", substring = true)
+            .assertCountEquals(2)
+
+        compose.onNodeWithText("Review changes").performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(target), reviewed)
+        assertTrue("the home must not open chat by itself", opened.isEmpty())
+
+        compose.onNodeWithText("Notes").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Open Code chat").performClick()
+        compose.waitForIdle()
+
+        assertEquals(listOf(target), opened)
+    }
+
+    @Test
+    fun `the latest measured turn is shown in the row and home`() {
+        val target = project("Notes", importedPath)
+        setContent(
+            state = ProjectsUiState(
+                loading = false,
+                projects = listOf(target),
+                activityByPath = mapOf(
+                    importedPath to ProjectActivity(
+                        changeCount = 2,
+                        added = 5,
+                        removed = 1,
+                        startedAtMs = 1_700_000_000_000L,
+                        notMeasured = false,
+                    )
+                ),
+            )
+        )
+
+        compose.onAllNodesWithText("Latest turn: 2 file(s) +5 -1", substring = true)
+            .assertCountEquals(1)
+        compose.onNodeWithText("Notes").performClick()
+        compose.waitForIdle()
+        compose.onAllNodesWithText("Latest turn: 2 file(s) +5 -1", substring = true)
+            .assertCountEquals(2)
     }
 
     @Test

@@ -266,7 +266,14 @@ class CrushEngine(
             // the pure [chatPolicyGate] below so it is unit-testable without
             // Android APIs; the reasons are content-free by construction
             // (counts only, never file text - the file holds the raw key).
-            if (instanceKey == EnginePaths.CHAT_INSTANCE_KEY) {
+            // V2-5 IA: the legacy instance IS Crush Chat now (the owner's
+            // sketch: "Crush Chat will use the legacy workspace"). The same
+            // fail-closed deny-all policy therefore applies to "" as well as
+            // the compatibility ChatPool key.
+            if (
+                instanceKey == EnginePaths.CHAT_INSTANCE_KEY ||
+                instanceKey.isEmpty()
+            ) {
                 // Fail-CLOSED end to end (mirrors [spawnVetoed]'s throw-veto
                 // stance below): the injector is contracted to never throw,
                 // but an evaluation that TOSSES anyway must refuse the birth -

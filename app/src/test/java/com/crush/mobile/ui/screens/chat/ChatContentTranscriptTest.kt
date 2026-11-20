@@ -87,7 +87,7 @@ class ChatContentTranscriptTest {
         // the same snapshot as the binding, so a ready engine reads "ready".
         setContent(ChatFixtures.view(phase = "connecting to agent", engineReady = true))
 
-        compose.onNodeWithText("Chat - no tools \u00b7 ready").assertIsDisplayed()
+        compose.onNodeWithText("Crush Chat - no tools \u00b7 ready").assertIsDisplayed()
         compose.onAllNodesWithText("connecting to agent").assertCountEquals(0)
     }
 
@@ -307,7 +307,7 @@ internal object ChatFixtures {
     fun view(
         sessionId: String? = "s1",
         label: String = "Retry the deck",
-        surface: String = "Chats - conversation only",
+        surface: String = "Crush Chat - conversation only",
         messages: List<ChatMessage> = emptyList(),
         phase: String = "ready",
         engineReady: Boolean = true,
@@ -318,6 +318,8 @@ internal object ChatFixtures {
         draft: String = "",
         prewarm: Boolean = true,
         enterSends: Boolean = false,
+        bindingKind: BindingKind = BindingKind.ChatPool,
+        projectLabel: String? = null,
         selectedModel: SelectedModelView? = null,
         models: List<ModelItem> = emptyList(),
         modelsError: String? = null,
@@ -340,7 +342,7 @@ internal object ChatFixtures {
                 unavailable = sessionsUnavailable,
             ),
         ),
-        binding = BindingView(kind = BindingKind.ChatPool, projectLabel = null),
+        binding = BindingView(kind = bindingKind, projectLabel = projectLabel),
         run = RunView(
             phase = phase,
             readiness = readiness

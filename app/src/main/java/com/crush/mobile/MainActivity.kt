@@ -241,10 +241,16 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                 onRetry = { checkEngineCompatibility() }
                             )
                         } else {
-                            CrushShell(
-                                navController = navController,
-                                fallbackRoute = startDestination,
-                            ) {
+                // The Chat/Code tabs are distinct even though both use the
+                // chat route: a project-bound chat is Crush Code, a legacy
+                // chat is Crush Chat. Tapping Crush Chat resets the binding.
+                val activeBinding by container.activeBinding.collectAsState()
+                CrushShell(
+                    navController = navController,
+                    fallbackRoute = startDestination,
+                    codeActive = activeBinding is com.crush.mobile.di.AppContainer.EngineBinding.Project,
+                    onSelectChat = { container.setActiveProject(null) },
+                ) {
                                 NavGraph(
                                     navController = navController,
                                     startDestination = startDestination,

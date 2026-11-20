@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -25,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -53,6 +55,13 @@ fun CrushShell(
     navController: NavHostController,
     /** The launch route, used for the single frame before the graph reports. */
     fallbackRoute: String,
+    /**
+     * V2-A12: a project-bound chat route is Crush Code, not Crush Chat.
+     * The shell highlights the Code destination and tapping Crush Chat resets
+     * the binding to the legacy Chat workspace.
+     */
+    codeActive: Boolean = false,
+    onSelectChat: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val entry by navController.currentBackStackEntryAsState()
@@ -62,48 +71,86 @@ fun CrushShell(
         when (shellLayoutFor(route, maxWidth.value)) {
             ShellLayout.Hidden -> content()
 
-            ShellLayout.BottomBar -> Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-                bottomBar = { CrushBottomBar(route, navController) },
-            ) { padding ->
-                // The bar consumed the bottom inset; without consuming it here
-                // the chat composer would add a second navigation-bar gap above
-                // the shell bar (device-visible on API 29).
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .consumeWindowInsets(padding)
-                ) {
-                    content()
+            ShellLayout.BottomBar -> {
+                // The keyboard must get the space, not the shell bar. With
+                // adjustResize the window shrinks; a persistent bottom bar sits
+                // between the composer and the IME and steals ~80dp of the
+                // typing surface (owner-reported 2026-11-20). Rails are on the
+                // side and stay put.
+                val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                Scaffold(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    bottomBar = {
+                        if (!imeVisible) {
+                            CrushBottomBar(
+                                route = route,
+                                navController = navController,
+                                codeActive = codeActive,
+                                onSelectChat = onSelectChat,
+                            )
+                        }
+                    },
+                ) { padding ->
+                    // The bar consumed the bottom inset; without consuming it here
+                    // the chat composer would add a second navigation-bar gap above
+                    // the shell bar (device-visible on API 29).
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                            .consumeWindowInsets(padding)
+                    ) {
+                        content()
+                    }
                 }
             }
 
             ShellLayout.Rail -> Row(Modifier.fillMaxSize()) {
-                CrushRail(route, navController)
+                CrushRail(route, navController, codeActive, onSelectChat)
                 Box(Modifier.weight(1f).fillMaxHeight()) { content() }
             }
 
             ShellLayout.ExtendedRail -> Row(Modifier.fillMaxSize()) {
-                CrushExtendedRail(route, navController)
+                CrushExtendedRail(route, navController, codeActive, onSelectChat)
                 Box(Modifier.weight(1f).fillMaxHeight()) { content() }
             }
         }
     }
 }
 
+/** V2-A12: Chat and Code share the `chat` route; the binding decides which. */
+private fun isSelected(
+    destination: PrimaryDestination,
+    route: String?,
+    codeActive: Boolean,
+): Boolean = when (destination) {
+    PrimaryDestination.Chat -> destination.route == route && !codeActive
+    PrimaryDestination.Projects ->
+        destination.route == route ||
+            (codeActive && route == Screen.Chat.route)
+    PrimaryDestination.Settings -> destination.route == route
+}
+
 @Composable
-private fun CrushBottomBar(route: String?, navController: NavController) {
+private fun CrushBottomBar(
+    route: String?,
+    navController: NavController,
+    codeActive: Boolean,
+    onSelectChat: (() -> Unit)?,
+) {
     NavigationBar(
         modifier = Modifier.testTag("shell-bottom-bar"),
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
         PrimaryDestination.entries.forEach { destination ->
-            val selected = destination.route == route
+            val selected = isSelected(destination, route, codeActive)
             NavigationBarItem(
                 selected = selected,
-                onClick = { navigatePrimary(navController, destination) },
+                onClick = {
+                    if (destination == PrimaryDestination.Chat) onSelectChat?.invoke()
+                    navigatePrimary(navController, destination)
+                },
                 // Filled icon + label + indicator fill: three signals, because
                 // the graphite accent cannot separate selected by hue.
                 icon = {
@@ -123,16 +170,24 @@ private fun CrushBottomBar(route: String?, navController: NavController) {
 }
 
 @Composable
-private fun CrushRail(route: String?, navController: NavController) {
+private fun CrushRail(
+    route: String?,
+    navController: NavController,
+    codeActive: Boolean,
+    onSelectChat: (() -> Unit)?,
+) {
     NavigationRail(
         modifier = Modifier.testTag("shell-rail"),
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
         PrimaryDestination.entries.forEach { destination ->
-            val selected = destination.route == route
+            val selected = isSelected(destination, route, codeActive)
             NavigationRailItem(
                 selected = selected,
-                onClick = { navigatePrimary(navController, destination) },
+                onClick = {
+                    if (destination == PrimaryDestination.Chat) onSelectChat?.invoke()
+                    navigatePrimary(navController, destination)
+                },
                 icon = {
                     Icon(
                         imageVector = if (selected) {
@@ -151,7 +206,12 @@ private fun CrushRail(route: String?, navController: NavController) {
 }
 
 @Composable
-private fun CrushExtendedRail(route: String?, navController: NavController) {
+private fun CrushExtendedRail(
+    route: String?,
+    navController: NavController,
+    codeActive: Boolean,
+    onSelectChat: (() -> Unit)?,
+) {
     Surface(
         modifier = Modifier
             .fillMaxHeight()
@@ -174,11 +234,12 @@ private fun CrushExtendedRail(route: String?, navController: NavController) {
                 ),
             )
             PrimaryDestination.entries.forEach { destination ->
+                val selected = isSelected(destination, route, codeActive)
                 NavigationDrawerItem(
                     label = { Text(stringResource(destination.labelRes)) },
                     icon = {
                         Icon(
-                            imageVector = if (destination.route == route) {
+                            imageVector = if (selected) {
                                 destination.filledIcon
                             } else {
                                 destination.outlinedIcon
@@ -186,8 +247,11 @@ private fun CrushExtendedRail(route: String?, navController: NavController) {
                             contentDescription = null,
                         )
                     },
-                    selected = destination.route == route,
-                    onClick = { navigatePrimary(navController, destination) },
+                    selected = selected,
+                    onClick = {
+                        if (destination == PrimaryDestination.Chat) onSelectChat?.invoke()
+                        navigatePrimary(navController, destination)
+                    },
                     modifier = Modifier.padding(
                         horizontal = CrushSpacing.md,
                         vertical = 2.dp,

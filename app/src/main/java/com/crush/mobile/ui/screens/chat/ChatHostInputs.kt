@@ -62,9 +62,9 @@ data class ChatHostInputs(
     /** The existing surface wording, preserved verbatim for 2b.1 parity. */
     val surfaceLabel: String
         get() = when (binding) {
-            BindingKind.ChatPool -> "Chats - conversation only"
+            BindingKind.ChatPool -> "Crush Chat - conversation only"
             BindingKind.Project -> "Project - ${projectLabel.orEmpty()}"
-            BindingKind.Legacy -> "Workspace (legacy)"
+            BindingKind.Legacy -> "Crush Chat"
         }
 
     /**

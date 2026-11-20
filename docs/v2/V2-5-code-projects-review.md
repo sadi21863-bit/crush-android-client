@@ -17,6 +17,12 @@ Authority:
 - **V2-A9 (owner, 2026-11-20):** V2-5 ships **Build + Review**; Explore is
   deferred until a real read-only file browser exists. No fake tab, no fourth
   primary destination.
+- **V2-A10 (owner, 2026-11-20):** the legacy workspace is Chat-only and is not
+  listed in Projects; a Code project opens a project home, not a chat directly.
+- **V2-A11/V2-A12 (owner notebook, 2026-11-20):** three tabs **Crush Chat /
+  Crush Code / Settings**; Crush Chat uses the legacy workspace and is Q&A-only;
+  Crush Code contains projects, and every project has its own sessions. See
+  `V2-5-chat-code-ia-plan.md`.
 
 ## 1. Scope
 
@@ -33,6 +39,9 @@ Authority:
 | V2-5.9 | Trust-before-bind | Every open/restore/handoff path keeps gate → consent → bind; no new bypass |
 | Carry-in | Review project scoping | Review history is currently process-global; a turn in project B supersedes project A's cards. V2-5 scopes it by engine instance so the Review surface cannot present another project's cards |
 | Carry-in | F-A Current marker | The V2-0 ledger assigned this to V2-4; V2-4 shipped the session-sheet marker only. Projects still has none, so it lands here |
+| V2-5.10 | Projects is Code-only + project home | Hide the Chat-only legacy workspace (V2-A10); a project row opens a home with identity, path, trust, last measured changes, Open Code chat and Review. No file browser |
+| V2-5.11 | IME shell behaviour | The phone bottom bar hides while the IME is visible so the composer sits directly above the keyboard; rails stay put |
+| V2-5.12 | Corrected Chat/Code IA | Crush Chat tab uses the legacy workspace and a chat list; Crush Code is the project list; a project opens its own session list; labels and shell selection follow |
 
 Out of scope:
 
@@ -85,9 +94,9 @@ verified because the app does not run tests.
 
 ### V2-5-D4 - Projects selection is never colour-alone
 
-The current project row (and the legacy row when `activeBinding` is Legacy)
-carries a filled check, the word `Current`, and
-`stateDescription = "Current project"`. The marker reads
+The current **Code project** row carries a filled check, the word `Current`,
+and `stateDescription = "Current project"`. The legacy workspace is not listed
+(V2-A10), so there is no legacy marker. The marker reads
 `container.activeBinding`; it is not a second stored choice.
 
 ### V2-5-D5 - Trust is visible, not implied
@@ -124,15 +133,66 @@ No wide/tablet claim in this package. The 600/840dp shell rules stay as
 shipped; Review and Projects are phone-first single surfaces. Tablets remain
 O3/parked.
 
+### V2-5-D10 - Projects is Code-only; a row opens a project home
+
+The legacy workspace is Chat state, not a Code project. It stays in the Room
+table for history/identity, but the Projects surface filters it out. A project
+row opens a focused home (sheet) with label, path, imported/app-managed
+identity, trust, the latest measured turn, and two actions:
+
+- **Open Code chat** - the existing trust-gated bind and Chat replace.
+- **Review changes** - the same trust-gated bind, then push Review for that
+  project; the project home itself never binds or grants permission.
+
+The home reads ReviewHistory's latest card for that root only. "No changes
+measured in this process" is a valid state; it does not invent activity. No
+file browser is added (V2-A9).
+
+### V2-5-D11 - The IME owns the bottom of the phone screen
+
+With the keyboard open, the phone bottom bar hides (it is navigation, not
+content) so the composer sits directly above the IME. The bar returns when the
+IME closes. Rails are on the side and stay. This fixes the owner-reported
+2026-11-20 behaviour where the bar sat between the composer and keyboard
+(F-O).
+
+### V2-5-D12 - Crush Chat is the legacy workspace
+
+The owner's notebook (2026-11-20) and V2-A11: Chat uses the legacy engine
+instance, not the separate ChatPool. The legacy instance receives the same
+readback-verified deny-all tool policy as ChatPool at spawn, so Chat stays
+Q&A-only at the engine boundary. New Chat mints a legacy session; ChatPool
+remains code-reachable only as a compatibility/archival binding. Existing
+ChatPool sessions are not deleted or silently migrated.
+
+### V2-5-D13 - The three tabs are list-first, and Code owns projects
+
+The owner's notebook and V2-A12:
+
+- **Crush Chat** is a chat list (legacy sessions) → conversation.
+- **Crush Code** is a project list → project home → that project's session
+  list → Code chat. "New session" mints on the project engine; it never jumps
+  to Chat.
+- **Settings** is unchanged.
+- The bottom-bar labels are **Crush Chat / Crush Code / Settings**. "Projects"
+  is a section inside Crush Code, not a peer destination.
+- The `chat` route renders the list first and the conversation after a
+  selection; in-screen Back returns to the list. No fourth route or second
+  ViewModel is added.
+
 ## 3. Code map
 
 | Area | File | Planned change |
 |---|---|---|
-| Projects state | `projects/ProjectsViewState.kt` | active project id / legacy-active fact; loading on refresh |
-| Projects host | `projects/ProjectsScreen.kt` | collect `activeBinding`; pass active id + trusted ids; keep SAF/AFA/trust wiring |
-| Projects content | `projects/ProjectsContent.kt` | CrushCard rows, Current marker + semantics, trust/identity labels, distinct states, humanised environment copy |
+| Projects state | `projects/ProjectsViewState.kt` | active project id; project activity summary; loaded on refresh |
+| Projects host | `projects/ProjectsScreen.kt` | collect `activeBinding` + `ReviewHistory` summary; pass active id; keep SAF/AFA/trust wiring; review-after-bind path |
+| Projects content | `projects/ProjectsContent.kt` | Code-only list (legacy filtered); CrushCard rows, Current marker + semantics, trust/identity labels, project-home sheet, distinct states |
+| Shell | `navigation/CrushShell.kt` | hide the phone bottom bar while the IME is visible (F-O) |
 | Project identity | `project/ProjectRef.kt`, `data/project/RoomProjectStore.kt` | carry `trusted` from the Room trust columns (defaulted for source compatibility) |
-| Chat identity | `chat/ChatViewState.kt`, `chat/ChatContent.kt` | project label in the header sub-line; tests for Project/ChatPool/Legacy |
+| Chat identity | `chat/ChatViewState.kt`, `chat/ChatContent.kt` | project label in the header sub-line; Crush Chat labels for Legacy/ChatPool |
+| Chat list | `chat/ChatListContent.kt`, `chat/ChatScreen.kt` | list-first Chat/Code sessions, Back-to-list, New chat/session |
+| Chat boundary | `engine/CrushEngine.kt` | apply the readback-verified chat deny-all policy to the legacy instance (`""`) as well as ChatPool |
+| Session creation | `chat/ChatViewModel.kt` | New chat binds Legacy; New session inside a project stays on that project engine |
 | Review store | `domain/file/ReviewHistory.kt`, `TurnChanges.kt` | scope key, per-scope supersede/run/cap/revert, not-measured card |
 | Turn call sites | `chat/ChatViewModel.kt` | freeze the instance key at turn start; pass scope/project label; make `runSettled` run even if recording fails |
 | Review host | `review/ReviewScreen.kt` | active scope + project label; keep SAF export; saveable export target |
@@ -147,25 +207,31 @@ provider policy, shell destinations.
 
 | Pin | File |
 |---|---|
-| Current project marker: active project row has check + `Current` + `Current project` semantics; legacy row when Legacy; others none | `ProjectsContentTest` |
+| Current project marker: active project row has check + `Current` + `Current project` semantics; others none | `ProjectsContentTest` |
+| Legacy workspace is not listed; an empty Code list still explains import | `ProjectsContentTest` |
+| Project home: identity, path, trust, last measured turn, Open Code chat and Review actions | `ProjectsContentTest` |
 | Trust label: approved vs no approved configuration; imported vs app-managed identity; no raw `L0_EMBEDDED` copy | `ProjectsContentTest` |
 | Projects states: loading, empty, error; busy disables import/remove; legacy has no Remove; remove names target | `ProjectsContentTest` |
-| Chat header: Project shows `<label> · <status>`; ChatPool keeps `Chat - no tools`; Legacy stays status-only | `ChatViewStateTest` + `ChatContentTranscriptTest` |
+| Chat header: Project shows `<label> · <status>`; ChatPool keeps `Crush Chat - no tools`; Legacy shows `Crush Chat · <status>` | `ChatViewStateTest` + `ChatContentTranscriptTest` |
+| List-first: Crush Chat shows legacy chats and dispatches select/new; a project shows its sessions, Review and New session; unavailable is not "empty" | `ChatListContentTest` |
 | Review isolation: cards from scope A do not appear in B; `beginTurn(A)` does not supersede B; cap 8 per scope; run flag per scope | `ReviewHistoryTest` |
 | Not-measured turn is retained and rendered as not measured; ordinary empty turn is dropped | `ReviewHistoryTest` + `ReviewContentTest` |
 | Provenance: project label, folder tail, turn/capture time, session short id | `ReviewContentTest` |
 | Revert: confirmed/named; disabled for running/superseded/reverted; concurrent reverts still serialize | `ReviewContentTest` + `ReviewHistoryTest` |
 | Export: byte-exact path preserved and labelled as-on-disk | `ReviewContentTest` (host copy unchanged) |
 | Trust before bind: existing `ProjectTrustServiceTest` + restore rows stay green | unchanged |
+| IME hides the phone bottom bar and restores it on close | device only (Robolectric cannot drive the IME) |
 
 ## 5. Evidence
 
 | Claim | Evidence | Status |
 |---|---|---|
-| Four-task gate | `v2-5-gate-1120-1.log`: `BUILD SUCCESSFUL in 20m 45s` | PASS (attempt 1) |
-| Unit-test count / failures | 910 tests, 95 suites, 0 failures, 0 errors, 0 skipped | PASS |
+| Four-task gate (final) | `v2-5-gate-1120-5.log`: `BUILD SUCCESSFUL in 28m 39s` | PASS (attempt 5) |
+| Unit-test count / failures | 915 tests, 96 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
 | CI | GitHub Actions run on the pushed commit | NOT PERFORMED |
+| Crush Chat list / legacy binding / Q&A boundary | device capture + app.log policy line | NOT PERFORMED |
+| Crush Code project list / project home / sessions | device capture | NOT PERFORMED |
 | Projects current marker / trust / states | device capture set | NOT PERFORMED |
 | Project identity in Code chat | device capture | NOT PERFORMED |
 | Populated Review card + provenance/partial | device capture (needs a real file-changing turn) | NOT PERFORMED |
@@ -173,6 +239,7 @@ provider policy, shell destinations.
 | Export byte-exact | device export + sha256 comparison | NOT PERFORMED in this pass |
 | Two-project isolation / switching | device + instrumentation where runnable | NOT PERFORMED |
 | Trust re-gating on changed `crushrc` | existing tests + device | NOT PERFORMED |
+| IME hides the phone bar | device capture | NOT PERFORMED |
 
 Device environment when the pass runs: Redmi Note 7 Pro `bbf8ca69`, API 29,
 393dp, app `com.crush.mobile`. Captures will go in
@@ -191,3 +258,9 @@ Device environment when the pass runs: Redmi Note 7 Pro `bbf8ca69`, API 29,
 - No screenshot harness; device captures are manual. 2.0x font scale will be
   checked on the affected surfaces if the device pass allows.
 - The extended-rail and wide layouts remain unobservable on this phone.
+- Crush Chat moved to the legacy instance; sessions created in the old
+  ChatPool are archival (not deleted, not listed). No migration is claimed.
+- The list-first Back is in-screen (the route is a primary destination); it
+  does not add a navigation entry.
+- The Code tab keeps the route name `projects`; "Projects" is the project list
+  inside Crush Code, not a separate destination.

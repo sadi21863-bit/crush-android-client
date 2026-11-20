@@ -26,6 +26,7 @@ import com.crush.mobile.CrushMobileApp
 import com.crush.mobile.data.project.PendingProjectTrust
 import com.crush.mobile.di.AppContainer.EngineBinding
 import com.crush.mobile.project.FolderUriDecoder
+import com.crush.mobile.project.ProjectRef
 import java.io.File
 
 /**
@@ -40,7 +41,10 @@ import java.io.File
  * navigation is the shell's job, so the signature is only `onOpenProject`.
  */
 @Composable
-fun ProjectsScreen(onOpenProject: () -> Unit) {
+fun ProjectsScreen(
+    onOpenProject: () -> Unit,
+    onOpenReview: () -> Unit,
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val container = (context.applicationContext as CrushMobileApp).container
     val vm: ProjectsViewModel = viewModel(factory = ProjectsViewModel.Factory(context, container))
@@ -48,7 +52,23 @@ fun ProjectsScreen(onOpenProject: () -> Unit) {
     // F-A: the Current marker is the container's binding, never a second
     // stored choice. Collect it here so the content stays container-free.
     val binding by container.activeBinding.collectAsStateWithLifecycle()
+    val reviewCards by container.reviewHistory.cards.collectAsStateWithLifecycle()
     var importError by remember { mutableStateOf<String?>(null) }
+
+    // V2-5 D10: the Code activity shown on a project row/home is the latest
+    // measured turn for that root, not a chat message count.
+    val activityByPath = remember(reviewCards) {
+        reviewCards.groupBy { it.rootPath }.mapValues { (_, cards) ->
+            val latest = cards.first()
+            ProjectActivity(
+                changeCount = latest.changes.fileCount,
+                added = latest.changes.totalAdded,
+                removed = latest.changes.totalRemoved,
+                startedAtMs = latest.startedAtMs,
+                notMeasured = latest.changes.snapshotUnavailable,
+            )
+        }
+    }
 
     // Re-read the rows whenever this primary destination re-enters
     // composition (e.g. returning from a project chat after consent): the
@@ -66,6 +86,7 @@ fun ProjectsScreen(onOpenProject: () -> Unit) {
     // lives on the container (`pendingProjectTrust`) but in the same dialog,
     // so the wording can never fork between the two surfaces.
     var pendingCrushrcTrust by remember { mutableStateOf<PendingProjectTrust?>(null) }
+    var trustTargetIsReview by remember { mutableStateOf(false) }
 
     // "Import folder as project" (user feature, 2026-11-04) - three launchers,
     // composed: the SAF folder picker, the storage-permission request that
@@ -209,41 +230,45 @@ fun ProjectsScreen(onOpenProject: () -> Unit) {
     val legacyPath = File(context.filesDir, "workspace").absolutePath
     val internalRoot = File(context.filesDir, "projects").absolutePath + File.separator
 
+    // One gate for both home actions. The home itself never binds; the
+    // chosen action decides where the successful, consented open lands.
+    fun openProject(project: ProjectRef, review: Boolean) {
+        trustTargetIsReview = review
+        if (project.repoDir.absolutePath == legacyPath) {
+            // Defensive only: the legacy row is filtered out of the Code list.
+            container.setActiveProject(null)
+            onOpenProject()
+            return
+        }
+        // S-02: the action goes through the central gate BEFORE anything
+        // binds. Allow binds + opens; Required parks the decision here.
+        vm.requestOpenProject(
+            ref = project,
+            onAllowed = { if (review) onOpenReview() else onOpenProject() },
+            onTrustRequired = { pending -> pendingCrushrcTrust = pending },
+        )
+    }
+
     ProjectsContent(
         state = s.copy(
             activeProjectId = (binding as? EngineBinding.Project)?.ref?.id,
-            legacyActive = binding is EngineBinding.Legacy,
+            activityByPath = activityByPath,
         ),
         legacyPath = legacyPath,
         internalRoot = internalRoot,
         importError = importError,
         pendingTrust = pendingCrushrcTrust,
         onImport = importClick,
-        onOpen = { project ->
-            when {
-                project.repoDir.absolutePath == legacyPath -> {
-                    container.setActiveProject(null)
-                    onOpenProject()
-                }
-                else ->
-                    // S-02: the row tap goes through the central gate BEFORE
-                    // anything binds. Allow binds + opens; Required parks the
-                    // decision here for the dialog.
-                    vm.requestOpenProject(
-                        ref = project,
-                        onAllowed = onOpenProject,
-                        onTrustRequired = { pending ->
-                            pendingCrushrcTrust = pending
-                        },
-                    )
-            }
-        },
+        onOpen = { project -> openProject(project, review = false) },
+        onReviewProject = { project -> openProject(project, review = true) },
         onRemove = vm::removeProject,
         onTrustConfirm = {
             val target = pendingCrushrcTrust
             pendingCrushrcTrust = null
             if (target != null) {
-                vm.grantTrustAndOpen(target.ref, onOpen = onOpenProject)
+                vm.grantTrustAndOpen(target.ref, onOpen = {
+                    if (trustTargetIsReview) onOpenReview() else onOpenProject()
+                })
             }
         },
         onTrustDismiss = { pendingCrushrcTrust = null },

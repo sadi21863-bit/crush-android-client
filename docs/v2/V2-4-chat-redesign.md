@@ -191,7 +191,7 @@ Unchanged on purpose: `ChatAction.kt`, `ChatDispatch.kt`, `ChatScreen.kt`,
 | Four-task gate (final) | `v2-4-gate-1120-5.log`: `BUILD SUCCESSFUL in 14m 59s` | PASS (attempt 5) |
 | Unit-test count / failures | 899 tests, 95 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
-| CI | `44725769114` on `c8c476a`, `44727630308` on `d655d63`, and `44733288902` on `e12750c`: all green | PASS |
+| CI | `44725769114` on `c8c476a`, `44727630308` on `d655d63`, `44733288902` on `e12750c`, and `44734151566` on `5f28ec0`: all green | PASS |
 | Chat empty state, ready status, picker visible | `01-launch.png`, `04-ready-empty-draft.png` | PASS on device |
 | Streaming + Stop | `05-streaming.png`, `06-stopped.png` | PASS on device |
 | Retry | `23-retry-failure.png` ... `27-retry-settled.png` (network toggle with owner consent; tool denied) | PASS on device |
@@ -233,9 +233,9 @@ PC's tethering for about two minutes; it was restored immediately.
   skipping the bubble when there is no text and no streaming placeholder.
 - **F-N (fixed, DEVICE-VERIFIED `31-fontscale-2x-settings.png`):** at 2.0x
   font scale the Settings Keyboard and tuning chip rows clipped off the right
-  edge because they were non-wrapping `Row`s. Migrated to `FlowRow`; the
-  re-capture shows both groups wrapping, and chat/session/model sheets held at
-  2.0x (`28`-`30`).
+  edge. Migrated to `FlowRow`; the re-capture shows the tuning groups wrapping,
+  and the Keyboard group uses the same layout. Chat, session sheet and model
+  sheet held at 2.0x (`28`-`30`).
 
 Gate history: attempt 1 (`v2-4-gate-1120-1.log`) failed one test because the
 session-sheet current-row assertion used `hasAnyAncestor` on a clickable row

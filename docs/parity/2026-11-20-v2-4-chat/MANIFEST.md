@@ -33,7 +33,7 @@ secure-window session; no credentials were entered by the agent.
 | 16-22 | model selection set | `17` shows the live provider as OpenCode Go with DeepSeek V4.1 Flash selected; `21` shows the optimistic switch to Claude Haiku; `22` shows the model reverted to Flash after the probe (the honest revert path). `16`, `18`-`20` are intermediates. |
 | 23-27 | Retry set | `23`/`24`: failed turn ("This reply failed / no reply received"); `25`: Retry button; `26`: Retry re-ran the turn and the ASK permission dialog gated the agent's `bash` call; `27`: Deny settled the run, failed pair retained above. |
 | 28-30 | 2.0x font scale | `28`: chat transcript at 2.0x (ellipsis in header/model, failed card and Retry readable, composer/nav fit); `29`: session sheet with current marker; `30`: model sheet with wrapped provenance and rows. |
-| 31 | `31-fontscale-2x-settings.png` | Settings chips at 2.0x after the `FlowRow` fix (appearance and performance rows wrap instead of clipping). |
+| 31 | `31-fontscale-2x-settings.png` | Performance/tuning chip groups at 2.0x after the `FlowRow` fix: 5 min/15 min and 30 min/1 hour wrap instead of clipping. The Keyboard group uses the same `FlowRow`; its pre-fix clipping was observed live, but only the tuning capture is stored. |
 | - | `_crop-user-bubble.png` | Before-state crop of F-L: near-black prose on graphite, kept as evidence, not a product surface. |
 
 ## Findings from this pass
@@ -47,8 +47,9 @@ secure-window session; no credentials were entered by the agent.
   no streaming placeholder. Re-captured in `15`.
 - **F-N (fixed, DEVICE-VERIFIED `31-fontscale-2x-settings.png`):** at 2.0x
   font scale the Settings Keyboard and tuning chip rows clipped off the right
-  edge. Migrated to `FlowRow`; chat, session sheet and model sheet held at
-  2.0x (`28`-`30`), and the Settings re-capture is `31`.
+  edge. Migrated to `FlowRow`; the re-capture shows the tuning groups wrapping,
+  and the Keyboard group uses the same layout. Chat, session sheet and model
+  sheet held at 2.0x (`28`-`30`).
 - **Observed, not a defect:** the provider shown in the sheet changed from
   OpenCode Zen to OpenCode Go during the pass and the subtitle followed it.
   Model selection optimistically showed Claude Haiku, then reverted to the

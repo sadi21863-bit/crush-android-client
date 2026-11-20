@@ -24,6 +24,12 @@ data class ProjectRef(
     val label: String,
     val repoDir: File,
     val environmentLevel: EnvironmentLevel = EnvironmentLevel.L0_EMBEDDED,
+    /**
+     * V2-5 D5: a consent record exists for this project's current
+     * configuration. Derived from the Room trust columns, never a second
+     * stored choice. Defaulted so existing constructions stay compatible.
+     */
+    val trusted: Boolean = false,
 ) {
 
     /**

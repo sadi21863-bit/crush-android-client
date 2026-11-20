@@ -1,5 +1,6 @@
 package com.crush.mobile.ui.screens.projects
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,12 +14,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,13 +34,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crush.mobile.data.project.PendingProjectTrust
 import com.crush.mobile.project.ProjectRef
 import com.crush.mobile.ui.CrushrcTrustDialog
+import com.crush.mobile.ui.components.CrushBanner
+import com.crush.mobile.ui.components.CrushCard
+import com.crush.mobile.ui.components.CrushEmptyState
+import com.crush.mobile.ui.components.CrushLoadingRow
+import com.crush.mobile.ui.components.CrushStatusLabel
+import com.crush.mobile.ui.components.CrushTone
 import com.crush.mobile.ui.crushrcTrustNote
+import com.crush.mobile.ui.theme.CrushSpacing
 import com.crush.mobile.ui.theme.CrushType
+import com.crush.mobile.ui.theme.LocalCrushColors
 
 /**
  * Phase 2b.2 (V2 plan §§5.6, 6.5): the Projects surface, rendered only from
@@ -103,41 +114,34 @@ fun ProjectsContent(
                 modifier = Modifier.padding(top = 6.dp)
             )
             importError?.let { err ->
-                Text(
-                    err,
-                    color = MaterialTheme.colorScheme.error,
-                    style = CrushType.body,
-                    modifier = Modifier.padding(top = 6.dp)
+                CrushBanner(
+                    text = err,
+                    tone = CrushTone.Error,
+                    modifier = Modifier.padding(top = CrushSpacing.sm)
                 )
             }
             Spacer(Modifier.height(12.dp))
 
             state.error?.let { err ->
-                Text(
-                    "Registry error: $err",
-                    color = MaterialTheme.colorScheme.error,
-                    style = CrushType.body,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                CrushBanner(
+                    text = "Projects error: $err",
+                    tone = CrushTone.Error,
+                    modifier = Modifier.padding(bottom = CrushSpacing.sm)
                 )
             }
 
             when {
-                state.loading -> Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(vertical = 16.dp)
-                ) {
-                    CircularProgressIndicator(Modifier.size(20.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text("Loading projects...")
-                }
+                state.loading -> CrushLoadingRow(
+                    text = "Loading projects...",
+                    modifier = Modifier.padding(vertical = CrushSpacing.lg)
+                )
 
-                state.projects.isEmpty() -> Text(
+                state.projects.isEmpty() -> CrushEmptyState(
                     // Say WHY, per the house rule on empty states.
-                    "No projects yet - the first entry here should always be the " +
-                        "legacy workspace (the app's existing chat history).",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 12.dp)
+                    title = "No projects yet",
+                    body = "Import a folder to create a project. The legacy " +
+                        "workspace appears here after migration.",
+                    modifier = Modifier.padding(vertical = CrushSpacing.md)
                 )
 
                 else -> LazyColumn(
@@ -151,9 +155,22 @@ fun ProjectsContent(
                         // reports the tap. It likewise never gets a Remove
                         // affordance: it hosts every existing chat, and the
                         // entry migration would re-create its row anyway.
-                        val removable = project.repoDir.absolutePath != legacyPath
+                        val isLegacy = project.repoDir.absolutePath == legacyPath
+                        val removable = !isLegacy
+                        // F-A/V2-5 D4: the current row is the container's
+                        // active binding, not a remembered UI choice.
+                        val current = project.id == state.activeProjectId ||
+                            (isLegacy && state.legacyActive)
+                        val identity = when {
+                            isLegacy -> "App history workspace"
+                            project.repoDir.absolutePath.startsWith(internalRoot) ->
+                                "App-managed workspace"
+                            else -> "Imported folder"
+                        }
                         ProjectRow(
-                            project,
+                            project = project,
+                            current = current,
+                            identityLabel = identity,
                             onOpen = { onOpen(project) },
                             onRemove = if (removable) {
                                 { pendingRemove = project }
@@ -237,44 +254,73 @@ fun ProjectsContent(
  * One registry row. [onRemove] is null for the legacy row (no Remove
  * affordance - it hosts the app's existing history and the entry migration
  * would resurrect it anyway).
+ *
+ * V2-5 D4/D5: the current row carries a filled check plus the word "Current"
+ * and a spoken state; trust is a written status, never a colour-only badge.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProjectRow(project: ProjectRef, onOpen: () -> Unit, onRemove: (() -> Unit)? = null) {
-    Card(onClick = onOpen, Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+private fun ProjectRow(
+    project: ProjectRef,
+    current: Boolean,
+    identityLabel: String,
+    onOpen: () -> Unit,
+    onRemove: (() -> Unit)? = null,
+) {
+    val colors = LocalCrushColors.current
+    CrushCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onOpen)
+            .semantics {
+                if (current) stateDescription = "Current project"
+            }
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.FolderOpen,
+                contentDescription = null,
+                tint = colors.accent
+            )
+            Spacer(Modifier.width(CrushSpacing.sm))
+            Text(
+                text = project.label,
+                style = CrushType.section,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (current) {
                 Icon(
-                    Icons.Filled.FolderOpen,
+                    Icons.Filled.Check,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = colors.accent,
+                    modifier = Modifier.size(16.dp)
                 )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    project.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                if (onRemove != null) {
-                    IconButton(onClick = onRemove) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = "Remove ${project.label}"
-                        )
-                    }
+                Spacer(Modifier.width(CrushSpacing.xs))
+                Text("Current", style = CrushType.metadata, color = colors.muted)
+            }
+            if (onRemove != null) {
+                IconButton(onClick = onRemove) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Remove ${project.label}"
+                    )
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                project.repoDir.absolutePath,
-                style = CrushType.code,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                "${project.environmentLevel.name} workspace",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
+        Spacer(Modifier.height(CrushSpacing.xs))
+        Text(
+            project.repoDir.absolutePath,
+            style = CrushType.code,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(CrushSpacing.xs))
+        Text(identityLabel, style = CrushType.metadata, color = colors.muted)
+        Spacer(Modifier.height(CrushSpacing.xs))
+        CrushStatusLabel(
+            text = if (project.trusted) "Configuration approved"
+            else "No approved configuration",
+            tone = if (project.trusted) CrushTone.Success else CrushTone.Neutral,
+        )
     }
 }

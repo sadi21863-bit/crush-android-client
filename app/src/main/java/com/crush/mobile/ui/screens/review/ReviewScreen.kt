@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crush.mobile.CrushMobileApp
+import com.crush.mobile.di.AppContainer.EngineBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,9 +37,29 @@ fun ReviewRoute(onBack: () -> Unit) {
     val history = remember {
         (context.applicationContext as CrushMobileApp).container.reviewHistory
     }
-    val cards by history.cards.collectAsStateWithLifecycle()
-    val runInFlight by history.runInFlight.collectAsStateWithLifecycle()
+    val container = remember {
+        (context.applicationContext as CrushMobileApp).container
+    }
+    val allCards by history.cards.collectAsStateWithLifecycle()
+    val runningScopes by history.runningScopes.collectAsStateWithLifecycle()
+    val binding by container.activeBinding.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+
+    // V2-5 D1/D3: Review shows only the active binding's cards. A project
+    // card can never appear under another project, and a project's running
+    // turn cannot disable another project's revert.
+    val scopeRoot: String? = when (val current = binding) {
+        is EngineBinding.Project -> current.ref.repoDir.absolutePath
+        is EngineBinding.Legacy -> File(context.filesDir, "workspace").absolutePath
+        is EngineBinding.ChatPool -> null
+    }
+    val projectLabel: String? = when (val current = binding) {
+        is EngineBinding.Project -> current.ref.label
+        is EngineBinding.Legacy -> "Legacy workspace"
+        is EngineBinding.ChatPool -> null
+    }
+    val cards = if (scopeRoot == null) emptyList() else allCards.filter { it.rootPath == scopeRoot }
+    val runInFlight = scopeRoot != null && scopeRoot in runningScopes
 
     // Export state (P4 proof loop): which file is awaiting the SAF picker, and
     // the last export outcome as one transient sentence. Export is a READ
@@ -72,6 +93,8 @@ fun ReviewRoute(onBack: () -> Unit) {
             cards = cards,
             runInFlight = runInFlight,
             exportMessage = exportMessage,
+            projectLabel = projectLabel,
+            scopeAvailable = scopeRoot != null,
         ),
         onBack = onBack,
         onRevert = { cardId, path ->

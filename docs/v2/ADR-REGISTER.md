@@ -25,6 +25,7 @@ Rules:
 | V2-A6 | Evidence labels (CODE/TEST/CI/DEVICE-RECORDED/DEVICE-VERIFIED/PARTIAL/PLANNED/NOT-PERFORMED/OWNER-DECISION) are mandatory in V2 reports | 2026-11-19 | Revision 4.0 §1.2; §5.10 accepted rules |
 | V2-A7 | V2.0 active scope is V2-0 to V2-6 only; V2-7, V2-8 and V2-9 are parked | 2026-11-19 | §5.10 package table |
 | V2-A8 | V2-1 visual direction approved (owner, 2026-11-19): neutral graphite accent (`#3B3B36` light / `#D3D0C8` dark, measured 10.62/12.17 on paper/bg), body text 15sp, platform monospace, V2-2 includes call-site reclassification. Because the accent is only 1.53:1 (light) / 1.29:1 (dark) from ink, interactive/selected state must never rely on hue alone: underline, fill, weight, filled icons and a 2dp focus outline carry it | 2026-11-19 | `V2-1-design-foundation.md` §4.1, §9; §5.11 |
+| V2-A9 | V2-5 ships **Build (project chat) + Review** as the phone workflow. **Explore is deferred** until a real read-only file browser exists; no fake Explore tab and no fourth primary destination (V2-A2). Build/Review navigation must not grant permission or change a run's binding/policy | 2026-11-20 | owner answer 2026-11-20; `V2-5-code-projects-review.md` |
 
 ## Open (owner gate)
 

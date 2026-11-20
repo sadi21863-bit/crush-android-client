@@ -1394,6 +1394,47 @@ NOT PERFORMED on device: frame timing (no baseline), reduced motion, density,
 wide/tablet, API 30+, provider switch (model selection was exercised), and
 instrumented tests. These stay open, not claimed.
 
+### 5.14 V2-5 Code / Projects / Review (in progress, 2026-11-20)
+
+V2-5 starts from the owner's "yes start" and the V2-A9 answer: ship **Build
+(project chat) + Review**; defer Explore until a real read-only file browser
+exists. No fourth primary destination, no fake Explore tab. The working
+record is `docs/v2/V2-5-code-projects-review.md`.
+
+Implementation batch 1:
+
+- **Projects (F-A):** `ProjectsUiState` now carries the active project id and
+  legacy-active fact projected from `container.activeBinding`; rows render a
+  check + `Current` + `Current project` semantics, a written trust status
+  (`Configuration approved` / `No approved configuration`), and a human
+  identity (`Imported folder` / `App-managed workspace` / `App history
+  workspace`) instead of the raw `L0_EMBEDDED` enum. `ProjectRef` carries
+  `trusted` from the Room consent stamp. Loading/empty/error use the shared
+  components; the SAF-cancel false error is fixed; the list refreshes on
+  re-entry so consent is not stale.
+- **Code identity:** the Chat header for a Project binding is now
+  `<project label> · <status>` via `BindingView.headerStatus`; ChatPool keeps
+  `Chat - no tools` and Legacy stays status-only. This uses the V2-4
+  readiness snapshot.
+- **Review scoping:** `ReviewHistory` is scoped by the run-frozen capture root:
+  `beginTurn(root)` supersedes only that root's cards, `runningScopes` gates
+  revert per project, and the 8-card cap is per root. The Review host filters
+  by the active binding, so project A's cards cannot appear under project B.
+- **Review truth:** a `snapshotUnavailable` turn is retained as "not measured"
+  instead of disappearing; cards show project label, turn time, capture time
+  and session; Review states that the app runs no tests and that export copies
+  the file as it is on disk now. The surface has a standard top bar.
+- **Rail:** the changed-files panel uses the shared card, says "not measured"
+  when appropriate, and the diff hunk header now reports separate before/after
+  counts instead of the same line count.
+
+The four-task gate is green on attempt 1 (`v2-5-gate-1120-1.log`,
+`BUILD SUCCESSFUL in 20m 45s`): 910 tests, 95 suites, 0 failures, 0 errors,
+0 skipped; lint 0 errors / 1 pre-existing warning. The device pass and CI are
+**NOT PERFORMED** at the time of writing; they are recorded in the V2-5
+document. Explore, tablet panes, Review history persistence and a test runner
+stay out of scope.
+
 ## 6. Upstream filings
 
 - **2026-11-13: closed as NO ACTION.** The unfiled drafts (candidates 1–3 in

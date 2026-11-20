@@ -11,9 +11,16 @@ import com.crush.mobile.domain.file.TurnChanges
  * seam.
  */
 data class ReviewUiState(
-    /** Newest first, as the history store publishes it. */
+    /** Newest first, already scoped to the active binding by the host. */
     val cards: List<TurnChanges> = emptyList(),
     val runInFlight: Boolean = false,
     /** The last export outcome as one sentence; null = no message. */
     val exportMessage: String? = null,
+    /** V2-5 D3: the project whose changes are on screen. */
+    val projectLabel: String? = null,
+    /**
+     * False for the ChatPool binding: chats run no tools, so there is no
+     * file-change scope to show. Distinct from an empty project history.
+     */
+    val scopeAvailable: Boolean = true,
 )

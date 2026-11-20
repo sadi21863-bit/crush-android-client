@@ -262,6 +262,28 @@ class ChatViewStateTest {
         )
 
         assertEquals("Chat - no tools \u00b7 ready", view.run.statusLabel(BindingKind.ChatPool))
+        assertEquals("Chat - no tools \u00b7 ready", view.binding.headerStatus(view.run))
+    }
+
+    @Test
+    fun `project identity stays in the header on a populated Code chat`() {
+        val named = ChatUiState(engineReady = true).toViewState(
+            ChatHostInputs(
+                binding = BindingKind.Project,
+                projectLabel = "notes-app",
+                snapshotReady = true,
+            )
+        )
+        assertEquals("notes-app \u00b7 ready", named.binding.headerStatus(named.run))
+
+        val unnamed = ChatUiState(engineReady = true).toViewState(
+            ChatHostInputs(
+                binding = BindingKind.Project,
+                projectLabel = null,
+                snapshotReady = true,
+            )
+        )
+        assertEquals("Project \u00b7 ready", unnamed.binding.headerStatus(unnamed.run))
     }
 
     @Test

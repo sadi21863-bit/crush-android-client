@@ -48,6 +48,10 @@ internal fun ProjectEntity.toRef(): ProjectRef = ProjectRef(
     environmentLevel = runCatching {
         ProjectRef.EnvironmentLevel.valueOf(environmentLevel)
     }.getOrDefault(ProjectRef.EnvironmentLevel.L0_EMBEDDED),
+    // A row with a consent stamp has an approval record; a fingerprint
+    // without a stamp is corrupt and the trust service re-gates it. The UI
+    // only claims "approved" for the former.
+    trusted = consentedAtMs != null,
 )
 
 internal fun ProjectRef.toEntity(now: Long): ProjectEntity = ProjectEntity(

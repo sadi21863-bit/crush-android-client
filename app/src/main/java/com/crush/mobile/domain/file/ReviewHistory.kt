@@ -57,16 +57,30 @@ import java.util.concurrent.atomic.AtomicLong
 class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
 
     companion object {
-        /** Enough turns for a working session; bounded anyway, like the snapshot. */
+        /** Enough turns for a working scope; bounded anyway, like the snapshot. */
         private const val MAX_CARDS = 8
+
+        /** Sentinel used by the legacy no-arg beginTurn(), which supersedes all. */
+        private const val ALL_SCOPES = "*"
     }
 
     private val _cards =
         MutableStateFlow<List<TurnChanges>>(emptyList())
 
-    /** Newest first. */
+    /** Newest first across all scopes; the Review host filters by its root. */
     val cards: StateFlow<List<TurnChanges>> = _cards.asStateFlow()
 
+    /**
+     * V2-5 D1: the roots with a turn in flight. Revert is refused only for a
+     * card in a running scope; project A's turn no longer disables project B.
+     */
+    private val _runningScopes = MutableStateFlow<Set<String>>(emptySet())
+    val runningScopes: StateFlow<Set<String>> = _runningScopes.asStateFlow()
+
+    /**
+     * True while any scope is running. Kept for callers/tests that only need
+     * the global fact; Review uses [runningScopes] for per-project gating.
+     */
     private val _runInFlight = MutableStateFlow(false)
     val runInFlight: StateFlow<Boolean> = _runInFlight.asStateFlow()
 
@@ -80,32 +94,70 @@ class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
     private val nextId = AtomicLong(1)
 
     /**
-     * A new turn was sent: the fly flag rises for the whole send/stream/collect
-     * window, and every existing card goes read-only. Called by the ViewModel
-     * where the capture root freezes; see [ChatViewModel.streamSend].
+     * A new turn was sent in [rootPath]: that scope's fly flag rises for the
+     * whole send/stream/collect window, and only that scope's existing cards
+     * go read-only. Called by the ViewModel with the run-frozen capture root.
      *
      * The flip waits on [opGate], so a turn cannot begin its record while a
      * revert's file operation is still in flight.
      */
+    suspend fun beginTurn(rootPath: String) {
+        beginTurnScoped(rootPath)
+    }
+
+    /**
+     * Compatibility entry for callers/tests that model ONE global scope
+     * (pre-V2-5 behavior): every card is superseded and every revert is
+     * blocked until [runSettled] without an argument. Production uses the
+     * root-scoped overload.
+     */
     suspend fun beginTurn() {
+        beginTurnScoped(null)
+    }
+
+    private suspend fun beginTurnScoped(rootPath: String?) {
         opGate.withLock {
+            _runningScopes.update { scopes ->
+                if (rootPath == null) scopes + ALL_SCOPES else scopes + rootPath
+            }
             _runInFlight.value = true
-            _cards.update { list -> list.map { if (it.superseded) it else it.copy(superseded = true) } }
+            _cards.update { list ->
+                list.map { card ->
+                    if ((rootPath == null || card.rootPath == rootPath) && !card.superseded) {
+                        card.copy(superseded = true)
+                    } else {
+                        card
+                    }
+                }
+            }
         }
     }
 
     /**
-     * The turn is over in every sense (the ViewModel's streamSend finally calls
-     * this AFTER collect, so a completed turn is revertible the moment its
-     * own card exists).
+     * The scoped turn is over in every sense (the ViewModel's streamSend
+     * finally calls this AFTER collect, so a completed turn is revertible the
+     * moment its own card exists).
      *
      * The flip is NonCancellable: a finally can run on an already-cancelled
      * coroutine, and a stuck-up flag would strand the store's gates forever.
      * It still waits on [opGate] for its brief flip.
      */
+    suspend fun runSettled(rootPath: String) {
+        withContext(NonCancellable) {
+            opGate.withLock {
+                _runningScopes.update { it - rootPath }
+                _runInFlight.value = _runningScopes.value.isNotEmpty()
+            }
+        }
+    }
+
+    /** Compatibility entry: clears every scope (pre-V2-5 single-scope tests). */
     suspend fun runSettled() {
         withContext(NonCancellable) {
-            opGate.withLock { _runInFlight.value = false }
+            opGate.withLock {
+                _runningScopes.value = emptySet()
+                _runInFlight.value = false
+            }
         }
     }
 
@@ -125,7 +177,10 @@ class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
         beforeTexts: Map<String, String?>,
         afterTexts: Map<String, String?>
     ): Long? {
-        if (changes.isEmpty) return null
+        // An ordinary empty outcome is not a card. A turn whose snapshot was
+        // unavailable is DIFFERENT: "we did not measure" must be reviewable,
+        // or the surface silently equates it with "nothing changed" (V2-5 D2).
+        if (changes.isEmpty && !changes.snapshotUnavailable) return null
         val card = TurnChanges(
             id = nextId.getAndIncrement(),
             startedAtMs = startedAtMs,
@@ -135,7 +190,18 @@ class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
             beforeTexts = beforeTexts,
             afterTexts = afterTexts
         )
-        _cards.update { list -> (listOf(card) + list).take(MAX_CARDS) }
+        _cards.update { list ->
+            val seen = mutableMapOf<String, Int>()
+            (listOf(card) + list).filter { candidate ->
+                val count = seen.getOrDefault(candidate.rootPath, 0)
+                if (count < MAX_CARDS) {
+                    seen[candidate.rootPath] = count + 1
+                    true
+                } else {
+                    false
+                }
+            }
+        }
         return card.id
     }
 
@@ -144,6 +210,7 @@ class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
     suspend fun clear() {
         opGate.withLock {
             _cards.value = emptyList()
+            _runningScopes.value = emptySet()
             _runInFlight.value = false
         }
     }
@@ -165,11 +232,12 @@ class ReviewHistory(private val reverter: FileReverter = FileReverter()) {
         val refusal = { reason: String ->
             note(cardId, path, FileReverter.Outcome.Refused(reason))
         }
-        if (_runInFlight.value) {
-            return@withLock refusal("a turn is running; revert while the agent is idle")
-        }
         val card = _cards.value.firstOrNull { it.id == cardId }
             ?: return@withLock refusal("this turn is no longer in the history")
+        val running = _runningScopes.value
+        if (ALL_SCOPES in running || card.rootPath in running) {
+            return@withLock refusal("a turn is running; revert while the agent is idle")
+        }
         if (card.superseded) {
             return@withLock refusal("older turn; only the latest completed turn is revertible")
         }

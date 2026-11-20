@@ -44,6 +44,9 @@ import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.file.FileDiff
 import com.crush.mobile.ui.CrushrcTrustDialog
 import com.crush.mobile.ui.components.CrushBanner
+import com.crush.mobile.ui.components.CrushButton
+import com.crush.mobile.ui.components.CrushButtonVariant
+import com.crush.mobile.ui.components.CrushCard
 import com.crush.mobile.ui.components.CrushEmptyState
 import com.crush.mobile.ui.components.CrushLoadingRow
 import com.crush.mobile.ui.components.CrushStatusLabel
@@ -125,7 +128,7 @@ fun ChatContent(
                         // the free-text phase alone. The words carry the state;
                         // the dot is decorative, so colour is not the signal.
                         CrushStatusLabel(
-                            text = state.run.statusLabel(state.binding.kind),
+                            text = state.binding.headerStatus(state.run),
                             tone = when (state.run.readiness) {
                                 EngineReadiness.Ready -> CrushTone.Success
                                 EngineReadiness.Recoverable -> CrushTone.Warning
@@ -895,47 +898,56 @@ private fun ToolActivityList(tools: List<ToolActivity>) {
  */
 @Composable
 private fun FileChangesPanel(changes: FileChangeSet, onOpenReview: (() -> Unit)? = null) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Text(
-            "${changes.fileCount} file${if (changes.fileCount == 1) "" else "s"} changed " +
-                "+${changes.totalAdded} -${changes.totalRemoved}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
+    CrushCard(modifier = Modifier.fillMaxWidth()) {
+        Text("This turn's changes", style = CrushType.section)
+        Spacer(Modifier.height(CrushSpacing.xs))
         if (changes.snapshotUnavailable) {
+            CrushStatusLabel(
+                text = "Changes were not measured for this turn",
+                tone = CrushTone.Warning,
+            )
+        } else {
             Text(
-                "No before-image was captured, so no diff is shown.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error
+                "${changes.fileCount} file${if (changes.fileCount == 1) "" else "s"} changed " +
+                    "+${changes.totalAdded} -${changes.totalRemoved}",
+                style = CrushType.secondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
-        changes.diffs.filter { it.hasChanges }.forEach { diff ->
-            FileDiffRow(diff)
-        }
-
         if (changes.unreadable.isNotEmpty()) {
+            Spacer(Modifier.height(CrushSpacing.xs))
             Text(
                 "${changes.unreadable.size} file(s) not shown (unreadable, binary, or too large): " +
                     changes.unreadable.take(4).joinToString(", ") +
                     if (changes.unreadable.size > 4) ", ..." else "",
-                style = MaterialTheme.typography.labelSmall,
+                style = CrushType.metadata,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+
+        if (changes.diffs.any { it.hasChanges }) {
+            Spacer(Modifier.height(CrushSpacing.sm))
+        }
+        changes.diffs.filter { it.hasChanges }.forEach { diff ->
+            FileDiffRow(diff)
         }
 
         // P4 (2026-11-07): the rail is the latest turn's summary; the Review
         // surface keeps EVERY completed turn of this process runtime with the
         // per-file revert. Only linked when there is something to review: a
         // link that lands on an empty history is a promise the app cannot keep.
-        if (onOpenReview != null && changes.fileCount > 0) {
-            TextButton(onClick = onOpenReview) {
-                Text("Review all turns")
-            }
+        // V2-5: a not-measured turn is reviewable too, because Review can say so.
+        if (
+            onOpenReview != null &&
+            (changes.fileCount > 0 || changes.unreadable.isNotEmpty() || changes.snapshotUnavailable)
+        ) {
+            Spacer(Modifier.height(CrushSpacing.xs))
+            CrushButton(
+                text = "Review all turns",
+                onClick = onOpenReview,
+                variant = CrushButtonVariant.TextOnly,
+            )
         }
     }
 }
@@ -970,7 +982,8 @@ internal fun FileDiffRow(diff: FileDiff) {
                     diff.path,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.weight(1f),
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 val tint = when {
                     diff.deleted -> MaterialTheme.colorScheme.error
@@ -1003,9 +1016,15 @@ internal fun FileDiffRow(diff: FileDiff) {
                         )
                     } else {
                         diff.hunks.forEach { hunk ->
+                            val beforeCount = hunk.lines.count {
+                                it.kind != DiffLine.Kind.ADDED
+                            }
+                            val afterCount = hunk.lines.count {
+                                it.kind != DiffLine.Kind.REMOVED
+                            }
                             Text(
-                                "@@ ${hunk.beforeStart},${hunk.lines.size} " +
-                                    "+${hunk.afterStart},${hunk.lines.size} @@",
+                                "@@ -${hunk.beforeStart},$beforeCount " +
+                                    "+${hunk.afterStart},$afterCount @@",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

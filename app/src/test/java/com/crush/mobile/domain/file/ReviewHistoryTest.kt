@@ -117,6 +117,75 @@ class ReviewHistoryTest {
     }
 
     @Test
+    fun `a turn in one root does not supersede or block another root`() = runBlocking {
+        val rootB = tmp.newFolder("workspace-b").canonicalFile
+        File(root, "a.txt").writeText("before")
+        val firstA = record()!!
+        history.runSettled()
+        val firstB = record(rootPath = rootB.absolutePath)!!
+
+        history.beginTurn(rootB.absolutePath)
+
+        assertFalse(
+            "project A's card must not be superseded by project B's turn",
+            history.cards.value.first { it.id == firstA }.superseded
+        )
+        assertTrue(
+            "project B's own older card is superseded",
+            history.cards.value.first { it.id == firstB }.superseded
+        )
+
+        // A's revert is not blocked by B's running turn; the global opGate
+        // still serializes the file work.
+        val outcome = history.revert(firstA, "a.txt")
+        assertTrue(outcome is FileReverter.Outcome.Done)
+        history.runSettled(rootB.absolutePath)
+    }
+
+    @Test
+    fun `the card cap is applied per root`() = runBlocking {
+        val rootB = tmp.newFolder("workspace-b").canonicalFile
+        repeat(9) { record(rootPath = root.absolutePath) }
+        record(rootPath = rootB.absolutePath)
+
+        assertEquals(
+            8,
+            history.cards.value.count { it.rootPath == root.absolutePath },
+        )
+        assertEquals(
+            1,
+            history.cards.value.count { it.rootPath == rootB.absolutePath },
+        )
+    }
+
+    @Test
+    fun `a not-measured turn is retained for Review`() = runBlocking {
+        val unmeasured = set.copy(
+            diffs = emptyList(),
+            unreadable = emptyList(),
+            snapshotUnavailable = true,
+        )
+
+        val id = record(changes = unmeasured)
+
+        assertEquals(1, history.cards.value.size)
+        assertEquals(id, history.cards.value.single().id)
+        assertTrue(history.cards.value.single().changes.snapshotUnavailable)
+    }
+
+    @Test
+    fun `a genuinely empty turn is still dropped`() = runBlocking {
+        val empty = set.copy(
+            diffs = emptyList(),
+            unreadable = emptyList(),
+            snapshotUnavailable = false,
+        )
+
+        assertNull(record(changes = empty))
+        assertTrue(history.cards.value.isEmpty())
+    }
+
+    @Test
     fun `a superseded card refuses revert and says so`() = runBlocking {
         val first = record()
         history.runSettled()

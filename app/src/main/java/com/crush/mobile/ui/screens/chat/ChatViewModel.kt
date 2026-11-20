@@ -3648,13 +3648,15 @@ class ChatViewModel(
         // before-image and after-image alike - belongs to the directory the
         // run's engine was bound to at start, not to whatever the Projects
         // surface has active when the turn ENDS.
-        runFileRoot = workspaceRoot()
-        // Review history (P4 v1): mark the fly flag and retire every older
-        // card NOW, so the Review surface can refuse mid-run file surgery and
-        // only ever offers the latest completed turn. The flag falls in this
-        // turn's finally, after collectFileChanges saw the workspace settled.
+        val frozenRoot = workspaceRoot()
+        runFileRoot = frozenRoot
+        // Review history (P4 v1): mark THIS scope's fly flag and retire its
+        // older cards NOW, so the Review surface can refuse mid-run file
+        // surgery and only ever offers that scope's latest completed turn.
+        // The flag falls in this turn's finally, after collectFileChanges saw
+        // the workspace settled. Other projects' cards are untouched (V2-5 D1).
         turnStartedAtMs = System.currentTimeMillis()
-        container.reviewHistory.beginTurn()
+        container.reviewHistory.beginTurn(frozenRoot.absolutePath)
         // Fresh id per turn, owned by the handle. ChatScreen keys its
         // LazyColumn by message id, and a constant sentinel produced
         // `IllegalArgumentException: Key "streaming" was already used` once
@@ -3976,12 +3978,15 @@ class ChatViewModel(
             //
             // Runtime, not persisted: this is what the agent did on THIS turn, so a
             // new session starts empty rather than inheriting a stale diff.
-            collectFileChanges()
-            // The Review surface's fly flag is honest about the whole turn:
-            // raised at send, lowered only now, after collect saw the
-            // workspace settle. Revert becomes available with the card in
-            // the same instant.
-            container.reviewHistory.runSettled()
+            //
+            // runSettled is in a finally so a failure while recording the card
+            // cannot leave the scope's fly flag up forever (V2-5 D1).
+            val reviewRoot = runFileRoot ?: workspaceRoot()
+            try {
+                collectFileChanges()
+            } finally {
+                container.reviewHistory.runSettled(reviewRoot.absolutePath)
+            }
             // The capture root belongs to THIS run alone; drop it so the next
             // send re-freezes against the instance it starts on.
             runFileRoot = null
@@ -4052,6 +4057,7 @@ class ChatViewModel(
         val snap = workspaceSnapshot ?: run {
             AppLog.w(TAG, "no pre-turn snapshot; file changes not measured")
             _state.update { it.copy(fileChanges = null) }
+            recordUnmeasuredTurn(sessionId)
             return
         }
         val ws = wsId ?: run {
@@ -4094,6 +4100,29 @@ class ChatViewModel(
                 afterTexts = result.afterTexts
             )
         }
+    }
+
+    /**
+     * V2-5 D2: a turn with no pre-turn snapshot is "not measured", not "no
+     * changes". The card is retained so Review can say which it is; there is
+     * nothing to revert, so the maps stay empty.
+     */
+    private fun recordUnmeasuredTurn(sessionId: String?) {
+        val root = runFileRoot ?: workspaceRoot()
+        container.reviewHistory.recordTurn(
+            sessionId = sessionId,
+            startedAtMs = turnStartedAtMs,
+            rootPath = root.absolutePath,
+            changes = FileChangeSet(
+                sessionId = sessionId,
+                diffs = emptyList(),
+                unreadable = emptyList(),
+                snapshotUnavailable = true,
+                capturedAtMs = System.currentTimeMillis(),
+            ),
+            beforeTexts = emptyMap(),
+            afterTexts = emptyMap(),
+        )
     }
 
     /**

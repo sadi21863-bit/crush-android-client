@@ -100,6 +100,20 @@ fun RunView.statusLabel(kind: BindingKind): String {
     return if (kind == BindingKind.ChatPool) "Chat - no tools \u00b7 $status" else status
 }
 
+/**
+ * V2-5 D6: project identity stays visible on a populated Code chat.
+ *
+ * The binding, not the session title, is the durable project fact. ChatPool
+ * keeps its no-tools hint (V2-4); Legacy stays status-only because it has no
+ * project identity to name.
+ */
+fun BindingView.headerStatus(run: RunView): String = when (kind) {
+    BindingKind.Project ->
+        "${projectLabel ?: "Project"} \u00b7 ${run.statusLabel(kind)}"
+    BindingKind.ChatPool,
+    BindingKind.Legacy -> run.statusLabel(kind)
+}
+
 data class ModelView(
     val providerId: String,
     val providerName: String,

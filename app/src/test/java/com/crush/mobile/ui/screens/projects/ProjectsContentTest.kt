@@ -1,9 +1,12 @@
 package com.crush.mobile.ui.screens.projects
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -27,10 +30,9 @@ import org.robolectric.annotation.Config
  * Phase 2b.2 (V2 plan §6.5): the Projects content layer renders from
  * fabricated [ProjectsUiState] and host-provided values only.
  *
- * Recorded scope note: the plan's Projects coverage list names a "current
- * marker", but the as-built surface has none and §4.7.2 assigns that target to
- * the Phase 7 redesign. 2b.2 is an extraction, so this suite pins the actual
- * pixels and interactions and does not invent the marker.
+ * V2-5 adds the current marker bound to the host's active binding (F-A) and a
+ * written trust/identity status; the earlier 2b.2 note that "the surface has
+ * none" is superseded by `V2-5-code-projects-review.md`.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h1600dp")
@@ -38,6 +40,12 @@ class ProjectsContentTest {
 
     @get:Rule
     val compose = createComposeRule()
+
+    private fun currentState(): SemanticsMatcher =
+        SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            "Current project",
+        )
 
     // Host-portable absolute paths: the surface compares `File.absolutePath`
     // values, and on the Windows JVM a hardcoded Unix path rewrites to
@@ -85,9 +93,9 @@ class ProjectsContentTest {
     fun `an empty registry explains what the list is for`() {
         setContent()
 
-        compose.onNodeWithText("No projects yet", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("No projects yet").assertIsDisplayed()
         compose.onNodeWithText(
-            "the first entry here should always be the legacy workspace",
+            "Import a folder to create a project.",
             substring = true,
         ).assertIsDisplayed()
     }
@@ -113,12 +121,12 @@ class ProjectsContentTest {
             importError = "Pick a project folder, not the root of internal storage.",
         )
 
-        compose.onNodeWithText("Registry error: registry read failed").assertIsDisplayed()
+        compose.onNodeWithText("Projects error: registry read failed").assertIsDisplayed()
         compose.onNodeWithText("Pick a project folder", substring = true).assertIsDisplayed()
     }
 
     @Test
-    fun `populated rows carry label path and environment`() {
+    fun `populated rows carry label path identity and trust`() {
         val imported = project(
             "Notes",
             importedPath,
@@ -137,7 +145,54 @@ class ProjectsContentTest {
         // viewport; existence is the parity fact here, the labels carry the
         // displayed assertion.
         compose.onNodeWithText(imported.repoDir.absolutePath).assertExists()
-        compose.onNodeWithText("L1_TERMUX_TOOLS workspace").assertExists()
+        // V2-5: the raw environment enum is gone; identity and trust are
+        // written status, not an implementation detail.
+        compose.onNodeWithText("Imported folder").assertExists()
+        compose.onNodeWithText("App history workspace").assertExists()
+        compose.onAllNodesWithText("No approved configuration").assertCountEquals(2)
+        compose.onAllNodesWithText("L1_TERMUX_TOOLS workspace").assertCountEquals(0)
+    }
+
+    @Test
+    fun `a trusted project says its configuration is approved`() {
+        val trusted = project("Notes", importedPath).copy(trusted = true)
+        setContent(
+            state = ProjectsUiState(loading = false, projects = listOf(trusted))
+        )
+
+        compose.onNodeWithText("Configuration approved").assertExists()
+        compose.onAllNodesWithText("No approved configuration").assertCountEquals(0)
+    }
+
+    @Test
+    fun `the active project is marked current by check word and semantics`() {
+        val active = project("Notes", importedPath)
+        setContent(
+            state = ProjectsUiState(
+                loading = false,
+                projects = listOf(project("Other", File(hostRoot, "other").absolutePath), active),
+                activeProjectId = active.id,
+            )
+        )
+
+        compose.onNodeWithText("Current").assertExists()
+        compose.onAllNodes(currentState()).assertCountEquals(1)
+        compose.onNode(hasText("Notes") and currentState()).assertExists()
+    }
+
+    @Test
+    fun `the legacy row is current when the legacy binding is active`() {
+        val legacy = project("Legacy workspace", legacyPath)
+        setContent(
+            state = ProjectsUiState(
+                loading = false,
+                projects = listOf(legacy),
+                legacyActive = true,
+            )
+        )
+
+        compose.onNodeWithText("Current").assertExists()
+        compose.onAllNodes(currentState()).assertCountEquals(1)
     }
 
     @Test

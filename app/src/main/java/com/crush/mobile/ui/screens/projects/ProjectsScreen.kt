@@ -14,6 +14,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crush.mobile.CrushMobileApp
 import com.crush.mobile.data.project.PendingProjectTrust
+import com.crush.mobile.di.AppContainer.EngineBinding
 import com.crush.mobile.project.FolderUriDecoder
 import java.io.File
 
@@ -43,7 +45,15 @@ fun ProjectsScreen(onOpenProject: () -> Unit) {
     val container = (context.applicationContext as CrushMobileApp).container
     val vm: ProjectsViewModel = viewModel(factory = ProjectsViewModel.Factory(context, container))
     val s by vm.state.collectAsStateWithLifecycle()
+    // F-A: the Current marker is the container's binding, never a second
+    // stored choice. Collect it here so the content stays container-free.
+    val binding by container.activeBinding.collectAsStateWithLifecycle()
     var importError by remember { mutableStateOf<String?>(null) }
+
+    // Re-read the rows whenever this primary destination re-enters
+    // composition (e.g. returning from a project chat after consent): the
+    // trust badge must reflect the record, not the composition-time snapshot.
+    LaunchedEffect(Unit) { vm.refresh() }
 
     // S4/F04 (acceptance A05) + S-02: an imported folder MAY carry a
     // project-root `crushrc` (or its `.crushrc` dotfile), which the embedded
@@ -68,6 +78,10 @@ fun ProjectsScreen(onOpenProject: () -> Unit) {
     val pickTreeFolder = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
+        // A cancelled picker returns null. The old path ran getTreeDocumentId
+        // on null, swallowed the throw and showed the "no real folder path"
+        // error - a false failure for a deliberate cancel.
+        if (uri == null) return@rememberLauncherForActivityResult
         val docId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
         val mappedPath = FolderUriDecoder.primaryPathFromTreeDocumentId(docId)
         val path = FolderUriDecoder.primaryProjectPathFromTreeDocumentId(docId)
@@ -196,7 +210,10 @@ fun ProjectsScreen(onOpenProject: () -> Unit) {
     val internalRoot = File(context.filesDir, "projects").absolutePath + File.separator
 
     ProjectsContent(
-        state = s,
+        state = s.copy(
+            activeProjectId = (binding as? EngineBinding.Project)?.ref?.id,
+            legacyActive = binding is EngineBinding.Legacy,
+        ),
         legacyPath = legacyPath,
         internalRoot = internalRoot,
         importError = importError,

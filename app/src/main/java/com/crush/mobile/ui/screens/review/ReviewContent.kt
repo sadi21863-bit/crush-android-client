@@ -12,13 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crush.mobile.domain.file.TurnChanges
+import com.crush.mobile.ui.components.CrushBanner
+import com.crush.mobile.ui.components.CrushCard
+import com.crush.mobile.ui.components.CrushEmptyState
+import com.crush.mobile.ui.components.CrushTone
 import com.crush.mobile.ui.screens.chat.FileDiffRow
+import com.crush.mobile.ui.theme.CrushSpacing
+import com.crush.mobile.ui.theme.CrushType
 import com.crush.mobile.ui.theme.LocalCrushColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,6 +59,7 @@ private val TIME_FORMAT = SimpleDateFormat("HH:mm:ss", Locale.US)
  * the pending-revert dialog is local `remember` state, as the sheets were in
  * 2b.1.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewContent(
     state: ReviewUiState,
@@ -58,78 +71,110 @@ fun ReviewContent(
     // one card, and Confirm/Cancel is the whole interaction.
     var pending by remember { mutableStateOf<Pair<TurnChanges, String>?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 24.dp)
-    ) {
-        Row(
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Review changes", style = CrushType.section)
+                        state.projectLabel?.let { label ->
+                            Text(
+                                label,
+                                style = CrushType.metadata,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(padding)
         ) {
-            TextButton(onClick = onBack) { Text("Back") }
-            Spacer(Modifier.width(8.dp))
             Text(
-                "Review changes",
-                style = MaterialTheme.typography.titleLarge
-            )
-        }
-        Text(
-            "Per-turn file changes recorded while the app runs. " +
-                "History clears when the app process ends. Revert targets the " +
-                "latest completed turn only, and refuses files edited after it.",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-
-        if (state.runInFlight) {
-            Text(
-                "A turn is running; revert is disabled until the agent is idle.",
-                style = MaterialTheme.typography.labelMedium,
-                color = LocalCrushColors.current.warning,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-            )
-        }
-
-        state.exportMessage?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-            )
-        }
-
-        if (state.cards.isEmpty()) {
-            Spacer(Modifier.height(32.dp))
-            Text(
-                "Nothing collected yet.\n\n" +
-                    "Send a prompt in a chat; when a turn ends, the files it " +
-                    "changed appear here with their diffs.",
-                style = MaterialTheme.typography.bodyMedium,
+                "Per-turn changes for ${state.projectLabel ?: "this chat"}. " +
+                    "History clears when the app process ends. Revert targets " +
+                    "the latest completed turn only. Tests are not run by Crush " +
+                    "Mobile; model claims are not test results. Export copies " +
+                    "the file as it is on disk now.",
+                style = CrushType.secondary,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(
+                    horizontal = CrushSpacing.lg,
+                    vertical = CrushSpacing.xs
+                )
             )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(
-                    start = 12.dp, end = 12.dp, bottom = 24.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(state.cards, key = { it.id }) { card ->
-                    TurnCard(
-                        card = card,
-                        runInFlight = state.runInFlight,
-                        onRevert = { path -> pending = card to path },
-                        onExport = { path -> onExport(card.rootPath, path) }
+
+            if (state.runInFlight) {
+                CrushBanner(
+                    text = "A turn is running; revert is disabled until the agent is idle.",
+                    tone = CrushTone.Warning,
+                    modifier = Modifier.padding(
+                        horizontal = CrushSpacing.lg,
+                        vertical = CrushSpacing.xs
                     )
+                )
+            }
+
+            state.exportMessage?.let {
+                Text(
+                    it,
+                    style = CrushType.secondary,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(
+                        horizontal = CrushSpacing.lg,
+                        vertical = CrushSpacing.xs
+                    )
+                )
+            }
+
+            when {
+                !state.scopeAvailable -> CrushEmptyState(
+                    title = "No file changes in this chat",
+                    body = "Chats run no tools, so there is no project diff to " +
+                        "review. Open a project chat to collect file changes.",
+                    modifier = Modifier.padding(CrushSpacing.xl)
+                )
+
+                state.cards.isEmpty() -> CrushEmptyState(
+                    title = "Nothing collected yet",
+                    body = "Send a prompt in a project chat; when a turn ends, " +
+                        "the files it changed appear here with their diffs.",
+                    modifier = Modifier.padding(CrushSpacing.xl)
+                )
+
+                else -> LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(
+                        start = CrushSpacing.md,
+                        end = CrushSpacing.md,
+                        bottom = CrushSpacing.xl
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(CrushSpacing.sm)
+                ) {
+                    items(state.cards, key = { it.id }) { card ->
+                        TurnCard(
+                            card = card,
+                            runInFlight = state.runInFlight,
+                            onRevert = { path -> pending = card to path },
+                            onExport = { path -> onExport(card.rootPath, path) }
+                        )
+                    }
                 }
             }
         }
@@ -142,9 +187,10 @@ fun ReviewContent(
             text = {
                 Text(
                     "Rewrites \"$path\" to the content it had before the " +
-                        "turn at ${timeLabel(card.startedAtMs)}. " +
-                        "The revert refuses automatically if the file changed " +
-                        "after that turn ended."
+                        "turn at ${timeLabel(card.startedAtMs)} in " +
+                        "${state.projectLabel ?: "this chat"}. The revert " +
+                        "refuses automatically if the file changed after that " +
+                        "turn ended."
                 )
             },
             confirmButton = {
@@ -169,67 +215,74 @@ private fun TurnCard(
     onRevert: (String) -> Unit,
     onExport: (String) -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Turn at ${timeLabel(card.startedAtMs)}",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Text(
-                        cardLabelDetail(card),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+    CrushCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
                 Text(
+                    "Turn at ${timeLabel(card.startedAtMs)}",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    cardLabelDetail(card),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                if (card.changes.snapshotUnavailable) {
+                    "not measured"
+                } else {
                     "${card.changes.fileCount} file(s) " +
-                        "+${card.changes.totalAdded} -${card.changes.totalRemoved}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+                        "+${card.changes.totalAdded} -${card.changes.totalRemoved}"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
-            if (card.superseded) {
-                Text(
-                    "Older turn - read-only; only the latest completed turn is revertible.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            if (card.changes.unreadable.isNotEmpty()) {
-                Text(
-                    "${card.changes.unreadable.size} tracked file(s) could not be " +
-                        "diffed (binary, oversize, or foreign path): " +
-                        card.changes.unreadable.take(3).joinToString(", ") +
-                        if (card.changes.unreadable.size > 3) ", ..." else "",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            if (card.changes.diffs.isEmpty()) {
-                Text(
-                    "No diffable file change in this turn.",
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
+        if (card.changes.snapshotUnavailable) {
+            Text(
+                "Changes were not measured for this turn. The pre-turn " +
+                    "snapshot was unavailable, so nothing is offered for revert.",
+                style = MaterialTheme.typography.labelSmall,
+                color = LocalCrushColors.current.warning,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+        if (card.superseded) {
+            Text(
+                "Older turn - read-only; only the latest completed turn is revertible.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+        if (card.changes.unreadable.isNotEmpty()) {
+            Text(
+                "${card.changes.unreadable.size} tracked file(s) could not be " +
+                    "diffed (binary, oversize, or foreign path): " +
+                    card.changes.unreadable.take(3).joinToString(", ") +
+                    if (card.changes.unreadable.size > 3) ", ..." else "",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+        if (card.changes.diffs.isEmpty() && !card.changes.snapshotUnavailable) {
+            Text(
+                "No diffable file change in this turn.",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
 
-            card.changes.diffs.forEach { diff ->
-                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                FileDiffRow(diff)
-                RevertRow(card, diff.path, runInFlight, onRevert)
-                ExportRow(diff.path, onExport)
-            }
+        card.changes.diffs.forEach { diff ->
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+            FileDiffRow(diff)
+            RevertRow(card, diff.path, runInFlight, onRevert)
+            ExportRow(diff.path, onExport)
         }
     }
 }
@@ -309,7 +362,10 @@ private fun cardLabelDetail(card: TurnChanges): String {
     val root = card.rootPath.trimEnd('/', '\\')
     val tail = root.substringAfterLast('/').ifBlank { root }
     val sid = card.sessionId?.let { "session ${it.take(8)}" } ?: "session"
-    return "$sid - $tail"
+    val captured = card.changes.capturedAtMs
+        .takeIf { it > 0L }
+        ?.let { "captured ${timeLabel(it)}" }
+    return listOfNotNull(sid, tail, captured).joinToString(" \u00b7 ")
 }
 
 private fun timeLabel(ms: Long): String = TIME_FORMAT.format(Date(ms))

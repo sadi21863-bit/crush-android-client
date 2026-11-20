@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.crush.mobile.domain.file.DiffHunk
@@ -96,8 +97,64 @@ class ReviewContentTest {
     fun `an empty history explains the process scope`() {
         setContent(ReviewUiState())
 
-        compose.onNodeWithText("Nothing collected yet.", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("Send a prompt in a chat", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Nothing collected yet", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Send a prompt in a project chat", substring = true)
+            .assertIsDisplayed()
+        compose.onNodeWithText("Tests are not run by Crush", substring = true)
+            .assertIsDisplayed()
+        compose.onNodeWithText("as it is on disk now", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `a chat pool scope explains that no file changes are collected`() {
+        setContent(ReviewUiState(scopeAvailable = false))
+
+        compose.onNodeWithText("No file changes in this chat").assertIsDisplayed()
+        compose.onNodeWithText("Chats run no tools", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Nothing collected yet", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a not-measured turn says so and offers no revert`() {
+        val changes = FileChangeSet(
+            sessionId = "sess-1",
+            diffs = emptyList(),
+            unreadable = emptyList(),
+            snapshotUnavailable = true,
+            capturedAtMs = 1000L,
+        )
+        setContent(ReviewUiState(cards = listOf(card(changes = changes))))
+
+        compose.onNodeWithText("not measured").assertExists()
+        compose.onNodeWithText("Changes were not measured", substring = true)
+            .assertIsDisplayed()
+        compose.onNodeWithText("Revert this file").assertDoesNotExist()
+        compose.onNodeWithText("No diffable file change", substring = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun `the project label and capture time are in the card provenance`() {
+        setContent(
+            ReviewUiState(
+                cards = listOf(
+                    card(
+                        changes = FileChangeSet(
+                            sessionId = "sess-1",
+                            diffs = listOf(diff()),
+                            unreadable = emptyList(),
+                            snapshotUnavailable = false,
+                            capturedAtMs = 1_700_000_001_000L,
+                        )
+                    )
+                ),
+                projectLabel = "notes-app",
+            )
+        )
+
+        compose.onNodeWithText("notes-app").assertIsDisplayed()
+        compose.onNodeWithText("captured ", substring = true).assertExists()
     }
 
     @Test
@@ -224,7 +281,7 @@ class ReviewContentTest {
         var backs = 0
         setContent(ReviewUiState(), onBack = { backs += 1 })
 
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
 
         assertEquals(1, backs)

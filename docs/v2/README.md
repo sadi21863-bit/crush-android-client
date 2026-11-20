@@ -1,8 +1,8 @@
 # V2 redesign package (planning and implementation)
 
 Status: **V2 implementation is authorized.** V2-1 direction is approved
-(V2-A8); V2-2 and V2-3 are complete; V2-4 is in progress. See the package
-table below for per-package evidence and limits.
+(V2-A8); V2-2, V2-3 and V2-4 are complete. See the package table below for
+per-package evidence and limits.
 
 Authority (owner, 2026-11-19): Revision 4.0 is the forward roadmap and
 design direction. The November 14 Rev 3.1 brief remains authoritative for
@@ -42,7 +42,7 @@ the owner's trims.
 | V2-1 | partial (direction approved) | token spec, state catalogue and a11y spec approved 2026-11-19 (V2-A8); prototype/flow tasks 3-6 still NOT PERFORMED, so the V2-1 exit criteria are not met |
 | V2-2 | complete (exit criteria, 2026-11-20) | tokens in `ui/theme/`, component set piloted on Diagnostics, 871 tests green, lint 0 errors, full gate passed on attempts 2-4 (attempt 1 failed on a test-fixture typo), CI `44618219274` green; device evidence in `docs/parity/2026-11-20-v2-2-tokens/` (two defects found and fixed: card hairline, dark navigation bar). Partial task items: no screenshot-test harness; font-scale/reduced-motion/density NOT PERFORMED. F-J selection affordance is carried to V2-4 |
 | V2-3 | complete (2026-11-20) | adaptive shell: bottom bar `<600dp`, rail `600-839dp`, extended rail `>=840dp` (extended rail not on hardware), single `navigatePrimary` rule, primary-only chrome; 885 tests green, lint 0 errors, CI run `44669754612` green; device pass in `docs/parity/2026-11-20-v2-3-shell/` (12 captures: bar, sheet, Back, IME, landscape rail, rotation). Limits: extended rail, API 30+, wide/tablet and instrumented tests NOT PERFORMED |
-| V2-4 | in progress (2026-11-20) | chat empty/transcript/composer/sheets/picker redesign plus F-B/F-C/F-E/F-J; tasks 4 and 7-cost/context trimmed by V2-A4; four-task gate green on attempt 2 (899 tests, 0 failures; lint 0 errors / 1 pre-existing warning); device pass and CI NOT PERFORMED yet |
+| V2-4 | complete (2026-11-20) | chat empty/transcript/composer/sheets/picker redesign plus F-B/F-C/F-E/F-J; tasks 4 and 7-cost/context trimmed by V2-A4; final gate 899 tests / 0 failures, lint 0 errors / 1 pre-existing warning; device pass 27 captures found and fixed F-L (user-prose contrast) and F-M (empty tool-only bubble); Retry verified after an owner-approved network cut. Limits: frame timing, 2.0x/density/wide, provider switch and model loading/not-in-list device states NOT PERFORMED; final-commit CI pending at writing |
 | V2-5 | not started | V2-3 shell |
 | V2-6 | not started | V2-2 components |
 | V2-7/8/9 | parked | separate owner approval |

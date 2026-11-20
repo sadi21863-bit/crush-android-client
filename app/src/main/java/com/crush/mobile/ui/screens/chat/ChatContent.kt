@@ -645,7 +645,11 @@ private fun Bubble(
                     retryEnabled = retryEnabled,
                     onRetry = onRetry
                 )
-            } else {
+            } else if (m.text.isNotEmpty() || m.isStreaming) {
+                // A tool-only or report-only turn has no speech of its own.
+                // Drawing its bubble produced an empty pill under the tool
+                // rows; skip the bubble entirely, the activity above is the
+                // content.
                 Box(
                     modifier = Modifier
                         .widthIn(max = 640.dp)

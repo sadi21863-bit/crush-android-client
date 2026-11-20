@@ -1328,7 +1328,7 @@ bar, so it is below 840dp (F-K). The extended-rail branch is Compose-tested
 at 1000dp only. 2.0x font scale, reduced motion, density, API 30+, wide/
 tablet and instrumented tests are NOT PERFORMED.
 
-### 5.13 V2-4 chat redesign (in progress, 2026-11-20)
+### 5.13 V2-4 chat redesign (complete, 2026-11-20)
 
 V2-4 works on the existing `ChatViewState` -> `ChatAction` seam; no host,
 dispatch or engine-boundary change. Scope is Revision 4.0 tasks 1, 2, 3, 5, 6,
@@ -1361,18 +1361,36 @@ Changes in the working tree:
   active row now carries a check, the word `Current` and
   `stateDescription = "Current chat"`.
 - **Transcript/markdown:** visible `You`/`Crush` role labels, 12dp message
-  rhythm, user bubbles wrap, assistant prose caps at 640dp, and heading sizes
-  now inherit into nested bold/italic/code with a 12sp floor (level 6 was 8sp).
+  rhythm, user bubbles wrap, assistant prose caps at 640dp, heading sizes
+  now inherit into nested bold/italic/code with a 12sp floor (level 6 was
+  8sp), the bubble colour now reaches every prose block (F-L), and a
+  tool-only row no longer draws an empty bubble (F-M).
 - **Composer:** growth uses `CrushDimens.composerMaxLines` (8); the §5.5.1
   gates and the always-enabled streaming Stop are unchanged.
 
-Evidence: the four-task gate is green on attempt 2
-(`v2-4-gate-1120-2.log`, 899 tests, 0 failures, 95 suites; lint 0 errors,
-1 pre-existing warning). Attempt 1 failed one test because an assertion used
-`hasAnyAncestor` on a merged clickable row; the test was corrected. The device
-pass was **NOT PERFORMED**: the phone was off USB for the whole batch. Device
-rows - streaming/Stop/Retry, session and model sheets, F-J, process recreation
-and frame timing - stay open in the V2-4 document.
+Evidence: the final four-task gate (attempt 4,
+`v2-4-gate-1120-4.log`) is green: 899 tests, 95 suites, 0 failures, 0 errors,
+0 skipped; lint 0 errors / 1 pre-existing `NotShrinkingResources` warning.
+Attempts 2 and 3 were also green; attempt 1 failed one test because a
+merged-semantics assertion used `hasAnyAncestor` on a clickable row, and the
+assertion was corrected.
+
+The device pass (`bbf8ca69`, API 29, 393dp) captured the empty state, ready
+header, picker, model sheet, session states, streaming/Stop, session
+switching, F-J chips, process recreation and Retry in
+`docs/parity/2026-11-20-v2-4-chat/` (27 captures plus a before-crop). Retry
+needed an owner-approved brief airplane-mode cut; after restore, Retry started
+a new turn and the ASK dialog gated the tool, which was denied. The pass found
+two real defects the tests could not see: **F-L**, user-bubble prose was
+near-black on graphite because `MarkdownText` ignored its colour for prose
+blocks, and **F-M**, a tool-only row drew an empty filled bubble. Both were
+fixed and re-captured (`12`, `15`). CI for the earlier `ff3fef9` commit is
+green (`44715709979`); the F-L/F-M commit's run is recorded in the V2-4
+document once it lands.
+
+NOT PERFORMED on device: frame timing (no baseline), 2.0x font scale, reduced
+motion, density, wide/tablet, API 30+, provider switch (model selection was
+exercised), and instrumented tests. These stay open, not claimed.
 
 ## 6. Upstream filings
 

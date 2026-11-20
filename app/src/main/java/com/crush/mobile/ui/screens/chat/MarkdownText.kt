@@ -84,11 +84,16 @@ fun MarkdownText(
                     inlineAnnotated(block.inlines, color, block.level),
                     modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
                     style = CrushType.section,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    // The bubble's colour must actually reach the prose. This
+                    // was previously used only for inline-code backgrounds, so
+                    // a user bubble rendered dark text on its graphite fill.
+                    color = color
                 )
                 is MdBlock.Paragraph -> Text(
                     inlineAnnotated(block.inlines, color),
-                    style = CrushType.body
+                    style = CrushType.body,
+                    color = color
                 )
                 is MdBlock.Bullet -> Row(Modifier.padding(start = (block.indent * 12).dp)) {
                     Text(
@@ -99,7 +104,8 @@ fun MarkdownText(
                     )
                     Text(
                         inlineAnnotated(block.inlines, color),
-                        style = CrushType.body
+                        style = CrushType.body,
+                        color = color
                     )
                 }
                 is MdBlock.Numbered -> Row(Modifier.padding(start = (block.indent * 12).dp)) {
@@ -111,20 +117,21 @@ fun MarkdownText(
                     )
                     Text(
                         inlineAnnotated(block.inlines, color),
-                        style = CrushType.body
+                        style = CrushType.body,
+                        color = color
                     )
                 }
                 is MdBlock.Quote -> Row {
                     Text(
                         "▏",
                         style = CrushType.body,
-                        color = MaterialTheme.colorScheme.primary
+                        color = color
                     )
                     Text(
                         inlineAnnotated(block.inlines, color),
                         style = CrushType.body,
                         modifier = Modifier.padding(start = 6.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = color
                     )
                 }
                 is MdBlock.Rule -> HorizontalDivider(

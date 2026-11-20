@@ -1,9 +1,9 @@
-# V2-4 - Chat redesign (in progress, started 2026-11-20)
+# V2-4 - Chat redesign (complete, 2026-11-20)
 
-Status: **IN PROGRESS.** This record is written before the code change so the
-scope, decisions and evidence rows exist independently of the implementation.
-Unfinished rows say NOT PERFORMED; they are filled only from a build log, a CI
-run or a device capture.
+Status: **COMPLETE** for the trimmed V2-4 scope. The four-task gate and the
+device pass are recorded below; rows that were not performed say so. Code was
+first committed as `ff3fef9`; the F-L/F-M transcript fixes landed after that
+commit and were re-gated and re-captured.
 
 Authority:
 
@@ -123,8 +123,11 @@ or would be a fake affordance on a new chat.
 - User bubbles wrap their content and stay right-aligned; assistant bubbles get
   a `widthIn(max = 640dp)` cap so a wide window does not produce 700dp prose.
   The cap is source-level only on this 393dp device.
-- Existing bubble colours and the user `onPrimaryContainer` contrast fix are
-  kept.
+- A tool-only turn draws its tool rows and no empty bubble (F-M, found on
+  device).
+- Existing bubble colours and the user `onPrimaryContainer` pair are kept.
+  `MarkdownText` now paints every prose block with the colour it is given, so
+  that pair actually reaches the user's text (F-L, found on device).
 
 ### V2-4-D6 - Markdown/code readability without parser changes
 
@@ -158,8 +161,8 @@ surfacing them is a visibility decision, not a visual redesign.
 |---|---|---|
 | Projection | `ChatViewState.kt` | `ModelCatalogueView.loading`; pure `RunView.statusLabel()` and `emptyCopy()` |
 | State | `ChatViewModel.kt` | `modelsLoading` flag around `loadModels`, reset on terminal paths/provider change |
-| Chat surface | `ChatContent.kt` | header status + picker label; empty state; role labels/spacing; composer max lines; session/model sheet states |
-| Markdown | `MarkdownText.kt` | heading span inheritance + 12sp floor |
+| Chat surface | `ChatContent.kt` | header status + picker label; empty state; role labels/spacing; tool-only bubble skip; composer max lines; session/model sheet states |
+| Markdown | `MarkdownText.kt` | heading span inheritance + 12sp floor; the passed colour reaches every prose block |
 | Components | `CrushComponents.kt` | `CrushChoiceChip` |
 | Settings | `SettingsContent.kt` | FilterChip -> `CrushChoiceChip` (F-J) |
 | Tests | `ChatViewStateTest`, `ChatContentTranscriptTest`, `ChatContentSheetsTest`, `CrushComponentsTest` | new pins listed below |
@@ -185,37 +188,72 @@ Unchanged on purpose: `ChatAction.kt`, `ChatDispatch.kt`, `ChatScreen.kt`,
 
 | Claim | Evidence | Status |
 |---|---|---|
-| Four-task gate | `v2-4-gate-1120-2.log`: `BUILD SUCCESSFUL in 13m 57s` | PASS (attempt 2) |
+| Four-task gate (final) | `v2-4-gate-1120-4.log`: `BUILD SUCCESSFUL in 15m 43s` | PASS (attempt 4) |
 | Unit-test count / failures | 899 tests, 95 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
-| CI | GitHub Actions run on the pushed commit | NOT PERFORMED |
-| Chat empty state, ready status, picker visible | device capture set below | NOT PERFORMED (device off USB) |
-| Streaming + Stop + Retry | device capture set below | NOT PERFORMED (device off USB) |
-| Session sheet current marker / unavailable state | device capture set below | NOT PERFORMED (device off USB) |
-| Model sheet provenance / loading / not-in-list | device capture set below | NOT PERFORMED (device off USB) |
-| Settings F-J selected chip | device capture set below | NOT PERFORMED (device off USB) |
-| Process recreation / no transcript bleed | device steps + log | NOT PERFORMED (device off USB) |
-| Frame timing baseline vs post-change | `dumpsys gfxinfo` numbers | NOT PERFORMED; no pre-change baseline was captured on this device |
+| CI | run `44715709979` on `ff3fef9` green (2026-11-20T10:05:09Z); the F-L/F-M commit is newer | PARTIAL: pre-fix commit green, final commit CI pending |
+| Chat empty state, ready status, picker visible | `01-launch.png`, `04-ready-empty-draft.png` | PASS on device |
+| Streaming + Stop | `05-streaming.png`, `06-stopped.png` | PASS on device |
+| Retry | `23-retry-failure.png` ... `27-retry-settled.png` (network toggle with owner consent; tool denied) | PASS on device |
+| Session sheet unavailable / current marker | `03-session-sheet.png`, `07-session-current.png` | PASS on device |
+| Session switching / no transcript bleed | `08-session-switched.png`, `12-user-text-fixed.png` | PASS on device |
+| Model sheet provenance / reload | `02-model-sheet.png`, `17-model-sheet-loaded.png` (provider changed from Zen to Go and the subtitle followed it) | PASS on device |
+| Model selection | `18`-`22` (optimistic switch, then probe revert to the persisted model) | PASS on device |
+| Model sheet loading / "not in current list" | source + JVM tests only | NOT PERFORMED on device |
+| Settings F-J selected chip | `13-settings-chips.png` | PASS on device |
+| Process recreation / session reload | reinstall/force-stop -> launch -> engine start -> session selected (`10`-`15`) | PASS on device |
+| Frame timing baseline vs post-change | `dumpsys gfxinfo` numbers | NOT PERFORMED; no pre-change baseline was captured |
 
-Gate attempt 1 (`v2-4-gate-1120-1.log`) failed one test: the session-sheet
-current-row assertion used `hasAnyAncestor` on a clickable row whose text is
-merged into the state-description node. The assertion was corrected to match
-the same merged node, not the production code. Attempt 2 is the green run
-above. A main-source compile failure before that (`gutter` read from
-`CrushSpacing` instead of `CrushDimens`) is also recorded rather than hidden.
+Device pass environment: `bbf8ca69`, API 29, 393dp portrait, app
+`com.crush.mobile`, debug APK. Captures `01`-`13` used the gate-3 APK (F-L
+fixed, F-M not); `14`-`27` used the final gate-4 APK. Capture `09` (Settings
+top) was deleted before commit because it showed the masked key chip; it was
+an intermediate, not a claim.
 
-Device environment when the pass runs: Redmi Note 7 Pro `bbf8ca69`, API 29,
-393dp portrait, app `com.crush.mobile`. Captures go in
-`docs/parity/2026-11-20-v2-4-chat/`.
+Retry method: with the owner's permission the phone's airplane mode was
+enabled for one turn, producing "This reply failed / no reply received". The
+network was restored and verified, Retry re-ran the turn, the ASK permission
+dialog appeared for the agent's `bash` call, and Deny settled the run. The
+failed pair remains above the new turn by design. Airplane mode also cut the
+PC's tethering for about two minutes; it was restored immediately.
+
+### Device findings
+
+- **F-L (fixed, DEVICE-VERIFIED `12-user-text-fixed.png`):** user-bubble prose
+  rendered `onSurface` on `primaryContainer` (near-black on graphite). The
+  colour argument reached `MarkdownText` but was used only for inline-code
+  backgrounds; paragraphs/headings/lists/quotes fell back to the content
+  colour. Fixed by passing the bubble colour to every prose block. The owner
+  spotted this in the first populated-transcript capture; it is a real
+  contrast defect, not a palette preference. A crop of the before state is
+  kept as `_crop-user-bubble.png`.
+- **F-M (fixed, DEVICE-VERIFIED `15-final-transcript.png`):** a tool-only
+  assistant row drew an empty filled bubble below its tool rows. Fixed by
+  skipping the bubble when there is no text and no streaming placeholder.
+
+Gate history: attempt 1 (`v2-4-gate-1120-1.log`) failed one test because the
+session-sheet current-row assertion used `hasAnyAncestor` on a clickable row
+whose text is merged into the state-description node; the test was corrected.
+Attempt 2 was the first green run. Attempt 3 was green after the F-L colour fix,
+and the final attempt 4 was green after the F-M empty-bubble fix. A main-source
+compile failure before attempt 1 (`gutter` read from `CrushSpacing` instead of
+`CrushDimens`) is also recorded rather than hidden.
 
 ## 6. Honest limits
 
 - API 29 cannot prove API 30+ behaviour, instrumented-test execution, or
   wide/tablet layouts. The 640dp bubble cap is a source rule, not an
   observation.
-- 2.0x font scale is checked by source rules (sp type, no fixed text heights,
-  wrapping rows) and, if the device pass allows it, by capture - not by an
-  automated screenshot harness (the repo has none).
+- 2.0x font scale, reduced motion and density overrides are **NOT PERFORMED**
+  on device. The source uses sp type, no fixed text heights and wrapping rows,
+  and the repo has no screenshot-test harness.
+- Frame timing is **NOT PERFORMED**: no pre-change baseline was captured on
+  this device, so no before/after numbers are claimed.
+- Model **selection** was exercised on device (including the probe revert).
+  Switching the **provider** is a Settings action and was **NOT PERFORMED** in
+  this pass.
 - The extended-rail branch remains unobservable on this phone (V2-3 F-K).
 - Tool-activity visibility (O4), delete confirmation (flow 13) and the
   redundant pre-key `agent/init` stay open; this record does not claim them.
+- The final F-L/F-M commit's CI is recorded separately once the push completes;
+  the green run in this table belongs to the earlier `ff3fef9` commit.

@@ -67,6 +67,7 @@ repeated bar taps replace rather than stack.
 | `SettingsContentTest`/`ProjectsContentTest`: top-level screens expose no Back control | PASS |
 | `ChatDispatchTest`: 35-row ledger, 22 action subtypes, 4 host continuations | PASS |
 | Four-task gate | **PASS**: `v2-3-gate-final-1120-083146.log` - 885 tests / 0 failures / 0 skipped (95 suites); lint 0 errors, 1 pre-existing `NotShrinkingResources` warning |
+| Continuous integration | **PASS**: GitHub Actions `android-ci` run `44669754612` on `4994a95`, conclusion `success` (2026-11-20T03:48:45Z) |
 | Phone device parity (bottom bar, sheet, Back, project open, IME) | **PASS on one phone**: captures 01-07, 10-12 in `docs/parity/2026-11-20-v2-3-shell/` |
 | Large-screen emulator/device matrix | **NOT PERFORMED**: `emulator -accel-check` reports no hypervisor driver (code 6), and the only AVD is arm64. Robolectric renders the rail at 800dp and the extended rail at 1000dp; landscape on the phone produced a real rail (window <840dp after insets) but no extended rail |
 | Rotation / process recreation | **PASS for route preservation**: portrait Chat -> landscape Chat -> portrait Chat, and Settings -> landscape Settings; the Activity was recreated (logcat `destroy`/`create`). Extended-rail layout and process death were not exercised |

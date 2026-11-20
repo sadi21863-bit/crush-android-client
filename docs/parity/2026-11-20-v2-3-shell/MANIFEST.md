@@ -53,6 +53,11 @@ never saw the credential. No key was entered in Settings during this pass.
 - **Rotation settings note.** Auto-rotate was switched off and `user_rotation`
   forced for the landscape captures, then `user_rotation` returned to 0 and
   `accelerometer_rotation` restored to 1 (the pre-test default assumed).
+- **Device state after the pass.** Capture 11 left the app bound to the Legacy
+  workspace (the row it opened), so the device's chat tab shows that workspace
+  ("engine stopped") instead of the Chat pool. This is runtime state, not a
+  code change, and it resets on the next cold start; no repository claim
+  depends on it.
 
 ## Limits
 

@@ -1288,7 +1288,7 @@ device captures stand in); task 6 is PARTIAL (theme verified in tests and
 on device, font-scale/reduced-motion/density checks NOT PERFORMED). The
 V2-2 *exit* criteria are met, which is what "complete" means here.
 
-### 5.12 V2-3 adaptive app shell (working tree, 2026-11-20)
+### 5.12 V2-3 adaptive app shell (complete, 2026-11-20)
 
 V2-3 moves primary navigation into an adaptive shell. Three destinations -
 Chat, Projects, Settings - with the brief 4.6 breakpoints: bottom bar below
@@ -1315,7 +1315,8 @@ they are primary destinations, and Back is the back-stack contract.
 boundaries; `ShellNavigationTest` (8) pins bar/rail/extended rail rendering,
 shell hiding on Review, no duplicate entries after Projects -> Settings ->
 Chat, Back returning to Chat, Chat entry survival across a detour, and rapid
-taps not stacking.
+taps not stacking. CI run `44669754612` on `4994a95` is GREEN (completed
+success 2026-11-20T03:48:45Z).
 
 **Device pass** (`bbf8ca69`, API 29, app 1.0.0) in
 `docs/parity/2026-11-20-v2-3-shell/` - 12 captures: light/dark bars,

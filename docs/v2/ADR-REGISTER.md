@@ -55,8 +55,12 @@ and an explicit go.
 Interpretation recorded with V2-1 (not a reopened decision): brief 4.2
 principle 1 budgets "permanent chrome <= 56dp on a 360dp phone" while
 brief 4.6 and V2-A2 require an 80dp phone bottom bar. The 56dp figure is
-read as the top-bar/transcript budget, with the bottom bar separate. If
-the owner intended total chrome, V2-A2 must be revisited before V2-3.
+read as the top-bar/transcript budget, with the bottom bar separate.
+
+**Resolved 2026-11-20:** the owner authorized V2-3 with the option text
+"80dp bottom bar below 600dp, rail 600-839dp, extended rail/drawer 840dp+",
+so the 80dp bar is the accepted reading and V2-3 implements it. The 56dp
+"permanent chrome" budget therefore does not include the bottom bar.
 
 ## Parked
 

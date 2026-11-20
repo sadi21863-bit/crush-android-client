@@ -31,6 +31,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.crush.mobile.ui.theme.CrushType
@@ -219,18 +221,18 @@ internal fun inlineAnnotated(
     fun walk(items: List<MdInline>) {
         items.forEach { item ->
             when (item) {
-                is MdInline.Text -> {
-                    if (headingLevel > 0) {
-                        pushStyle(SpanStyle(fontSize = (20 - headingLevel * 2).sp))
-                    }
-                    append(item.text)
-                    if (headingLevel > 0) pop()
-                }
+                is MdInline.Text -> append(item.text)
                 is MdInline.Code -> {
                     pushStyle(
                         SpanStyle(
                             fontFamily = CrushType.code.fontFamily,
-                            fontSize = CrushType.code.fontSize,
+                            // Inside a heading the level size wins; a nested
+                            // 13sp code span used to shrink heading words.
+                            fontSize = if (headingLevel > 0) {
+                                TextUnit.Unspecified
+                            } else {
+                                CrushType.code.fontSize
+                            },
                             background = color.copy(alpha = 0.10f)
                         )
                     )
@@ -258,5 +260,14 @@ internal fun inlineAnnotated(
             }
         }
     }
-    walk(inlines)
+    if (headingLevel > 0) {
+        // V2-4 D6: the level size wraps the WHOLE heading. The old code pushed
+        // it only onto plain Text runs, so any bold/italic word fell back to
+        // 16sp. The 12sp floor keeps level 6 readable (it used to be 8sp).
+        withStyle(SpanStyle(fontSize = (20 - headingLevel * 2).coerceAtLeast(12).sp)) {
+            walk(inlines)
+        }
+    } else {
+        walk(inlines)
+    }
 }

@@ -385,6 +385,12 @@ data class ChatUiState(
     val models: List<LiveZenModel> = emptyList(),
     val modelsError: String? = null,
     /**
+     * V2-4 F-B: true while a picker-triggered catalogue fetch is in flight.
+     * The sheet needs to tell "still fetching" from "provider returned no
+     * models"; both used to render as an empty list.
+     */
+    val modelsLoading: Boolean = false,
+    /**
      * Non-null when a stop was requested but the server did not confirm the run
      * ended. Null means either nothing was stopped, or the stop was confirmed.
      *
@@ -1873,61 +1879,69 @@ class ChatViewModel(
 /** Live catalogue for the current provider, so the picker cannot offer a retired model. */
     fun loadModels() {
         viewModelScope.launch {
-            // Resolve the provider ONCE, here in the suspend context, per the
-            // same race that broke bootstrap (see currentPersistedProvider):
-            // the key factory lambda below is `() -> String`, so it cannot
-            // suspend, and a mirror read inside it can still be cold.
-            val providerId = currentProviderId()
-            // 2026-11-01 (promoted from the v099 lane): OpenCode/Console
-            // families serve the list on a plan-dependent base - prefer
-            // Provider.modelsListBase, then the plain compat base. resolve()
-            // guarantees a known id, so the ?: exit is unreachable in
-            // practice but keeps the checker honest without !!.
-            val providerRow = Providers.byId(providerId) ?: return@launch
-            val base = providerRow.modelsBase ?: providerRow.modelsListBase
-            if (base == null) {
+            _state.update { it.copy(modelsLoading = true) }
+            try {
+                // Resolve the provider ONCE, here in the suspend context, per the
+                // same race that broke bootstrap (see currentPersistedProvider):
+                // the key factory lambda below is `() -> String`, so it cannot
+                // suspend, and a mirror read inside it can still be cold.
+                val providerId = currentProviderId()
+                // 2026-11-01 (promoted from the v099 lane): OpenCode/Console
+                // families serve the list on a plan-dependent base - prefer
+                // Provider.modelsListBase, then the plain compat base. resolve()
+                // guarantees a known id, so the ?: exit is unreachable in
+                // practice but keeps the checker honest without !!.
+                val providerRow = Providers.byId(providerId) ?: return@launch
+                val base = providerRow.modelsBase ?: providerRow.modelsListBase
+                if (base == null) {
+                    _state.update {
+                        it.copy(
+                            models = emptyList(),
+                            modelsError =
+                                "provider \"$providerId\" has no OpenAI-compatible /models base configured"
+                        )
+                    }
+                    return@launch
+                }
+                val r = ZenModelsApi(
+                    { container.keySession.require(secureKeys, providerId) },
+                    baseUrl = base,
+                    chatBaseCandidates = providerRow.chatBases
+                ).fetch()
+                // Engine-aware filtering (2026-11-03): drop ids the engine's
+                // config no longer knows, using the cache bootstrap recorded for
+                // THIS provider. Without the cache (failed boot) the raw list
+                // stands - the picker must not lie about availability it cannot
+                // verify yet.
+                val visible = engineVisibleIdsCache
+                    .takeIf { engineVisibleProviderId == providerId && it.isNotEmpty() }
+                val vision = engineVisionIdsCache
+                    .takeIf { engineVisionProviderId == providerId }
+                    .orEmpty()
+                val models = (if (visible == null) {
+                    r.models
+                } else {
+                    val dropped = r.models.filter { it.id !in visible }.map { it.id }
+                    if (dropped.isNotEmpty()) {
+                        AppLog.w(
+                            TAG,
+                            "picker: hiding ${dropped.size} model(s) the engine no longer knows: " +
+                                dropped.joinToString(",")
+                        )
+                    }
+                    r.models.filter { it.id in visible }
+                }).map { m -> m.copy(supportsImages = m.id in vision) }
                 _state.update {
                     it.copy(
-                        models = emptyList(),
-                        modelsError =
-                            "provider \"$providerId\" has no OpenAI-compatible /models base configured"
+                        models = models,
+                        modelsError = r.error
                     )
                 }
-                return@launch
-            }
-            val r = ZenModelsApi(
-                { container.keySession.require(secureKeys, providerId) },
-                baseUrl = base,
-                chatBaseCandidates = providerRow.chatBases
-            ).fetch()
-            // Engine-aware filtering (2026-11-03): drop ids the engine's
-            // config no longer knows, using the cache bootstrap recorded for
-            // THIS provider. Without the cache (failed boot) the raw list
-            // stands - the picker must not lie about availability it cannot
-            // verify yet.
-            val visible = engineVisibleIdsCache
-                .takeIf { engineVisibleProviderId == providerId && it.isNotEmpty() }
-            val vision = engineVisionIdsCache
-                .takeIf { engineVisionProviderId == providerId }
-                .orEmpty()
-            val models = (if (visible == null) {
-                r.models
-            } else {
-                val dropped = r.models.filter { it.id !in visible }.map { it.id }
-                if (dropped.isNotEmpty()) {
-                    AppLog.w(
-                        TAG,
-                        "picker: hiding ${dropped.size} model(s) the engine no longer knows: " +
-                            dropped.joinToString(",")
-                    )
-                }
-                r.models.filter { it.id in visible }
-            }).map { m -> m.copy(supportsImages = m.id in vision) }
-            _state.update {
-                it.copy(
-                    models = models,
-                    modelsError = r.error
-                )
+            } finally {
+                // Every exit - including the two early returns above - clears
+                // the spinner. A fetch that never reports loading=false would
+                // leave the sheet claiming "loading" forever.
+                _state.update { it.copy(modelsLoading = false) }
             }
         }
     }
@@ -2030,6 +2044,7 @@ class ChatViewModel(
                 selectedModel = "",
                 models = emptyList(),
                 modelsError = null,
+                modelsLoading = false,
                 fileChanges = null
             )
         }

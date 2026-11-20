@@ -15,12 +15,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +40,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crush.mobile.ui.theme.CrushDimens
 import com.crush.mobile.ui.theme.CrushShape
@@ -90,7 +96,13 @@ fun CrushStatusLabel(
                 .background(tint, CircleShape)
         )
         Spacer(Modifier.width(CrushSpacing.sm))
-        Text(text = text, style = CrushType.metadata, color = colors.muted)
+        Text(
+            text = text,
+            style = CrushType.metadata,
+            color = colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -120,6 +132,58 @@ fun CrushCard(
             content = content,
         )
     }
+}
+
+/**
+ * V2-4 F-J: a choice chip whose selected state survives the neutral accent.
+ *
+ * The Settings FilterChips differed from their siblings by a subtle fill only,
+ * which V2-A8 predicted would become too weak once the violet accent was gone.
+ * Selection here is a filled check + accent border + semi-bold label, while the
+ * chip's own `selected` semantics still carries the state to assistive tech.
+ */
+@Composable
+fun CrushChoiceChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalCrushColors.current
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier,
+        label = {
+            Text(
+                text = text,
+                style = CrushType.control,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        },
+        leadingIcon = if (selected) {
+            {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        } else {
+            null
+        },
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = colors.surface,
+            labelColor = colors.ink,
+            selectedContainerColor = colors.accentSoft,
+            selectedLabelColor = colors.ink,
+            selectedLeadingIconColor = colors.accent,
+        ),
+        border = BorderStroke(
+            width = CrushDimens.hairline,
+            color = if (selected) colors.accent else colors.separator,
+        ),
+    )
 }
 
 /**

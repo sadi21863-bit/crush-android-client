@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.crush.mobile.data.crush.PermissionRequest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,8 +58,52 @@ class ChatContentTranscriptTest {
         )
 
         // With prewarm off the bare phase wording ("engine stopped") is the
-        // user's own choice, so the empty state must explain the way out.
-        compose.onNodeWithText("Engine starts when you begin typing").assertIsDisplayed()
+        // user's own choice, so the empty state must explain the way out and
+        // must not repeat the scary phase text as its body.
+        compose.onNodeWithText("Start a conversation").assertIsDisplayed()
+        compose.onNodeWithText("Type below - the agent starts when you begin typing.")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `a failed engine empty state shows the failure, not cold-start copy`() {
+        setContent(
+            ChatFixtures.view(
+                messages = emptyList(),
+                phase = "engine failed: no port",
+                engineReady = false,
+                readiness = EngineReadiness.Failed,
+                prewarm = true,
+            )
+        )
+
+        compose.onNodeWithText("Agent unavailable").assertIsDisplayed()
+        compose.onAllNodesWithText("Start a conversation").assertCountEquals(0)
+    }
+
+    @Test
+    fun `the header never shows a stale connecting phase once ready`() {
+        // F-E: the old header printed run.phase verbatim. Readiness comes from
+        // the same snapshot as the binding, so a ready engine reads "ready".
+        setContent(ChatFixtures.view(phase = "connecting to agent", engineReady = true))
+
+        compose.onNodeWithText("Chat - no tools \u00b7 ready").assertIsDisplayed()
+        compose.onAllNodesWithText("connecting to agent").assertCountEquals(0)
+    }
+
+    @Test
+    fun `the model picker is visible on a new chat with no selection`() {
+        val actions = mutableListOf<ChatAction>()
+        setContent(ChatFixtures.view(selectedModel = null), actions)
+
+        // F-C: the old button rendered an empty id string and was invisible.
+        compose.onNodeWithText("Model").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Choose model").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText(
+            "Live list from OpenCode Zen. FREE marks a model listed at no cost."
+        ).assertIsDisplayed()
+        assertTrue(actions.contains(ChatAction.OpenModels))
     }
 
     @Test
@@ -75,12 +120,12 @@ class ChatContentTranscriptTest {
         compose.onNodeWithText("Assemble the deck.").assertIsDisplayed()
         compose.onNodeWithText("Deck assembled.").assertIsDisplayed()
 
-        // ACCEPTANCE GAP (recorded in the 2b.1 ledger): bubbles carry no role
-        // semantics, and the text node fills the bubble width (pre-existing
-        // `MarkdownText(fillMaxWidth)`), so left-bounds do not distinguish
-        // roles either. The strongest honest role assertion is the
-        // assistant-only actions row: "Copy message" exists exactly once, on
-        // the completed assistant row.
+        // V2-4 D5: role is now visible text, not only fill colour/geometry.
+        compose.onAllNodesWithText("You").assertCountEquals(1)
+        compose.onAllNodesWithText("Crush").assertCountEquals(1)
+
+        // The assistant-only actions row still proves the affordance is on the
+        // completed assistant row and nowhere else.
         compose.onAllNodesWithText("Copy message").assertCountEquals(1)
         compose.onNodeWithText("Copy message").assertIsDisplayed()
     }
@@ -165,6 +210,25 @@ class ChatContentTranscriptTest {
         )
 
         compose.onNodeWithText("FREE").assertIsDisplayed()
+        // V2-4 D3: the human display name wins over the raw id.
+        compose.onNodeWithText("DeepSeek").assertIsDisplayed()
+        compose.onAllNodesWithText("deepseek-v4.1-flash").assertCountEquals(0)
+    }
+
+    @Test
+    fun `the picker falls back to a suffix-stripped id when the name is blank`() {
+        setContent(
+            ChatFixtures.view(
+                selectedModel = SelectedModelView(
+                    id = "deepseek-v4.1-flash-free",
+                    displayName = "",
+                    presentInCatalogue = true,
+                    freeMarker = FreeMarker.Shown,
+                    supportsImages = null,
+                )
+            )
+        )
+
         // The suffix is stripped from the title, not duplicated into it.
         compose.onNodeWithText("deepseek-v4.1-flash").assertIsDisplayed()
     }
@@ -184,7 +248,7 @@ class ChatContentTranscriptTest {
         )
 
         compose.onAllNodesWithText("FREE").assertCountEquals(0)
-        compose.onNodeWithText("glm-5.2").assertIsDisplayed()
+        compose.onNodeWithText("GLM").assertIsDisplayed()
     }
 
     @Test
@@ -247,6 +311,7 @@ internal object ChatFixtures {
         messages: List<ChatMessage> = emptyList(),
         phase: String = "ready",
         engineReady: Boolean = true,
+        readiness: EngineReadiness? = null,
         streaming: Boolean = false,
         canType: Boolean = true,
         canSend: Boolean = true,
@@ -256,6 +321,7 @@ internal object ChatFixtures {
         selectedModel: SelectedModelView? = null,
         models: List<ModelItem> = emptyList(),
         modelsError: String? = null,
+        modelsLoading: Boolean = false,
         permission: PermissionRequest? = null,
         question: QuestionView? = null,
         handoff: HandoffView = HandoffView(null, emptyList(), null, null),
@@ -277,7 +343,8 @@ internal object ChatFixtures {
         binding = BindingView(kind = BindingKind.ChatPool, projectLabel = null),
         run = RunView(
             phase = phase,
-            readiness = if (engineReady) EngineReadiness.Ready else EngineReadiness.Starting,
+            readiness = readiness
+                ?: if (engineReady) EngineReadiness.Ready else EngineReadiness.Starting,
             streaming = streaming,
             stopNotice = null,
             engineReady = engineReady,
@@ -286,7 +353,11 @@ internal object ChatFixtures {
             providerId = "opencode",
             providerName = "OpenCode Zen",
             selected = selectedModel,
-            catalogue = ModelCatalogueView(items = models, error = modelsError),
+            catalogue = ModelCatalogueView(
+                items = models,
+                error = modelsError,
+                loading = modelsLoading,
+            ),
         ),
         transcript = TranscriptView(
             messages = messages,

@@ -77,6 +77,29 @@ data class RunView(
     val engineReady: Boolean = false,
 )
 
+/**
+ * V2-4 F-E: the header's status line must come from the same coherent snapshot
+ * as the binding, never from the free-text [phase] alone.
+ *
+ * `phase` is written by several independent ViewModel paths and was measured
+ * 18 minutes stale (`connecting to agent` with no engine process). [readiness]
+ * is computed in [toViewState] from the same host inputs that produce the
+ * binding, so the two can no longer disagree. Raw `phase` is kept only where
+ * it is the sole detail - a boot attempt number or a failure reason - and
+ * readiness has already constrained that case.
+ */
+fun RunView.statusLabel(kind: BindingKind): String {
+    val status = when (readiness) {
+        EngineReadiness.Switching -> "switching agent"
+        EngineReadiness.Ready -> "ready"
+        EngineReadiness.Recoverable -> "agent not ready - send to retry"
+        EngineReadiness.Starting, EngineReadiness.Failed ->
+            phase.takeIf { it.isNotBlank() }
+                ?: if (readiness == EngineReadiness.Failed) "engine failed" else "starting agent"
+    }
+    return if (kind == BindingKind.ChatPool) "Chat - no tools \u00b7 $status" else status
+}
+
 data class ModelView(
     val providerId: String,
     val providerName: String,
@@ -100,6 +123,13 @@ data class SelectedModelView(
 data class ModelCatalogueView(
     val items: List<ModelItem>,
     val error: String?,
+    /**
+     * V2-4 F-B: opening the picker starts a live fetch. Without this fact an
+     * empty catalogue cannot be told apart from a fetch still in flight, so
+     * the sheet either lies ("no models") or shows nothing at all.
+     * Defaulted so every existing construction stays source-compatible.
+     */
+    val loading: Boolean = false,
 )
 
 data class ModelItem(
@@ -138,6 +168,53 @@ data class ComposerView(
      */
     val prewarm: Boolean = false,
 )
+
+/** The empty transcript, stated honestly for the current snapshot (V2-4 D2). */
+data class EmptyChatCopy(val title: String, val body: String)
+
+/**
+ * V2-4 D2: the welcome state may only claim what the snapshot proves.
+ *
+ * The old single line was correct for prewarm-off cold start and wrong
+ * everywhere else: on a failed engine it hid the failure, and on a ready
+ * engine it said the engine had not started. Order matters - a settled
+ * failure/recovery wins over the cold-start explanation, and a ready engine
+ * wins over "starting".
+ */
+fun ChatViewState.emptyCopy(): EmptyChatCopy {
+    val title = "Start a conversation"
+    return when {
+        run.readiness == EngineReadiness.Failed -> EmptyChatCopy(
+            title = "Agent unavailable",
+            body = run.phase.takeIf { it.isNotBlank() }
+                ?: "The agent could not start. Check Settings, then try again.",
+        )
+        run.readiness == EngineReadiness.Recoverable -> EmptyChatCopy(
+            title = "Agent needs attention",
+            body = "The agent is running but not ready. Send a message to retry the handshake.",
+        )
+        !composer.prewarm && !run.engineReady -> EmptyChatCopy(
+            title = title,
+            body = "Type below - the agent starts when you begin typing.",
+        )
+        run.engineReady -> EmptyChatCopy(
+            title = title,
+            body = when (binding.kind) {
+                BindingKind.ChatPool ->
+                    "Ask a question or plan a change. This chat answers and plans; tools are off."
+                BindingKind.Project ->
+                    "Ask about ${binding.projectLabel ?: "this project"}, plan a change, or run a command."
+                BindingKind.Legacy ->
+                    "Ask about the code, plan a change, or run a command."
+            },
+        )
+        run.readiness == EngineReadiness.Switching -> EmptyChatCopy(
+            title = title,
+            body = "Switching to this agent...",
+        )
+        else -> EmptyChatCopy(title = title, body = "Starting the agent...")
+    }
+}
 
 data class GateView(
     val permission: PermissionRequest?,
@@ -235,6 +312,7 @@ fun ChatUiState.toViewState(inputs: ChatHostInputs): ChatViewState {
                     )
                 },
                 error = modelsError,
+                loading = modelsLoading,
             ),
         ),
         transcript = TranscriptView(

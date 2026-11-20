@@ -30,12 +30,9 @@ import org.robolectric.annotation.Config
  * T2B1-03 (V2 plan §6.3): the four sheets/dialogs `ChatContent` owns,
  * rendered from fabricated state only.
  *
- * Recorded acceptance gaps (2b.1 ledger):
- * - the active session is marked by COLOR ONLY - no spoken/semantic state, so
- *   the strongest honest assertion here is that no selected state exists;
- * - delete is NOT confirmed: the trash button dispatches `DeleteSession`
- *   immediately and the `SessionSheet` confirmation dialog is unreachable
- *   (baseline flow 13, pre-existing; pinned, not fixed, in 2b.1).
+ * V2-4 changed the recorded gap on the active session: it now carries a check,
+ * the word "Current" and `stateDescription = "Current chat"`. Delete is still
+ * NOT confirmed (baseline flow 13, pre-existing; pinned, not fixed).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h1600dp")
@@ -67,6 +64,11 @@ class ChatContentSheetsTest {
 
     private fun openSessionSheet() {
         compose.onNodeWithContentDescription("Open chats list").performClick()
+        compose.waitForIdle()
+    }
+
+    private fun openModelSheet() {
+        compose.onNodeWithContentDescription("Choose model").performClick()
         compose.waitForIdle()
     }
 
@@ -108,9 +110,14 @@ class ChatContentSheetsTest {
         compose.onNodeWithText("Newer chat").assertIsDisplayed()
         compose.onNodeWithText("Active chat").assertIsDisplayed()
 
-        // ACCEPTANCE GAP (recorded): the active row is color-only. Nothing in
-        // the sheet announces which chat is open.
-        compose.onAllNodes(selectedState("selected")).assertCountEquals(0)
+        // V2-4 D4: the active row is no longer colour-only. Exactly one row
+        // carries the spoken state, on the SAME merged node as the label (the
+        // row is clickable, so the text is merged upward).
+        compose.onAllNodes(selectedState("Current chat")).assertCountEquals(1)
+        compose.onNode(
+            hasText("Active chat") and selectedState("Current chat")
+        ).assertExists()
+        compose.onNodeWithText("Current").assertIsDisplayed()
     }
 
     @Test
@@ -146,7 +153,7 @@ class ChatContentSheetsTest {
         openSessionSheet()
         actions.clear()
 
-        compose.onAllNodesWithContentDescription("Delete chat")[0].performClick()
+        compose.onAllNodesWithContentDescription("Delete chat: Newer chat")[0].performClick()
         compose.waitForIdle()
 
         // ACCEPTANCE GAP (recorded, pre-existing): the target says delete is
@@ -201,6 +208,8 @@ class ChatContentSheetsTest {
         openSessionSheet()
 
         compose.onNodeWithText("Earlier chat").assertIsDisplayed()
+        compose.onNodeWithText("Showing the last known list. The engine isn't connected.")
+            .assertIsDisplayed()
         compose.onAllNodesWithText("Chats aren't available").assertCountEquals(0)
     }
 
@@ -225,12 +234,15 @@ class ChatContentSheetsTest {
             )
         )
 
-        compose.onNodeWithText("glm-5.2").performClick()
-        compose.waitForIdle()
+        openModelSheet()
 
-        compose.onNodeWithText("Live list from OpenCode Zen. Free models cost nothing.")
-            .assertIsDisplayed()
-        compose.onNodeWithText("GLM 5.2").assertIsDisplayed()
+        compose.onNodeWithText(
+            "Live list from OpenCode Zen. FREE marks a model listed at no cost."
+        ).assertIsDisplayed()
+        // The top bar also carries the selected display name, so the sheet row
+        // is asserted through its selected semantics; the bare text appears
+        // twice (top bar + row).
+        compose.onAllNodesWithText("GLM 5.2").assertCountEquals(2)
         compose.onNodeWithText("Kimi K2").assertIsDisplayed()
         // The selected row is announced, and only it.
         compose.onAllNodes(selectedState("selected")).assertCountEquals(1)
@@ -257,8 +269,7 @@ class ChatContentSheetsTest {
             actions,
         )
 
-        compose.onNodeWithText("glm-5.2").performClick()
-        compose.waitForIdle()
+        openModelSheet()
         actions.clear()
 
         compose.onNodeWithText("Kimi K2").performClick()
@@ -281,10 +292,63 @@ class ChatContentSheetsTest {
             )
         )
 
-        compose.onNodeWithText("glm-5.2").performClick()
-        compose.waitForIdle()
+        openModelSheet()
 
         compose.onNodeWithText("catalogue fetch failed").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a model fetch in flight says it is loading`() {
+        setContent(
+            ChatFixtures.view(
+                selectedModel = SelectedModelView(
+                    id = "glm-5.2",
+                    displayName = "GLM 5.2",
+                    presentInCatalogue = true,
+                    freeMarker = FreeMarker.Hidden,
+                    supportsImages = false,
+                ),
+                models = emptyList(),
+                modelsLoading = true,
+            )
+        )
+
+        openModelSheet()
+
+        compose.onNodeWithText("Loading models...").assertIsDisplayed()
+        compose.onAllNodesWithText("No models listed").assertCountEquals(0)
+    }
+
+    @Test
+    fun `a selected model outside the live list is named with a reload affordance`() {
+        val actions = mutableListOf<ChatAction>()
+        setContent(
+            ChatFixtures.view(
+                selectedModel = SelectedModelView(
+                    id = "ghost-model",
+                    displayName = "Ghost",
+                    presentInCatalogue = false,
+                    freeMarker = FreeMarker.Hidden,
+                    supportsImages = null,
+                ),
+                models = listOf(
+                    ModelItem("glm-5.2", "GLM 5.2", isFree = false, supportsImages = false)
+                ),
+            ),
+            actions,
+        )
+
+        openModelSheet()
+        actions.clear()
+
+        compose.onNodeWithText(
+            "ghost-model isn't in the current list. It stays selected until you " +
+                "choose another model."
+        ).assertIsDisplayed()
+        compose.onAllNodesWithText("Reload")[0].performClick()
+        compose.waitForIdle()
+
+        assertEquals(listOf(ChatAction.ReloadModels), actions)
     }
 
     // -------------------------------------------------------------- handoff

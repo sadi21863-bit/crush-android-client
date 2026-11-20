@@ -16,7 +16,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -44,6 +43,7 @@ import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.PermissionMode
 import com.crush.mobile.domain.model.TuningPolicy
+import com.crush.mobile.ui.components.CrushChoiceChip
 import com.crush.mobile.ui.theme.CrushType
 import com.crush.mobile.ui.theme.LocalCrushColors
 import kotlinx.coroutines.launch
@@ -290,20 +290,20 @@ fun SettingsContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilterChip(
+                        CrushChoiceChip(
+                            text = "System",
                             selected = settings.themeMode == "system",
                             onClick = { onSelectTheme("system") },
-                            label = { Text("System") }
                         )
-                        FilterChip(
+                        CrushChoiceChip(
+                            text = "Light",
                             selected = settings.themeMode == "light",
                             onClick = { onSelectTheme("light") },
-                            label = { Text("Light") }
                         )
-                        FilterChip(
+                        CrushChoiceChip(
+                            text = "Dark",
                             selected = settings.themeMode == "dark",
                             onClick = { onSelectTheme("dark") },
-                            label = { Text("Dark") }
                         )
                     }
                 }
@@ -317,15 +317,15 @@ fun SettingsContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilterChip(
+                        CrushChoiceChip(
+                            text = "Enter sends",
                             selected = settings.enterSendMode == "send",
                             onClick = { onSelectEnterSend("send") },
-                            label = { Text("Enter sends") }
                         )
-                        FilterChip(
+                        CrushChoiceChip(
+                            text = "Enter = newline",
                             selected = settings.enterSendMode == "newline",
                             onClick = { onSelectEnterSend("newline") },
-                            label = { Text("Enter = newline") }
                         )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
@@ -602,10 +602,10 @@ private fun TuningRow(
             modifier = Modifier.padding(top = 4.dp)
         ) {
             options.forEach { (opt, text) ->
-                FilterChip(
+                CrushChoiceChip(
+                    text = text,
                     selected = value == opt,
                     onClick = { onPick(opt) },
-                    label = { Text(text) }
                 )
             }
         }

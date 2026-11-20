@@ -12,6 +12,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
@@ -41,6 +43,14 @@ import com.crush.mobile.domain.file.DiffLine
 import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.file.FileDiff
 import com.crush.mobile.ui.CrushrcTrustDialog
+import com.crush.mobile.ui.components.CrushBanner
+import com.crush.mobile.ui.components.CrushEmptyState
+import com.crush.mobile.ui.components.CrushLoadingRow
+import com.crush.mobile.ui.components.CrushStatusLabel
+import com.crush.mobile.ui.components.CrushTone
+import com.crush.mobile.ui.theme.CrushDimens
+import com.crush.mobile.ui.theme.CrushShape
+import com.crush.mobile.ui.theme.CrushSpacing
 import com.crush.mobile.ui.theme.CrushType
 import com.crush.mobile.ui.theme.LocalCrushColors
 import com.crush.mobile.ui.theme.LocalDiffColors
@@ -107,15 +117,22 @@ fun ChatContent(
                     Column {
                         Text(
                             state.session.label,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1
+                            style = CrushType.section,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            if (state.binding.kind == BindingKind.ChatPool)
-                                "Chat - no tools - ${state.run.phase}" else state.run.phase,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (state.run.engineReady) LocalCrushColors.current.success
-                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        // F-E: derived from the readiness snapshot, never from
+                        // the free-text phase alone. The words carry the state;
+                        // the dot is decorative, so colour is not the signal.
+                        CrushStatusLabel(
+                            text = state.run.statusLabel(state.binding.kind),
+                            tone = when (state.run.readiness) {
+                                EngineReadiness.Ready -> CrushTone.Success
+                                EngineReadiness.Recoverable -> CrushTone.Warning
+                                EngineReadiness.Failed -> CrushTone.Error
+                                EngineReadiness.Starting,
+                                EngineReadiness.Switching -> CrushTone.Neutral
+                            }
                         )
                     }
                 },
@@ -133,25 +150,48 @@ fun ChatContent(
                     IconButton(onClick = { onAction(ChatAction.NewChat) }) {
                         Icon(Icons.Default.Add, contentDescription = "New chat (conversation-only)")
                     }
-                    // Model picker. Only models Zen actually serves are listed.
-                    TextButton(onClick = {
-                        showModels = true
-                        onAction(ChatAction.OpenModels)
-                    }) {
+                    // Model picker: only models the provider actually serves are
+                    // listed. The label always has a value - display name, then
+                    // id, then the word "Model" - because the old id-only
+                    // button rendered as invisible space on a new chat (F-C).
+                    val chosenModel = state.model.selected
+                    val modelLabel = chosenModel?.displayName?.takeIf { it.isNotBlank() }
+                        ?: chosenModel?.id?.removeSuffix("-free")
+                        ?: "Model"
+                    TextButton(
+                        onClick = {
+                            showModels = true
+                            onAction(ChatAction.OpenModels)
+                        },
+                        // Stable, spoken target: the visible text is the model
+                        // name, which changes and may be long.
+                        modifier = Modifier.semantics {
+                            contentDescription = "Choose model"
+                            stateDescription = "Current: $modelLabel"
+                        },
+                        contentPadding = PaddingValues(horizontal = CrushSpacing.sm)
+                    ) {
                         // Was rendering "freespace-bunny-free" because the badge
                         // and the id had no separator between them.
-                        if (state.model.selected?.freeMarker == FreeMarker.Shown) {
+                        if (chosenModel?.freeMarker == FreeMarker.Shown) {
                             Text(
                                 "FREE",
-                                style = MaterialTheme.typography.labelSmall,
+                                style = CrushType.badge,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(CrushSpacing.xs))
                         }
                         Text(
-                            state.model.selected?.id?.removeSuffix("-free").orEmpty(),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1
+                            text = modelLabel,
+                            style = CrushType.control,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 110.dp)
+                        )
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -188,23 +228,30 @@ fun ChatContent(
         }
     ) { pad ->
         if (messages.isEmpty()) {
-            // "engine stopped" is ChatViewModel's wording for a supervisor that
-            // is not running. With prewarm off that is the user's own choice, not
-            // a fault, and showing it unlabelled would read as a broken app.
-            val phase = if (!state.composer.prewarm && !state.run.engineReady) {
-                "Engine starts when you begin typing"
-            } else {
-                state.run.phase
+            // V2-4 D2: state-aware welcome copy. The old single line was only
+            // correct for prewarm-off cold start; on a failed or ready engine it
+            // either hid the failure or claimed the engine had not started.
+            val copy = state.emptyCopy()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(pad)
+                    .padding(CrushSpacing.xl),
+                contentAlignment = Alignment.Center
+            ) {
+                CrushEmptyState(title = copy.title, body = copy.body)
             }
-            EmptyState(phase, Modifier.padding(pad))
         } else {
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(pad),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                contentPadding = PaddingValues(
+                    horizontal = CrushDimens.gutter,
+                    vertical = CrushSpacing.lg
+                ),
+                verticalArrangement = Arrangement.spacedBy(CrushSpacing.md)
             ) {
                 // The replay-surviving resume affordance (the D+F drive's UX
                 // enhancement): a table-driven bar PINNED at the transcript's
@@ -430,13 +477,15 @@ fun ChatContent(
     if (showModels) {
         ModelSheet(
             models = state.model.catalogue.items,
-            selected = state.model.selected?.id.orEmpty(),
+            selected = state.model.selected,
             providerName = state.model.providerName,
             error = state.model.catalogue.error,
+            loading = state.model.catalogue.loading,
             onPick = { id ->
                 showModels = false
                 onAction(ChatAction.SelectModel(id))
             },
+            onReload = { onAction(ChatAction.ReloadModels) },
             onDismiss = { showModels = false }
         )
     }
@@ -501,18 +550,6 @@ fun ChatContent(
     }
 }
 
-@Composable
-private fun EmptyState(phase: String, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            phase,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(24.dp)
-        )
-    }
-}
-
 /** Assistant-bubble silhouette, shared by the reply path and the error card. */
 private val AssistantBubbleShape = RoundedCornerShape(
     topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp
@@ -562,6 +599,16 @@ private fun Bubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
+        // V2-4 D5: role is visible text, not merely fill colour or corner
+        // geometry. A report carrier has no speech of its own and is skipped.
+        if (!reportOnly) {
+            Text(
+                text = if (isUser) "You" else "Crush",
+                style = CrushType.metadata,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = CrushSpacing.xs)
+            )
+        }
         // Detached sub-agent results (engine v0.100.0+) are genuine transcript
         // rows, not model speech: they render as their own card above the
         // bubble that used them, both live and after a reopen.
@@ -601,6 +648,7 @@ private fun Bubble(
             } else {
                 Box(
                     modifier = Modifier
+                        .widthIn(max = 640.dp)
                         .clip(
                             RoundedCornerShape(
                                 topStart = 16.dp, topEnd = 16.dp,
@@ -618,12 +666,17 @@ private fun Bubble(
                         if (m.text.isEmpty() && m.isStreaming && m.error == null) {
                             Text(
                                 if (m.tools.isEmpty()) "thinking..." else "working...",
-                                style = MaterialTheme.typography.bodyMedium
+                                style = CrushType.body,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
                             MarkdownText(
                                 m.text,
-                                modifier = Modifier.fillMaxWidth(),
+                                // User rows wrap their content and stay
+                                // right-aligned; assistant prose takes the
+                                // available width (capped above for wide
+                                // windows). Previously both filled the row.
+                                modifier = if (isUser) Modifier else Modifier.fillMaxWidth(),
                                 // User bubbles paint primaryContainer, so the
                                 // text must be onPrimaryContainer. The old
                                 // default (onSurface) measured 2.05:1 on the
@@ -1154,8 +1207,8 @@ value: String,
                 value = value,
                 onValueChange = onChange,
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Message") },
-                maxLines = 5,
+                placeholder = { Text("Message", style = CrushType.body) },
+                maxLines = CrushDimens.composerMaxLines,
                 enabled = enabled && !streaming,
                 // ENTER-SEND SETTING (analysis §4 P2): the preference existed
                 // end-to-end in the model, DataStore and ViewModel with no
@@ -1182,7 +1235,7 @@ value: String,
                     Icon(Icons.Default.Stop, contentDescription = "Stop")
                 }
             } else {
-FilledIconButton(
+                FilledIconButton(
                     onClick = onSend,
                     enabled = sendEnabled && value.isNotBlank()
                 ) {
@@ -1283,48 +1336,45 @@ private fun SessionSheet(
             // list below belongs to instead of implying a global inbox.
             Text(
                 surfaceLabel,
-                style = MaterialTheme.typography.labelMedium,
+                style = CrushType.metadata,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                modifier = Modifier.padding(horizontal = CrushSpacing.xs)
             )
 
             if (loading && sessions.isEmpty()) {
-                Text(
-                    "Loading chats...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 16.dp)
+                CrushLoadingRow(
+                    text = "Loading chats...",
+                    modifier = Modifier.padding(vertical = CrushSpacing.lg)
                 )
             } else if (unavailable && sessions.isEmpty()) {
                 // Finding 11: an empty list here is UNQUERIED, not empty. The
                 // engine is stopped (or still booting), so the app must not
                 // present "No chats yet" as a confirmed answer. A cached
-                // non-empty list skips this branch and stays visible.
-                Text(
-                    "Chats aren't available",
-                    style = CrushType.section,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                Text(
-                    "The engine isn't connected. Send a message to start it, " +
+                // non-empty list skips this branch and stays visible below.
+                CrushEmptyState(
+                    title = "Chats aren't available",
+                    body = "The engine isn't connected. Send a message to start it, " +
                         "then reopen this sheet.",
-                    style = CrushType.body,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    modifier = Modifier.padding(vertical = CrushSpacing.sm)
                 )
             } else if (sessions.isEmpty()) {
                 // Say WHY it is empty. An unexplained empty list reads as data
                 // loss, which is the failure mode this project keeps hitting.
-                Text(
-                    "No chats yet",
-                    style = CrushType.section,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                Text(
-                    "Start one and it will appear here.",
-                    style = CrushType.body,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                CrushEmptyState(
+                    title = "No chats yet",
+                    body = "Start one and it will appear here.",
+                    modifier = Modifier.padding(vertical = CrushSpacing.sm)
                 )
             } else {
+                if (unavailable) {
+                    // A cached list is still useful, but it is not live. Say so
+                    // instead of letting an old list masquerade as current.
+                    CrushBanner(
+                        text = "Showing the last known list. The engine isn't connected.",
+                        tone = CrushTone.Warning,
+                        modifier = Modifier.padding(bottom = CrushSpacing.sm)
+                    )
+                }
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
                     items(sessions, key = { it.id }) { sess ->
                         val active = sess.id == activeId
@@ -1335,11 +1385,12 @@ private fun SessionSheet(
                         // button. The color-carrying wrapper has no behaviour
                         // of its own, so it must not pretend otherwise.
                         Surface(
-                            color = if (active) MaterialTheme.colorScheme.secondaryContainer
+                            color = if (active) LocalCrushColors.current.accentSoft
                             else MaterialTheme.colorScheme.surface,
+                            shape = CrushShape.standard,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 // Tap target for OPENING the chat. The delete
                                 // button used to sit inside this same clickable
                                 // Surface, so one tap fired both handlers and
@@ -1351,14 +1402,44 @@ Row(verticalAlignment = Alignment.CenterVertically) {
                                     Modifier
                                         .weight(1f)
                                         .clickable { onPick(sess.id) }
-                                        .padding(vertical = 10.dp),
+                                        // V2-4 D4: the current chat is spoken,
+                                        // not just tinted. The fill, check and
+                                        // word below are the visual half.
+                                        .semantics {
+                                            if (active) stateDescription = "Current chat"
+                                        }
+                                        .padding(
+                                            horizontal = CrushSpacing.md,
+                                            vertical = CrushSpacing.md
+                                        ),
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    Text(
-                                        sess.label,
-                                        style = CrushType.body,
-                                        maxLines = 1
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (active) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = LocalCrushColors.current.accent,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(Modifier.width(CrushSpacing.xs))
+                                        }
+                                        Text(
+                                            sess.label,
+                                            style = CrushType.body,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        if (active) {
+                                            Spacer(Modifier.width(CrushSpacing.sm))
+                                            Text(
+                                                "Current",
+                                                style = CrushType.metadata,
+                                                color = LocalCrushColors.current.muted
+                                            )
+                                        }
+                                    }
                                     val detail = SessionList.detail(
                                         messageCount = sess.messageCount,
                                         cost = sess.cost,
@@ -1369,7 +1450,7 @@ Row(verticalAlignment = Alignment.CenterVertically) {
                                     if (detail.isNotEmpty()) {
                                         Text(
                                             detail,
-                                            style = MaterialTheme.typography.labelSmall,
+                                            style = CrushType.metadata,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -1377,12 +1458,15 @@ Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { onDelete(sess.id) }) {
                                     Icon(
                                         Icons.Default.Delete,
-                                        contentDescription = "Delete chat"
+                                        // Name the target: a list of identical
+                                        // "Delete chat" buttons is ambiguous to
+                                        // a screen-reader user.
+                                        contentDescription = "Delete chat: ${sess.label}"
                                     )
                                 }
                             }
                         }
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(CrushSpacing.sm))
                     }
                 }
             }
@@ -1404,90 +1488,173 @@ Row(verticalAlignment = Alignment.CenterVertically) {
  */
 private fun ModelSheet(
     models: List<ModelItem>,
-    selected: String,
+    selected: SelectedModelView?,
     providerName: String,
     error: String?,
+    loading: Boolean,
     onPick: (String) -> Unit,
+    onReload: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val selectedId = selected?.id
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text(
-            "Model",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
-        Text(
-            "Live list from $providerName. Free models cost nothing.",
-            style = CrushType.body,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
-        )
-        error?.let {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = CrushSpacing.xl)
+                .navigationBarsPadding()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Model",
+                    style = CrushType.section,
+                    modifier = Modifier.weight(1f)
+                )
+                // V2-4 D3: the reload action existed in the ViewModel but had
+                // no emitter, so a failed or empty fetch was a dead end.
+                TextButton(onClick = onReload, enabled = !loading) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(CrushSpacing.xs))
+                    Text("Reload", style = CrushType.control)
+                }
+            }
             Text(
-                it,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 20.dp)
+                text = if (providerName.isBlank()) {
+                    "Live model list. FREE marks a model listed at no cost."
+                } else {
+                    "Live list from $providerName. FREE marks a model listed at no cost."
+                },
+                style = CrushType.secondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-        LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
-            items(models, key = { it.id }) { m ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onPick(m.id) }
-                        // Active state: visible check for sighted users,
-                        // speakable state for readers.
-                        .let { base ->
-                            if (m.id == selected) {
-                                base.semantics { stateDescription = "selected" }
-                            } else {
-                                base
+
+            // Only claim absence when the list actually loaded. During a
+            // failed fetch the catalogue is empty but the model's absence is
+            // unverified, and the error banner below already tells that story.
+            if (!loading && error == null && selected != null && !selected.presentInCatalogue) {
+                Spacer(Modifier.height(CrushSpacing.sm))
+                CrushBanner(
+                    text = "${selected.id} isn't in the current list. It stays selected " +
+                        "until you choose another model.",
+                    tone = CrushTone.Warning,
+                    actionLabel = "Reload",
+                    onAction = onReload
+                )
+            }
+
+            error?.let {
+                Spacer(Modifier.height(CrushSpacing.sm))
+                CrushBanner(text = it, tone = CrushTone.Error)
+            }
+
+            if (loading) {
+                Spacer(Modifier.height(CrushSpacing.sm))
+                CrushLoadingRow(
+                    text = if (models.isEmpty()) "Loading models..." else "Refreshing models...",
+                    modifier = Modifier.padding(vertical = CrushSpacing.sm)
+                )
+            } else if (models.isEmpty() && error == null) {
+                Spacer(Modifier.height(CrushSpacing.sm))
+                CrushEmptyState(
+                    title = "No models listed",
+                    body = "The provider returned an empty list. Reload to try again."
+                )
+            }
+
+            Spacer(Modifier.height(CrushSpacing.sm))
+            LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
+                items(models, key = { it.id }) { m ->
+                    val isSelected = m.id == selectedId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isSelected) LocalCrushColors.current.accentSoft
+                                else Color.Transparent
+                            )
+                            .clickable { onPick(m.id) }
+                            // Active state: visible check for sighted users,
+                            // speakable state for readers.
+                            .let { base ->
+                                if (isSelected) {
+                                    base.semantics { stateDescription = "selected" }
+                                } else {
+                                    base
+                                }
                             }
+                            .padding(
+                                horizontal = CrushSpacing.md,
+                                vertical = CrushSpacing.md
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                m.displayName,
+                                style = CrushType.body,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                m.id,
+                                style = CrushType.metadata,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(m.displayName, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            m.id,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (m.id == selected) {
-                        // Active-state rule (skill audit 2026-10-31): the sheet
-                        // received the selected id but never rendered it, so
-                        // the list gave no feedback about the current choice
-                        // and a reload looked like the selection was lost.
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(10.dp))
-                    }
-                    if (m.isFree) {
-                        // Non-interactive badge (analysis §4 P2): the AssistChip
-                        // was focusable and tappable while doing nothing, so a
-                        // screen reader announced a fake actionless row. A
-                        // labelled Text carries the same information without
-                        // inventing a behaviour, and it gets an explicit
-                        // contentDescription because "FREE" alone announces
-                        // poorly out of context.
-                        Text(
-                            "FREE",
-                            modifier = Modifier.semantics {
-                                contentDescription = "Free model"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        if (m.supportsImages) {
+                            Text(
+                                "Images",
+                                modifier = Modifier.semantics {
+                                    contentDescription = "Supports images"
+                                },
+                                style = CrushType.metadata,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(CrushSpacing.sm))
+                        }
+                        if (m.isFree) {
+                            // Non-interactive badge (analysis §4 P2): the
+                            // AssistChip was focusable and tappable while doing
+                            // nothing, so a screen reader announced a fake
+                            // actionless row. A labelled Text carries the same
+                            // information without inventing a behaviour, and it
+                            // gets an explicit contentDescription because
+                            // "FREE" alone announces poorly out of context.
+                            Text(
+                                "FREE",
+                                modifier = Modifier.semantics {
+                                    contentDescription = "Free model"
+                                },
+                                style = CrushType.metadata,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(CrushSpacing.sm))
+                        }
+                        if (isSelected) {
+                            // Active-state rule (skill audit 2026-10-31): the
+                            // sheet received the selected id but never rendered
+                            // it, so the list gave no feedback about the current
+                            // choice and a reload looked like the selection was
+                            // lost.
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = LocalCrushColors.current.accent
+                            )
+                        }
                     }
                 }
             }
+            Spacer(Modifier.height(CrushSpacing.xl))
         }
-        Spacer(Modifier.height(24.dp))
     }
 }

@@ -1,5 +1,6 @@
 package com.crush.mobile.ui.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.MaterialTheme
@@ -8,6 +9,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -59,6 +62,35 @@ class CrushComponentsTest {
         compose.onNodeWithText("FREE")
             .assertIsDisplayed()
             .assertHasNoClickAction()
+    }
+
+    @Test
+    fun choiceChipCarriesSelectionInSemanticsAndStillClicks() {
+        // V2-4 F-J: the visual check/border/weight cannot be asserted here,
+        // but the selected state must be real semantics, and the sibling must
+        // still be an ordinary click target.
+        var picked = ""
+        compose.setContent {
+            CrushMobileTheme(themeMode = "light") {
+                Column {
+                    CrushChoiceChip(
+                        text = "Light",
+                        selected = true,
+                        onClick = { picked = "Light" },
+                    )
+                    CrushChoiceChip(
+                        text = "Dark",
+                        selected = false,
+                        onClick = { picked = "Dark" },
+                    )
+                }
+            }
+        }
+
+        compose.onNodeWithText("Light").assertIsSelected()
+        compose.onNodeWithText("Dark").assertIsNotSelected().performClick()
+        compose.waitForIdle()
+        assertEquals("Dark", picked)
     }
 
     @Test

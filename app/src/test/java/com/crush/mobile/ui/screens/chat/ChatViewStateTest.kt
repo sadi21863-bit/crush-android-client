@@ -4,6 +4,7 @@ import com.crush.mobile.data.api.LiveZenModel
 import com.crush.mobile.data.crush.Session
 import com.crush.mobile.data.crush.SubAgentReport
 import com.crush.mobile.domain.file.FileChangeSet
+import com.crush.mobile.engine.EngineState
 import com.crush.mobile.project.ProjectRef
 import com.google.gson.JsonParser
 import java.io.File
@@ -223,6 +224,100 @@ class ChatViewStateTest {
         assertEquals(listOf(destination), view.handoff.destinations)
         assertEquals("not dispatched", view.handoff.notice)
         assertEquals(hint, view.handoff.resume)
+    }
+
+    @Test
+    fun `the header status is derived from readiness, not the stale phase`() {
+        // F-E: the phase was measured 18 minutes stale while the engine was
+        // gone. Readiness comes from the same snapshot as the binding, so a
+        // ready engine must never render "connecting to agent".
+        val view = ChatUiState(
+            phase = "connecting to agent",
+            engineReady = true,
+        ).toViewState(ChatHostInputs(snapshotReady = true))
+
+        assertEquals(EngineReadiness.Ready, view.run.readiness)
+        assertEquals("ready", view.run.statusLabel(BindingKind.Legacy))
+    }
+
+    @Test
+    fun `a failed engine keeps its reason in the header`() {
+        val view = ChatUiState(phase = "engine failed: no port").toViewState(
+            ChatHostInputs(
+                snapshotReady = true,
+                instanceKey = "",
+                engineStateKey = "",
+                engineState = EngineState.Failed("no port", willRetry = false),
+            )
+        )
+
+        assertEquals(EngineReadiness.Failed, view.run.readiness)
+        assertEquals("engine failed: no port", view.run.statusLabel(BindingKind.Legacy))
+    }
+
+    @Test
+    fun `a chat pool binding keeps its no-tools hint with the status`() {
+        val view = ChatUiState(engineReady = true).toViewState(
+            ChatHostInputs(binding = BindingKind.ChatPool, snapshotReady = true)
+        )
+
+        assertEquals("Chat - no tools \u00b7 ready", view.run.statusLabel(BindingKind.ChatPool))
+    }
+
+    @Test
+    fun `the empty state never calls a prewarm-off cold start broken`() {
+        val copy = ChatUiState(phase = "engine stopped").toViewState(
+            ChatHostInputs(prewarm = false, snapshotReady = true)
+        ).emptyCopy()
+
+        assertEquals("Start a conversation", copy.title)
+        assertTrue(copy.body.contains("starts when you begin typing"))
+        assertFalse(copy.body.contains("engine stopped"))
+    }
+
+    @Test
+    fun `the empty state reports a settled failure and a recoverable agent`() {
+        val failed = ChatUiState(phase = "engine failed: no port").toViewState(
+            ChatHostInputs(
+                snapshotReady = true,
+                engineState = EngineState.Failed("no port", willRetry = false),
+            )
+        ).emptyCopy()
+        assertEquals("Agent unavailable", failed.title)
+        assertEquals("engine failed: no port", failed.body)
+
+        val recoverable = ChatUiState(
+            recoverable = true,
+            phase = "agent not ready: drift",
+        ).toViewState(ChatHostInputs(snapshotReady = true)).emptyCopy()
+        assertEquals("Agent needs attention", recoverable.title)
+        assertTrue(recoverable.body.contains("retry"))
+    }
+
+    @Test
+    fun `a ready chat pool empty state says tools are off`() {
+        val copy = ChatUiState(engineReady = true).toViewState(
+            ChatHostInputs(
+                binding = BindingKind.ChatPool,
+                snapshotReady = true,
+                prewarm = true,
+            )
+        ).emptyCopy()
+
+        assertEquals("Start a conversation", copy.title)
+        assertTrue(copy.body.contains("tools are off"))
+    }
+
+    @Test
+    fun `the catalogue loading fact is projected`() {
+        assertTrue(
+            ChatUiState(modelsLoading = true).toViewState(ChatHostInputs())
+                .model.catalogue.loading
+        )
+        assertFalse(
+            ChatUiState().toViewState(ChatHostInputs())
+                .model.catalogue.loading
+        )
     }
 
     @Test

@@ -1328,6 +1328,52 @@ bar, so it is below 840dp (F-K). The extended-rail branch is Compose-tested
 at 1000dp only. 2.0x font scale, reduced motion, density, API 30+, wide/
 tablet and instrumented tests are NOT PERFORMED.
 
+### 5.13 V2-4 chat redesign (in progress, 2026-11-20)
+
+V2-4 works on the existing `ChatViewState` -> `ChatAction` seam; no host,
+dispatch or engine-boundary change. Scope is Revision 4.0 tasks 1, 2, 3, 5, 6,
+7 (picker only), 8 and 9, with tasks 4 (pinned/follow/jump-to-bottom) and 7's
+cost/context metadata trimmed by V2-A4. The working record, code map and
+evidence table live in `docs/v2/V2-4-chat-redesign.md`.
+
+Changes in the working tree:
+
+- **Empty state (D2):** a pure `ChatViewState.emptyCopy()` replaces the
+  prewarm-only line. A settled failure says "Agent unavailable"; a recoverable
+  agent says "Agent needs attention"; prewarm-off cold start explains that
+  typing starts the agent; a ready `Chats` binding says tools are off. A ready
+  engine is never described as not started.
+- **F-E header:** `RunView.statusLabel(kind)` derives the header status from
+  `readiness` (the same snapshot as the binding), not the free-text `phase`.
+  `ready`, `switching agent`, `agent not ready - send to retry` and the failure
+  reason are now mutually consistent with the binding; `Chats` keeps its
+  `no tools` hint. The status is a dot plus words, not success colour alone.
+- **F-C picker visibility:** the top-bar control always renders a label
+  (`displayName` -> suffix-stripped id -> `Model`) plus a dropdown arrow, with
+  a stable "Choose model" accessible name.
+- **F-B picker provenance/loading:** the sheet subtitle names the actual
+  provider; `ModelCatalogueView.loading` is projected from a new
+  `modelsLoading` flag around `loadModels`; loading, error and empty are
+  distinct; `ReloadModels` finally has an emitter (header and warning banner);
+  a selected model absent from the live list is named in a warning banner.
+- **F-J selection:** `CrushChoiceChip` adds a filled check, accent border and
+  semi-bold label; all Settings FilterChips migrate to it. The session sheet's
+  active row now carries a check, the word `Current` and
+  `stateDescription = "Current chat"`.
+- **Transcript/markdown:** visible `You`/`Crush` role labels, 12dp message
+  rhythm, user bubbles wrap, assistant prose caps at 640dp, and heading sizes
+  now inherit into nested bold/italic/code with a 12sp floor (level 6 was 8sp).
+- **Composer:** growth uses `CrushDimens.composerMaxLines` (8); the §5.5.1
+  gates and the always-enabled streaming Stop are unchanged.
+
+Evidence: the four-task gate is green on attempt 2
+(`v2-4-gate-1120-2.log`, 899 tests, 0 failures, 95 suites; lint 0 errors,
+1 pre-existing warning). Attempt 1 failed one test because an assertion used
+`hasAnyAncestor` on a merged clickable row; the test was corrected. The device
+pass was **NOT PERFORMED**: the phone was off USB for the whole batch. Device
+rows - streaming/Stop/Retry, session and model sheets, F-J, process recreation
+and frame timing - stay open in the V2-4 document.
+
 ## 6. Upstream filings
 
 - **2026-11-13: closed as NO ACTION.** The unfiled drafts (candidates 1–3 in

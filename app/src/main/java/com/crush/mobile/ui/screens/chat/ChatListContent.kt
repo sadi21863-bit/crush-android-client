@@ -105,23 +105,28 @@ fun ChatListContent(
             Spacer(Modifier.height(CrushSpacing.md))
 
             val list = state.session.list
+            val engineReady = state.run.engineReady
             when {
                 list.loading && list.items.isEmpty() -> CrushLoadingRow(
                     text = "Loading chats...",
                     modifier = Modifier.padding(vertical = CrushSpacing.lg)
                 )
 
-                list.unavailable && list.items.isEmpty() -> {
+                list.items.isEmpty() && (!engineReady || list.unavailable) -> {
                     CrushBanner(
-                        text = "Chats aren't available. Start one to connect the engine.",
+                        text = if (isCode) {
+                            "Sessions aren't available. Start one to connect this project's engine."
+                        } else {
+                            "Chats aren't available. Start one to connect the engine."
+                        },
                         tone = CrushTone.Warning,
                     )
                     Spacer(Modifier.height(CrushSpacing.md))
                     Text(
                         if (isCode) {
-                            "Start a session to connect this project's engine."
+                            "The project engine is not running, so its session list has not been loaded."
                         } else {
-                            "Start a chat to connect the engine."
+                            "The Chat engine is not running, so the chat list has not been loaded."
                         },
                         style = CrushType.body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

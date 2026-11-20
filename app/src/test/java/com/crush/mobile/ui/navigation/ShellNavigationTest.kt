@@ -43,7 +43,7 @@ class ShellNavigationTest {
     private fun setContent(
         start: String = "chat",
         codeActive: Boolean = false,
-        onSelectChat: (() -> Unit)? = null,
+        onSelectChat: (() -> Boolean)? = null,
     ) {
         compose.setContent {
             nav = rememberNavController()
@@ -78,7 +78,10 @@ class ShellNavigationTest {
         setContent(
             start = "chat",
             codeActive = true,
-            onSelectChat = { chatSelections += 1 },
+            onSelectChat = {
+                chatSelections += 1
+                true
+            },
         )
 
         compose.onNodeWithText("Crush Code").assertIsSelected()
@@ -88,6 +91,21 @@ class ShellNavigationTest {
         compose.waitForIdle()
 
         assertEquals(1, chatSelections)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun `a running project vetoes the Chat switch`() {
+        setContent(
+            start = "projects",
+            codeActive = true,
+            onSelectChat = { false },
+        )
+
+        compose.onNodeWithText("Crush Chat").performClick()
+        compose.waitForIdle()
+
+        assertEquals("projects", nav.currentDestination?.route)
     }
 
     @Test

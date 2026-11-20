@@ -61,7 +61,11 @@ fun CrushShell(
      * the binding to the legacy Chat workspace.
      */
     codeActive: Boolean = false,
-    onSelectChat: (() -> Unit)? = null,
+    /**
+     * Return false to veto the Chat tab switch (a project run is in flight).
+     * The shell then neither navigates nor changes the binding.
+     */
+    onSelectChat: (() -> Boolean)? = null,
     content: @Composable () -> Unit,
 ) {
     val entry by navController.currentBackStackEntryAsState()
@@ -136,7 +140,7 @@ private fun CrushBottomBar(
     route: String?,
     navController: NavController,
     codeActive: Boolean,
-    onSelectChat: (() -> Unit)?,
+    onSelectChat: (() -> Boolean)?,
 ) {
     NavigationBar(
         modifier = Modifier.testTag("shell-bottom-bar"),
@@ -148,8 +152,12 @@ private fun CrushBottomBar(
             NavigationBarItem(
                 selected = selected,
                 onClick = {
-                    if (destination == PrimaryDestination.Chat) onSelectChat?.invoke()
-                    navigatePrimary(navController, destination)
+                    val proceed = if (destination == PrimaryDestination.Chat) {
+                        onSelectChat?.invoke() ?: true
+                    } else {
+                        true
+                    }
+                    if (proceed) navigatePrimary(navController, destination)
                 },
                 // Filled icon + label + indicator fill: three signals, because
                 // the graphite accent cannot separate selected by hue.
@@ -174,7 +182,7 @@ private fun CrushRail(
     route: String?,
     navController: NavController,
     codeActive: Boolean,
-    onSelectChat: (() -> Unit)?,
+    onSelectChat: (() -> Boolean)?,
 ) {
     NavigationRail(
         modifier = Modifier.testTag("shell-rail"),
@@ -210,7 +218,7 @@ private fun CrushExtendedRail(
     route: String?,
     navController: NavController,
     codeActive: Boolean,
-    onSelectChat: (() -> Unit)?,
+    onSelectChat: (() -> Boolean)?,
 ) {
     Surface(
         modifier = Modifier

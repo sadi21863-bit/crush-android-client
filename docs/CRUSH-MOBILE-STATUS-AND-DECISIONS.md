@@ -1448,13 +1448,16 @@ project has its own sessions. The implementation now:
   chat, Review) as the bridge into a project's sessions.
 
 The IME bar fix (F-O) is included. The final gate on this corrected tree is
-green: `v2-5-gate-1120-5.log`, 915 tests / 96 suites / 0 failures, lint 0
-errors / 1 pre-existing warning. The device pass and CI are still pending; the
-package is not complete until they are recorded.
+green: `v2-5-gate-1120-8.log`, 917 tests / 96 suites / 0 failures, lint 0
+errors / 1 pre-existing warning. **The owner skipped the final device pass on
+2026-11-21**, so the corrected-IA list states, the fixed IME bar, populated
+Review/export and two-project switch remain NOT PERFORMED on device; V2-5 is
+not called complete.
 
-Explore, tablet panes, Review history persistence and a test runner stay out of
-scope. ChatPool sessions created before V2-A11 are archival, not migrated or
-listed.
+The capture manifest records that `13-ime-bar-before-fix.png` is the **before**
+state (renamed from a misleading filename), not proof of the fix. Explore,
+tablet panes, Review history persistence and a test runner stay out of scope.
+ChatPool sessions created before V2-A11 are archival, not migrated or listed.
 
 ## 6. Upstream filings
 

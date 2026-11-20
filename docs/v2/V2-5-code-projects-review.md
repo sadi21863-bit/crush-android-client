@@ -1,8 +1,9 @@
 # V2-5 - Code / Projects / Review redesign (in progress, started 2026-11-20)
 
-Status: **IN PROGRESS.** This record is written before the code change. Code
-will land in batches on the existing host/content seams; unfinished rows stay
-NOT PERFORMED until a build log, CI run or device capture exists.
+Status: **IN PROGRESS (code/gate green; device pass skipped by owner).**
+The corrected IA and list-first changes are implemented and gated. The owner
+skipped the final device pass on 2026-11-21, so the final device rows stay
+NOT PERFORMED and V2-5 is not called device-verified or complete.
 
 Authority:
 
@@ -226,20 +227,27 @@ provider policy, shell destinations.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| Four-task gate (final) | `v2-5-gate-1120-5.log`: `BUILD SUCCESSFUL in 28m 39s` | PASS (attempt 5) |
-| Unit-test count / failures | 915 tests, 96 suites, 0 failures, 0 errors, 0 skipped | PASS |
+| Four-task gate (final) | `v2-5-gate-1120-8.log`: `BUILD SUCCESSFUL in 8m 49s` | PASS (attempt 8) |
+| Unit-test count / failures | 917 tests, 96 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
 | CI | GitHub Actions run on the pushed commit | NOT PERFORMED |
-| Crush Chat list / legacy binding / Q&A boundary | device capture + app.log policy line | NOT PERFORMED |
-| Crush Code project list / project home / sessions | device capture | NOT PERFORMED |
-| Projects current marker / trust / states | device capture set | NOT PERFORMED |
-| Project identity in Code chat | device capture | NOT PERFORMED |
-| Populated Review card + provenance/partial | device capture (needs a real file-changing turn) | NOT PERFORMED |
-| Revert confirmed and serialized | device + existing JVM tests | NOT PERFORMED on device |
-| Export byte-exact | device export + sha256 comparison | NOT PERFORMED in this pass |
-| Two-project isolation / switching | device + instrumentation where runnable | NOT PERFORMED |
-| Trust re-gating on changed `crushrc` | existing tests + device | NOT PERFORMED |
-| IME hides the phone bar | device capture | NOT PERFORMED |
+| Corrected-IA device pass | owner skipped the final pass on 2026-11-21 | NOT PERFORMED |
+| Crush Chat list / legacy binding / Q&A boundary | partial pre-fix captures only; stopped-engine copy was false | NOT PERFORMED |
+| Crush Code project list / project home / sessions | partial pre-IA captures; final list state not captured | PARTIAL |
+| Projects current marker / trust / states | captures `10`/`11` (pre-IA labels) | PARTIAL |
+| Project identity in Code chat | captures `02`/`12` (pre-IA labels) | PARTIAL |
+| Populated Review card + provenance/partial | no final capture | NOT PERFORMED |
+| Revert confirmed and serialized | no final device capture | NOT PERFORMED |
+| Export byte-exact | no final device export | NOT PERFORMED |
+| Two-project isolation / switching | no final device pass | NOT PERFORMED |
+| Trust re-gating on changed `crushrc` | tests only; no final device pass | NOT PERFORMED |
+| IME hides the phone bar | `13` is the BEFORE state; no fixed capture | NOT PERFORMED |
+
+The capture manifest (`docs/parity/2026-11-20-v2-5-code/MANIFEST.md`) records
+what each pre-fix image actually shows. In particular,
+`13-ime-bar-before-fix.png` was renamed from a misleading
+`13-ime-bar-hidden.png`: it shows the bar above the keyboard **before** the
+fix, and is not evidence that the fix works on device.
 
 Device environment when the pass runs: Redmi Note 7 Pro `bbf8ca69`, API 29,
 393dp, app `com.crush.mobile`. Captures will go in

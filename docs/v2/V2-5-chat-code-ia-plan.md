@@ -110,6 +110,7 @@ The home never binds by itself. The trust gate runs before either action.
 
 ## Evidence
 
-NOT PERFORMED for the corrected IA until the phases above land. The previous
-V2-5 batch evidence covers project-scoped Review, Projects current/trust, and
-the IME bar; it remains valid where it does not conflict with D1/D4.
+Code and gate: PASS (`v2-5-gate-1120-8.log`, 917 tests / 96 suites / 0
+failures; lint 0 errors / 1 pre-existing warning). Final device pass: **NOT
+PERFORMED** — the owner skipped it on 2026-11-21. Pre-fix captures and their
+limits are listed in `../parity/2026-11-20-v2-5-code/MANIFEST.md`.

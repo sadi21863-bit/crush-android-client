@@ -2,6 +2,7 @@ package com.crush.mobile
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
@@ -249,7 +250,22 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     navController = navController,
                     fallbackRoute = startDestination,
                     codeActive = activeBinding is com.crush.mobile.di.AppContainer.EngineBinding.Project,
-                    onSelectChat = { container.setActiveProject(null) },
+                    onSelectChat = {
+                        val key = container.activeInstanceKey.value
+                        val blocked = container.activeProjectRef != null &&
+                            container.engineRunInFlightFor == key
+                        if (blocked) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Wait for the project turn to finish before opening Crush Chat.",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                            false
+                        } else {
+                            container.setActiveProject(null)
+                            true
+                        }
+                    },
                 ) {
                                 NavGraph(
                                     navController = navController,

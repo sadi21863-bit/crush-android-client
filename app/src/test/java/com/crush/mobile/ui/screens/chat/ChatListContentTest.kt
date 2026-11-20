@@ -123,4 +123,20 @@ class ChatListContentTest {
             .assertIsDisplayed()
         compose.onAllNodesWithText("No chats yet").assertCountEquals(0)
     }
+
+    @Test
+    fun `a stopped engine does not claim the list is empty`() {
+        setContent(
+            ChatFixtures.view(
+                bindingKind = BindingKind.Legacy,
+                sessions = emptyList(),
+                engineReady = false,
+                prewarm = false,
+            )
+        )
+
+        compose.onNodeWithText("Chats aren't available", substring = true)
+            .assertIsDisplayed()
+        compose.onAllNodesWithText("No chats yet").assertCountEquals(0)
+    }
 }

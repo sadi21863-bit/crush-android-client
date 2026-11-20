@@ -19,7 +19,6 @@ import com.crush.mobile.domain.provider.Providers
  */
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -48,7 +47,6 @@ fun SettingsScreen(
             tuning = resolvedTuning,
             profile = deviceProfile,
         ),
-        onBack = onBack,
         onOpenDiagnostics = onOpenDiagnostics,
         onSelectProvider = viewModel::saveProviderId,
         onSaveKey = { key ->

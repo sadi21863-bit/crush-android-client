@@ -40,8 +40,6 @@ object ChatDispatch {
      * returning null there would silently discard the consent prompt.
      */
     fun hostEffect(action: ChatAction): ChatHostEffect? = when (action) {
-        ChatAction.OpenSettings -> ChatHostEffect.Navigate(HostDestination.Settings)
-        ChatAction.OpenProjects -> ChatHostEffect.Navigate(HostDestination.Projects)
         ChatAction.OpenReview -> ChatHostEffect.Navigate(HostDestination.Review)
         is ChatAction.ConfirmHandoff ->
             ChatHostEffect.ConfirmHandoff(action.summary, action.destinationId)

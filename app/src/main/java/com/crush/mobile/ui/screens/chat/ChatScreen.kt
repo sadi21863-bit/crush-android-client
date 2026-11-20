@@ -24,8 +24,6 @@ import com.crush.mobile.util.AppLog
  */
 @Composable
 fun ChatScreen(
-    onOpenSettings: () -> Unit,
-    onOpenProjects: () -> Unit,
     onOpenReview: () -> Unit,
     isLocked: Boolean = false
 ) {
@@ -148,8 +146,6 @@ fun ChatScreen(
             when (val effect = vm.dispatch(action)) {
                 ChatHostEffect.None -> Unit
                 is ChatHostEffect.Navigate -> when (effect.destination) {
-                    HostDestination.Settings -> onOpenSettings()
-                    HostDestination.Projects -> onOpenProjects()
                     HostDestination.Review -> onOpenReview()
                 }
 

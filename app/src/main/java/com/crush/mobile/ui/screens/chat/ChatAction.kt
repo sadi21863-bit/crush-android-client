@@ -20,8 +20,6 @@ sealed interface ChatAction {
     data object NewChat : ChatAction
     data object OpenSessions : ChatAction
     data object OpenModels : ChatAction
-    data object OpenSettings : ChatAction
-    data object OpenProjects : ChatAction
     data object OpenReview : ChatAction
 
     data class SelectModel(val id: String) : ChatAction
@@ -47,7 +45,7 @@ sealed interface ChatAction {
 }
 
 /** Navigation targets the host owns; the Chat ViewModel never navigates. */
-enum class HostDestination { Settings, Projects, Review }
+enum class HostDestination { Review }
 
 /**
  * An explicit host continuation.

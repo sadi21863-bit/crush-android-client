@@ -34,11 +34,11 @@ import java.io.File
  * render tree lives in [ProjectsContent], which receives only values and
  * callbacks.
  *
- * The screen signature is deliberately unchanged (`onBack`, `onOpenProject`):
- * callers and navigation do not know the seam exists.
+ * The screen owns the ViewModel, the container and the Context-derived paths;
+ * navigation is the shell's job, so the signature is only `onOpenProject`.
  */
 @Composable
-fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
+fun ProjectsScreen(onOpenProject: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val container = (context.applicationContext as CrushMobileApp).container
     val vm: ProjectsViewModel = viewModel(factory = ProjectsViewModel.Factory(context, container))
@@ -201,7 +201,6 @@ fun ProjectsScreen(onBack: () -> Unit, onOpenProject: () -> Unit) {
         internalRoot = internalRoot,
         importError = importError,
         pendingTrust = pendingCrushrcTrust,
-        onBack = onBack,
         onImport = importClick,
         onOpen = { project ->
             when {

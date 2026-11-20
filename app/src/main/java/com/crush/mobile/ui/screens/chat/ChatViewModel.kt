@@ -735,8 +735,6 @@ class ChatViewModel(
             // Host-owned and permission actions returned above. Kept explicit
             // so the compiler still enforces exhaustiveness if the sealed set
             // grows later.
-            ChatAction.OpenSettings,
-            ChatAction.OpenProjects,
             ChatAction.OpenReview,
             is ChatAction.ConfirmHandoff,
             ChatAction.OpenHandoffInCode,

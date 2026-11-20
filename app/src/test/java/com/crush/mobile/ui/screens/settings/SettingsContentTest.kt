@@ -88,7 +88,6 @@ class SettingsContentTest {
 
     private fun setContent(
         state: SettingsViewState = state(),
-        onBack: () -> Unit = {},
         onOpenDiagnostics: () -> Unit = {},
         onSelectProvider: (String) -> Unit = {},
         onSaveKey: (String) -> Unit = {},
@@ -102,7 +101,6 @@ class SettingsContentTest {
         compose.setContent {
             SettingsContent(
                 state = state,
-                onBack = onBack,
                 onOpenDiagnostics = onOpenDiagnostics,
                 onSelectProvider = onSelectProvider,
                 onSaveKey = onSaveKey,
@@ -253,15 +251,12 @@ class SettingsContentTest {
     }
 
     @Test
-    fun `back dispatches the host callback`() {
-        var backs = 0
-        setContent(onBack = { backs += 1 })
+    fun `a top-level destination has no back control`() {
+        setContent()
 
-        // The top-bar back control is an icon button, not a text button; the
-        // only "Back" here is its content description.
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.waitForIdle()
-
-        assertEquals(1, backs)
+        // V2-3: Settings is a primary destination reached from the shell, so
+        // the screen must not own a back arrow. Back is the system/back-stack
+        // contract (Chat stays at the root).
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
     }
 }

@@ -1288,6 +1288,45 @@ device captures stand in); task 6 is PARTIAL (theme verified in tests and
 on device, font-scale/reduced-motion/density checks NOT PERFORMED). The
 V2-2 *exit* criteria are met, which is what "complete" means here.
 
+### 5.12 V2-3 adaptive app shell (working tree, 2026-11-20)
+
+V2-3 moves primary navigation into an adaptive shell. Three destinations -
+Chat, Projects, Settings - with the brief 4.6 breakpoints: bottom bar below
+600dp, compact rail 600-839dp, extended rail at 840dp and above. Selection
+is a filled icon + indicator fill + an always-visible label, never colour
+alone (the neutral graphite accent cannot carry state by hue). Onboarding,
+Review and Diagnostics render without shell chrome; Review and Diagnostics
+keep their pushed-route Back arrows.
+
+The shell is the single navigation source of truth: `navigatePrimary` uses
+`popUpTo(Chat) { saveState = true }` + `launchSingleTop` + `restoreState`, so
+repeated bar taps replace instead of stacking, Chat stays at the root, and a
+Settings detour preserves the Chat `NavBackStackEntry` (and therefore its
+ViewModel/run). The chat sheet lost its Settings/Projects buttons because
+they duplicated the bar; Review stays contextual in the sheet.
+`ChatDispatchTest`'s interaction ledger is now 35 rows / 22 action subtypes /
+4 host continuations. Settings and Projects lost their top-bar back arrows:
+they are primary destinations, and Back is the back-stack contract.
+
+**Verification.** Final four-task gate
+(`v2-3-gate-final-1120-083146.log`) green: 885 tests, 0 failures, 0 skipped,
+95 suites; lint 0 errors / 1 pre-existing `NotShrinkingResources` warning.
+`PrimaryDestinationsTest` (6) pins the routes and the 599.9/600/839.9/840
+boundaries; `ShellNavigationTest` (8) pins bar/rail/extended rail rendering,
+shell hiding on Review, no duplicate entries after Projects -> Settings ->
+Chat, Back returning to Chat, Chat entry survival across a detour, and rapid
+taps not stacking.
+
+**Device pass** (`bbf8ca69`, API 29, app 1.0.0) in
+`docs/parity/2026-11-20-v2-3-shell/` - 12 captures: light/dark bars,
+selection affordance, the reduced sheet, Projects/Settings without back
+arrows, Back -> Chat, IME above the bar, Legacy-workspace open -> Chat, and
+rotation. Landscape (850.9dp physical) rendered the compact rail, not the
+extended rail: the window excludes the display cutout and the 3-button nav
+bar, so it is below 840dp (F-K). The extended-rail branch is Compose-tested
+at 1000dp only. 2.0x font scale, reduced motion, density, API 30+, wide/
+tablet and instrumented tests are NOT PERFORMED.
+
 ## 6. Upstream filings
 
 - **2026-11-13: closed as NO ACTION.** The unfiled drafts (candidates 1–3 in

@@ -30,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import com.crush.mobile.engine.EngineCompatibility
 import com.crush.mobile.ui.CrushrcTrustDialog
 import com.crush.mobile.ui.crushrcTrustNote
+import com.crush.mobile.ui.navigation.CrushShell
 import com.crush.mobile.ui.navigation.NavGraph
 import com.crush.mobile.ui.navigation.Screen
 import com.crush.mobile.ui.screens.lock.LockOverlay
@@ -240,13 +241,18 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                 onRetry = { checkEngineCompatibility() }
                             )
                         } else {
-                            NavGraph(
+                            CrushShell(
                                 navController = navController,
-                                startDestination = startDestination,
-                                // The chat tree must know the gate is closed, not
-                                // just render behind the overlay.
-                                isLocked = gateState.value == AppLockPolicy.Gate.PROMPT
-                            )
+                                fallbackRoute = startDestination,
+                            ) {
+                                NavGraph(
+                                    navController = navController,
+                                    startDestination = startDestination,
+                                    // The chat tree must know the gate is closed, not
+                                    // just render behind the overlay.
+                                    isLocked = gateState.value == AppLockPolicy.Gate.PROMPT
+                                )
+                            }
                         }
                         // Deliberately OUTSIDE the branch above. The lock gate is
                         // not a compatibility concern: a locked app must not

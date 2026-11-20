@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.AlertDialog
@@ -63,7 +62,6 @@ fun ProjectsContent(
     internalRoot: String,
     importError: String?,
     pendingTrust: PendingProjectTrust?,
-    onBack: () -> Unit,
     onImport: () -> Unit,
     onOpen: (ProjectRef) -> Unit,
     onRemove: (ProjectRef) -> Unit,
@@ -79,12 +77,7 @@ fun ProjectsContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Projects") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
+                title = { Text("Projects") }
             )
         }
     ) { padding ->

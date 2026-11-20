@@ -59,7 +59,6 @@ class ProjectsContentTest {
         state: ProjectsUiState = ProjectsUiState(loading = false),
         importError: String? = null,
         pendingTrust: PendingProjectTrust? = null,
-        onBack: () -> Unit = {},
         onImport: () -> Unit = {},
         onOpen: (ProjectRef) -> Unit = {},
         onRemove: (ProjectRef) -> Unit = {},
@@ -73,7 +72,6 @@ class ProjectsContentTest {
                 internalRoot = internalRoot,
                 importError = importError,
                 pendingTrust = pendingTrust,
-                onBack = onBack,
                 onImport = onImport,
                 onOpen = onOpen,
                 onRemove = onRemove,
@@ -222,17 +220,17 @@ class ProjectsContentTest {
     }
 
     @Test
-    fun `import and back dispatch their host callbacks`() {
+    fun `import dispatches its host callback and a top-level screen has no back control`() {
         var imports = 0
-        var backs = 0
-        setContent(onBack = { backs += 1 }, onImport = { imports += 1 })
+        setContent(onImport = { imports += 1 })
 
         compose.onNodeWithText("Import folder").assertIsEnabled().performClick()
-        compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
 
         assertEquals(1, imports)
-        assertEquals(1, backs)
+        // V2-3: Projects is a primary destination reached from the shell; the
+        // screen must not own a back arrow.
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
     }
 
     @Test

@@ -14,12 +14,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -420,14 +418,6 @@ fun ChatContent(
             onNew = {
                 showSessions = false
                 onAction(ChatAction.NewChat)
-            },
-            onSettings = {
-                showSessions = false
-                onAction(ChatAction.OpenSettings)
-            },
-            onProjects = {
-                showSessions = false
-                onAction(ChatAction.OpenProjects)
             },
             onReview = {
                 showSessions = false
@@ -1227,8 +1217,6 @@ private fun SessionSheet(
     onPick: (String) -> Unit,
     onDelete: (String) -> Unit,
     onNew: () -> Unit,
-    onSettings: () -> Unit,
-    onProjects: () -> Unit,
     onReview: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1276,45 +1264,18 @@ private fun SessionSheet(
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding()
         ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(onClick = onNew, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("New chat")
-                }
-                OutlinedButton(onClick = onSettings, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Settings, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Settings")
-                }
+            Button(onClick = onNew, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("New chat")
             }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Full-width second row: the Projects surface (ADR-0001 P3).
-                // Kept out of the two-button row so neither shrinks below a
-                // comfortable label width on a phone.
-                OutlinedButton(onClick = onProjects, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.FolderOpen, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Projects")
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Full-width third row: the Review surface (P4 v1). Same
-                // reasoning as Projects - a half-row with project-relative paths
-                // would truncate legibility, and this is the surface where a
-                // mis-tap ends up reverting a file, so the target stays big.
-                OutlinedButton(onClick = onReview, modifier = Modifier.weight(1f)) {
-                    Text("Review changes")
-                }
+            Spacer(Modifier.height(8.dp))
+            // Review stays in the sheet: it is contextual to the conversation,
+            // not a primary destination, and the shell's bar cannot reach a
+            // pushed route. Settings/Projects moved to the shell bar, so this
+            // sheet is now only about the chats list and turn review.
+            OutlinedButton(onClick = onReview, modifier = Modifier.fillMaxWidth()) {
+                Text("Review changes")
             }
             Spacer(Modifier.height(8.dp))
             // S4: the sheet is scoped to the CURRENT surface's pool (the engine

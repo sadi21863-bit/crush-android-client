@@ -87,15 +87,7 @@ class ChatDispatchTest {
     }
 
     @Test
-    fun `navigation actions return their explicit destinations`() {
-        assertEquals(
-            ChatHostEffect.Navigate(HostDestination.Settings),
-            ChatDispatch.hostEffect(ChatAction.OpenSettings),
-        )
-        assertEquals(
-            ChatHostEffect.Navigate(HostDestination.Projects),
-            ChatDispatch.hostEffect(ChatAction.OpenProjects),
-        )
+    fun `the review action returns its explicit destination`() {
         assertEquals(
             ChatHostEffect.Navigate(HostDestination.Review),
             ChatDispatch.hostEffect(ChatAction.OpenReview),
@@ -160,7 +152,7 @@ class ChatDispatchTest {
     )
 
     @Test
-    fun `the 37-row interaction ledger is complete and every row is owned`() {
+    fun `the 35-row interaction ledger is complete and every row is owned`() {
         val ref = ProjectRef(
             id = UUID.randomUUID(),
             label = "Project",
@@ -198,29 +190,27 @@ class ChatDispatchTest {
             LedgerRow(21, "Session pick", Owner.ContentDispatch, listOf(ChatAction.SelectSession("s"))),
             LedgerRow(22, "Session delete", Owner.Dispatch, listOf(ChatAction.DeleteSession("s"))),
             LedgerRow(23, "Sheet New chat", Owner.ContentDispatch, listOf(ChatAction.NewChat)),
-            LedgerRow(24, "Sheet Settings", Owner.Dispatch, listOf(ChatAction.OpenSettings)),
-            LedgerRow(25, "Sheet Projects", Owner.Dispatch, listOf(ChatAction.OpenProjects)),
-            LedgerRow(26, "Sheet Review", Owner.Dispatch, listOf(ChatAction.OpenReview)),
-            LedgerRow(27, "Sheet dismiss", Owner.Content),
-            LedgerRow(28, "Model pick", Owner.ContentDispatch, listOf(ChatAction.SelectModel("m"))),
-            LedgerRow(29, "Model sheet dismiss", Owner.Content),
-            LedgerRow(30, "Summary edit", Owner.Content),
-            LedgerRow(31, "Destination select", Owner.Content),
+            LedgerRow(24, "Sheet Review", Owner.Dispatch, listOf(ChatAction.OpenReview)),
+            LedgerRow(25, "Sheet dismiss", Owner.Content),
+            LedgerRow(26, "Model pick", Owner.ContentDispatch, listOf(ChatAction.SelectModel("m"))),
+            LedgerRow(27, "Model sheet dismiss", Owner.Content),
+            LedgerRow(28, "Summary edit", Owner.Content),
+            LedgerRow(29, "Destination select", Owner.Content),
             LedgerRow(
-                32,
+                30,
                 "Handoff Confirm",
                 Owner.ContentDispatch,
                 listOf(ChatAction.ConfirmHandoff(destinationId = "dest", summary = "plan")),
             ),
-            LedgerRow(33, "Sheet dismiss", Owner.Dispatch, listOf(ChatAction.CloseHandoffSheet)),
-            LedgerRow(34, "Discard", Owner.Dispatch, listOf(ChatAction.DiscardHandoff)),
-            LedgerRow(35, "Open in Code", Owner.ContentDispatch, listOf(ChatAction.OpenHandoffInCode)),
-            LedgerRow(36, "Trust Confirm", Owner.HostOnly, listOf(ChatAction.GrantHandoffTrust(ref))),
-            LedgerRow(37, "Trust Dismiss", Owner.HostOnly),
+            LedgerRow(31, "Sheet dismiss", Owner.Dispatch, listOf(ChatAction.CloseHandoffSheet)),
+            LedgerRow(32, "Discard", Owner.Dispatch, listOf(ChatAction.DiscardHandoff)),
+            LedgerRow(33, "Open in Code", Owner.ContentDispatch, listOf(ChatAction.OpenHandoffInCode)),
+            LedgerRow(34, "Trust Confirm", Owner.HostOnly, listOf(ChatAction.GrantHandoffTrust(ref))),
+            LedgerRow(35, "Trust Dismiss", Owner.HostOnly),
         )
 
-        assertEquals(37, rows.size)
-        assertEquals((1..37).toList(), rows.map { it.n })
+        assertEquals(35, rows.size)
+        assertEquals((1..35).toList(), rows.map { it.n })
         assertEquals(
             "interaction ledger elements must stay in document order",
             rows.map { it.element },
@@ -228,8 +218,10 @@ class ChatDispatchTest {
         )
 
         val ledgerActions = rows.flatMap { it.actions }
-        // One representative per ChatAction subtype: all 24 appear.
-        assertEquals(24, ledgerActions.distinct().size)
+        // One representative per ChatAction subtype: all 22 appear. The two
+        // former sheet actions (Settings, Projects) are gone: V2-3 moved those
+        // transitions to the shell, so they are no longer chat interactions.
+        assertEquals(22, ledgerActions.distinct().size)
 
         rows.filter { it.actions.isEmpty() }.forEach { row ->
             assertTrue(
@@ -269,11 +261,11 @@ class ChatDispatchTest {
             }
         }
 
-        // Appendix C.3 effect table: six host continuations, three permission
+        // Appendix C.3 effect table: four host continuations, three permission
         // decisions, fifteen ViewModel commands. ConfirmHandoff is an explicit
         // host continuation because its trust callback must survive the seam.
         val distinct = ledgerActions.distinct()
-        assertEquals(6, distinct.count { ChatDispatch.hostEffect(it) != null })
+        assertEquals(4, distinct.count { ChatDispatch.hostEffect(it) != null })
         assertEquals(3, distinct.count { ChatDispatch.permissionDecision(it) != null })
         assertEquals(
             15,

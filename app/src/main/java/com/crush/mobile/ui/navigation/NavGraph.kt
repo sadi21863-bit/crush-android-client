@@ -65,8 +65,6 @@ fun NavGraph(
 
         composable(Screen.Chat.route) {
             ChatScreen(
-                onOpenSettings = { navController.navigate(Screen.Settings.route) },
-                onOpenProjects = { navController.navigate(Screen.Projects.route) },
                 onOpenReview = { navController.navigate(Screen.Review.route) },
                 isLocked = isLocked
             )
@@ -81,9 +79,10 @@ fun NavGraph(
             )
         }
 
-        // Reachable from the chat sheet (next to Settings). The Projects
-        // surface is the ADR-0001 registry's in-app reader; opening a row
-        // returns to chat bound to that row's engine instance.
+        // A primary destination in the V2-3 shell (V2-A2), not a sheet
+        // shortcut. The Projects surface is the ADR-0001 registry's in-app
+        // reader; opening a row returns to chat bound to that row's engine
+        // instance.
         //
         // The row-open REPLACES the whole stack back to a single chat entry:
         // navigate with popUpTo(chat, inclusive) instead of a bare push. A
@@ -95,7 +94,6 @@ fun NavGraph(
         // re-bootstraps that row's engine binding (unchanged semantics).
         composable(Screen.Projects.route) {
             ProjectsScreen(
-                onBack = { navController.popBackStack() },
                 onOpenProject = {
                     navController.navigate(Screen.Chat.route) {
                         popUpTo(Screen.Chat.route) { inclusive = true }
@@ -107,7 +105,6 @@ fun NavGraph(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
                 onOpenDiagnostics = { navController.navigate(Screen.Diagnostics.route) },
             )
         }

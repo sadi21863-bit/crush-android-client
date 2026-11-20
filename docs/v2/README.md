@@ -18,6 +18,7 @@ the owner's trims.
 | `ADR-REGISTER.md` | accepted, open and parked V2 decisions |
 | `V2-1-design-foundation.md` | **approved** colour/type/spacing/shape/dimension/motion tokens (graphite accent, 15sp body, platform monospace), measured against the shipped theme; phone screen-state catalogue; navigation decision sheet; Q1-Q4 answered 2026-11-19 (V2-A8) |
 | `V2-2-token-integration.md` | V2-2 evidence record: theme layer, semantic status roles, type reclassification counts, component pilot (Diagnostics), test list, gate status and honest limits |
+| `V2-3-app-shell.md` | V2-3 adaptive shell record: three primary destinations, 600/840dp breakpoints, `navigatePrimary` back-stack rule, sheet de-duplication, test list, device evidence and honest limits |
 | `../parity/2026-11-19-v2-0-baseline/MANIFEST.md` | fresh task-6 phone capture set: device/build, 15 captures, findings F-A to F-G, corrections C1 to C3 |
 
 ## Scope
@@ -37,7 +38,7 @@ the owner's trims.
 | V2-0 | in progress | reconciliation sign-off by owner; task 6 evidence landed |
 | V2-1 | partial (direction approved) | token spec, state catalogue and a11y spec approved 2026-11-19 (V2-A8); prototype/flow tasks 3-6 still NOT PERFORMED, so the V2-1 exit criteria are not met |
 | V2-2 | complete (exit criteria, 2026-11-20) | tokens in `ui/theme/`, component set piloted on Diagnostics, 871 tests green, lint 0 errors, full gate passed on attempts 2-4 (attempt 1 failed on a test-fixture typo), CI `44618219274` green; device evidence in `docs/parity/2026-11-20-v2-2-tokens/` (two defects found and fixed: card hairline, dark navigation bar). Partial task items: no screenshot-test harness; font-scale/reduced-motion/density NOT PERFORMED. F-J selection affordance is carried to V2-4 |
-| V2-3 | not started | V2-2 components |
+| V2-3 | complete (2026-11-20) | adaptive shell: bottom bar `<600dp`, rail `600-839dp`, extended rail `>=840dp` (extended rail not on hardware), single `navigatePrimary` rule, primary-only chrome; 885 tests green, lint 0 errors; device pass in `docs/parity/2026-11-20-v2-3-shell/` (12 captures: bar, sheet, Back, IME, landscape rail, rotation). Limits: extended rail, API 30+, wide/tablet and instrumented tests NOT PERFORMED |
 | V2-4 | not started | V2-3 shell |
 | V2-5 | not started | V2-3 shell |
 | V2-6 | not started | V2-2 components |

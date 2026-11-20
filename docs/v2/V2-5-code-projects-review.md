@@ -230,7 +230,7 @@ provider policy, shell destinations.
 | Four-task gate (final) | `v2-5-gate-1120-8.log`: `BUILD SUCCESSFUL in 8m 49s` | PASS (attempt 8) |
 | Unit-test count / failures | 917 tests, 96 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
-| CI | GitHub Actions run on the pushed commit | NOT PERFORMED |
+| CI | run `44835596927` on `fff704d`: completed success | PASS |
 | Corrected-IA device pass | owner skipped the final pass on 2026-11-21 | NOT PERFORMED |
 | Crush Chat list / legacy binding / Q&A boundary | partial pre-fix captures only; stopped-engine copy was false | NOT PERFORMED |
 | Crush Code project list / project home / sessions | partial pre-IA captures; final list state not captured | PARTIAL |

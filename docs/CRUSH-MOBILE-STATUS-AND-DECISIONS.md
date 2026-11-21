@@ -1132,7 +1132,7 @@ authorizes no implementation.
 | V2-3 | ACTIVE | 3 destinations; delete the dead `Screen.Models`; no 4th Code destination. |
 | V2-4 | ACTIVE | Drop pinned/follow (task 4) and cost/context (task 7); keep empty state, transcript, composer, session sheet, picker and actions. |
 | V2-5 | DONE (phone) | Code is project-bound; phone-first; tablet panes only after phone acceptance (still parked). |
-| V2-6 | ACTIVE | Finding 13 copy; no new density/nav/response-rendering preferences; preserve Diagnostics; provider round-trip. |
+| V2-6 | DONE (phone) | Settings/Onboarding redesign; Finding 13 copy; no new preferences. |
 | V2-7 | PARKED | Deterministic intelligent UI; separate approval. |
 | V2-8 | PARKED | Structured model UI; separate approval. |
 | V2-9 | PARKED | Release/rollout; Gate 7 remains deferred. |
@@ -1184,7 +1184,7 @@ authorizes no implementation.
 | O9 | SEPARATE ROADMAP - not a V2 prerequisite |
 | O10 | DEFERRED - deny-all remains |
 | O11 | NOT PERFORMED - needs instrumentation/injected stall |
-| O12 | SCHEDULED - V2-6, copy only |
+| O12 | RESOLVED 2026-11-21 - Finding 13 copy fixed in V2-6 ("Add a key for <provider> to start chatting.") |
 | O13 | RESOLVED - brief on disk is 1,319 lines; the earlier 996 figure counted non-blank lines only |
 
 **Accepted plan-wide rules from Revision 4.0 (no behavior change)**
@@ -1483,6 +1483,52 @@ coverage.
 Explore, tablet panes, Review history persistence and a test runner stay out of
 scope. ChatPool sessions created before V2-A11 are archival, not migrated or
 listed.
+
+### 5.15 V2-6 Settings / Onboarding (complete on phone, 2026-11-21)
+
+Revision 4.0's V2-6 was trimmed by V2-A4: no new preference set (O5 stays
+closed), no density/navigation/reduced-motion/response-rendering control. What
+shipped is the design pass plus the preserved contracts. Record:
+`docs/v2/V2-6-settings-onboarding.md`; captures:
+`docs/parity/2026-11-21-v2-6-settings/`.
+
+- **Settings** now uses the V2-2 component set and tokens: section headers in
+  the token scale, hairline `CrushCard`s, graphite primary/secondary actions,
+  one spacing scale. The visible order follows brief §4.7.4: Provider/API key ->
+  Permissions -> Appearance (theme, keyboard) -> Performance -> About with the
+  Diagnostics entry. Every control still writes real state; there are no dead
+  switches and no app-lock toggle. Permissions stays a switch whose OFF state is
+  the safe one, with written status and the blast-radius warning.
+- **Onboarding** keeps its behavior and gains the token hero/card plus an
+  explicit honesty line: the key is saved on this device and is not checked
+  until the first message (CORR-001 remains open; the screen no longer risks
+  implying verification).
+- **Finding 13 is fixed**: the missing-key line reads "Add a key for
+  \<provider\> to start chatting." and is pinned by `SettingsContentTest`.
+- **Preserved**: credentials remain write-only in the surface
+  (`hasApiKey`/`vaultIds`/hint only, `SecureKeyStore` untouched), the tested
+  provider offer rule and stored-key exception are unchanged, and provider
+  selection still cannot navigate away or strand a key.
+
+Evidence. Full gate `v2-6-gate-1.log`: 919 tests / 96 classes / 0 failures / 0
+errors / 0 skipped; lint 0 errors / 1 pre-existing `NotShrinkingResources`
+warning. Device (2026-11-21): before `00`-`01`, after `12`-`14`, permission
+states `15`-`16`, Finding 13 `20`, and the provider round-trip `17`-`19` with
+the owner's Go restored in `21`. The cold start with OpenRouter reported
+`ciphertext=true` and composed the Chat tree, so the launch route stayed Chat
+rather than Onboarding. Selecting key-less Zen logged
+`provider=opencode-zen storedCiphertext=false
+providersWithKeys=hyper,openrouter,opencode-go` and did **not** substitute a
+keyed provider; the restored Go bootstrap then reported
+`ensureAgentReady ... is_ready=true` with `deepseek-v4.1-flash` re-resolved
+(`22`).
+
+Limits: Onboarding's device frame is NOT PERFORMED (reaching it would cost the
+stored key), as are tablet/wide and 2.0x font, and a device key save/replace/
+delete (credential entry is owner-only). The pass also observed that injected
+`adb input tap` was intermittently unreliable on Settings while real-finger taps,
+drags, hover and keyboard all worked; the manifest records that as a harness
+observation with no root cause claimed.
 
 ## 6. Upstream filings
 

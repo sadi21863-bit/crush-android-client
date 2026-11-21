@@ -1,0 +1,25 @@
+Crush Mobile - V2-6 device log excerpts
+Device: Redmi Note 7 Pro bbf8ca69, API 29, com.crush.mobile (gate v2-6-gate-1)
+Copied from the app's private files, 2026-11-21. Provider NAMES only; no key,
+hint or ciphertext is quoted.
+
+1) Cold start with OpenRouter selected: the launch route is Chat, not Onboarding
+   15:19:06.391 I/Main: resume gate=PROMPT coldStart=true away=-1s ciphertext=true ...
+   15:19:07.653 I/ChatViewModel: lock engaged; refusing to bootstrap
+
+2) Selecting a provider with no stored key: no silent substitution
+   15:39:43.972 I/ChatViewModel: provider switched to opencode-zen; re-bootstrapping
+   15:39:44.059 I/ChatViewModel: bootstrap key empty: provider=opencode-zen
+                storedCiphertext=false providersWithKeys=hyper,openrouter,opencode-go
+
+   Zen is offered (no key) and reported as such. The resolver did not fall back
+   to a provider that happens to have a credential.
+
+3) Owner's OpenCode Go restored and the next bootstrap is healthy
+   15:57:52.688 I/CrushSession: ensureAgentReady: key set for provider
+                'opencode-go'; model[large] = deepseek-v4.1-flash;
+                model[small] = deepseek-v4.1-flash; agent/init ok;
+                is_ready=true is_busy=false
+
+   The provider round-trip left the engine ready on the restored provider with
+   the model re-resolved; no credential was read or written by the pass.

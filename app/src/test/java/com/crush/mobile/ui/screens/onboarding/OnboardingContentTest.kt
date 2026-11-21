@@ -189,6 +189,18 @@ class OnboardingContentTest {
     }
 
     @Test
+    fun `onboarding says the key is not checked before the first message`() {
+        setContent()
+
+        // CORR-001 is still open: saving does not validate. The screen must
+        // not imply a check happened (V2-6-D6).
+        compose.onNodeWithText(
+            "Saved on this device. No check runs until your first message."
+        ).assertIsDisplayed()
+        compose.onNodeWithText("verified", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun `the reveal toggle flips the key mask`() {
         setContent()
 

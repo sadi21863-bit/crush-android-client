@@ -241,6 +241,18 @@ class SettingsContentTest {
     }
 
     @Test
+    fun `the missing-key line names the provider and uses a valid article`() {
+        setContent()
+
+        // Finding 13: "Add a OpenCode Zen key" was ungrammatical and read as
+        // if the provider were the object of "add".
+        compose.onNodeWithText("Add a key for OpenCode Zen to start chatting.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        compose.onNodeWithText("Add a OpenCode", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun `a save error reaches the snackbar`() {
         setContent(state(error = "Could not save the API key."))
 

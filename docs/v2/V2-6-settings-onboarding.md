@@ -125,6 +125,7 @@ copy/share and log tail are unchanged by this package.
 | Provider round-trip | `17` OpenRouter selected without leaving Settings; `18` relaunch lands on Chat (`ciphertext=true`, ChatViewModel composed), not Onboarding; `19` provider persisted; `21` OpenCode Go restored and persisted; `22` the next Crush Chat bootstrap is `ready` on Go with the model re-resolved | PASS on device |
 | No silent provider substitution | Log excerpt: selecting key-less Zen reports `provider=opencode-zen storedCiphertext=false providersWithKeys=hyper,openrouter,opencode-go` instead of falling back to a keyed provider | PASS on device |
 | Onboarding redesign | unit pins (11/11); device frame not reachable without costing the stored key | NOT PERFORMED (device), content PASS |
+| 2.0x font scale on Settings | BEFORE `24` (the "key stored" badge squeezed the hint column); fixed to a status line; AFTER `26`-`27`; font scale restored `28` | PASS after fix |
 | Credential path | `SecureKeyStore`/host untouched; content sees `hasApiKey`/`vaultIds`/hint only; no key in any capture or log | PASS (code review + unit tests) |
 
 Harness note: injected `adb input tap` was intermittently unreliable on this
@@ -145,7 +146,11 @@ delete on device (needs credential entry, which the agent never performs).
   so its device row is NOT PERFORMED with that reason. The content is
   Robolectric-pinned (11/11).
 - Tablet/wide layouts remain unobservable on this phone (O3).
-- 2.0x font scale was not driven on these two surfaces during the pass.
+- 2.0x font scale was driven on Settings and fixed (see §7); Onboarding at 2.0
+  is not reachable for the same reason as its device row.
+- The API action buttons wrap their labels at 2.0x instead of shrinking. They
+  stay fully legible with no clipping; the wrap is accepted rather than adding
+  an auto-sizing dependency.
 - The key save/replace/delete paths were not driven on device because they need
   credential entry, which the agent never performs. Save/failure/clear are
   unit-pinned and the host is unchanged.
@@ -154,3 +159,24 @@ delete on device (needs credential entry, which the agent never performs).
   manifest records it as a harness observation with no root cause claimed.
 - No new preference exists to migrate (task 2 trimmed), so no migration test
   exists to write; this is a trim, not a gap.
+
+## 7. Post-pass 2.0x font-scale check (2026-11-21)
+
+The first 2.0x pass (`font_scale=2.0`) found one real layout failure on
+Settings: the per-provider "key stored" badge shared the provider `Row` with
+the name/hint column, so at 2.0 the hint column lost about half its width and
+wrapped word-by-word (`24-font2x-providers-before.png`).
+
+Fix: the badge is now a `CrushStatusLabel` on its own line under the hint -
+the same written-status pattern the project rows use. Recheck at 2.0: names
+and hints keep the full width (`26-font2x-providers-fixed.png`). The API
+action buttons wrap "Replace key" onto two lines inside the pill, which is
+legible and not clipped (`27-font2x-api-actions.png`); Permissions, Appearance
+and the bottom bar stay legible (`25-font2x-permissions-appearance.png`).
+Font scale was restored to 1.0 and Settings re-captured
+(`28-font-restored-1x.png`).
+
+This adds one finding (V2-6 F-P) and one fix to the package. The first re-gate
+run was lost when the local build was killed mid-write and left a truncated
+KSP cache (`StreamCorruptedException`); after clearing `kspCaches/release`,
+the re-gate is `v2-6-gate-4.log`.

@@ -1521,14 +1521,17 @@ rather than Onboarding. Selecting key-less Zen logged
 providersWithKeys=hyper,openrouter,opencode-go` and did **not** substitute a
 keyed provider; the restored Go bootstrap then reported
 `ensureAgentReady ... is_ready=true` with `deepseek-v4.1-flash` re-resolved
-(`22`).
+(`22`). A 2.0x font-scale pass then caught the provider "key stored" badge
+squeezing the hint column; the badge became a status line of its own and the
+recheck passed (`24` before, `26`-`27` after), with the scale restored in
+`28`.
 
 Limits: Onboarding's device frame is NOT PERFORMED (reaching it would cost the
-stored key), as are tablet/wide and 2.0x font, and a device key save/replace/
-delete (credential entry is owner-only). The pass also observed that injected
-`adb input tap` was intermittently unreliable on Settings while real-finger taps,
-drags, hover and keyboard all worked; the manifest records that as a harness
-observation with no root cause claimed.
+stored key), as are tablet/wide and Onboarding at 2.0x, and a device key
+save/replace/delete (credential entry is owner-only). The pass also observed
+that injected `adb input tap` was intermittently unreliable on Settings while
+real-finger taps, drags, hover and keyboard all worked; the manifest records
+that as a harness observation with no root cause claimed.
 
 ## 6. Upstream filings
 

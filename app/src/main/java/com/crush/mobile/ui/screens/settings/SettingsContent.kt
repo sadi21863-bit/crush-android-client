@@ -44,6 +44,8 @@ import com.crush.mobile.ui.components.CrushButtonVariant
 import com.crush.mobile.ui.components.CrushCard
 import com.crush.mobile.ui.components.CrushChoiceChip
 import com.crush.mobile.ui.components.CrushSectionHeader
+import com.crush.mobile.ui.components.CrushStatusLabel
+import com.crush.mobile.ui.components.CrushTone
 import com.crush.mobile.ui.theme.CrushShape
 import com.crush.mobile.ui.theme.CrushSpacing
 import com.crush.mobile.ui.theme.CrushType
@@ -153,20 +155,22 @@ fun SettingsContent(
                                 style = CrushType.secondary,
                                 color = LocalCrushColors.current.muted
                             )
-                        }
-                        // Per-provider vault badge (2026-11-01). The vault holds
-                        // one credential per provider, but until now only the
-                        // ACTIVE one's saved state was visible ("API key saved"
-                        // below), so the user could not know a switch would
-                        // actually work. Slot presence only: this never implies
-                        // the plaintext is shown here.
-                        if (p.id in state.vaultIds) {
-                            Text(
-                                "key stored",
-                                style = CrushType.metadata,
-                                color = LocalCrushColors.current.success,
-                                modifier = Modifier.padding(start = CrushSpacing.sm)
-                            )
+                            // Per-provider vault badge (2026-11-01). The vault
+                            // holds one credential per provider, but until now
+                            // only the ACTIVE one's saved state was visible
+                            // ("API key saved" below), so the user could not
+                            // know a switch would actually work. Slot presence
+                            // only: this never implies the plaintext is shown
+                            // here. It sits on its own line (V2-6 2.0x check):
+                            // beside the name it stole the column width and
+                            // wrapped the hint word-by-word at 2.0x.
+                            if (p.id in state.vaultIds) {
+                                Spacer(Modifier.height(CrushSpacing.xs))
+                                CrushStatusLabel(
+                                    text = "key stored",
+                                    tone = CrushTone.Success,
+                                )
+                            }
                         }
                     }
                 }

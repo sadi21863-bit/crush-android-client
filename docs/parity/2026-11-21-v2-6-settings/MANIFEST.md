@@ -30,6 +30,12 @@ the cold start (`ciphertext=true`), the key-less Zen bootstrap
 substitution**, and the restored Go bootstrap (`is_ready=true`, model
 re-resolved to `deepseek-v4.1-flash`). No key, hint or ciphertext is quoted.
 
+| `24-font2x-providers-before.png` | **2.0x pass, BEFORE the fix**: the "key stored" badge shares the provider row, so the hint column is squeezed and wraps word-by-word | FAIL, fixed |
+| `25-font2x-permissions-appearance.png` | 2.0x: Permissions, theme chips and the keyboard chips (which wrap to two rows as designed) remain legible | PASS (no defect) |
+| `26-font2x-providers-fixed.png` | 2.0x after the fix: the badge is a status line under the hint; names and hints keep the full width | PASS after fix |
+| `27-font2x-api-actions.png` | 2.0x: "Replace key" wraps onto two lines inside the pill; "Delete" stays one line; legible, no clipping | PASS (wrap accepted) |
+| `28-font-restored-1x.png` | `font_scale` restored to 1.0; Settings renders at the normal scale again | PASS on device |
+
 ## Environment notes (not app claims)
 
 - **Injected taps were unreliable on this Settings screen during the pass.**
@@ -54,6 +60,6 @@ re-resolved to `deepseek-v4.1-flash`). No key, hint or ciphertext is quoted.
   provider and then being unable to return without entering a key. The content
   is Robolectric-pinned (11/11); a device frame would cost the owner's stored
   provider state, so it is NOT PERFORMED by decision.
-- Tablet/wide panes (O3); 2.0x font scale on Settings/Onboarding.
+- Tablet/wide panes (O3); 2.0x font scale on Onboarding.
 - A key save, replace or delete on device: that needs credential entry, which
   the agent never performs. The save/failure paths are unit-pinned.

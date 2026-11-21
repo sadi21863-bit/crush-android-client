@@ -1,9 +1,12 @@
-# V2-5 - Code / Projects / Review redesign (in progress, started 2026-11-20)
+# V2-5 - Code / Projects / Review redesign (complete on phone, 2026-11-21)
 
-Status: **IN PROGRESS (code/gate green; device pass skipped by owner).**
-The corrected IA and list-first changes are implemented and gated. The owner
-skipped the final device pass on 2026-11-21, so the final device rows stay
-NOT PERFORMED and V2-5 is not called device-verified or complete.
+Status: **COMPLETE for the phone.** The corrected IA and list-first changes are
+implemented, gate 9 is green, and the final corrected-IA device pass ran to
+completion on 2026-11-21. Every exit row that can be observed on this phone now
+has a device frame: Crush Chat/Crush Code IA, list-first surfaces, IME, populated
+Review, byte-exact export, confirmed revert, two-project switching,
+changed-`crushrc` re-gating, and the legacy deny-all spawn line. Tablet/wide
+panes remain **NOT PERFORMED by decision** (V2-A4/O3, V2-5.7).
 
 Authority:
 
@@ -230,24 +233,29 @@ provider policy, shell destinations.
 | Four-task gate (final) | `v2-5-gate-1120-9.log`: `BUILD SUCCESSFUL in 18m 56s` (includes the IME visible-frame fix) | PASS (attempt 9) |
 | Unit-test count / failures | 917 tests, 96 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
-| CI | run `44835596927` on `fff704d` (pre-IME-fix commit) | PASS for that commit; new run pending |
-| Corrected-IA device pass | `30`-`38` and `40` on the final build; the phone dropped off USB before Review/export/two-project/trust | PARTIAL |
-| Crush Chat list / legacy binding / Q&A boundary | `30`-`34`: New chat binds legacy (`Crush Chat · connecting/ready`), Q&A turn answered ("4") with no tool rows, list shows the new chat plus old legacy history. The spawn policy line was not re-captured from `app.log` | PASS (UI); policy line NOT CAPTURED |
+| CI | runs `44835596927` (`fff704d`), `44836244335` (`266a6c4`), `44867537034` (`682a4bc`) all green; the evidence commit needs its own run | PASS for those commits |
+| Corrected-IA device pass | `30`-`38`, `40`-`94` on the final build: all IA surfaces, IME, populated Review, export, revert, two-project switch and trust re-gating | PASS on device |
+| Crush Chat list / legacy binding / Q&A boundary | `30`-`34`: New chat binds legacy (`Crush Chat · connecting/ready`), Q&A turn answered ("4") with no tool rows, list shows the new chat plus old legacy history | PASS |
+| Legacy deny-all policy at the engine | `2026-11-21-device-log-excerpts.txt`: `[] chat tool policy installed (readback-verified, 35 ids denied); spawning with the deny-all toolset` on three spawns | PASS on device |
 | Crush Code project list / project home / sessions | `35`-`38`: no legacy row, project home with identity/trust/latest run, project session list, project-bound Code chat with the Code tab selected | PASS |
+| Project home actions land on that project | `88` and `93`: "Open Code chat" on project 1 and project 2 lands on each project's own Code sessions, Code tab selected | PASS on device |
 | Projects current marker / trust / states | `35`-`38` on the final build; the current marker was absent with no run, which is correct | PASS (this state) |
 | Project identity in Code chat | `38` | PASS |
-| Populated Review card + provenance/partial | not reached; phone disconnected | NOT PERFORMED |
-| Revert confirmed and serialized | no final device capture | NOT PERFORMED |
-| Export byte-exact | no final device export | NOT PERFORMED |
-| Two-project isolation / switching | two projects exist (`36`); switching not captured | NOT PERFORMED |
-| Trust re-gating on changed `crushrc` | tests only; not captured on device | NOT PERFORMED |
-| IME hides the phone bar | First final build FAILED (`39`: bar above keyboard; `WindowInsets.ime` read 0 under adjustResize). Visible-frame fix in gate 9; `40-ime-fixed.png` shows the composer above the keyboard with no bottom bar | PASS on device after fix |
+| Populated Review card + provenance/partial | `57`: turn at 10:22:58, session `d294c825`, project label, captured time, 1 file +1 −0, `HELLO.md` new | PASS on device |
+| Revert confirmed and serialized | `66`: dialog names `HELLO.md`, the turn at 10:22:58 and the project; `67`: "Reverted" disabled + "Done: created file deleted"; shell check confirms the file is gone | PASS on device |
+| Export byte-exact | `60`/`58`: opened SAF, saved to Downloads; `sha256` of `Download/HELLO.md` = `6892ab1c…7003` = source on disk; `64` shows the in-app "Exported a copy of HELLO.md." | PASS on device |
+| Two-project isolation / switching | `80` project 2 Current → `88`/`93` each project's own sessions → `91` Current on project 1 → `94` Current back on project 2 | PASS on device |
+| Trust re-gating on changed `crushrc` | `72` cold-resume gate says the crushrc CHANGED since approval; `73` Cancel leaves the unbound Chat list; original 17 bytes restored → `74` project home opens with no dialog. Log line in `2026-11-21-device-log-excerpts.txt` | PASS on device (cancel + restore paths; accept covered by tests) |
+| IME hides the phone bar | First final build FAILED (`39`: bar above keyboard; `WindowInsets.ime` read 0 under adjustResize). Visible-frame fix in gate 9; `40` and `51` show the composer above the keyboard with no bottom bar | PASS on device after fix |
 
 The capture manifest (`docs/parity/2026-11-20-v2-5-code/MANIFEST.md`) records
-what each pre-fix image actually shows. In particular,
+what each image actually shows. In particular,
 `13-ime-bar-before-fix.png` was renamed from a misleading
 `13-ime-bar-hidden.png`: it shows the bar above the keyboard **before** the
-fix, and is not evidence that the fix works on device.
+fix, and is not evidence that the fix works on device. The manifest also names
+what this pass did **not** capture: tablet/wide panes, 2.0x font scale, the
+accept branch of the changed-`crushrc` dialog, a not-measured Review card, the
+Chat-switch veto Toast, and a running session row.
 
 Device environment when the pass runs: Redmi Note 7 Pro `bbf8ca69`, API 29,
 393dp, app `com.crush.mobile`. Captures will go in

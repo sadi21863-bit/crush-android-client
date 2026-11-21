@@ -1131,7 +1131,7 @@ authorizes no implementation.
 | V2-2 | ACTIVE | Tokens/components; density is a rendering check, not a user preference. |
 | V2-3 | ACTIVE | 3 destinations; delete the dead `Screen.Models`; no 4th Code destination. |
 | V2-4 | ACTIVE | Drop pinned/follow (task 4) and cost/context (task 7); keep empty state, transcript, composer, session sheet, picker and actions. |
-| V2-5 | ACTIVE | Code is project-bound; phone-first; tablet panes only after phone acceptance. |
+| V2-5 | DONE (phone) | Code is project-bound; phone-first; tablet panes only after phone acceptance (still parked). |
 | V2-6 | ACTIVE | Finding 13 copy; no new density/nav/response-rendering preferences; preserve Diagnostics; provider round-trip. |
 | V2-7 | PARKED | Deterministic intelligent UI; separate approval. |
 | V2-8 | PARKED | Structured model UI; separate approval. |
@@ -1394,7 +1394,7 @@ NOT PERFORMED on device: frame timing (no baseline), reduced motion, density,
 wide/tablet, API 30+, provider switch (model selection was exercised), and
 instrumented tests. These stay open, not claimed.
 
-### 5.14 V2-5 Code / Projects / Review (in progress, 2026-11-20)
+### 5.14 V2-5 Code / Projects / Review (complete on phone, 2026-11-21)
 
 V2-5 starts from the owner's "yes start" and the V2-A9 answer: ship **Build
 (project chat) + Review**; defer Explore until a real read-only file browser
@@ -1449,20 +1449,36 @@ project has its own sessions. The implementation now:
 
 The IME bar fix (F-O) is included. The final gate on this corrected tree is
 green: `v2-5-gate-1120-9.log`, 917 tests / 96 suites / 0 failures, lint 0
-errors / 1 pre-existing warning. CI run `44835596927` on `fff704d` is green;
-the IME-fix commit needs its own run.
+errors / 1 pre-existing warning. CI runs `44835596927` (`fff704d`),
+`44836244335` (`266a6c4`) and `44867537034` (`682a4bc`) are green; this
+evidence commit needs its own run.
 
-The owner resumed the device pass on 2026-11-21. Verified on the final build:
-Crush Chat binds the legacy engine and answers a Q&A turn with no tool rows
-(`33`), the Chat list shows new + old legacy chats (`34`), Crush Code lists
-only projects (`35`), project home (`36`), project sessions (`37`),
-project-bound Code chat with the Code tab selected (`38`), and the IME fix
-(`40`). **The first IME build failed**: `WindowInsets.ime` read 0 under
-adjustResize (`39`); gate 9 replaced it with visible-frame detection.
+The owner resumed the device pass on 2026-11-21 and it ran to completion on the
+final build. Verified on the phone:
 
-Still NOT PERFORMED on device: populated Review/revert/export, two-project
-switch, trust re-gating on a changed `crushrc`, and the legacy chat-policy
-spawn line. The phone dropped off USB after `40`. V2-5 is not complete.
+- Crush Chat binds the legacy engine and answers a Q&A turn with no tool rows
+  (`33`), the Chat list shows new + old legacy chats (`34`), and the engine log
+  shows the deny-all policy for the legacy `[]` instance (35 ids, readback
+  verified) before each spawn.
+- Crush Code lists only projects (`35`), the project home (`36`), project
+  sessions (`37`), and the project-bound Code chat with the Code tab selected
+  (`38`). "Open Code chat" lands on that project's own sessions (`88`, `93`).
+- The IME fix (`40`, `51`) after the first IME build failed: `WindowInsets.ime`
+  read 0 under adjustResize (`39`); gate 9 replaced it with visible-frame
+  detection.
+- A measured turn populated Review (`57`) and the project rows (`69`), the
+  revert dialog named file/turn/project (`66`) and the revert deleted the
+  created file (`67`), and the export was byte-identical on disk (`60`), with
+  the app confirming the copy (`64`).
+- Two projects switch Current cleanly (`80`, `88`, `91`, `92`-`94`).
+- A changed `crushrc` re-gates on the cold-resume path (`72`); Cancel binds
+  nothing (`73`); restoring the original bytes clears the prompt (`74`).
+
+V2-5 is complete for the phone. Tablet/wide panes, the changed-`crushrc` accept
+branch, a not-measured Review card, the Chat-switch veto Toast and a running
+session row are not device-captured; the first is out of scope by decision
+(V2-A4/O3) and the rest are listed in the capture manifest with their test
+coverage.
 
 Explore, tablet panes, Review history persistence and a test runner stay out of
 scope. ChatPool sessions created before V2-A11 are archival, not migrated or

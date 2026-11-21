@@ -1,0 +1,23 @@
+Crush Mobile - V2-5 device log excerpts
+Device: Redmi Note 7 Pro bbf8ca69, API 29, com.crush.mobile
+Copied from the app's private files on 2026-11-21. No credentials are included.
+
+1) Legacy Crush Chat deny-all tool policy, readback-verified before spawn
+   Source: files/app-archive-2026-11-21.log
+
+07:10:21.646 I/CrushEngine: [] chat tool policy installed (readback-verified, 35 ids denied); spawning with the deny-all toolset
+07:35:03.386 I/CrushEngine: [] chat tool policy installed (readback-verified, 35 ids denied); spawning with the deny-all toolset
+08:03:17.992 I/CrushEngine: [] chat tool policy installed (readback-verified, 35 ids denied); spawning with the deny-all toolset
+
+   The bracketed instance key is empty: V2-5-D12 binds Crush Chat to the legacy
+   instance, so the same fail-closed policy covers "" as well as the old ChatPool.
+
+2) Trust re-gate after the crushrc bytes changed
+   Source: files/app.log
+
+12:50:37.323 I/Lifecycle: handoff resume blocked: project consent required (crushrc changed since consent (fingerprint moved))
+
+   This is the cold-resume path that produced the dialog in
+   72-trust-regate-changed.png; Cancel left the app on the unbound Crush Chat
+   list (73). Restoring the original bytes (17 bytes: "#!/bin/bash\ntrue\n")
+   removed the prompt (74).

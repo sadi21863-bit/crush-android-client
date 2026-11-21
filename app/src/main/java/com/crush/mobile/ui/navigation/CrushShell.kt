@@ -1,5 +1,7 @@
 package com.crush.mobile.ui.navigation
 
+import android.graphics.Rect
+import android.view.ViewTreeObserver
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -8,7 +10,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -24,9 +25,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -81,7 +86,11 @@ fun CrushShell(
                 // between the composer and the IME and steals ~80dp of the
                 // typing surface (owner-reported 2026-11-20). Rails are on the
                 // side and stay put.
-                val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                // adjustResize shrinks the window, so WindowInsets.ime can read
+                // 0 even while the keyboard is up (measured on API 29,
+                // 2026-11-21). The visible display frame is the reliable signal
+                // for a resized window.
+                val imeVisible = rememberImeVisible()
                 Scaffold(
                     containerColor = MaterialTheme.colorScheme.background,
                     bottomBar = {
@@ -122,8 +131,33 @@ fun CrushShell(
     }
 }
 
-/** V2-A12: Chat and Code share the `chat` route; the binding decides which. */
-private fun isSelected(
+/**
+ * Keyboard visibility for a window using `adjustResize`.
+ *
+ * With adjustResize the app window is already shortened, so IME insets can be
+ * zero. Comparing the root height with the visible display frame is the stable
+ * signal (the keyboard is far taller than the status/navigation bars).
+ */
+@Composable
+private fun rememberImeVisible(): Boolean {
+    val view = LocalView.current
+    var visible by remember { mutableStateOf(false) }
+    DisposableEffect(view) {
+        val observer = view.viewTreeObserver
+        val listener = ViewTreeObserver.OnGlobalLayoutListener {
+            val frame = Rect()
+            view.getWindowVisibleDisplayFrame(frame)
+            val hidden = view.rootView.height - frame.bottom
+            val threshold = view.resources.displayMetrics.density * 120f
+            visible = hidden > threshold
+        }
+        observer.addOnGlobalLayoutListener(listener)
+        onDispose { observer.removeOnGlobalLayoutListener(listener) }
+    }
+    return visible
+}
+
+/** V2-A12: Chat and Code share the `chat` route; the binding decides which. */private fun isSelected(
     destination: PrimaryDestination,
     route: String?,
     codeActive: Boolean,

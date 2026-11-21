@@ -1448,16 +1448,25 @@ project has its own sessions. The implementation now:
   chat, Review) as the bridge into a project's sessions.
 
 The IME bar fix (F-O) is included. The final gate on this corrected tree is
-green: `v2-5-gate-1120-8.log`, 917 tests / 96 suites / 0 failures, lint 0
-errors / 1 pre-existing warning. CI run `44835596927` on `fff704d` is green.
-**The owner skipped the final device pass on 2026-11-21**, so the corrected-IA
-list states, the fixed IME bar, populated Review/export and two-project switch
-remain NOT PERFORMED on device; V2-5 is not called complete.
+green: `v2-5-gate-1120-9.log`, 917 tests / 96 suites / 0 failures, lint 0
+errors / 1 pre-existing warning. CI run `44835596927` on `fff704d` is green;
+the IME-fix commit needs its own run.
 
-The capture manifest records that `13-ime-bar-before-fix.png` is the **before**
-state (renamed from a misleading filename), not proof of the fix. Explore,
-tablet panes, Review history persistence and a test runner stay out of scope.
-ChatPool sessions created before V2-A11 are archival, not migrated or listed.
+The owner resumed the device pass on 2026-11-21. Verified on the final build:
+Crush Chat binds the legacy engine and answers a Q&A turn with no tool rows
+(`33`), the Chat list shows new + old legacy chats (`34`), Crush Code lists
+only projects (`35`), project home (`36`), project sessions (`37`),
+project-bound Code chat with the Code tab selected (`38`), and the IME fix
+(`40`). **The first IME build failed**: `WindowInsets.ime` read 0 under
+adjustResize (`39`); gate 9 replaced it with visible-frame detection.
+
+Still NOT PERFORMED on device: populated Review/revert/export, two-project
+switch, trust re-gating on a changed `crushrc`, and the legacy chat-policy
+spawn line. The phone dropped off USB after `40`. V2-5 is not complete.
+
+Explore, tablet panes, Review history persistence and a test runner stay out of
+scope. ChatPool sessions created before V2-A11 are archival, not migrated or
+listed.
 
 ## 6. Upstream filings
 

@@ -227,21 +227,21 @@ provider policy, shell destinations.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| Four-task gate (final) | `v2-5-gate-1120-8.log`: `BUILD SUCCESSFUL in 8m 49s` | PASS (attempt 8) |
+| Four-task gate (final) | `v2-5-gate-1120-9.log`: `BUILD SUCCESSFUL in 18m 56s` (includes the IME visible-frame fix) | PASS (attempt 9) |
 | Unit-test count / failures | 917 tests, 96 suites, 0 failures, 0 errors, 0 skipped | PASS |
 | Lint | `lint-results-release.txt`: 0 errors, 1 `NotShrinkingResources` warning (pre-existing) | PASS |
-| CI | run `44835596927` on `fff704d`: completed success | PASS |
-| Corrected-IA device pass | owner skipped the final pass on 2026-11-21 | NOT PERFORMED |
-| Crush Chat list / legacy binding / Q&A boundary | partial pre-fix captures only; stopped-engine copy was false | NOT PERFORMED |
-| Crush Code project list / project home / sessions | partial pre-IA captures; final list state not captured | PARTIAL |
-| Projects current marker / trust / states | captures `10`/`11` (pre-IA labels) | PARTIAL |
-| Project identity in Code chat | captures `02`/`12` (pre-IA labels) | PARTIAL |
-| Populated Review card + provenance/partial | no final capture | NOT PERFORMED |
+| CI | run `44835596927` on `fff704d` (pre-IME-fix commit) | PASS for that commit; new run pending |
+| Corrected-IA device pass | `30`-`38` and `40` on the final build; the phone dropped off USB before Review/export/two-project/trust | PARTIAL |
+| Crush Chat list / legacy binding / Q&A boundary | `30`-`34`: New chat binds legacy (`Crush Chat · connecting/ready`), Q&A turn answered ("4") with no tool rows, list shows the new chat plus old legacy history. The spawn policy line was not re-captured from `app.log` | PASS (UI); policy line NOT CAPTURED |
+| Crush Code project list / project home / sessions | `35`-`38`: no legacy row, project home with identity/trust/latest run, project session list, project-bound Code chat with the Code tab selected | PASS |
+| Projects current marker / trust / states | `35`-`38` on the final build; the current marker was absent with no run, which is correct | PASS (this state) |
+| Project identity in Code chat | `38` | PASS |
+| Populated Review card + provenance/partial | not reached; phone disconnected | NOT PERFORMED |
 | Revert confirmed and serialized | no final device capture | NOT PERFORMED |
 | Export byte-exact | no final device export | NOT PERFORMED |
-| Two-project isolation / switching | no final device pass | NOT PERFORMED |
-| Trust re-gating on changed `crushrc` | tests only; no final device pass | NOT PERFORMED |
-| IME hides the phone bar | `13` is the BEFORE state; no fixed capture | NOT PERFORMED |
+| Two-project isolation / switching | two projects exist (`36`); switching not captured | NOT PERFORMED |
+| Trust re-gating on changed `crushrc` | tests only; not captured on device | NOT PERFORMED |
+| IME hides the phone bar | First final build FAILED (`39`: bar above keyboard; `WindowInsets.ime` read 0 under adjustResize). Visible-frame fix in gate 9; `40-ime-fixed.png` shows the composer above the keyboard with no bottom bar | PASS on device after fix |
 
 The capture manifest (`docs/parity/2026-11-20-v2-5-code/MANIFEST.md`) records
 what each pre-fix image actually shows. In particular,

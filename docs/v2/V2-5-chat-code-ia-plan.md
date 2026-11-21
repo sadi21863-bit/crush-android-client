@@ -110,7 +110,11 @@ The home never binds by itself. The trust gate runs before either action.
 
 ## Evidence
 
-Code and gate: PASS (`v2-5-gate-1120-8.log`, 917 tests / 96 suites / 0
-failures; lint 0 errors / 1 pre-existing warning). Final device pass: **NOT
-PERFORMED** — the owner skipped it on 2026-11-21. Pre-fix captures and their
-limits are listed in `../parity/2026-11-20-v2-5-code/MANIFEST.md`.
+Code and gate: PASS (`v2-5-gate-1120-9.log`, 917 tests / 96 suites / 0
+failures; lint 0 errors / 1 pre-existing warning). Device pass on 2026-11-21 is
+**PARTIAL**: Chat-on-legacy with a Q&A turn, the Chat list, Code-only projects,
+project home, project sessions, Code-tab selection in a project chat and the
+IME fix are verified (captures `30`-`38`, `40`); populated Review/revert/export,
+two-project switching and trust re-gating are NOT PERFORMED because the phone
+dropped off USB. The first IME build failed (`39`) and was fixed in gate 9.
+Capture limits are in `../parity/2026-11-20-v2-5-code/MANIFEST.md`.

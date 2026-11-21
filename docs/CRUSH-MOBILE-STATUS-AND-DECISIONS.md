@@ -1510,11 +1510,11 @@ shipped is the design pass plus the preserved contracts. Record:
   provider offer rule and stored-key exception are unchanged, and provider
   selection still cannot navigate away or strand a key.
 
-Evidence. Full gate `v2-6-gate-1.log`: 919 tests / 96 classes / 0 failures / 0
-errors / 0 skipped; lint 0 errors / 1 pre-existing `NotShrinkingResources`
-warning. Device (2026-11-21): before `00`-`01`, after `12`-`14`, permission
-states `15`-`16`, Finding 13 `20`, and the provider round-trip `17`-`19` with
-the owner's Go restored in `21`. The cold start with OpenRouter reported
+Evidence. Full gate `v2-6-gate-4.log` (post-2.0-fix): 919 tests / 96 classes / 0
+failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing
+`NotShrinkingResources` warning. Device (2026-11-21): before `00`-`01`, after
+`12`-`14`, permission states `15`-`16`, Finding 13 `20`, and the provider
+round-trip `17`-`19` with the owner's Go restored in `21`. The cold start with OpenRouter reported
 `ciphertext=true` and composed the Chat tree, so the launch route stayed Chat
 rather than Onboarding. Selecting key-less Zen logged
 `provider=opencode-zen storedCiphertext=false

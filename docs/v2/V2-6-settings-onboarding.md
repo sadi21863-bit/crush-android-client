@@ -118,7 +118,7 @@ copy/share and log tail are unchanged by this package.
 | Claim | Evidence | Status |
 |---|---|---|
 | Content classes (new pins included) | `SettingsContentTest` 11/11, `OnboardingContentTest` 11/11, 0 failures (local `v2-6-tests-2.log`, 2026-11-21) | PASS |
-| Full gate | `v2-6-gate-1.log`: 919 tests / 96 classes / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing `NotShrinkingResources` warning; `BUILD SUCCESSFUL in 26m` | PASS |
+| Full gate | `v2-6-gate-4.log` (post-2.0-fix): 919 tests / 96 classes / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing `NotShrinkingResources` warning; `BUILD SUCCESSFUL in 12m 29s`. First pass `v2-6-gate-1.log` was also green before the 2.0 fix | PASS |
 | Settings redesign on device | before `00`-`01`; after `12`-`14` (sections, cards, type, order, buttons) | PASS on device |
 | Permissions control | `15` AUTO-APPROVE state + `16` ASK restored; the host write and recomposition ran (keyboard activation) | PASS on device |
 | Finding 13 | `20`: Zen selected, "Add a key for OpenCode Zen to start chatting."; unit pin fails the old wording | PASS on device |
@@ -179,4 +179,4 @@ Font scale was restored to 1.0 and Settings re-captured
 This adds one finding (V2-6 F-P) and one fix to the package. The first re-gate
 run was lost when the local build was killed mid-write and left a truncated
 KSP cache (`StreamCorruptedException`); after clearing `kspCaches/release`,
-the re-gate is `v2-6-gate-4.log`.
+`v2-6-gate-4.log` is green (919 tests / 0 failures; lint 0 / 1).

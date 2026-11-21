@@ -2187,6 +2187,13 @@ class ChatViewModel(
         }
         _state.update { it.copy(sessionsLoading = true, sessionsUnavailable = false) }
         viewModelScope.launch {
+            // O11 harness: a debuggable launch may inject a stall so the
+            // loading row is observable on device. Always 0 in release.
+            val stall = container.debugSessionListStallMs
+            if (stall > 0L) {
+                AppLog.i(TAG, "O11 session-list stall injected: ${stall}ms")
+                delay(stall)
+            }
             val ok = runCatching { mgr.reattachIfStale() }.getOrDefault(false)
             val ws = if (ok) mgr.currentWorkspaceId else null
             val list = if (ws == null) {

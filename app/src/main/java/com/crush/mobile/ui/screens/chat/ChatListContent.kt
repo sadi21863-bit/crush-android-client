@@ -108,7 +108,7 @@ fun ChatListContent(
             val engineReady = state.run.engineReady
             when {
                 list.loading && list.items.isEmpty() -> CrushLoadingRow(
-                    text = "Loading chats...",
+                    text = if (isCode) "Loading sessions..." else "Loading chats...",
                     modifier = Modifier.padding(vertical = CrushSpacing.lg)
                 )
 

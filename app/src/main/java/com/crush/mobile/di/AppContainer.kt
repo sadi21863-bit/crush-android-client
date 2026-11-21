@@ -311,6 +311,14 @@ class AppContainer(context: Context) {
     var activeProjectRef: com.crush.mobile.project.ProjectRef? = null
         private set
 
+    /**
+     * O11 harness: 0 in every normal launch. A debuggable build may arm a
+     * session-list stall from its launch intent (see `DebugStall`); the
+     * ViewModel only delays when this is positive.
+     */
+    @Volatile
+    var debugSessionListStallMs: Long = 0L
+
     private fun keyFor(binding: EngineBinding): String = when (binding) {
         is EngineBinding.Legacy -> ""
         is EngineBinding.ChatPool -> EnginePaths.CHAT_INSTANCE_KEY

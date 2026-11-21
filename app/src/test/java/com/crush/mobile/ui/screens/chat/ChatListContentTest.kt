@@ -110,6 +110,33 @@ class ChatListContentTest {
     }
 
     @Test
+    fun `a loading project list says sessions`() {
+        setContent(
+            ChatFixtures.view(
+                bindingKind = BindingKind.Project,
+                projectLabel = "notes-app",
+                sessionsLoading = true,
+            )
+        )
+
+        compose.onNodeWithText("Loading sessions...").assertIsDisplayed()
+        compose.onNodeWithText("Loading chats...").assertDoesNotExist()
+    }
+
+    @Test
+    fun `a loading chat list says chats`() {
+        setContent(
+            ChatFixtures.view(
+                bindingKind = BindingKind.Legacy,
+                sessionsLoading = true,
+            )
+        )
+
+        compose.onNodeWithText("Loading chats...").assertIsDisplayed()
+        compose.onNodeWithText("Loading sessions...").assertDoesNotExist()
+    }
+
+    @Test
     fun `an unavailable list does not claim the chat pool is empty`() {
         setContent(
             ChatFixtures.view(

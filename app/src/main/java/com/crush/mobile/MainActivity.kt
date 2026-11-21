@@ -175,6 +175,19 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
         val container = (application as CrushMobileApp).container
 
+        // O11 harness: only a debuggable build can arm the session-list stall,
+        // and only from an explicit launch extra. Release builds have the
+        // FLAG_DEBUGGABLE bit clear, so this is 0 and the delay is never taken.
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            container.debugSessionListStallMs = com.crush.mobile.util.DebugStall.sessionsMs(
+                debuggable = true,
+                extraMs = intent?.getLongExtra(
+                    com.crush.mobile.util.DebugStall.SESSIONS_EXTRA,
+                    0L,
+                ) ?: 0L,
+            )
+        }
+
         // Routes the system PIN/pattern/password screen result back to the
         // pending unlock. Registered here because the credential screen is an
         // Activity, not a dialog, so it cannot report through a callback.

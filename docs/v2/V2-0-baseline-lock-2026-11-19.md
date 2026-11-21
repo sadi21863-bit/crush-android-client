@@ -198,12 +198,34 @@ Dispositions:
 - **Session delete** is destructive and was not re-run; the baseline FAIL and
   `T2B1-03`'s pin remain the evidence.
 - **Session empty/loading** sits in a sub-second window and survived two
-  manual retries. It needs an injected stall or instrumentation (this is
-  O11); another manual pass will not close it.
+  manual retries. It needed an injected stall or instrumentation (this is
+  O11; harness and device status below).
 - **Populated Review card** had no completed file-changing turn in that
   session; the rows remain unit-pinned, not device-driven.
 - **Onboarding key entry** requires the owner's real credential; the agent
   must not perform it. Branches remain unit-pinned.
+
+### O11 update (2026-11-22): the stall harness
+
+The loading half now has an in-app harness instead of another manual retry:
+
+- `DebugStall` + `AppContainer.debugSessionListStallMs`: a **debuggable**
+  launch arms it from `--el crush.debug.stall_sessions_ms <ms>` (0..15 s;
+  release builds are non-debuggable, so the value is always 0 there).
+- `ChatViewModel.loadSessions()` delays between setting `sessionsLoading` and
+  the fetch, and logs `O11 session-list stall injected: <ms>ms`.
+- The list copy is surface-aware: `Loading chats...` for Crush Chat and
+  `Loading sessions...` for a project's Code sessions.
+- Pins: `DebugStallTest` (release / negative / clamp) and two
+  `ChatListContentTest` loading-label rows.
+
+Device status: the stall **fires and logs** on the V2-6-era build
+(`00:24:35.225` and `00:24:44.956`, 8000 ms). A device frame of the loading
+row was still not captured: on this ROM, injected `adb input tap`
+intermittently lands ~200 px above the target inside scrollable content
+(real-finger taps are exact), so the list surface could not be opened inside
+the empty-list window. The row remains unit-pinned; O11's device evidence is
+**PARTIAL** until one owner-assisted or instrumentation capture.
 
 No outstanding item was marked closed by this re-read.
 

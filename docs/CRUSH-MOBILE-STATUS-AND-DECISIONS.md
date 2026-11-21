@@ -1183,7 +1183,7 @@ authorizes no implementation.
 | O8 | NO CHANGE - import-only/AFA stands; any policy change needs an ADR and store review |
 | O9 | SEPARATE ROADMAP - not a V2 prerequisite |
 | O10 | DEFERRED - deny-all remains |
-| O11 | NOT PERFORMED - needs instrumentation/injected stall |
+| O11 | PARTIAL - debug-only stall harness landed 2026-11-22 (logs on device); the loading-row device frame is still not captured (injected-tap offset) |
 | O12 | RESOLVED 2026-11-21 - Finding 13 copy fixed in V2-6 ("Add a key for <provider> to start chatting.") |
 | O13 | RESOLVED - brief on disk is 1,319 lines; the earlier 996 figure counted non-blank lines only |
 

@@ -1,9 +1,10 @@
 # V2-8 - Structured model UI experiment (opened 2026-11-22)
 
-**Status: OPEN - candidate A harness built and device-checked; model-run
-measurements pending.** Owner authorized opening V2-8 on 2026-11-22. This
-record fixes the experiment's boundaries and exit criteria before any result,
-so the experiment cannot quietly become a production renderer.
+**Status: OPEN - candidate A harness built; Robolectric accessibility render
+checks pass; model-run measurements pending.** Owner authorized opening V2-8 on
+2026-11-22. This record fixes the experiment's boundaries and exit criteria
+before any result, so the experiment cannot quietly become a production
+renderer.
 
 ## 1. What the research settled
 
@@ -92,6 +93,11 @@ On `bbf8ca69` (Redmi Note 7 Pro, API 29), same prompts per candidate:
 6. what the model actually produced when asked for the envelope (raw samples
    stored only if they contain no workspace data).
 
+Status (2026-11-22): items 1 and 5 have a harness (the lab) but no corpus run;
+item 3 has **Robolectric** render checks for dark theme, 2.0x font scale and RTL
+(`UiBlockViewTest`), while TalkBack and all device rows remain NOT PERFORMED;
+items 2, 4 and 6 are NOT PERFORMED.
+
 ## 4. Exit criteria
 
 Adopt a structured renderer into production only if **all** hold:
@@ -136,6 +142,9 @@ otherwise:
   contradictions).
 - V2-7 implementation: `V2-7-intelligent-ui.md`; the closed contract is
   `ui-block-v1.md` (validator + renderer + debug preview, producer-free).
-- Candidate A lab: `UiBlockLabActivity` (debug only), normalization tests
-  `UiBlockLabTest`, device sample in `docs/parity/2026-11-22-v2-8-lab/`.
+- Candidate A lab: `UiBlockLabActivity` (debug only, "Copy" prompt button),
+  normalization tests `UiBlockLabTest`, device sample in
+  `docs/parity/2026-11-22-v2-8-lab/`.
+- Robolectric render checks: `UiBlockViewTest` covers dark theme, 2.0x font
+  scale and RTL; TalkBack and device rows remain open.
 - No model-produced result exists yet; this record must not be read as one.

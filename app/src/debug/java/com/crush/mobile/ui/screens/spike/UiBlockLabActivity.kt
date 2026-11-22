@@ -21,13 +21,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.crush.mobile.ui.blocks.UiBlockParse
@@ -93,6 +97,7 @@ private val SAMPLE_PAYLOAD = """
 private fun LabScreen() {
     var payload by remember { mutableStateOf(TextFieldValue(SAMPLE_PAYLOAD)) }
     var result by remember { mutableStateOf<UiBlockParse?>(null) }
+    val clipboard = LocalClipboardManager.current
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("ui_block lab") }) }
@@ -104,7 +109,20 @@ private fun LabScreen() {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = CrushSpacing.lg, vertical = CrushSpacing.md)
         ) {
-            Text("Experiment prompt", style = CrushType.metadata)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Experiment prompt",
+                    style = CrushType.metadata,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(EXPERIMENT_PROMPT))
+                    }
+                ) {
+                    Text("Copy")
+                }
+            }
             Spacer(Modifier.height(CrushSpacing.xs))
             SelectionContainer {
                 Text(

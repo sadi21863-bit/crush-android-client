@@ -1,5 +1,10 @@
 package com.crush.mobile.ui.blocks
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -85,5 +90,68 @@ class UiBlockViewTest {
         compose.onNodeWithTag("ui-block-code").assertIsDisplayed()
         compose.onNodeWithText("kotlin").assertIsDisplayed()
         compose.onNodeWithText("val answer = 42").assertIsDisplayed()
+    }
+
+    private fun sampleDocument(): UiBlockDocument = UiBlockDocument(
+        listOf(
+            UiBlock.Table(
+                columns = listOf("Name", "Value"),
+                rows = listOf(listOf("alpha", "1")),
+            ),
+            UiBlock.KeyValue(
+                listOf(UiBlock.KeyValue.Item("Model", "DeepSeek V4.1 Flash"))
+            ),
+            UiBlock.Callout(
+                tone = UiBlock.Callout.Tone.WARNING,
+                title = "Careful",
+                text = "This is a warning.",
+            ),
+        )
+    )
+
+    @Test
+    fun `a document renders in the dark theme`() {
+        compose.setContent {
+            CrushMobileTheme(themeMode = "dark") {
+                UiBlockView(sampleDocument())
+            }
+        }
+
+        compose.onNodeWithText("alpha").assertExists()
+        compose.onNodeWithText("DeepSeek V4.1 Flash").assertExists()
+        compose.onNodeWithText("Careful").assertExists()
+    }
+
+    @Test
+    fun `a document renders at a 2x font scale`() {
+        compose.setContent {
+            CrushMobileTheme(themeMode = "light") {
+                val base = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(base.density, fontScale = 2f)
+                ) {
+                    UiBlockView(sampleDocument())
+                }
+            }
+        }
+
+        compose.onNodeWithText("alpha").assertExists()
+        compose.onNodeWithText("DeepSeek V4.1 Flash").assertExists()
+    }
+
+    @Test
+    fun `a document renders right-to-left`() {
+        compose.setContent {
+            CrushMobileTheme(themeMode = "light") {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides LayoutDirection.Rtl
+                ) {
+                    UiBlockView(sampleDocument())
+                }
+            }
+        }
+
+        compose.onNodeWithText("alpha").assertExists()
+        compose.onNodeWithText("Careful").assertExists()
     }
 }

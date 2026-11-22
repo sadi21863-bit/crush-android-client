@@ -1126,7 +1126,7 @@ authorizes no implementation.
 
 | Package | Status | Applied trim |
 |---|---|---|
-| V2-0 | ACTIVE | Baseline re-lock at `1679f25`; O11 is a harness task; no implementation. |
+| V2-0 | ACTIVE | Baseline re-lock at `1679f25`; O11 harness landed (`d5a0718`) and the loading row was captured on device on 2026-11-22; no implementation. |
 | V2-1 | ACTIVE | Prototype within brief §4.6; no drawer-vs-tabs reopen. |
 | V2-2 | ACTIVE | Tokens/components; density is a rendering check, not a user preference. |
 | V2-3 | ACTIVE | 3 destinations; delete the dead `Screen.Models`; no 4th Code destination. |
@@ -1151,10 +1151,13 @@ authorizes no implementation.
    pixel-identical and Back returning to the same chat at `89e294b`. What
    was not device-driven: the theme/keyboard/permission/tuning/About rows
    (unit-pinned); provider selection was Finding 12, fixed in §5.9.
-3. §2.3/O11: the fresh-workspace session-list row stays NOT PERFORMED.
-   Another manual pass will not close it - the loading half is a
-   sub-second window and already survived two retries (2b.1 row 14). It
-   needs an injected stall/fault or instrumentation.
+3. §2.3/O11: **CLOSED 2026-11-22.** The fresh-workspace loading row was the
+   sub-second half that survived two manual retries. It now has a debug-only
+   stall harness (logs `O11 session-list stall injected: 8000ms` on device) and
+   a debug-only preview activity that rendered the real row for the device
+   capture: `docs/parity/2026-11-22-o11-session-loading/` (Loading sessions /
+   Loading chats). The live window is evidenced by the stall log plus unit
+   pins, not by a manual end-to-end capture - the MANIFEST says so.
 4. §2.2: "hardened against TOCTOU" overstates the service's contract.
    `ProjectTrustService` says check-at-bind is the practical contract,
    "not a TOCTOU impossibility proof". Use "gate-observed recording; no
@@ -1166,9 +1169,10 @@ authorizes no implementation.
   no `composable`). The brief's Phase 5 cleanup is otherwise lost.
 - V2-6: explicitly preserve/redesign Diagnostics; the Models sheet is
   covered by V2-4's picker work.
-- V2-0: O11 is a test-harness task (injected stall or instrumentation), not
-  another manual parity attempt; it may not close inside V2-0's no-change
-  boundary.
+- V2-0: O11's harness work is **done** (2026-11-22): `DebugStall` +
+  `SessionListPreviewActivity`, device frames in
+  `docs/parity/2026-11-22-o11-session-loading/`. No further parity attempt is
+  needed for that row.
 
 **Open-decision dispositions**
 
@@ -1183,7 +1187,7 @@ authorizes no implementation.
 | O8 | NO CHANGE - import-only/AFA stands; any policy change needs an ADR and store review |
 | O9 | SEPARATE ROADMAP - not a V2 prerequisite |
 | O10 | DEFERRED - deny-all remains |
-| O11 | PARTIAL - debug-only stall harness landed 2026-11-22 (logs on device); the loading-row device frame is still not captured (injected-tap offset) |
+| O11 | PASS 2026-11-22 - debug-only stall harness (logs on device) + debug-only preview activity captured both rows (`Loading sessions...` / `Loading chats...`) in `docs/parity/2026-11-22-o11-session-loading/`; live window evidenced by the stall log and unit pins |
 | O12 | RESOLVED 2026-11-21 - Finding 13 copy fixed in V2-6 ("Add a key for <provider> to start chatting.") |
 | O13 | RESOLVED - brief on disk is 1,319 lines; the earlier 996 figure counted non-blank lines only |
 

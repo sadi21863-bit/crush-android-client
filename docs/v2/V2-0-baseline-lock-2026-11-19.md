@@ -197,9 +197,9 @@ Dispositions:
   app (spike `FAULT` intent) or under instrumentation.
 - **Session delete** is destructive and was not re-run; the baseline FAIL and
   `T2B1-03`'s pin remain the evidence.
-- **Session empty/loading** sits in a sub-second window and survived two
-  manual retries. It needed an injected stall or instrumentation (this is
-  O11; harness and device status below).
+- **Session empty/loading** sat in a sub-second window and survived two manual
+  retries. It was closed on 2026-11-22 by the injected stall plus a rendered
+  capture (this is O11; harness and device status below).
 - **Populated Review card** had no completed file-changing turn in that
   session; the rows remain unit-pinned, not device-driven.
 - **Onboarding key entry** requires the owner's real credential; the agent
@@ -219,24 +219,26 @@ The loading half now has an in-app harness instead of another manual retry:
 - Pins: `DebugStallTest` (release / negative / clamp) and two
   `ChatListContentTest` loading-label rows.
 
-Device status: the stall **fires and logs** on the V2-6-era build
-(`00:24:35.225` and `00:24:44.956`, 8000 ms). A device frame of the loading
-row was still not captured: on this ROM, injected `adb input tap`
-intermittently lands ~200 px above the target inside scrollable content
-(real-finger taps are exact), so the list surface could not be opened inside
-the empty-list window. The row remains unit-pinned; O11's device evidence is
-**PARTIAL** until one owner-assisted or instrumentation capture.
+Device status: the stall **fires and logs** on device (`00:24:35.225` and
+`00:24:44.956`, 8000 ms). The rendered loading row was then captured from the
+real composable through a **debug-only preview activity**
+(`SessionListPreviewActivity`, debug source set, absent from release builds):
 
-Instrumentation was tried next: an `O11LoadingRowTest` rendered the same list
-surface in a Compose test on-device. The spinner's infinite animation made
-`waitForIdle` hang; with the test clock paused (`autoAdvance = false` plus one
-frame) the test process crashed instead, and this ROM's logcat produced no
-readable stack (the crash buffer is empty by policy here). The test was
-removed rather than committed broken. O11 stays **PARTIAL**; the harness and
-the unit pins are the evidence, and a single owner-assisted timed capture
-remains the shortest route to the frame.
+- `01-code-loading-sessions.png` — project Code list, `Loading sessions...`
+- `02-chat-loading-chats.png` — Crush Chat, `Loading chats...`
 
-No outstanding item was marked closed by this re-read.
+Two earlier routes were attempted and are recorded in that folder's MANIFEST:
+injected `adb input tap` intermittently lands ~200 px above the target inside
+scrollable content (real-finger taps are exact), and an instrumented activity
+launch is refused by API 29 background-start rules on this ROM
+(`ActivityTaskManager` logs the `START` and never delivers it, while `am start`
+resumes the same component instantly). The spinner's infinite animation also
+means on-device Compose `waitForIdle` never returns; the instrumentation test
+was removed rather than committed broken.
+
+O11 is **PASS** for the rendered row and the surface-aware copy. The live
+navigation window is evidenced by the stall log plus the unit pins, not by a
+manual end-to-end capture; the record says so rather than implying one.
 
 ## 6. Device and form-factor coverage
 

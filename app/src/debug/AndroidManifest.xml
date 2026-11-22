@@ -21,5 +21,17 @@
             android:exported="false"
             android:label="Crush Spike"
             android:theme="@style/Theme.CrushMobile" />
+
+        <!--
+            O11 (2026-11-22): real list composable in its loading state, for the
+            device capture. Debug source set only; not reachable from release.
+            Exported because this ROM's `am start` (shell uid) is refused on a
+            non-exported activity; the screen is static preview UI with no data.
+        -->
+        <activity
+            android:name=".ui.screens.spike.SessionListPreviewActivity"
+            android:exported="true"
+            android:label="Session list preview"
+            android:theme="@style/Theme.CrushMobile" />
     </application>
 </manifest>

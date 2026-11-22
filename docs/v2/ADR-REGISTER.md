@@ -40,7 +40,7 @@ Rules:
 | O8 | AFA/import-only policy change | project import | NO CHANGE; needs ADR + store review |
 | O9 | Release hardening/rollout | shipping | separate roadmap; V2-9 parked |
 | O10 | Deny-all relaxation for Chat | Chat tool policy | DEFERRED; deny-all stands |
-| O11 | Session-list loading evidence | parity closure | test-harness task: injected stall or instrumentation; manual retries exhausted |
+| O11 | **RESOLVED 2026-11-22** - loading row captured on device (`Loading sessions...` / `Loading chats...`) via a debug-only stall harness plus a debug-only preview activity; see `docs/parity/2026-11-22-o11-session-loading/` | parity closure | done; live window evidenced by the stall log and unit pins |
 | O12 | **RESOLVED 2026-11-21** - Finding 13 copy fixed in V2-6 ("Add a key for \<provider\> to start chatting.") | - | resolved; see §5.15 and the V2-6 record |
 | O14 | CI SDK auto-download flake: `platforms;android-37.0` failed with a zip-read error on run `44549231349` attempt 1; attempt 2 passed | gate reliability | record only; hardening (pre-install the platform and/or retry the download in `.github/workflows/android-ci.yml`) edits a build file and needs its own authorization |
 

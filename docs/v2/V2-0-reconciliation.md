@@ -21,8 +21,9 @@ Corrections already applied to the ledger (not to the brief):
 - The app code baseline is `1c902eb`, not `1679f25` (the latter is docs).
 
 The other three Revision 4.0 review corrections in §5.10 still stand:
-2b.4 device parity was performed; O11 needs an injected stall or
-instrumentation; the trust wording is "gate-observed", not TOCTOU-free.
+2b.4 device parity was performed; O11 was a harness task (closed 2026-11-22:
+stall harness plus the captured loading rows); the trust wording is
+"gate-observed", not TOCTOU-free.
 
 Status labels: CODE, TEST, PARTIAL, NOT DONE (absent from tree/records),
 STALE (pre-2b anchors), SUPERSEDED, NOT VERIFIED, OWNER-GATE.

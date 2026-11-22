@@ -37,6 +37,12 @@ catalogue are approved; the prototype/flow tasks are honestly open. V2-1 is
 **PARTIAL, not done** — the approval unblocks V2-2 tokens and components,
 not a claim that the V2-1 exit criteria were met.
 
+> **2026-11-22 — closure proposed, not applied.** Tasks 3, 5 and 6 are
+> proposed as **superseded** by the shipped, device-verified V2-3/V2-4/V2-5
+> screens (no prototype screens built); task 4 (tablet) stays deferred under
+> O3. See `V2-1-exit-reconciliation-2026-11-22.md`. The rows above are
+> unchanged until the owner decides.
+
 ## 2. Method and limits
 
 - Contrast is WCAG 2.x relative luminance over sRGB, computed on the exact

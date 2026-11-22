@@ -1127,7 +1127,7 @@ authorizes no implementation.
 | Package | Status | Applied trim |
 |---|---|---|
 | V2-0 | ACTIVE | Baseline re-lock at `1679f25`; O11 harness landed (`d5a0718`) and the loading row was captured on device on 2026-11-22; no implementation. |
-| V2-1 | ACTIVE | Prototype within brief §4.6; no drawer-vs-tabs reopen. |
+| V2-1 | ACTIVE | Prototype within brief §4.6; no drawer-vs-tabs reopen. **Closure proposed 2026-11-22** (`docs/v2/V2-1-exit-reconciliation-2026-11-22.md`); awaits owner decision. |
 | V2-2 | ACTIVE | Tokens/components; density is a rendering check, not a user preference. |
 | V2-3 | ACTIVE | 3 destinations; delete the dead `Screen.Models`; no 4th Code destination. |
 | V2-4 | ACTIVE | Drop pinned/follow (task 4) and cost/context (task 7); keep empty state, transcript, composer, session sheet, picker and actions. |

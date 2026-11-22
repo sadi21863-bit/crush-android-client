@@ -3,9 +3,9 @@
 Status: **V2 implementation is authorized.** V2-0 and V2-2 through V2-6 are
 complete on the phone; V2-1 is complete for the phone scope (V2-A8 direction,
 V2-A13 closure: tablet prototypes carried under O3). V2-9 is complete for its
-hardening scope (V2-A15) and Gate 7 stays deferred. V2-7 is in progress and
-V2-8 is an opened experiment (V2-A16/A17). See the package table below for
-per-package evidence and limits.
+hardening scope (V2-A15) and Gate 7 stays deferred. V2-7 is complete for its
+foundation scope (V2-A18); V2-8 is closed as not adopted (V2-A19). See the
+package table below for per-package evidence and limits.
 
 Authority (owner, 2026-11-19): Revision 4.0 is the forward roadmap and
 design direction. The November 14 Rev 3.1 brief remains authoritative for
@@ -61,7 +61,7 @@ the owner's trims.
 | V2-5 | complete (phone, 2026-11-21) | corrected IA V2-A11/A12: Crush Chat on legacy with deny-all policy, Crush Code project list → project home → project sessions, list-first tabs, Code-tab shell selection; Project-scoped Review, not-measured cards, IME bar; gate 9 green (917 tests, 0 failures; lint 0 errors / 1 pre-existing warning). Device pass completed 2026-11-21: IA + project-bound chat + IME (30-38, 40), populated Review (57), byte-exact export (58-60, 64), confirmed revert (66-67), two-project switching (80-94), changed-`crushrc` re-gate (72-74), legacy deny-all spawn line. Tablet/wide, 2.0x font, the accept branch, a not-measured card, the Chat-switch veto and a running session row are the listed limits |
 | V2-6 | complete (phone, 2026-11-21) | Settings/Onboarding redesign on the V2-2 components; brief §4.7.4 section order; Finding 13 copy fixed; no new preferences (V2-A4/O5); provider round-trip and relaunch route verified on device (`17`-`21`), ASK restored; 2.0x font scale checked and the provider-badge squeeze fixed (`24`-`27`). Gate `v2-6-gate-1.log`: 919 tests / 96 classes / 0 failures, lint 0 errors / 1 pre-existing warning; the post-fix re-gate `v2-6-gate-4.log` is green. Limits: Onboarding device row, tablet/wide, Onboarding at 2.0x, and key save/delete on device NOT PERFORMED (see manifest); injected-tap harness quirk recorded |
 | V2-7 | **complete (foundation)** | opened 2026-11-22 (V2-A16); closed same day (V2-A18): 7.1 reasoning Collapsed/Off, 7.2 unknown-part fallback, 7.3 `ui_block/v1` validator/renderer. No external UI framework. Evidence: `docs/parity/2026-11-22-v2-7-reasoning/`, `docs/parity/2026-11-22-v2-7-blocks/` |
-| V2-8 | **active (experiment)** | opened 2026-11-22 (V2-A17): debug-only candidate A lab built; **3 runs, 1/3 schema-valid** (runs 1-2 drifted and were rejected; run 3 with exact key names rendered). No adoption proposed. A2UI reference-only unless alpha + compileSdk are explicitly accepted. Evidence: `docs/parity/2026-11-22-v2-8-lab/` |
+| V2-8 | **closed (not adopted)** | opened 2026-11-22 (V2-A17); closed 2026-11-23 (V2-A19): 3 candidate-A runs, **1/3 schema-valid** (runs 1-2 drifted/rejected, run 3 with exact keys rendered). Exit criteria not met; no production renderer adopted. The V2-7 host-authored registry remains. Evidence: `docs/parity/2026-11-22-v2-8-lab/` |
 | V2-9 | **complete (hardening, 2026-11-22)** | ASK default recorded (already closed in code); `SecureKeyStoreInstrumentedTest` OK (3 tests) on `bbf8ca69`; `tools/check-secrets.ps1` PASS over 674 tracked files; gate 924 tests / 0 failures, lint 0 errors / 1 warning. Gate 7 submission/signing/listing remains deferred. Evidence: `docs/parity/2026-11-22-v2-9-hardening/` |
 
 ## Rules that apply to every package

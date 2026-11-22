@@ -1,9 +1,9 @@
 # V2-8 - Structured model UI experiment (opened 2026-11-22)
 
-**Status: OPEN - candidate A run set complete (1/3 schema-valid); no adoption is
-proposed.** Owner authorized opening V2-8 on 2026-11-22. This record fixes the
-experiment's boundaries and exit criteria before any result, so the experiment
-cannot quietly become a production renderer.
+**Status: CLOSED - NOT ADOPTED (2026-11-23).** Owner authorized opening V2-8 on
+2026-11-22; three candidate-A runs were performed and the exit criteria were not
+met. No production renderer is adopted. The V2-7 `ui_block/v1` registry stays
+host-authored; the debug lab stays available for a future experiment. See §7.
 
 ## 1. What the research settled
 
@@ -152,4 +152,35 @@ otherwise:
   `docs/parity/2026-11-22-v2-8-lab/`.
 - Robolectric render checks: `UiBlockViewTest` covers dark theme, 2.0x font
   scale and RTL; TalkBack and device rows remain open.
-- No model-produced result exists yet; this record must not be read as one.
+- Model-produced results are recorded in §7 and
+  `docs/parity/2026-11-22-v2-8-lab/`: two rejected documents and one valid run.
+  The sample frame alone is not a model result.
+
+## 7. Closure (2026-11-23)
+
+**Disposition: NOT ADOPTED.** Three candidate-A runs with DeepSeek V4.1 Flash
+on `opencode-go`:
+
+| Run | Prompt | Result |
+|---|---|---|
+| 1 | original | rejected: `key`/`value`, `body`, invented metadata |
+| 2 | original | rejected: same drift, `variant` instead of `tone` |
+| 3 | + exact key names | valid: 4 blocks parsed and rendered; `n/a` values |
+
+**Schema-valid 1/3.** The exit criteria in §4 are not met: no schema-constrained
+channel exists, the one valid run required hand-added key names, device
+accessibility/timing rows are NOT PERFORMED, and the two invalid documents were
+rejected whole (which is the correct fallback, not a UX win). Candidate B
+remains blocked by alpha + protocol 0.9.1 + `compileSdk 37.1`; candidate C would
+face the same prompt dependence.
+
+What is kept:
+
+- `ui_block/v1` and `UiBlockView` - used for host-authored blocks (V2-7.3);
+- the debug lab and its evidence - available if Crush ever exposes a per-turn
+  structured-output channel;
+- the strict validator and text fallback - the safety boundary that made the
+  negative result harmless.
+
+No production code, dependency, preference or Chat behaviour changes with this
+closure.

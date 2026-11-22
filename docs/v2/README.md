@@ -1,8 +1,8 @@
 # V2 redesign package (planning and implementation)
 
-Status: **V2 implementation is authorized.** V2-1 is complete for the phone
-scope (V2-A8 direction, V2-A13 closure: tablet prototypes carried under O3);
-V2-2 through V2-6 are complete on the phone. See the package table
+Status: **V2 implementation is authorized.** V2-0 and V2-2 through V2-6 are
+complete on the phone; V2-1 is complete for the phone scope (V2-A8 direction,
+V2-A13 closure: tablet prototypes carried under O3). See the package table
 below for per-package evidence and limits.
 
 Authority (owner, 2026-11-19): Revision 4.0 is the forward roadmap and
@@ -18,6 +18,7 @@ the owner's trims.
 |---|---|
 | `V2-0-baseline-lock-2026-11-19.md` | locked SHA/toolchain/source inventory, parity ledger re-read, device limits, research log |
 | `V2-0-reconciliation.md` | line-by-line reconciliation of the Rev 3.1 brief against the locked tree (task 4) |
+| `V2-0-signoff-2026-11-22.md` | **accepted (V2-A14)**: V2-0 complete; reconciles every old §9 gap against what shipped and names the carry-over rows (perf proof, Diagnostics/About pinned version, report test, screenshot/instrumentation suite, T6-01/T6-02, onboarding device row) |
 | `ADR-REGISTER.md` | accepted, open and parked V2 decisions |
 | `V2-1-design-foundation.md` | **approved** colour/type/spacing/shape/dimension/motion tokens (graphite accent, 15sp body, platform monospace), measured against the shipped theme; phone screen-state catalogue; navigation decision sheet; Q1-Q4 answered 2026-11-19 (V2-A8) |
 | `V2-1-exit-reconciliation-2026-11-22.md` | **accepted (V2-A13)**: tasks 3/5/6 closed as superseded by the shipped V2-3/V2-4/V2-5 evidence (no prototype screens built); task 4 (tablet) carried under O3; §3 lists what the closure cannot claim |
@@ -44,7 +45,7 @@ the owner's trims.
 
 | Package | Status | Entry condition |
 |---|---|---|
-| V2-0 | in progress | reconciliation sign-off by owner; task 6 evidence landed |
+| V2-0 | **complete** | baseline ledger accepted by the owner 2026-11-22 (V2-A14): reconciliation gaps reconciled in `V2-0-signoff-2026-11-22.md`; carry-over rows (perf proof, Diagnostics/About pinned version + report test, screenshot/instrumentation suite, T6-01/T6-02, onboarding device row) stay open without being exit blockers |
 | V2-1 | **complete (phone scope)** | token spec, state catalogue and a11y spec approved 2026-11-19 (V2-A8); closed 2026-11-22 (V2-A13) — tasks 3/5/6 superseded by the shipped, device-verified V2-3/V2-4/V2-5 screens (no prototypes built), task 4 (tablet) carried under O3. Limits: `V2-1-exit-reconciliation-2026-11-22.md` §3 |
 | V2-2 | complete (exit criteria, 2026-11-20) | tokens in `ui/theme/`, component set piloted on Diagnostics, 871 tests green, lint 0 errors, full gate passed on attempts 2-4 (attempt 1 failed on a test-fixture typo), CI `44618219274` green; device evidence in `docs/parity/2026-11-20-v2-2-tokens/` (two defects found and fixed: card hairline, dark navigation bar). Partial task items: no screenshot-test harness; font-scale/reduced-motion/density NOT PERFORMED. F-J selection affordance is carried to V2-4 |
 | V2-3 | complete (2026-11-20) | adaptive shell: bottom bar `<600dp`, rail `600-839dp`, extended rail `>=840dp` (extended rail not on hardware), single `navigatePrimary` rule, primary-only chrome; 885 tests green, lint 0 errors, CI run `44669754612` green; device pass in `docs/parity/2026-11-20-v2-3-shell/` (12 captures: bar, sheet, Back, IME, landscape rail, rotation). Limits: extended rail, API 30+, wide/tablet and instrumented tests NOT PERFORMED |

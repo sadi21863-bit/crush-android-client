@@ -1,7 +1,7 @@
 # V2-0 - Rev 3.1 brief reconciliation (2026-11-19)
 
-**Status: task 4 COMPLETE; owner sign-off pending.** Planning record only.
-No source, test or build file changed.
+**Status: task 4 COMPLETE; owner accepted 2026-11-22 (V2-A14).** Planning
+record only. No source, test or build file changed.
 
 Sources:
 
@@ -226,6 +226,11 @@ Gaps that need a V2 work package:
 | V2-6 | Diagnostics pinned engine version + contract level; report-level redaction/tail test; About build/engine/contract; Finding 13 copy |
 | Test debt | container-level `applyBinding`/`bindingSnapshot` test; automated screenshot suite; instrumentation additions; `T6-01`/`T6-02` |
 
+Disposition at the 2026-11-22 sign-off (`V2-0-signoff-2026-11-22.md` §3):
+several rows landed in V2-3/V2-4/V2-6; the rest are named carry-over work and
+do not block the V2-0 exit (V2-A14). This table is kept as the pre-closure
+gap list.
+
 ## 10. Exit and boundary
 
 V2-0 task 4 is complete: every brief area has a status and an evidence
@@ -233,5 +238,6 @@ pointer, and the four earlier corrections are resolved (brief length,
 2b.4 parity, O11 harness, TOCTOU wording). Task 6 landed later on
 2026-11-19 as `docs/parity/2026-11-19-v2-0-baseline/` (15 captures), which
 confirmed F-A, F-B and F-D on-device and added F-E, the stale header phase.
-Owner acceptance of this ledger is the remaining V2-0 exit step. No
-implementation is authorized by this document.
+Owner acceptance was given on 2026-11-22 (`V2-0-signoff-2026-11-22.md`,
+V2-A14); the §9 gap dispositions and the carried rows are recorded there.
+No implementation is authorized by this document.

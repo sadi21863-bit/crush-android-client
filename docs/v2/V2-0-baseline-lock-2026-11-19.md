@@ -1,7 +1,8 @@
 # V2-0 - Baseline lock and design research (2026-11-19)
 
-**Status: IN PROGRESS.** Planning record only. No source, test or build
-file changed. Authority is hybrid (owner, 2026-11-19, §5.10 of
+**Status: COMPLETE — ledger accepted by the owner 2026-11-22 (V2-A14).**
+Planning record only. No source, test or build file changed. Authority is
+hybrid (owner, 2026-11-19, §5.10 of
 `../CRUSH-MOBILE-STATUS-AND-DECISIONS.md`): Revision 4.0 is the forward
 roadmap; the November 14 Rev 3.1 brief remains authoritative for the UI
 state contract, test registry, composer gates and parity standard.
@@ -312,7 +313,7 @@ Compose-first V2-1 prototype.
 | 1 | Record SHA, tree, toolchain, architecture, CI | DONE | sections 1-3, 7 |
 | 2 | Re-read all five 2b manifests, close outstanding parity | DONE (re-read) / OPEN items | section 5; closures need device, fault injection or instrumentation |
 | 3 | Source inventory | DONE | section 4 |
-| 4 | Reconcile Rev 3.1 line by line | DONE (owner sign-off pending) | `V2-0-reconciliation.md` |
+| 4 | Reconcile Rev 3.1 line by line | DONE / **ACCEPTED 2026-11-22** | `V2-0-reconciliation.md`; acceptance in `V2-0-signoff-2026-11-22.md` (V2-A14) |
 | 5 | T3/A2UI/json-render/CopilotKit/adaptive research | DONE as reference refresh | section 8; no adoption |
 | 6 | Fresh phone screenshots + unsupported form factors | DONE for phone captures / list DONE; unsupported form factors remain unprovable on this device | `docs/parity/2026-11-19-v2-0-baseline/` |
 | 7 | ADR register for open owner decisions | DONE | `ADR-REGISTER.md` |
@@ -320,10 +321,11 @@ Compose-first V2-1 prototype.
 Exit criteria: "no unresolved disagreement about what is already
 implemented" and "every V2 requirement has a source reference and an evidence
 label". Task 4 landed as `V2-0-reconciliation.md`; task 6 landed as
-`docs/parity/2026-11-19-v2-0-baseline/` once the device was attached. Owner
-acceptance of the reconciliation ledger is the remaining exit step; the
-unsupported form factors stay unprovable on this device. V2-0 still requires
-owner acknowledgement before V2-1 work.
+`docs/parity/2026-11-19-v2-0-baseline/` once the device was attached. **Owner
+acceptance was given on 2026-11-22** (`V2-0-signoff-2026-11-22.md`, V2-A14):
+V2-0 is COMPLETE. The unsupported form factors stay unprovable on this device,
+and the carry-over rows named in the sign-off record stay open without being
+exit blockers.
 
 ## 10. Boundary
 

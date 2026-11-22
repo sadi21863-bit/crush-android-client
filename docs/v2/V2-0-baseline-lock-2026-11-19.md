@@ -227,6 +227,15 @@ intermittently lands ~200 px above the target inside scrollable content
 the empty-list window. The row remains unit-pinned; O11's device evidence is
 **PARTIAL** until one owner-assisted or instrumentation capture.
 
+Instrumentation was tried next: an `O11LoadingRowTest` rendered the same list
+surface in a Compose test on-device. The spinner's infinite animation made
+`waitForIdle` hang; with the test clock paused (`autoAdvance = false` plus one
+frame) the test process crashed instead, and this ROM's logcat produced no
+readable stack (the crash buffer is empty by policy here). The test was
+removed rather than committed broken. O11 stays **PARTIAL**; the harness and
+the unit pins are the evidence, and a single owner-assisted timed capture
+remains the shortest route to the frame.
+
 No outstanding item was marked closed by this re-read.
 
 ## 6. Device and form-factor coverage

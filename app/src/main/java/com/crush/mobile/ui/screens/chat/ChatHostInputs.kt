@@ -1,6 +1,7 @@
 package com.crush.mobile.ui.screens.chat
 
 import com.crush.mobile.engine.EngineState
+import com.crush.mobile.domain.model.ReasoningDisplay
 
 /**
  * Phase 2a (V2 plan §5.2.1, Appendix C.1): the host-resolved inputs the Chat
@@ -56,6 +57,12 @@ data class ChatHostInputs(
     val snapshotReady: Boolean = false,
     val prewarm: Boolean = false,
     val enterSendMode: EnterSendMode = EnterSendMode.Newline,
+    /**
+     * V2-7 (owner, 2026-11-22): whether reasoning is shown. Host-resolved from
+     * persisted settings; defaulted so every existing projection construction
+     * stays source-compatible.
+     */
+    val reasoningDisplay: ReasoningDisplay = ReasoningDisplay.COLLAPSED,
     val providerDisplayName: String = "",
 ) {
 

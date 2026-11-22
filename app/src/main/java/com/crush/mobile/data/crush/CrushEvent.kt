@@ -58,6 +58,25 @@ data class RunComplete(
 )
 
 /**
+ * V2-7: the part types this build renders explicitly. Everything else goes
+ * through [StreamMessage.unknownText] instead of vanishing.
+ */
+private val KNOWN_PART_TYPES = setOf(
+    "text",
+    "reasoning",
+    "finish",
+    "tool_call",
+    "tool_result",
+    "sub_agent_report",
+)
+
+/** Fields worth showing for an unknown part before falling back to raw JSON. */
+private val DISPLAY_FIELDS = listOf("text", "content", "message", "title", "thinking")
+
+private const val UNKNOWN_PART_MAX_CHARS = 1_200
+private const val UNKNOWN_TOTAL_MAX_CHARS = 3_000
+
+/**
  * A message as delivered by `message` events.
  *
  * CRITICAL: Crush republishes the WHOLE message on every update rather than
@@ -80,6 +99,42 @@ data class StreamMessage(
     val thinking: String
         get() = parts.filter { it.optString("type") == "reasoning" }
             .joinToString("\n") { it.data()?.optString("thinking").orEmpty() }
+
+    /**
+     * V2-7 / acceptance-kit row 6: parts this build does not render.
+     *
+     * The renderer must tolerate new part types (sub-agent and question shapes
+     * reach the pipe on v0.100+) without crashing and without silently
+     * dropping them. This produces a bounded, plain-text fallback: a known
+     * display field when the part has one, otherwise the part's JSON, capped so
+     * one new type cannot turn a bubble into a payload dump.
+     *
+     * Hidden parts stay hidden: `data.hidden == true` is the engine's own
+     * suppression signal and is already honoured for text parts.
+     */
+    val unknownText: String
+        get() = parts
+            .filter { part ->
+                val type = part.optString("type").orEmpty()
+                type !in KNOWN_PART_TYPES && part.data()?.optBoolean("hidden") != true
+            }
+            .mapNotNull { part ->
+                val type = part.optString("type").orEmpty().ifBlank { "unknown" }
+                val data = part.data()
+                val body = data?.let { d ->
+                    DISPLAY_FIELDS.firstNotNullOfOrNull { key ->
+                        d.optString(key)?.takeIf { it.isNotBlank() }
+                    } ?: d.toString()
+                }.orEmpty()
+                if (body.isBlank()) {
+                    null
+                } else {
+                    "Unsupported content ($type):\n" +
+                        body.take(UNKNOWN_PART_MAX_CHARS)
+                }
+            }
+            .joinToString("\n\n")
+            .take(UNKNOWN_TOTAL_MAX_CHARS)
 
     val isFinished: Boolean
         get() = parts.any { it.optString("type") == "finish" }

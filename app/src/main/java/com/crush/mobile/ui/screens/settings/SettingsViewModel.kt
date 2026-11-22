@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.crush.mobile.data.repository.SettingsRepository
 import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.domain.model.PermissionMode
+import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.util.AppLog
 import kotlinx.coroutines.Dispatchers
@@ -139,6 +140,17 @@ class SettingsViewModel(
      */
     fun savePermissionMode(mode: PermissionMode) {
         viewModelScope.launch { settingsRepository.savePermissionMode(mode) }
+    }
+
+    /**
+     * V2-7: persists the reasoning display mode.
+     *
+     * Like the other display settings, the value flows back through the
+     * settings flow, so a failed write snaps the chips back rather than
+     * leaving the UI claiming a state the store does not have.
+     */
+    fun saveReasoningDisplay(display: ReasoningDisplay) {
+        viewModelScope.launch { settingsRepository.saveReasoningDisplay(display) }
     }
 
     /**

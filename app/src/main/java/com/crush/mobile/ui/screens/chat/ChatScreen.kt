@@ -99,6 +99,7 @@ fun ChatScreen(
 
     LaunchedEffect(engineState) { vm.bindEngine(engineState) }    // Provider is chosen on the Settings screen, which has its own ViewModel.
     LaunchedEffect(Unit) { vm.observeProviderChanges() }
+    LaunchedEffect(Unit) { vm.observeReasoningDisplay() }
     // An unlock is the only event that can make a blocked bootstrap retryable;
     // engine state does not change when the user authenticates.
     LaunchedEffect(keyAvailable) { vm.onKeyAvailable() }

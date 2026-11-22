@@ -5,10 +5,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performTextInput
 import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.PermissionMode
+import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.domain.provider.Provider
 import org.junit.Assert.assertEquals
@@ -94,6 +95,7 @@ class SettingsContentTest {
         onClearKey: () -> Unit = {},
         onSelectTheme: (String) -> Unit = {},
         onSelectEnterSend: (String) -> Unit = {},
+        onReasoningDisplayChange: (ReasoningDisplay) -> Unit = {},
         onPermissionChange: (PermissionMode) -> Unit = {},
         onTuningChange: (TuningPolicy.Overrides) -> Unit = {},
         onResetTuning: () -> Unit = {},
@@ -107,6 +109,7 @@ class SettingsContentTest {
                 onClearKey = onClearKey,
                 onSelectTheme = onSelectTheme,
                 onSelectEnterSend = onSelectEnterSend,
+                onReasoningDisplayChange = onReasoningDisplayChange,
                 onPermissionChange = onPermissionChange,
                 onTuningChange = onTuningChange,
                 onResetTuning = onResetTuning,
@@ -196,10 +199,21 @@ class SettingsContentTest {
         val modes = mutableListOf<PermissionMode>()
         setContent(onPermissionChange = { modes += it })
 
-        compose.onNode(isToggleable()).performClick()
+        compose.onNodeWithTag("auto-approve-switch").performClick()
         compose.waitForIdle()
 
         assertEquals(listOf(PermissionMode.AUTO_APPROVE), modes)
+    }
+
+    @Test
+    fun `the reasoning choice dispatches the off mode`() {
+        val values = mutableListOf<ReasoningDisplay>()
+        setContent(onReasoningDisplayChange = { values += it })
+
+        compose.onNodeWithTag("reasoning-off").performScrollTo().performClick()
+        compose.waitForIdle()
+
+        assertEquals(listOf(ReasoningDisplay.OFF), values)
     }
 
     @Test

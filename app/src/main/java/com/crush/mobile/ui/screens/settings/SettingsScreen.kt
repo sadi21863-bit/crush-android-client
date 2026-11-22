@@ -63,6 +63,7 @@ fun SettingsScreen(
         },
         onSelectTheme = viewModel::saveThemeMode,
         onSelectEnterSend = viewModel::saveEnterSendMode,
+        onReasoningDisplayChange = viewModel::saveReasoningDisplay,
         onPermissionChange = viewModel::savePermissionMode,
         onTuningChange = viewModel::saveTuning,
         onResetTuning = viewModel::resetTuning,

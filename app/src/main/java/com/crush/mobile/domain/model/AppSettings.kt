@@ -18,6 +18,11 @@ data class AppSettings(
     val selectedModel: String = "",
     val themeMode: String = "system",
     val enterSendMode: String = "newline",
+    /**
+     * V2-7 (owner, 2026-11-22): whether reasoning is shown. Collapsed by
+     * default; `OFF` never shows it and discards it before storage/replay.
+     */
+    val reasoningDisplay: ReasoningDisplay = ReasoningDisplay.COLLAPSED,
     val temperature: Double = 0.7,
     /**
      * Provider id as Crush's Catwalk catalog names it. Verified on device by

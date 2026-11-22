@@ -4,6 +4,7 @@ import com.crush.mobile.data.local.SettingsDataStore
 import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.PermissionMode
+import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.domain.model.TuningPolicy
 import kotlinx.coroutines.flow.Flow
 
@@ -52,6 +53,10 @@ suspend fun clearApiKey(providerId: String) = dataStore.clearApiKey(providerId)
      */
     suspend fun savePermissionMode(mode: PermissionMode) =
         dataStore.savePermissionMode(mode)
+
+    /** V2-7: show reasoning collapsed, keep it hidden, or discard it. */
+    suspend fun saveReasoningDisplay(display: ReasoningDisplay) =
+        dataStore.saveReasoningDisplay(display)
 
     suspend fun saveTuningOverrides(o: TuningPolicy.Overrides) =
         dataStore.saveTuningOverrides(o)

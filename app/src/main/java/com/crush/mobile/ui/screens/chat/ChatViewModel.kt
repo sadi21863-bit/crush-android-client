@@ -46,6 +46,7 @@ import com.crush.mobile.domain.handoff.HandoffPackage
 import com.crush.mobile.domain.handoff.HandoffPackageDraft
 import com.crush.mobile.domain.handoff.RedactionVerdict
 import com.crush.mobile.domain.handoff.firstPrompt
+import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.EnginePaths
 import com.crush.mobile.engine.EngineSockets
@@ -95,7 +96,7 @@ import okhttp3.OkHttpClient
  * too: a reopened chat that showed the answer but hid the fact the agent read
  * six files would misrepresent what happened.
  */
-internal fun replayRow(m: StreamMessage): ChatMessage? {
+internal fun replayRow(m: StreamMessage, keepReasoning: Boolean = true): ChatMessage? {
     val text = m.text
     val tools = m.toolCalls.mapNotNull(ToolActivityParser::from)
     val reports = m.subAgentReports
@@ -118,9 +119,11 @@ internal fun replayRow(m: StreamMessage): ChatMessage? {
                 id = "h-a-${m.id}",
                 role = "assistant",
                 text = text,
+                thinking = if (keepReasoning) m.thinking else "",
                 tools = tools,
                 error = error,
-                reports = reports
+                reports = reports,
+                unknownText = m.unknownText
             )
         else -> null
     }
@@ -307,7 +310,12 @@ data class ChatMessage(
      * before this field existed the row was silently dropped both live and
      * after a reopen.
      */
-    val reports: List<SubAgentReport> = emptyList()
+    val reports: List<SubAgentReport> = emptyList(),
+    /**
+     * V2-7: bounded plain text for message parts this build does not render.
+     * Defaulted so every existing construction and test fixture compiles.
+     */
+    val unknownText: String = ""
 )
 
 /**
@@ -467,6 +475,15 @@ val selectedModel: String = "",
      * is never assembled from a provider's public name.
      */
     val providerId: String = Providers.DEFAULT.id,
+
+    /**
+     * V2-7: mirrors the persisted reasoning display mode for the turn loop.
+     *
+     * `OFF` drops reasoning as it arrives; `COLLAPSED` keeps it in
+     * [ChatMessage]. Defaulted so every existing construction compiles; the
+     * observer updates it from settings.
+     */
+    val reasoningDisplay: ReasoningDisplay = ReasoningDisplay.COLLAPSED,
 
     // ------------------------------------------------------------------
     // P6 Batch C - the Chat->Code handoff consent surface.
@@ -674,6 +691,7 @@ class ChatViewModel(
                 } else {
                     EnterSendMode.Newline
                 },
+                reasoningDisplay = settings.reasoningDisplay,
                 providerDisplayName = Providers.byId(chat.providerId)?.displayName ?: chat.providerId,
             ),
         )
@@ -994,6 +1012,22 @@ class ChatViewModel(
 
     /** True only when a workspace is live, so an early emission is ignored. */
     private fun engineReadyNow(): Boolean = _state.value.engineReady && wsId != null
+
+    /**
+     * V2-7: mirrors the persisted reasoning display mode into [ChatUiState] for
+     * the live turn loop. The turn loop cannot read DataStore per frame, and
+     * `OFF` has to discard reasoning at arrival rather than only at render.
+     */
+    fun observeReasoningDisplay() {
+        viewModelScope.launch {
+            container.settingsRepository.settings
+                .map { it.reasoningDisplay }
+                .distinctUntilChanged()
+                .collect { display ->
+                    _state.update { it.copy(reasoningDisplay = display) }
+                }
+        }
+    }
 
     fun bindEngine(engineState: EngineState) {
         // S5 wedge instrumentation (2026-11-05): the two overnight hangs showed
@@ -2245,7 +2279,12 @@ class ChatViewModel(
             // keeping: tool activity is replayed too, finish-error rows are
             // preserved (the audit's invisible failed turns - see [replayRow]),
             // and mid-stream empty snapshots stay dropped.
-            val replayed = history.mapNotNull { m -> replayRow(m) }
+            val replayed = history.mapNotNull { m ->
+                replayRow(
+                    m,
+                    keepReasoning = _state.value.reasoningDisplay != ReasoningDisplay.OFF
+                )
+            }
 
             wsId = ws
             // Fully qualified: inside launch{} a bare `this` is the
@@ -4360,8 +4399,16 @@ class ChatViewModel(
                                     updateStreaming(handle) {
                                         it.copy(
                                             text = m.text.ifBlank { it.text },
-                                            thinking = m.thinking.ifBlank { it.thinking },
+                                            thinking = if (
+                                                _state.value.reasoningDisplay ==
+                                                ReasoningDisplay.OFF
+                                            ) {
+                                                ""
+                                            } else {
+                                                m.thinking.ifBlank { it.thinking }
+                                            },
                                             tools = merge.tools.ifEmpty { it.tools },
+                                            unknownText = m.unknownText,
                                             error = m.finishError ?: it.error
                                         )
                                     }
@@ -4648,7 +4695,12 @@ class ChatViewModel(
                 val history = runCatching { crushApi(port).messages(ws, sid) }
                     .onFailure { AppLog.w(TAG, "late report refresh failed: ${it.message}") }
                     .getOrNull() ?: return@repeat
-                val replayed = history.mapNotNull { m -> replayRow(m) }
+                val replayed = history.mapNotNull { m ->
+                    replayRow(
+                        m,
+                        keepReasoning = _state.value.reasoningDisplay != ReasoningDisplay.OFF
+                    )
+                }
                 if (!lateReportRefreshDue(st.messages, replayed)) return@repeat
                 AppLog.i(
                     TAG,

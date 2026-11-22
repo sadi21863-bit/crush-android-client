@@ -33,11 +33,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.crush.mobile.domain.model.AppSettings
 import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.PermissionMode
+import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.ui.components.CrushButton
 import com.crush.mobile.ui.components.CrushButtonVariant
@@ -76,6 +78,7 @@ fun SettingsContent(
     onClearKey: () -> Unit,
     onSelectTheme: (String) -> Unit,
     onSelectEnterSend: (String) -> Unit,
+    onReasoningDisplayChange: (ReasoningDisplay) -> Unit,
     onPermissionChange: (PermissionMode) -> Unit,
     onTuningChange: (TuningPolicy.Overrides) -> Unit,
     onResetTuning: () -> Unit,
@@ -357,6 +360,57 @@ fun SettingsContent(
             // it. AppSettings.temperature and saveTemperature stay in data,
             // deliberately: they are persisted state, not UI.
 
+            // V2-7 (owner, 2026-11-22): the reasoning display choice. Two
+            // states: collapsed, or off. "Off" is not just a hidden block: it
+            // discards reasoning at the transcript boundary, so it can never be
+            // shown or replayed later.
+            CrushSectionHeader("Chat")
+
+            CrushCard {
+                Text(
+                    "Model reasoning",
+                    style = CrushType.body,
+                    color = LocalCrushColors.current.ink
+                )
+                Spacer(Modifier.height(CrushSpacing.sm))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(CrushSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(CrushSpacing.sm)
+                ) {
+                    CrushChoiceChip(
+                        text = "Collapsed",
+                        selected = settings.reasoningDisplay == ReasoningDisplay.COLLAPSED,
+                        onClick = {
+                            onReasoningDisplayChange(ReasoningDisplay.COLLAPSED)
+                        },
+                        modifier = Modifier.testTag("reasoning-collapsed"),
+                    )
+                    CrushChoiceChip(
+                        text = "Off",
+                        selected = settings.reasoningDisplay == ReasoningDisplay.OFF,
+                        onClick = {
+                            onReasoningDisplayChange(ReasoningDisplay.OFF)
+                        },
+                        modifier = Modifier.testTag("reasoning-off"),
+                    )
+                }
+                Spacer(Modifier.height(CrushSpacing.xs))
+                Text(
+                    when (settings.reasoningDisplay) {
+                        ReasoningDisplay.COLLAPSED ->
+                            "Reasoning appears as a closed block above the reply. " +
+                                "Tap it to read; it stays closed until you do."
+                        ReasoningDisplay.OFF ->
+                            "Reasoning is never shown and is dropped before it " +
+                                "reaches the transcript. Switch back to Collapsed " +
+                                "any time; the model may still produce it while off."
+                    },
+                    style = CrushType.body,
+                    color = LocalCrushColors.current.muted
+                )
+            }
+
             TuningSection(
                 settings = settings,
                 resolved = state.tuning,
@@ -451,7 +505,8 @@ private fun PermissionSection(
                     onChange(
                         if (it) PermissionMode.AUTO_APPROVE else PermissionMode.ASK
                     )
-                }
+                },
+                modifier = Modifier.testTag("auto-approve-switch")
             )
         }
         Spacer(Modifier.height(CrushSpacing.sm))

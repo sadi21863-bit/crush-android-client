@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.crush.mobile.domain.file.DiffLine
 import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.file.FileDiff
+import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.ui.CrushrcTrustDialog
 import com.crush.mobile.ui.components.CrushBanner
 import com.crush.mobile.ui.components.CrushButton
@@ -299,6 +303,7 @@ fun ChatContent(
                     }
                     Bubble(
                         m = m,
+                        reasoningDisplay = state.reasoningDisplay,
                         retryText = retryText,
                         retryEnabled = state.run.engineReady && !state.run.streaming,
                         onRetry = {
@@ -570,9 +575,103 @@ private val AssistantBubbleShape = RoundedCornerShape(
     topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp
 )
 
+/**
+ * V2-7: reasoning is model prose, but it is not the reply. It renders as a
+ * collapsed disclosure above the answer, in plain text (never Markdown) so a
+ * model-authored heading or link cannot impersonate host chrome. Expanded text
+ * is bounded for the same reason code blocks are: a runaway chain of thought
+ * must not turn one bubble into thousands of layout nodes.
+ */
+private const val REASONING_MAX_CHARS = 8000
+
+@Composable
+private fun ReasoningBlock(messageId: String, thinking: String) {
+    var expanded by rememberSaveable(messageId) { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .widthIn(max = 640.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surfaceVariant.copy(alpha = 0.55f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(role = Role.Button) { expanded = !expanded }
+                .semantics {
+                    stateDescription = if (expanded) "Expanded" else "Collapsed"
+                }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Reasoning",
+                style = CrushType.metadata,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (expanded) {
+                    Icons.Filled.ExpandLess
+                } else {
+                    Icons.Filled.ExpandMore
+                },
+                contentDescription = null,
+                tint = colors.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        if (expanded) {
+            Text(
+                text = if (thinking.length <= REASONING_MAX_CHARS) {
+                    thinking
+                } else {
+                    thinking.take(REASONING_MAX_CHARS) + "\n\n[reasoning truncated]"
+                },
+                style = CrushType.secondary,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(
+                    start = 12.dp, end = 12.dp, bottom = 10.dp
+                )
+            )
+        }
+    }
+}
+
+/**
+ * V2-7: the visible fallback for an unrendered part type. Plain text on a
+ * quiet surface - it is a receipt that something arrived, not a new UI
+ * vocabulary invented from model output.
+ */
+@Composable
+private fun UnsupportedContentBlock(text: String) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 640.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            "Unsupported content",
+            style = CrushType.metadata,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text,
+            style = CrushType.secondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @Composable
 private fun Bubble(
     m: ChatMessage,
+    // V2-7 (owner, 2026-11-22): host-resolved display mode. Only COLLAPSED
+    // draws the block; OFF keeps it out of the transcript entirely.
+    reasoningDisplay: ReasoningDisplay = ReasoningDisplay.COLLAPSED,
     // D13: non-null only on a failed assistant row that has a preceding user
     // prompt available to re-send; drives the card's Retry affordance.
     retryText: String? = null,
@@ -645,6 +744,23 @@ private fun Bubble(
             // was invisible.
             if (!isUser && m.tools.isNotEmpty()) {
                 ToolActivityList(m.tools)
+                Spacer(Modifier.height(6.dp))
+            }
+            // V2-7: reasoning sits between the work and the answer. Collapsed
+            // by default, so a long chain of thought never pushes the reply
+            // off-screen; the text is plain, never Markdown, so model-authored
+            // formatting cannot masquerade as host UI.
+            if (!isUser && reasoningDisplay == ReasoningDisplay.COLLAPSED &&
+                m.thinking.isNotBlank()
+            ) {
+                ReasoningBlock(messageId = m.id, thinking = m.thinking)
+                Spacer(Modifier.height(6.dp))
+            }
+            // V2-7 / acceptance-kit row 6: a part type this build does not
+            // know must be visible as text, not silently swallowed. The text is
+            // already bounded by StreamMessage.unknownText.
+            if (!isUser && m.unknownText.isNotBlank()) {
+                UnsupportedContentBlock(m.unknownText)
                 Spacer(Modifier.height(6.dp))
             }
             if (!isUser && m.error != null) {

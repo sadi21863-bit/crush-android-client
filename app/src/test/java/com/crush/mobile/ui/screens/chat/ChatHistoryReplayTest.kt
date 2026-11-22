@@ -36,6 +36,9 @@ class ChatHistoryReplayTest {
 
     private fun textPart(t: String) = obj("""{"type":"text","data":{"text":"$t"}}""")
 
+    private fun reasoningPart(t: String) =
+        obj("""{"type":"reasoning","data":{"thinking":"$t"}}""")
+
     @Test
     fun `a finish-error assistant turn is kept and carries the error`() {
         val row = replayRow(msg("m1", "assistant", listOf(finishError())))
@@ -64,6 +67,38 @@ class ChatHistoryReplayTest {
         val asst = replayRow(msg("a1", "assistant", listOf(textPart("hi"))))
         assertEquals("hi", asst!!.text)
         assertNull(asst.error)
+    }
+
+    @Test
+    fun `reasoning survives replay on an assistant row`() {
+        // V2-7: the live path already copied thinking into ChatMessage; replay
+        // did not, so a reopened chat silently lost it. The wire shape is the
+        // same `reasoning` part the live accessor reads.
+        val row = replayRow(
+            msg("a3", "assistant", listOf(reasoningPart("check the folder"), textPart("done")))
+        )
+        assertEquals("done", row!!.text)
+        assertEquals("check the folder", row.thinking)
+    }
+
+    @Test
+    fun `unknown parts survive replay as text`() {
+        val artifact = obj("""{"type":"artifact","data":{"title":"Chart"}}""")
+        val row = replayRow(msg("a4", "assistant", listOf(textPart("done"), artifact)))
+        assertEquals("done", row!!.text)
+        assertTrue("unknown part must not vanish on replay", row.unknownText.contains("Chart"))
+    }
+
+    @Test
+    fun `off mode drops reasoning on replay`() {
+        // V2-7: OFF is not a render-time hide. The row must come back without
+        // the reasoning text, so switching back cannot resurrect it.
+        val row = replayRow(
+            msg("a5", "assistant", listOf(reasoningPart("secret"), textPart("done"))),
+            keepReasoning = false,
+        )
+        assertEquals("done", row!!.text)
+        assertEquals("", row.thinking)
     }
 
     @Test

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.crush.mobile.domain.model.AppSettings
+import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.domain.provider.Providers
 import com.crush.mobile.domain.model.PermissionMode
 import com.crush.mobile.domain.model.TuningPolicy
@@ -40,6 +41,7 @@ class SettingsDataStore(context: Context, private val keySession: KeySession) {
         private val SELECTED_MODEL = stringPreferencesKey("selected_model")
         private val THEME_MODE = stringPreferencesKey("theme_mode")
         private val ENTER_SEND_MODE = stringPreferencesKey("enter_send_mode")
+        private val REASONING_DISPLAY = stringPreferencesKey("reasoning_display")
         private val TEMPERATURE = stringPreferencesKey("temperature")
         private val PROVIDER_ID = stringPreferencesKey("provider_id")
         private val PERMISSION_MODE = stringPreferencesKey("permission_mode")
@@ -96,6 +98,8 @@ class SettingsDataStore(context: Context, private val keySession: KeySession) {
             selectedModel = prefs[SELECTED_MODEL].orEmpty(),
             themeMode = prefs[THEME_MODE] ?: "system",
             enterSendMode = prefs[ENTER_SEND_MODE] ?: "newline",
+            // V2-7: parse() fails safe to COLLAPSED on an absent/corrupt value.
+            reasoningDisplay = ReasoningDisplay.parse(prefs[REASONING_DISPLAY]),
             temperature = prefs[TEMPERATURE]?.toDoubleOrNull() ?: 0.7,
             providerId = providerId,
             // parse() fails SAFE: an absent or corrupt value means ASK, never
@@ -186,6 +190,11 @@ class SettingsDataStore(context: Context, private val keySession: KeySession) {
 
     suspend fun savePermissionMode(mode: PermissionMode) {
         context.dataStore.edit { prefs -> prefs[PERMISSION_MODE] = mode.stored }
+    }
+
+    /** V2-7: whether reasoning is collapsed, hidden, or discarded. */
+    suspend fun saveReasoningDisplay(display: ReasoningDisplay) {
+        context.dataStore.edit { prefs -> prefs[REASONING_DISPLAY] = display.stored }
     }
 
     suspend fun saveTemperature(temp: Double) {

@@ -3,6 +3,7 @@ package com.crush.mobile.ui.screens.chat
 import com.crush.mobile.data.crush.PermissionRequest
 import com.crush.mobile.data.crush.SubAgentReport
 import com.crush.mobile.domain.file.FileChangeSet
+import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.project.ProjectRef
 
 /**
@@ -24,6 +25,12 @@ data class ChatViewState(
     val gate: GateView,
     val handoff: HandoffView,
     val notice: NoticeView,
+    /**
+     * V2-7 (owner, 2026-11-22): how the reasoning block is displayed. Defaulted
+     * so fabricated projections in tests and any caller that predates the field
+     * keep compiling; the host always supplies the persisted value.
+     */
+    val reasoningDisplay: ReasoningDisplay = ReasoningDisplay.COLLAPSED,
 )
 
 data class SessionView(
@@ -363,5 +370,6 @@ fun ChatUiState.toViewState(inputs: ChatHostInputs): ChatViewState {
             resume = handoffResumeHint,
         ),
         notice = NoticeView(deleteError = deleteError),
+        reasoningDisplay = inputs.reasoningDisplay,
     )
 }

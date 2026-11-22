@@ -170,6 +170,37 @@ class StreamMessageTest {
     }
 
     @Test
+    fun `an unknown part is surfaced as bounded text`() {
+        // V2-7 / acceptance-kit row 6: a new part type must not vanish.
+        val m = msg(
+            """{"role":"assistant","parts":[
+               {"type":"artifact","data":{"title":"Chart","text":"sales"}},
+               {"type":"text","data":{"text":"answer"}}]}"""
+        )
+        assertEquals("answer", m.text)
+        assertTrue(m.unknownText.contains("artifact"))
+        assertTrue(m.unknownText.contains("sales"))
+    }
+
+    @Test
+    fun `a hidden unknown part stays hidden`() {
+        val m = msg(
+            """{"role":"assistant","parts":[
+               {"type":"artifact","data":{"text":"internal","hidden":true}}]}"""
+        )
+        assertEquals("", m.unknownText)
+    }
+
+    @Test
+    fun `unknown part text is bounded`() {
+        val body = "x".repeat(5000)
+        val m = msg(
+            """{"role":"assistant","parts":[{"type":"blob","data":{"text":"$body"}}]}"""
+        )
+        assertTrue(m.unknownText.length < 3500)
+    }
+
+    @Test
     fun `a finish part with reason error is surfaced`() {
         // The exact production failure: isFinished was true, text was empty, and
         // the real cause ("Model is unavailable") was invisible.

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.crush.mobile.data.crush.PermissionRequest
+import com.crush.mobile.domain.model.ReasoningDisplay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -296,6 +297,70 @@ class ChatContentTranscriptTest {
 
         compose.onAllNodesWithText("Continue in Code").assertCountEquals(0)
     }
+
+    @Test
+    fun `reasoning renders collapsed and expands on tap`() {
+        setContent(
+            ChatFixtures.view(
+                messages = listOf(
+                    ChatMessage(
+                        id = "a1",
+                        role = "assistant",
+                        text = "Answer ready.",
+                        thinking = "step one then step two",
+                    )
+                )
+            )
+        )
+
+        compose.onNodeWithText("Reasoning").assertIsDisplayed()
+        compose.onNodeWithText("step one then step two").assertDoesNotExist()
+
+        compose.onNodeWithText("Reasoning").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithText("step one then step two").assertIsDisplayed()
+    }
+
+    @Test
+    fun `reasoning is absent when off`() {
+        setContent(
+            ChatFixtures.view(
+                reasoningDisplay = ReasoningDisplay.OFF,
+                messages = listOf(
+                    ChatMessage(
+                        id = "a1",
+                        role = "assistant",
+                        text = "Answer ready.",
+                        thinking = "hidden thought",
+                    )
+                )
+            )
+        )
+
+        compose.onNodeWithText("Reasoning").assertDoesNotExist()
+        compose.onNodeWithText("hidden thought").assertDoesNotExist()
+        compose.onNodeWithText("Answer ready.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `unknown parts render a visible fallback`() {
+        setContent(
+            ChatFixtures.view(
+                messages = listOf(
+                    ChatMessage(
+                        id = "a1",
+                        role = "assistant",
+                        text = "Answer ready.",
+                        unknownText = "Unsupported content (artifact):\nChart",
+                    )
+                )
+            )
+        )
+
+        compose.onNodeWithText("Unsupported content").assertIsDisplayed()
+        compose.onNodeWithText("Chart", substring = true).assertIsDisplayed()
+    }
 }
 
 /**
@@ -331,6 +396,7 @@ internal object ChatFixtures {
         sessionsLoading: Boolean = false,
         sessionsUnavailable: Boolean = false,
         deleteError: String? = null,
+        reasoningDisplay: ReasoningDisplay = ReasoningDisplay.COLLAPSED,
     ): ChatViewState = ChatViewState(
         session = SessionView(
             id = sessionId,
@@ -380,5 +446,6 @@ internal object ChatFixtures {
         gate = GateView(permission = permission, question = question),
         handoff = handoff,
         notice = NoticeView(deleteError = deleteError),
+        reasoningDisplay = reasoningDisplay,
     )
 }

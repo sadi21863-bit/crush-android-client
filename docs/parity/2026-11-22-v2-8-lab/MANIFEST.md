@@ -1,4 +1,4 @@
-# V2-8 candidate A lab evidence (2026-11-22)
+# V2-8 candidate A lab evidence (2026-11-23)
 
 Device `bbf8ca69`, Redmi Note 7 Pro, API 29, arm64-v8a. Debug build from the
 V2-8 candidate-A tree; light theme. Provider `opencode-go`, model DeepSeek V4.1
@@ -6,29 +6,39 @@ Flash.
 
 ## Files
 
-| File | What it shows | What it does not show |
-|---|---|---|
-| `00-lab-sample-parsed.png` | the lab's built-in sample parsed into 4 blocks: text, table, key-value, callout | a model-produced payload |
-| `01-model-reply.png` | the real model reply (tail): a `kv` block using `key`/`value`, a callout using `body`, and an invented `anthropic/claude-sonnet-4` model line | the start of the reply; the full prompt exchange |
-| `02-lab-model-rejected.png` | the same reply pasted into the lab and rejected: **`block 3: item 0: unexpected field 'key'`** | any rendered UI for invalid output |
+| File | What it shows |
+|---|---|
+| `00-lab-sample-parsed.png` | the built-in sample parsed and rendered (4 blocks) |
+| `01-model-reply.png` | run 1 reply: `key`/`value`, `body`, invented `anthropic/claude-sonnet-4` |
+| `02-lab-model-rejected.png` | run 1 rejected: `block 3: item 0: unexpected field 'key'` |
+| `03-run2-reply.png` | run 2 reply: same `key`/`value` drift, plus `variant` instead of `tone` |
+| `04-run2-rejected.png` | run 2 rejected: same block/field |
+| `05-run3-reply.png` | run 3 reply after appending "kv items use k and v; callout uses tone and text": uses `k`/`v`, `tone`/`text`, values `n/a` |
+| `06-run3-parsed.png` | run 3 accepted: `Parsed 4 block(s)` |
+| `07-run3-rendered.png` | run 3 rendered: text, table, key-value rows, warning callout |
 
-## Real run (one prompt, one model)
+## Results
 
-The lab's prompt was copied to the clipboard, pasted into Crush Chat, and sent.
-The model answered with a JSON envelope, but it drifted from the contract:
+| Run | Prompt | Parse | What happened |
+|---|---|---|---|
+| 1 | lab prompt, unchanged | **rejected** | `kv` used `key`/`value`; callout used `body`; invented model/tokens; validator rejected the whole document |
+| 2 | lab prompt, unchanged | **rejected** | same `key`/`value` drift; callout used `variant` instead of `tone` |
+| 3 | lab prompt + "STRICT: kv items use k and v. callout uses tone and text." | **valid** | 4 blocks rendered; the model used `n/a` instead of inventing model/token data |
 
-- `kv` items used `"key"` / `"value"` instead of `"k"` / `"v"`;
-- the callout used `"body"` instead of `"text"`;
-- it invented `anthropic/claude-sonnet-4` as the model and token counts even
-  though the session was `opencode-go` / DeepSeek V4.1 Flash.
+**Schema-valid: 1/3.** Runs 1-2 are consistent schema drift; run 3 shows prompt
+precision can fix the keys, but the result remains prompt-dependent. The
+fail-closed path worked on every invalid document: no partial render, exact
+rejection reason shown.
 
-The host did not attempt a repair. `UiBlockParser` rejected the whole document,
-the lab showed the exact reason, and nothing was rendered. **Parse result:
-0/1 schema-valid; 1 rejection; fallback path proven.**
+## Why this matters
 
-This is a negative result for candidate A as prompted: a plain-text request is
-not a structured-output guarantee. It supports keeping the strict validator and
-not adopting model-generated UI without a schema-constrained channel.
+- A plain-text prompt is not a structured-output guarantee. Naming the exact
+  keys helps, but nothing enforces them.
+- The host-owned validator is the safety boundary; it rejected two of three
+  documents without rendering anything.
+- The model filled absent facts with `n/a` in run 3 rather than inventing them,
+  but run 1 invented a model/provider/token line. Data trust remains a model
+  behaviour, not a schema property.
 
 ## Method
 
@@ -49,10 +59,9 @@ state or write a file.
 
 ## Limits
 
-- One prompt, one model, one sample. This is a signal, not a corpus.
-- The JSON was pasted by the owner/agent through the UI; no automated producer.
+- Three prompts, one model, one sample. A signal, not a corpus.
+- The JSON was moved by copy/paste through the UI; no automated producer.
 - Render time, token cost, TalkBack, device dark/2.0x/RTL and the three-candidate
   comparison remain NOT PERFORMED.
-- The reply's content (including the invented model line) is recorded only as
-  evidence of schema drift; it is not a claim about the model's general
-  behaviour.
+- The replies' content is evidence of schema drift only, not a general claim
+  about the model.

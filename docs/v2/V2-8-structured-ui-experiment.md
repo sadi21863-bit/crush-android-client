@@ -1,7 +1,7 @@
 # V2-8 - Structured model UI experiment (opened 2026-11-22)
 
-**Status: OPEN - candidate A harness built; Robolectric accessibility render
-checks pass; model-run measurements pending.** Owner authorized opening V2-8 on
+**Status: OPEN - candidate A run performed; the model reply was rejected for
+schema drift, so no adoption is proposed.** Owner authorized opening V2-8 on
 2026-11-22. This record fixes the experiment's boundaries and exit criteria
 before any result, so the experiment cannot quietly become a production
 renderer.
@@ -93,10 +93,15 @@ On `bbf8ca69` (Redmi Note 7 Pro, API 29), same prompts per candidate:
 6. what the model actually produced when asked for the envelope (raw samples
    stored only if they contain no workspace data).
 
-Status (2026-11-22): items 1 and 5 have a harness (the lab) but no corpus run;
-item 3 has **Robolectric** render checks for dark theme, 2.0x font scale and RTL
-(`UiBlockViewTest`), while TalkBack and all device rows remain NOT PERFORMED;
-items 2, 4 and 6 are NOT PERFORMED.
+Status (2026-11-22): one real candidate-A run was performed with DeepSeek V4.1
+Flash on `opencode-go`. The reply was **not schema-valid**: `key`/`value`
+instead of `k`/`v`, `body` instead of `text`, and invented model/token data. The
+strict validator rejected the whole document (`block 3: item 0: unexpected field
+'key'`), and nothing was rendered. **Parse success 0/1; fallback proven.**
+Item 3 has Robolectric render checks for dark theme, 2.0x font scale and RTL;
+TalkBack and all device accessibility rows remain NOT PERFORMED. Items 2, 4 and
+the multi-prompt taxonomy remain NOT PERFORMED. Evidence:
+`docs/parity/2026-11-22-v2-8-lab/`.
 
 ## 4. Exit criteria
 

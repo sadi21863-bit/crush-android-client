@@ -1,9 +1,9 @@
 # V2-8 - Structured model UI experiment (opened 2026-11-22)
 
-**Status: OPEN - research complete; experiment not built.** Owner authorized
-opening V2-8 on 2026-11-22. This record fixes the experiment's boundaries and
-exit criteria before any code, so the experiment cannot quietly become a
-production renderer.
+**Status: OPEN - candidate A harness built and device-checked; model-run
+measurements pending.** Owner authorized opening V2-8 on 2026-11-22. This
+record fixes the experiment's boundaries and exit criteria before any result,
+so the experiment cannot quietly become a production renderer.
 
 ## 1. What the research settled
 
@@ -36,7 +36,7 @@ From `V2-7-8-web-research-2026-11-22.md` (all sources retrieved 2026-11-22):
 
 | Candidate | What it is | Gate |
 |---|---|---|
-| A. Prompt-only `ui_block/v1` | Ask the model to emit a strict JSON block envelope in a text part; validate and render through the V2-7.3 registry. The parser/renderer now exist (`ui-block-v1.md`); the experiment still needs a producer prompt and measurements | No new endpoint; no actions |
+| A. Prompt-only `ui_block/v1` | Ask the model to emit a strict JSON block envelope in a text part; validate and render through the V2-7.3 registry. The parser/renderer and a **debug-only paste lab** exist (`UiBlockLabActivity`); a real model run still needs an owner paste | No new endpoint; no actions |
 | B. A2UI `1.0.0-alpha02` | Official Compose renderer with a tiny Basic Catalog subset, in an isolated debug module | Requires an explicit owner decision on alpha + `compileSdk 37.1` + protocol 0.9.1 |
 | C. json-render-style adapter | A local Compose adapter for a flat `{root, elements}` spec, no JS dependency | Design reference only; no Vercel dependency |
 
@@ -56,6 +56,29 @@ must not import the TypeScript package; it is a local interpretation.
   pattern as the O11 stall.
 - Model output stays untrusted input: schema, size and depth limits; unknown
   block/field -> text fallback; no raw JSON dump beyond the bounded receipt.
+
+## 2.1 Candidate A harness (built 2026-11-22)
+
+`UiBlockLabActivity` is a debug-only screen:
+
+1. shows the experiment prompt (selectable, not auto-sent);
+2. accepts pasted model output;
+3. strips **at most one** outer Markdown fence (`normalizeUiBlockPayload`);
+4. runs the same strict `UiBlockParser`;
+5. renders a valid document through `UiBlockView`, or shows the exact rejection
+   reason.
+
+The producer step is manual because Crush has no per-turn structured-output
+request (research §5). This is a deliberate limit, not a claim of automation.
+The lab does not call the engine, touch Chat state, or write any file.
+
+What it can measure now: parse success/fallback, block counts, the rejection
+reason, and whether the rendered tree is legible. What it cannot measure without
+more work: render time/frame metrics, token cost, TalkBack/font-scale/RTL, and
+the three-candidate comparison. Those remain open in §3.
+
+Device evidence: `docs/parity/2026-11-22-v2-8-lab/` (sample parsed on device;
+a real model payload is still NOT PERFORMED).
 
 ## 3. Measurements to record
 
@@ -113,4 +136,6 @@ otherwise:
   contradictions).
 - V2-7 implementation: `V2-7-intelligent-ui.md`; the closed contract is
   `ui-block-v1.md` (validator + renderer + debug preview, producer-free).
-- No experiment code exists yet; this record must not be read as a result.
+- Candidate A lab: `UiBlockLabActivity` (debug only), normalization tests
+  `UiBlockLabTest`, device sample in `docs/parity/2026-11-22-v2-8-lab/`.
+- No model-produced result exists yet; this record must not be read as one.

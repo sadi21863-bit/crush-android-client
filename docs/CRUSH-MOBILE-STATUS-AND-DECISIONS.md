@@ -1140,7 +1140,7 @@ authorizes no implementation.
 | V2-5 | DONE (phone) | Code is project-bound; phone-first; tablet panes only after phone acceptance (still parked). |
 | V2-6 | DONE (phone) | Settings/Onboarding redesign; Finding 13 copy; no new preferences. |
 | V2-7 | **COMPLETE (foundation, 2026-11-22)** | 7.1 reasoning Collapsed/Off (device-verified), 7.2 unknown-part fallback, 7.3 `ui_block/v1` closed registry + debug preview. No external UI framework; V2-8 remains the model-authored experiment. |
-| V2-8 | **ACTIVE (experiment)** | Opened 2026-11-22 (V2-A17): debug-only, read-only structured-UI comparison; research complete, not built. A2UI reference-only by default. |
+| V2-8 | **ACTIVE (experiment)** | Opened 2026-11-22 (V2-A17): debug-only candidate A paste lab built and device-checked; model-run measurements pending. A2UI reference-only by default. |
 | V2-9 | **COMPLETE (hardening, 2026-11-22)** | ASK default evidence, real-Keystore instrumented coverage (3/3 on `bbf8ca69`), key-rotation checklist + scanner (PASS, 674 files). Gate 7 remains deferred; no submission, signing or listing work. |
 
 **Corrections to Revision 4.0 (recorded here; the revision file is not edited)**

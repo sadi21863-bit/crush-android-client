@@ -44,5 +44,15 @@
             android:exported="true"
             android:label="UI block preview"
             android:theme="@style/Theme.CrushMobile" />
+
+        <!--
+            V2-8 candidate A (2026-11-22): paste model output, validate and render.
+            Debug source set only; static lab, no data, no input beyond the field.
+        -->
+        <activity
+            android:name=".ui.screens.spike.UiBlockLabActivity"
+            android:exported="true"
+            android:label="UI block lab"
+            android:theme="@style/Theme.CrushMobile" />
     </application>
 </manifest>

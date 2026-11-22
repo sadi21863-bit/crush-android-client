@@ -23,7 +23,7 @@ Rules:
 | V2-A4 | No brief deferral is reopened: pinned message/follow, cost/context-window display, new density/navigation/response-rendering preferences, structured model UI and release packaging stay backlog | 2026-11-19 | §5.10; package trims |
 | V2-A5 | Provider offer rule: offer tested providers only (`isKnown`), plus any provider whose key is already stored; hidden ids remain resolvable | 2026-11-18 | `Providers.offerable`, `1c902eb`, after-f12 manifest |
 | V2-A6 | Evidence labels (CODE/TEST/CI/DEVICE-RECORDED/DEVICE-VERIFIED/PARTIAL/PLANNED/NOT-PERFORMED/OWNER-DECISION) are mandatory in V2 reports | 2026-11-19 | Revision 4.0 §1.2; §5.10 accepted rules |
-| V2-A7 | V2.0 active scope is V2-0 to V2-6 only; V2-7, V2-8 and V2-9 are parked | 2026-11-19 | §5.10 package table |
+| V2-A7 | V2.0 active scope is V2-0 to V2-6 only; V2-7, V2-8 and V2-9 are parked (superseded for V2-9 on 2026-11-22 by V2-A15, hardening only) | 2026-11-19 | §5.10 package table |
 | V2-A8 | V2-1 visual direction approved (owner, 2026-11-19): neutral graphite accent (`#3B3B36` light / `#D3D0C8` dark, measured 10.62/12.17 on paper/bg), body text 15sp, platform monospace, V2-2 includes call-site reclassification. Because the accent is only 1.53:1 (light) / 1.29:1 (dark) from ink, interactive/selected state must never rely on hue alone: underline, fill, weight, filled icons and a 2dp focus outline carry it | 2026-11-19 | `V2-1-design-foundation.md` §4.1, §9; §5.11 |
 | V2-A9 | V2-5 ships **Build (project chat) + Review** as the phone workflow. **Explore is deferred** until a real read-only file browser exists; no fake Explore tab and no fourth primary destination (V2-A2). Build/Review navigation must not grant permission or change a run's binding/policy | 2026-11-20 | owner answer 2026-11-20; `V2-5-code-projects-review.md` |
 | V2-A10 | The legacy workspace is **Chat-only** and is not listed in Projects. Projects lists imported/app-managed Code projects; a row opens a **project home** (identity, path, trust, last measured changes, Open Code chat, Review) rather than jumping straight into a chat. This supersedes brief §4.7.2's "legacy row" clause | 2026-11-20 | owner answer 2026-11-20; `V2-5-code-projects-review.md` |
@@ -31,6 +31,7 @@ Rules:
 | V2-A12 | The three primary destinations are labeled **Crush Chat, Crush Code, Settings**; Projects is the project list inside Crush Code, not a peer tab. Chat and Code are list-first: Chat shows chats, Code shows projects, a project shows its own sessions. Each project's sessions stay on that project's engine | 2026-11-20 | owner notebook 2026-11-20; `V2-5-chat-code-ia-plan.md` |
 | V2-A13 | **V2-1 is complete for the phone scope.** Tasks 3, 5 and 6 (navigation, chat-state and project/Review prototypes) are closed as **superseded** by the shipped, device-verified V2-3/V2-4/V2-5 screens; no prototype screens are built. Task 4 (tablet rail/list-detail) stays NOT PERFORMED under O3 | 2026-11-22 | owner approved option A; `V2-1-exit-reconciliation-2026-11-22.md` §2, §3, §6 |
 | V2-A14 | **V2-0 is complete.** The baseline ledger is accepted as-is: every brief area has a status and evidence pointer, and the open rows are named carry-over work (perf proof, Diagnostics/About pinned version, report redaction/tail test, screenshot/instrumentation suite, T6-01/T6-02, onboarding device row). Acceptance does not claim those gaps are fixed | 2026-11-22 | owner acceptance; `V2-0-signoff-2026-11-22.md` §3, §4 |
+| V2-A15 | **V2-9 is opened for hardening only**, not release/rollout: (1) record the ASK permission default, (2) add real-Keystore instrumented coverage, (3) add the key-rotation checklist and local scanner. Gate 7 store submission, signing and listing stay deferred; V2-7/V2-8 stay parked | 2026-11-22 | owner approval; `V2-9-release-hardening.md` §1 |
 
 ## Open (owner gate)
 
@@ -40,7 +41,7 @@ Rules:
 | O4 | Tool-activity visibility level | Chat transcript design | backlog until usability evidence |
 | O5 | Any preference beyond existing Settings | V2-6 | backlog; no new preference batch |
 | O8 | AFA/import-only policy change | project import | NO CHANGE; needs ADR + store review |
-| O9 | Release hardening/rollout | shipping | separate roadmap; V2-9 parked |
+| O9 | Release hardening/rollout | shipping | **V2-9 hardening opened and completed 2026-11-22 (V2-A15)**; store rollout still a separate roadmap step |
 | O10 | Deny-all relaxation for Chat | Chat tool policy | DEFERRED; deny-all stands |
 | O11 | **RESOLVED 2026-11-22** - loading row captured on device (`Loading sessions...` / `Loading chats...`) via a debug-only stall harness plus a debug-only preview activity; see `docs/parity/2026-11-22-o11-session-loading/` | parity closure | done; live window evidenced by the stall log and unit pins |
 | O12 | **RESOLVED 2026-11-21** - Finding 13 copy fixed in V2-6 ("Add a key for \<provider\> to start chatting.") | - | resolved; see §5.15 and the V2-6 record |
@@ -74,7 +75,6 @@ so the 80dp bar is the accepted reading and V2-3 implements it. The 56dp
 |---|---|---|
 | V2-7 | Deterministic intelligent UI foundation | separate approval; A2UI is alpha (`1.0.0-alpha02`, 2026-10-21) |
 | V2-8 | Structured model UI experiment | same |
-| V2-9 | Release hardening and rollout | Gate 7 remains deferred |
 
 ## Standing constraints (not decisions to revisit)
 

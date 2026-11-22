@@ -2,8 +2,9 @@
 
 Status: **V2 implementation is authorized.** V2-0 and V2-2 through V2-6 are
 complete on the phone; V2-1 is complete for the phone scope (V2-A8 direction,
-V2-A13 closure: tablet prototypes carried under O3). See the package table
-below for per-package evidence and limits.
+V2-A13 closure: tablet prototypes carried under O3). V2-9 is complete for its
+hardening scope (V2-A15); Gate 7 stays deferred. V2-7/V2-8 remain parked. See
+the package table below for per-package evidence and limits.
 
 Authority (owner, 2026-11-19): Revision 4.0 is the forward roadmap and
 design direction. The November 14 Rev 3.1 brief remains authoritative for
@@ -29,6 +30,7 @@ the owner's trims.
 | `V2-5-chat-code-ia-plan.md` | Corrected Chat/Code IA from the owner notebook: Crush Chat on legacy, Crush Code project sessions, list-first (V2-A11/A12) |
 | `V2-5-chat-code-split-research.md` | Source-plan research for the Chat/Code split, drift list and legacy-history consequence |
 | `V2-6-settings-onboarding.md` | Settings/Onboarding redesign record: V2-A4 trim, brief section order, Finding 13 copy, honest onboarding copy, evidence (complete on phone) |
+| `V2-9-release-hardening.md` | **active (hardening only)**: ASK default recorded (already closed in code), real-Keystore instrumented coverage, key-rotation checklist + local scanner; Gate 7 stays deferred |
 | `../parity/2026-11-19-v2-0-baseline/MANIFEST.md` | fresh task-6 phone capture set: device/build, 15 captures, findings F-A to F-G, corrections C1 to C3 |
 
 ## Scope
@@ -52,7 +54,8 @@ the owner's trims.
 | V2-4 | complete (2026-11-20) | chat empty/transcript/composer/sheets/picker redesign plus F-B/F-C/F-E/F-J; tasks 4 and 7-cost/context trimmed by V2-A4; final gate 899 tests / 0 failures, lint 0 errors / 1 pre-existing warning; 30-capture device pass found and fixed F-L (user-prose contrast), F-M (empty tool-only bubble) and F-N (2.0x chip clipping); Retry verified after an owner-approved network cut; 2.0x font scale checked; CI `44734151566` green. Limits: frame timing, reduced motion, density, wide/tablet, provider switch and model loading/not-in-list device states NOT PERFORMED |
 | V2-5 | complete (phone, 2026-11-21) | corrected IA V2-A11/A12: Crush Chat on legacy with deny-all policy, Crush Code project list → project home → project sessions, list-first tabs, Code-tab shell selection; Project-scoped Review, not-measured cards, IME bar; gate 9 green (917 tests, 0 failures; lint 0 errors / 1 pre-existing warning). Device pass completed 2026-11-21: IA + project-bound chat + IME (30-38, 40), populated Review (57), byte-exact export (58-60, 64), confirmed revert (66-67), two-project switching (80-94), changed-`crushrc` re-gate (72-74), legacy deny-all spawn line. Tablet/wide, 2.0x font, the accept branch, a not-measured card, the Chat-switch veto and a running session row are the listed limits |
 | V2-6 | complete (phone, 2026-11-21) | Settings/Onboarding redesign on the V2-2 components; brief §4.7.4 section order; Finding 13 copy fixed; no new preferences (V2-A4/O5); provider round-trip and relaunch route verified on device (`17`-`21`), ASK restored; 2.0x font scale checked and the provider-badge squeeze fixed (`24`-`27`). Gate `v2-6-gate-1.log`: 919 tests / 96 classes / 0 failures, lint 0 errors / 1 pre-existing warning; the post-fix re-gate `v2-6-gate-4.log` is green. Limits: Onboarding device row, tablet/wide, Onboarding at 2.0x, and key save/delete on device NOT PERFORMED (see manifest); injected-tap harness quirk recorded |
-| V2-7/8/9 | parked | separate owner approval |
+| V2-7/8 | parked | separate owner approval |
+| V2-9 | **complete (hardening, 2026-11-22)** | ASK default recorded (already closed in code); `SecureKeyStoreInstrumentedTest` OK (3 tests) on `bbf8ca69`; `tools/check-secrets.ps1` PASS over 674 tracked files; gate 924 tests / 0 failures, lint 0 errors / 1 warning. Gate 7 submission/signing/listing remains deferred. Evidence: `docs/parity/2026-11-22-v2-9-hardening/` |
 
 ## Rules that apply to every package
 

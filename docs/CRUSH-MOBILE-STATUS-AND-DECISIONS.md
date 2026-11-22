@@ -1127,7 +1127,7 @@ authorizes no implementation.
 | Package | Status | Applied trim |
 |---|---|---|
 | V2-0 | ACTIVE | Baseline re-lock at `1679f25`; O11 harness landed (`d5a0718`) and the loading row was captured on device on 2026-11-22; no implementation. |
-| V2-1 | ACTIVE | Prototype within brief §4.6; no drawer-vs-tabs reopen. **Closure proposed 2026-11-22** (`docs/v2/V2-1-exit-reconciliation-2026-11-22.md`); awaits owner decision. |
+| V2-1 | **COMPLETE (phone scope)** | Prototype within brief §4.6; no drawer-vs-tabs reopen. Closed 2026-11-22 (V2-A13): tasks 3/5/6 superseded by shipped evidence, tablet prototypes carried under O3 — `docs/v2/V2-1-exit-reconciliation-2026-11-22.md`. |
 | V2-2 | ACTIVE | Tokens/components; density is a rendering check, not a user preference. |
 | V2-3 | ACTIVE | 3 destinations; delete the dead `Screen.Models`; no 4th Code destination. |
 | V2-4 | ACTIVE | Drop pinned/follow (task 4) and cost/context (task 7); keep empty state, transcript, composer, session sheet, picker and actions. |
@@ -1232,8 +1232,15 @@ proposal keeps the existing diff pairs (7.87 / 6.57 light, 10.5 / 8.0 dark)
 and offers a measured warm-neutral palette plus spacing, shape, type,
 dimension and motion tokens. Four owner answers (Q1-Q4) and approval of
 sections 4-8 are the visual-direction sign-off (gate O2). Prototype tasks
-remain NOT PERFORMED because they add screens and need authorization;
-V2-1 is PARTIAL, not done.
+remain NOT PERFORMED because they add screens and need authorization; on
+2026-11-19 V2-1 was PARTIAL, not done.
+
+> **2026-11-22 — V2-1 closed (phone scope), V2-A13.** The owner approved
+> `docs/v2/V2-1-exit-reconciliation-2026-11-22.md` option A: tasks 3, 5 and 6
+> are closed as **superseded** by the shipped, device-verified V2-3/V2-4/V2-5
+> screens (no prototype screens were built); task 4 (tablet/wide) remains
+> NOT PERFORMED under **O3**. §3 of that record lists what the closure cannot
+> claim. The paragraph above is retained as the 2026-11-19 record.
 
 **Owner answers (2026-11-19) and the V2-A8 decision.** Accent =
 **neutral graphite** `#3B3B36` light / `#D3D0C8` dark (10.62 / 12.17 on

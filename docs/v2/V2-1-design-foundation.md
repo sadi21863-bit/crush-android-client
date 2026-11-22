@@ -3,10 +3,16 @@
 Status: **APPROVED 2026-11-19.** Owner gate **O2 resolved**; decision recorded
 as **V2-A8**. Date of proposal 2026-11-19.
 
-The owner answered Q1-Q4 and approved sections 4-8, which authorizes **V2-2
-only**. V2-3 (shell and navigation) is still not authorized, and the
-prototype tasks 3-6 below remain NOT PERFORMED, so V2-1 as a *whole* stays
-PARTIAL even though its design direction is now binding.
+The owner answered Q1-Q4 and approved sections 4-8, which authorized **V2-2**
+(V2-3 later got its own go). On 2026-11-19 the prototype tasks 3-6 below were
+NOT PERFORMED, so V2-1 as a *whole* stayed PARTIAL even though its design
+direction was binding.
+
+**Closed 2026-11-22 (V2-A13):** V2-1 is **complete for the phone scope**.
+Tasks 3, 5 and 6 are superseded by the shipped, device-verified V2-3/V2-4/V2-5
+screens; task 4 (tablet) remains NOT PERFORMED under O3. The task rows in §1
+keep their pre-closure wording deliberately; see
+`V2-1-exit-reconciliation-2026-11-22.md` for the disposition and limits.
 
 The proposal changed no product source, test, Gradle file or navigation code,
 adds no preference and touches no permission, persistence or engine
@@ -20,7 +26,7 @@ Rev 3.1 brief sections 4.2-4.9 and by the accepted decisions in
 
 ## 1. What V2-1 must deliver
 
-| Rev 4.0 task | Status after this document |
+| Rev 4.0 task | Status as of 2026-11-19 (pre-closure) |
 |---|---|
 | 1. Color, type, spacing, shape, elevation, motion, icon tokens | DONE, **APPROVED** |
 | 2. Shared components and state variants | PARTIAL: state catalogue only; component library lands in V2-2 |
@@ -32,16 +38,18 @@ Rev 3.1 brief sections 4.2-4.9 and by the accepted decisions in
 | 8. Validate flows against current app behavior | PARTIAL: device evidence for 15 surfaces, not a walkthrough of every flow |
 
 V2-1 exit requires an approved spec **and** screen-state catalogue **and**
-complete phone flows **and** specified tablet behavior. The spec and
-catalogue are approved; the prototype/flow tasks are honestly open. V2-1 is
-**PARTIAL, not done** — the approval unblocks V2-2 tokens and components,
-not a claim that the V2-1 exit criteria were met.
+complete phone flows **and** specified tablet behavior. At the time of the
+proposal the spec and catalogue were approved while the prototype/flow tasks
+were honestly open, so V2-1 was **PARTIAL, not done** — the approval unblocked
+V2-2 tokens and components, not a claim that the V2-1 exit criteria were met.
 
-> **2026-11-22 — closure proposed, not applied.** Tasks 3, 5 and 6 are
-> proposed as **superseded** by the shipped, device-verified V2-3/V2-4/V2-5
+> **2026-11-22 — closure accepted (V2-A13).** Tasks 3, 5 and 6 are now
+> recorded as **superseded** by the shipped, device-verified V2-3/V2-4/V2-5
 > screens (no prototype screens built); task 4 (tablet) stays deferred under
-> O3. See `V2-1-exit-reconciliation-2026-11-22.md`. The rows above are
-> unchanged until the owner decides.
+> O3. See `V2-1-exit-reconciliation-2026-11-22.md`. The rows above keep the
+> original pre-closure wording for traceability; the package table in
+> `README.md` and the §1 status block in the reconciliation record carry the
+> closed state.
 
 ## 2. Method and limits
 

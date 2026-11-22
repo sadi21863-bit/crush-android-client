@@ -1,7 +1,8 @@
 # V2-1 exit reconciliation (2026-11-22)
 
-Status: **PROPOSAL — awaits the owner's decision.** Docs only; no source,
-test or build change. Nothing here closes V2-1 by itself.
+Status: **ACCEPTED (option A), 2026-11-22, owner.** V2-1 is closed for the
+phone scope; task 4 is carried under O3. Docs only; no source, test or build
+change followed. Recorded as ADR **V2-A13**.
 
 ## 1. Why this record exists
 
@@ -15,15 +16,16 @@ phone**. The decisions the prototypes were meant to inform have already been
 made, built and measured against hardware. Building throwaway prototype
 screens now would answer no open question and would duplicate shipped UI.
 
-So the honest options are:
+So the honest options were:
 
 - **(A, recommended)** close V2-1 for the phone scope, cite the shipped
   evidence, and carry the one genuinely unbuilt item (tablet/wide
   prototypes, task 4) under open decision **O3**;
 - **(B)** authorize new prototype screens anyway, as a visual exercise.
 
-This record supports (A) and states exactly what it would and would not
-claim. The owner decides in §6.
+This record supported (A). **The owner chose option A on 2026-11-22** (§6),
+so the dispositions below are now the recorded state and the package
+tables say complete (phone scope).
 
 ## 2. Task-by-task disposition
 
@@ -85,15 +87,14 @@ settled. It would not claim:
 | Loading rows (O11) | `docs/parity/2026-11-22-o11-session-loading/` |
 | Device limits | `docs/v2/V2-0-baseline-lock-2026-11-19.md` §6 |
 
-## 6. Decision requested
+## 6. Decision (recorded)
 
-1. **Approve option A?** Then V2-1 is recorded **COMPLETE (phone scope)**,
-   task 4 is carried under O3, and the package tables in
-   `docs/v2/README.md` and `docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md` §5.10
-   move V2-1 from "partial" to "complete (phone)" with §3 as the stated
-   limits.
-2. **Or approve option B?** Then name which screens (tasks 3, 5, 6; task 4
-   remains blocked) and they become an authorized package item with its own
-   evidence bar.
+**Option A — approved by the owner on 2026-11-22.** V2-1 is
+**COMPLETE (phone scope)**: tasks 3, 5 and 6 are closed as superseded by the
+shipped, device-verified screens; task 4 remains NOT PERFORMED and is carried
+under **O3**; §3 is the binding list of limits on the closure. Recorded in
+`ADR-REGISTER.md` as **V2-A13**, and reflected in `docs/v2/README.md` and
+`docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md` §5.10.
 
-No source change follows either way. Only the status records move.
+Option B was not taken; no prototype screens were built. No source change
+followed either way — only the status records moved.

@@ -1,10 +1,12 @@
 # V2-7 - Deterministic intelligent UI foundation (opened 2026-11-22)
 
-**Status: IN PROGRESS.** Owner authorized opening V2-7 on 2026-11-22, with one
-explicit instruction: model reasoning is shown **collapsed**, and a setting can
-turn it off completely. **V2-7.1 and V2-7.2 are complete and device-verified**
-(2026-11-22); V2-7.3 (the `ui_block/v1` registry) is the remaining work.
-Everything below is bounded by that instruction and by the research records:
+**Status: COMPLETE (foundation), 2026-11-22.** Owner authorized opening V2-7 on
+2026-11-22, with one explicit instruction: model reasoning is shown
+**collapsed**, and a setting can turn it off completely. All three selected
+items (7.1 reasoning + setting, 7.2 unknown-part fallback, 7.3 `ui_block/v1`
+registry) are implemented, gated and device-checked. V2-8 remains the
+model-authored experiment. Everything below is bounded by that instruction and
+by the research records:
 
 - `V2-7-8-codebase-inventory-2026-11-22.md` (what the tree can support)
 - `V2-7-8-web-research-2026-11-22.md` (A2UI / json-render / MCP Apps / structured
@@ -20,7 +22,7 @@ any later structured renderer:
 |---|---|---|
 | V2-7.1 | **Reasoning block + two-state setting.** Model reasoning renders as a collapsed disclosure above the reply; Settings offers **Collapsed / Off**, where Off never shows and drops reasoning at the transcript boundary. Reversible at any time. | **DONE** (gate + device: `docs/parity/2026-11-22-v2-7-reasoning/`) |
 | V2-7.2 | **Unknown-part fallback.** A message part this build does not know renders as bounded plain text (`Unsupported content (type)`) instead of vanishing; hidden parts stay hidden. Acceptance-kit row 6. | **DONE** (gate; renderer pinned) |
-| V2-7.3 | **Host-owned `ui_block/v1` registry.** A closed, versioned block model and a deterministic Compose renderer with validation, fallback, stable replacement on whole-message republish, and accessible semantics. No HTML/JS/WebView/URLs/actions. | PLANNED - spec first, then renderer |
+| V2-7.3 | **Host-owned `ui_block/v1` registry.** Closed six-type vocabulary, strict whole-document validator, deterministic Compose renderer, debug-only preview. No production producer; V2-8 may feed envelopes through it read-only. | **DONE** (gate + device preview: `docs/parity/2026-11-22-v2-7-blocks/`); spec in `ui-block-v1.md` |
 
 ### Not in V2-7
 
@@ -100,8 +102,11 @@ No other preference is added in this package.
 | Projection input | `ui/screens/chat/ChatHostInputs.kt`, `ChatViewModel.hostState` |
 | State | `ChatMessage.thinking` / `ChatMessage.unknownText`, `ChatViewState.reasoningDisplay`, `ChatUiState.reasoningDisplay` |
 | Replay | `ChatViewModel.replayRow` (thinking + unknownText) |
-| Parser | `data/crush/CrushEvent.kt` (`unknownText`, known-type set, hidden rule, caps) |
-| Renderer | `ui/screens/chat/ChatContent.kt` (`ReasoningBlock`, `UnsupportedContentBlock`, inside the private `Bubble`) |
+| Wire parser | `data/crush/CrushEvent.kt` (`unknownText`, known-type set, hidden rule, caps) |
+| Transcript rendering | `ui/screens/chat/ChatContent.kt` (`ReasoningBlock`, `UnsupportedContentBlock` inside the private `Bubble`) |
+| Block parsing | `ui/blocks/UiBlock.kt` (`UiBlock`, `UiBlockParser`, limits, strict field checks) |
+| Rendering | `ui/blocks/UiBlockView.kt` (six fixed block renderers, no interaction) |
+| Preview | `app/src/debug/.../UiBlockPreviewActivity.kt` + debug manifest entry |
 
 The composer gates (`canType`, `canSend`, `canSubmitViaIme`) and the Chat
 deny-all boundary are untouched.
@@ -121,8 +126,9 @@ deny-all boundary are untouched.
   with empty `thinking`; the live branch uses the same mode.
 - **Gate:** `:app:testDebugUnitTest :app:assembleDebug
   :app:assembleDebugAndroidTest :app:lintRelease`.
-  `v2-7-gate-2.log`: **938 tests / 98 classes / 0 failures**; lint **0 errors /
-  1 pre-existing warning**.
+  `v2-7-gate-2.log` (7.1/7.2): **938 tests / 98 classes / 0 failures**;
+  `v2-7-blocks-gate-1.log` (7.3): **954 tests / 100 classes / 0 failures**;
+  lint **0 errors / 1 pre-existing warning** in both.
 - **Device:** `docs/parity/2026-11-22-v2-7-reasoning/` - Settings in both
   states, a live reasoning turn collapsed and expanded, the same chat with Off,
   and the restored block after switching back. API 29 only.

@@ -36,7 +36,7 @@ From `V2-7-8-web-research-2026-11-22.md` (all sources retrieved 2026-11-22):
 
 | Candidate | What it is | Gate |
 |---|---|---|
-| A. Prompt-only `ui_block/v1` | Ask the model to emit a strict JSON block envelope in a text part; validate and render through the V2-7.3 registry | No new endpoint; no actions |
+| A. Prompt-only `ui_block/v1` | Ask the model to emit a strict JSON block envelope in a text part; validate and render through the V2-7.3 registry. The parser/renderer now exist (`ui-block-v1.md`); the experiment still needs a producer prompt and measurements | No new endpoint; no actions |
 | B. A2UI `1.0.0-alpha02` | Official Compose renderer with a tiny Basic Catalog subset, in an isolated debug module | Requires an explicit owner decision on alpha + `compileSdk 37.1` + protocol 0.9.1 |
 | C. json-render-style adapter | A local Compose adapter for a flat `{root, elements}` spec, no JS dependency | Design reference only; no Vercel dependency |
 
@@ -111,5 +111,6 @@ otherwise:
 - Codebase: `V2-7-8-codebase-inventory-2026-11-22.md`.
 - External: `V2-7-8-web-research-2026-11-22.md` (source table, verdicts,
   contradictions).
-- V2-7 implementation: `V2-7-intelligent-ui.md`.
+- V2-7 implementation: `V2-7-intelligent-ui.md`; the closed contract is
+  `ui-block-v1.md` (validator + renderer + debug preview, producer-free).
 - No experiment code exists yet; this record must not be read as a result.

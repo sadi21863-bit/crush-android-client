@@ -1,0 +1,89 @@
+package com.crush.mobile.ui.blocks
+
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import com.crush.mobile.ui.theme.CrushMobileTheme
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+/**
+ * V2-7.3: the deterministic renderer.
+ *
+ * The document is fabricated from the public model rather than parsed, so a
+ * parser regression cannot make this test pass vacuously.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "w411dp-h891dp")
+class UiBlockViewTest {
+
+    @get:Rule
+    val compose = createComposeRule()
+
+    private fun setContent(vararg blocks: UiBlock) {
+        compose.setContent {
+            CrushMobileTheme(themeMode = "light") {
+                UiBlockView(UiBlockDocument(blocks.toList()))
+            }
+        }
+    }
+
+    @Test
+    fun `a table renders its headers and cells`() {
+        setContent(
+            UiBlock.Table(
+                columns = listOf("Name", "Value"),
+                rows = listOf(listOf("alpha", "1"), listOf("beta", "2")),
+            )
+        )
+
+        compose.onNodeWithTag("ui-block-table").assertIsDisplayed()
+        compose.onNodeWithText("Name").assertIsDisplayed()
+        compose.onNodeWithText("alpha").assertIsDisplayed()
+        compose.onNodeWithText("beta").assertIsDisplayed()
+    }
+
+    @Test
+    fun `key-value pairs show both sides`() {
+        setContent(
+            UiBlock.KeyValue(
+                listOf(
+                    UiBlock.KeyValue.Item("Model", "DeepSeek V4.1 Flash"),
+                    UiBlock.KeyValue.Item("Provider", "opencode-go"),
+                )
+            )
+        )
+
+        compose.onNodeWithTag("ui-block-kv").assertIsDisplayed()
+        compose.onNodeWithText("Model").assertIsDisplayed()
+        compose.onNodeWithText("DeepSeek V4.1 Flash").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a callout shows its title and body`() {
+        setContent(
+            UiBlock.Callout(
+                tone = UiBlock.Callout.Tone.WARNING,
+                title = "Careful",
+                text = "This is a warning.",
+            )
+        )
+
+        compose.onNodeWithTag("ui-block-callout").assertIsDisplayed()
+        compose.onNodeWithText("Careful").assertIsDisplayed()
+        compose.onNodeWithText("This is a warning.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a code block shows the language and code`() {
+        setContent(UiBlock.Code(language = "kotlin", text = "val answer = 42"))
+
+        compose.onNodeWithTag("ui-block-code").assertIsDisplayed()
+        compose.onNodeWithText("kotlin").assertIsDisplayed()
+        compose.onNodeWithText("val answer = 42").assertIsDisplayed()
+    }
+}

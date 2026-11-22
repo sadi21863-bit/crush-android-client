@@ -33,5 +33,16 @@
             android:exported="true"
             android:label="Session list preview"
             android:theme="@style/Theme.CrushMobile" />
+
+        <!--
+            V2-7.3 (2026-11-22): the real ui_block/v1 renderer with a host-authored
+            document. Debug source set only; static screen, no data, no input.
+            Exported for the same ROM reason as the session-list preview above.
+        -->
+        <activity
+            android:name=".ui.screens.spike.UiBlockPreviewActivity"
+            android:exported="true"
+            android:label="UI block preview"
+            android:theme="@style/Theme.CrushMobile" />
     </application>
 </manifest>

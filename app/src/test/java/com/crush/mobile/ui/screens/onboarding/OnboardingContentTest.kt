@@ -70,6 +70,18 @@ class OnboardingContentTest {
     }
 
     @Test
+    fun `the heading promises provider models without a model count`() {
+        setContent()
+
+        // A5: no hardcoded catalogue number - the promise is qualified by the
+        // provider the user actually connects.
+        compose.onNodeWithText(
+            "Connect a provider and chat with its available models"
+        ).assertIsDisplayed()
+        compose.onNodeWithText("70+", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun `the provider slot names the selected provider`() {
         setContent()
 

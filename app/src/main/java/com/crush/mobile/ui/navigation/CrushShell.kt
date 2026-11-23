@@ -169,6 +169,28 @@ private fun rememberImeVisible(): Boolean {
     PrimaryDestination.Settings -> destination.route == route
 }
 
+/**
+ * V2-GAP-AUDIT A1: one veto path for all three shell layouts.
+ *
+ * Only the Chat destination asks [onSelectChat]; the callback returns false
+ * while a project run is in flight (it shows the Toast itself). Returning false
+ * must mean "neither navigate nor change the binding", so the rail and the
+ * extended rail cannot offer an escape hatch the bottom bar closes.
+ *
+ * @return true when navigation was requested, false when the switch was vetoed.
+ */
+private fun selectPrimary(
+    destination: PrimaryDestination,
+    navController: NavController,
+    onSelectChat: (() -> Boolean)?,
+): Boolean {
+    val proceed = if (destination == PrimaryDestination.Chat) {
+        onSelectChat?.invoke() ?: true
+    } else true
+    if (proceed) navigatePrimary(navController, destination)
+    return proceed
+}
+
 @Composable
 private fun CrushBottomBar(
     route: String?,
@@ -185,14 +207,7 @@ private fun CrushBottomBar(
             val selected = isSelected(destination, route, codeActive)
             NavigationBarItem(
                 selected = selected,
-                onClick = {
-                    val proceed = if (destination == PrimaryDestination.Chat) {
-                        onSelectChat?.invoke() ?: true
-                    } else {
-                        true
-                    }
-                    if (proceed) navigatePrimary(navController, destination)
-                },
+                onClick = { selectPrimary(destination, navController, onSelectChat) },
                 // Filled icon + label + indicator fill: three signals, because
                 // the graphite accent cannot separate selected by hue.
                 icon = {
@@ -226,10 +241,7 @@ private fun CrushRail(
             val selected = isSelected(destination, route, codeActive)
             NavigationRailItem(
                 selected = selected,
-                onClick = {
-                    if (destination == PrimaryDestination.Chat) onSelectChat?.invoke()
-                    navigatePrimary(navController, destination)
-                },
+                onClick = { selectPrimary(destination, navController, onSelectChat) },
                 icon = {
                     Icon(
                         imageVector = if (selected) {
@@ -290,10 +302,7 @@ private fun CrushExtendedRail(
                         )
                     },
                     selected = selected,
-                    onClick = {
-                        if (destination == PrimaryDestination.Chat) onSelectChat?.invoke()
-                        navigatePrimary(navController, destination)
-                    },
+                    onClick = { selectPrimary(destination, navController, onSelectChat) },
                     modifier = Modifier.padding(
                         horizontal = CrushSpacing.md,
                         vertical = 2.dp,

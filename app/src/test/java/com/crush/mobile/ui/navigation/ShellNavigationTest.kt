@@ -71,6 +71,35 @@ class ShellNavigationTest {
         Text("$route-content")
     }
 
+    /**
+     * V2-GAP-AUDIT A1: the Chat veto must mean the same thing at every width.
+     *
+     * Starts on Projects so a permitted tap has somewhere to go; asserts the
+     * route through the shared [nav] recorder rather than on the Toast the real
+     * callback shows. The invocation count pins that the callback ran exactly
+     * once either way, so a layout that skipped the veto is caught.
+     */
+    private fun assertChatTapHonoursVeto(layoutTag: String, proceed: Boolean) {
+        var chatSelections = 0
+        setContent(
+            start = "projects",
+            onSelectChat = {
+                chatSelections += 1
+                proceed
+            },
+        )
+
+        compose.onNodeWithTag(layoutTag).assertIsDisplayed()
+        compose.onNodeWithText("Crush Chat").performClick()
+        compose.waitForIdle()
+
+        assertEquals(1, chatSelections)
+        assertEquals(
+            if (proceed) "chat" else "projects",
+            nav.currentDestination?.route,
+        )
+    }
+
     @Test
     @Config(qualifiers = "w411dp-h1600dp")
     fun `a project chat highlights Crush Code and Chat resets the binding`() {
@@ -227,5 +256,41 @@ class ShellNavigationTest {
         compose.onNodeWithText("Settings").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("settings-content").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun `bottom bar vetoes the Chat switch when a run is in flight`() {
+        assertChatTapHonoursVeto("shell-bottom-bar", proceed = false)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun `bottom bar opens Chat when the switch is allowed`() {
+        assertChatTapHonoursVeto("shell-bottom-bar", proceed = true)
+    }
+
+    @Test
+    @Config(qualifiers = "w700dp-h1200dp")
+    fun `rail vetoes the Chat switch when a run is in flight`() {
+        assertChatTapHonoursVeto("shell-rail", proceed = false)
+    }
+
+    @Test
+    @Config(qualifiers = "w700dp-h1200dp")
+    fun `rail opens Chat when the switch is allowed`() {
+        assertChatTapHonoursVeto("shell-rail", proceed = true)
+    }
+
+    @Test
+    @Config(qualifiers = "w1000dp-h1400dp")
+    fun `extended rail vetoes the Chat switch when a run is in flight`() {
+        assertChatTapHonoursVeto("shell-extended-rail", proceed = false)
+    }
+
+    @Test
+    @Config(qualifiers = "w1000dp-h1400dp")
+    fun `extended rail opens Chat when the switch is allowed`() {
+        assertChatTapHonoursVeto("shell-extended-rail", proceed = true)
     }
 }

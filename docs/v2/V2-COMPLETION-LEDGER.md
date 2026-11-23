@@ -9,6 +9,10 @@ check exists: rows that were not run say NOT PERFORMED and stay that way. Gate 7
 (signing, packaging, listing, submission, rollout) is a separate milestone and
 is out of scope for everything here.
 
+The **V2-12** audit-fix batch (2026-11-23) is appended as its own row in §2 and
+its own line in §4; its four-task gate ran green at 997 tests / 104 suites / 0
+failures (`v2-12-gate-2026-11-23.log`). The V2-11 rows stay as written.
+
 ## 1. Reading guide for the five evidence labels
 
 | Label | Means | Requires |
@@ -45,6 +49,7 @@ Rules that hold across this ledger:
 | **V2-8** | nothing in production; debug-only `app/src/debug/.../UiBlockLabActivity.kt` + `normalizeUiBlockPayload` | `UiBlockLabTest`, `UiBlockParserTest` (12), `UiBlockViewTest` (7; includes the dark, 2.0x and RTL renders) | — | `docs/parity/2026-11-22-v2-8-lab/` `00`-`07`: three candidate-A runs, 1/3 schema-valid | model-authored production renderer (not adopted, V2-A19); render time, token cost, TalkBack, device dark/2.0x/RTL, three-candidate comparison NOT PERFORMED; A2UI blocked (alpha, protocol 0.9.1, `compileSdk 37.1`) | `docs/v2/V2-8-structured-ui-experiment.md` §7 |
 | **V2-9** | no production source change; adds `app/src/androidTest/java/com/crush/mobile/SecureKeyStoreInstrumentedTest.kt`, `tools/check-secrets.ps1`, `docs/release-key-rotation.md` | no new class; ASK default pinned by `PermissionModeTest`, `SettingsContentTest` | `SecureKeyStoreInstrumentedTest` — `OK (3 tests)` on `bbf8ca69`; `docs/parity/2026-11-22-v2-9-hardening/01-securekeystore-instrumented.txt` | `01-securekeystore-instrumented.txt`, `02-secret-scan.txt` (PASS, 674 tracked files, 2 allowlisted fixtures) | auth-gated/biometric key path (absent by design); API 30+ Keystore/StrongBox; git history; Gate 7 | `docs/v2/V2-9-release-hardening.md` §6 |
 | **V2-11** | docs, `tools/perf-baseline.ps1` (measurement tool; capture stored at `docs/parity/2026-11-23-v2-baseline-perf/`) and the `parseUncaughtFromLog` terminator fix in `app/src/main/java/com/crush/mobile/ui/screens/diagnostics/DiagnosticsReport.kt` | `AppContainerBindingTest` (4), `DiagnosticsReportTest` (11), `ChatAccessibilityTest` (4) = 19 tests, focused run green (`v2-ledger-tests-1123g.log`); full gate 981/104/0 — see §5 | — | `docs/parity/2026-11-23-v2-baseline-perf/MANIFEST.md`: 3 cold starts, project engine boot, one PSS/gfxinfo sample on `bbf8ca69` | frame budget; a second capture for comparison; any tablet/API 30+ row; instrumented execution | this file; `docs/v2/V2-GAP-AUDIT.md`; `docs/v2/V2-FINAL-INTEGRATION-REVIEW.md` (same batch) |
+| **V2-12** | `ui/navigation/CrushShell.kt` (`selectPrimary` shared by bottom bar, rail and extended rail); `ui/screens/review/ReviewContent.kt` ("Export current file" label + historical read-only note); `ui/screens/projects/ProjectsContent.kt` (duplicate footer removed); `ui/screens/onboarding/OnboardingContent.kt` (provider-qualified heading, no hardcoded model count); `engine/EngineInstanceRegistry.kt` (atomic check-and-reserve in one monitor, terminal-failure release, `STARTING` counted) + `di/AppContainer.kt` (`requestEngineStart` registers the runtime before the gate); `ui/screens/settings/SettingsContent.kt` and `SettingsScreen.kt` (key save reports its real result and keeps the draft, delete confirmation, auto-approve confirmation); comment-only corrections in `ChatViewModel.kt`/`AppContainer.kt` describing two non-legacy project slots with chat on legacy | `ShellNavigationTest` (16; 6 new — veto and allowed switch per layout), `EngineInstanceRegistryTest` (19; 4 new — reservation, terminal release, retry keeps it, simultaneous starts), `SettingsContentTest` (17; 5 new), `OnboardingContentTest` (12; 1 new), `ProjectsContentTest` (15), `ReviewContentTest` (13) — all inside the full gate, 997/104/0 (`v2-12-gate-2026-11-23.log`) | — | — (gate only; no device or instrumented run) | device / TalkBack / API 30+ verification of every surface above; `A7`/`A7b` (owner sign-off), `A12` (answering agent questions), `A2`, `A6`, `A13` — §6 row 13 | `docs/v2/V2-AUDIT-FIXES.md`; `v2-12-gate-2026-11-23.log` |
 
 ## 3. Capture sets referenced above
 
@@ -85,6 +90,14 @@ tracked; the gate logs cited in §4 sit at the repo root and are not.
   whole tree: **981 tests / 104 suites / 0 failures / 0 errors / 0 skipped**,
   lint **0 errors / 1 pre-existing warning** (`v2-11-gate-2026-11-23.log`,
   2026-11-23). See §5 for the classes.
+- V2-12 (the audit-fix batch) adds 16 `@Test` methods over V2-11:
+  `ShellNavigationTest` 10 → 16, `EngineInstanceRegistryTest` 15 → 19,
+  `SettingsContentTest` 12 → 17, `OnboardingContentTest` 11 → 12;
+  `ProjectsContentTest` (15) and `ReviewContentTest` (13) changed assertions
+  without changing counts. The full four-task gate then executed the whole tree:
+  **997 tests / 104 suites / 0 failures / 0 errors / 0 skipped**, lint **0
+  errors / 1 pre-existing warning** (`v2-12-gate-2026-11-23.log`, 2026-11-23,
+  34m01s).
 - Instrumented: 6 classes / 15 `@Test` methods exist under `app/src/androidTest`;
   only `SecureKeyStoreInstrumentedTest` (3 tests) has a stored device run.
 - `:app:assembleDebugAndroidTest` compiles the test APK in every gate. Compiling
@@ -149,11 +162,21 @@ named and open. They are listed here so "complete" cannot be read as "closed".
 | 10 | Onboarding device row | content pinned by `OnboardingContentTest` (11/11) | a device frame; reason recorded in the V2-6 manifest (a fresh install or a key-less provider, which costs the owner's stored state) | No |
 | 11 | Device matrix (tablet/wide, extended rail, API 30+) | `ShellNavigationTest` renders rails at 800dp and 1000dp; landscape produced a real compact rail on device (`08`/`09`) | any ≥840dp hardware, any tablet/foldable, any API 30+ runtime | No (O3) |
 | 12 | Accessibility | semantics: `ChatAccessibilityTest` (V2-11, focused run green — see §5), `CrushComponentsTest`, `CrushTokensTest` 48dp floor; 2.0x device rows V2-4 `28`-`31`, V2-6 `24`-`27` | **TalkBack traversal (NOT PERFORMED anywhere)**; 1.3x font scale (only 2.0x rows exist); accessibility of `ui_block/v1` and RTL on device | No |
-| 13 | External audit findings (V2-11 audit verification) | `docs/v2/V2-GAP-AUDIT.md`: A1-A14 verified with file:line, batches `V2-AUDIT-0`…`V2-AUDIT-7` | none of the fixes are implemented; `A7`/`A7b` (a rejected permission policy is logged and remembered as applied) needs owner sign-off | Not for V2 exit; the audit names A7 as a release gate for any later shipping milestone |
+| 13 | External audit findings | `docs/v2/V2-GAP-AUDIT.md` verified A1-A14 with file:line. The V2-12 fix batch is recorded in `docs/v2/V2-AUDIT-FIXES.md` and sits inside the green gate (997/104/0): `A1` (one `selectPrimary` veto for all three layouts), `A3` ("Export current file" + historical read-only note), `A4` (duplicate Projects footer removed), `A5` (provider-qualified heading), `A8` (atomic reservation, terminal-failure release, pre-registration), `A10` (key save reports its result and keeps the draft), `A11` (delete confirmation), the auto-approve confirmation (`V2-AUDIT-4`), and `A14` (comments describe two project slots, chat on legacy) | `A7`/`A7b` (a rejected permission policy is logged and remembered as applied) still needs owner sign-off; `A12` (answering questions), `A2` (project home), `A6` (route/mode dual meaning — monitor only) and `A13` (runtime disposal) stay open; no device, TalkBack or API 30+ run covers any fixed row | Not for V2 exit; the audit names A7 as a release gate for any later shipping milestone |
 
 Rows 4 and 5 change class in this batch: the *test* halves are done
 at the report/container level, so they move out of "no test exists" into
 "pinned in JVM, unmeasured on device". Row 12's TalkBack half is unchanged.
+
+**V2-12 (2026-11-23).** Row 13 changes class: eight audit findings
+(`A1`, `A3`, `A4`, `A5`, `A8`, `A10`, `A11`, `A14`) and the delete/auto-approve
+confirmations are implemented and inside the green gate, so the row no longer
+reads "none of the fixes are implemented". The row's subject stays the audit
+itself, so it does not take a JVM-TESTED label; the classes that pin each fix
+are named in the V2-12 row of §2. Row 13 keeps `A7`/`A7b` as the release gate
+and adds no device claim. Row 10's count also moves: `OnboardingContentTest` is
+12/12 after the V2-12 heading case; the row keeps its 11/11 as the V2-11-era
+number.
 
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no
@@ -198,7 +221,9 @@ on device; key save/replace/delete on device; the accept branch of the
 changed-`crushrc` dialog; a not-measured Review card on device; the Chat-switch
 veto Toast; a running session row; Review history across process death; the 5
 unevaluated instrumented classes; model-authored `ui_block` timing, token cost
-and accessibility; the Diagnostics screen/share path on device.
+and accessibility; the Diagnostics screen/share path on device; any device row
+for the V2-12 fixes (rail veto, Review export label, Projects footer, Settings
+confirmations).
 
 Each item above appears in a package record's limits section or in
 `docs/v2/V2-GAP-AUDIT.md`. None is implied to work.
@@ -218,6 +243,7 @@ Each item above appears in a package record's limits section or in
 | `docs/v2/V2-9-release-hardening.md` | hardening scope closure (V2-A15) |
 | `docs/v2/ADR-REGISTER.md` | accepted decisions V2-A1…V2-A19, open O3-O14 |
 | `docs/v2/V2-GAP-AUDIT.md` | external audit verified against source, with file:line and batch IDs |
+| `docs/v2/V2-AUDIT-FIXES.md` | the V2-12 audit-fix batch: per-`A` change, the tests that pin it, and what stayed open (§2, §6 row 13) |
 | `docs/v2/V2-FINAL-INTEGRATION-REVIEW.md` | final pass over the Rev 3.1 state contract, composer gates, security boundaries (same batch) |
 | `tools/perf-baseline.ps1`, `docs/parity/2026-11-23-v2-baseline-perf/` | the measurement script and the first stored capture (cold start, engine boot, PSS, one gfxinfo sample) |
 | `docs/parity/*/MANIFEST.md` | the 12 capture sets in §3; each names what it does and does not prove |

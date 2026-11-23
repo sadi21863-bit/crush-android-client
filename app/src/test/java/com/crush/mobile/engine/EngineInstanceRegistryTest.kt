@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CyclicBarrier
 
 /**
  * §1 of the Gate-7 design memo (2026-11-05): the per-instance engine
@@ -25,6 +27,12 @@ class EngineInstanceRegistryTest {
         var state: EngineState = EngineState.Stopped,
         var stopped: Boolean = false,
     )
+
+    /**
+     * One racer's start-gate outcome. A holder, not a nullable String:
+     * ConcurrentHashMap refuses null values and "accepted" IS a null result.
+     */
+    private class GateResult(val accepted: Boolean, val refusal: String?)
 
     /**
      * Shared wiring: liveness derives from plain fields (the volatility-only
@@ -232,6 +240,115 @@ class EngineInstanceRegistryTest {
             "p2's grain stays its own truth (bookkeeping, not budget input)",
             EngineInstanceRegistry.Grain.IDLE,
             t.registry.inspect().single { it.key == "p2" }.grain
+        )
+    }
+
+    @Test
+    fun `a STARTING reservation holds its slot before any child exists`() {
+        val t = bed()
+        t.registry.runtimeFor("p1") { liveChild("p1") } // occupies 1 of 2 slots
+        t.registry.runtimeFor("p2") { FakeRuntime("p2") } // childless: reservation only
+        t.registry.runtimeFor("p3") { FakeRuntime("p3") }
+        assertNull("the last slot is free before anyone reserves it", t.registry.requestStart("p2"))
+        assertEquals(
+            "the accepted start is reserved, not yet live",
+            EngineInstanceRegistry.Grain.STARTING,
+            t.registry.inspect().single { it.key == "p2" }.grain
+        )
+        val refusal = t.registry.requestStart("p3")
+        assertTrue(
+            "a childless STARTING key still holds its slot - otherwise check-then-reserve races",
+            refusal != null
+        )
+        assertTrue("the reservation is counted in the refusal", refusal!!.contains("2/2"))
+    }
+
+    @Test
+    fun `a terminal start failure releases the reservation`() {
+        val t = bed()
+        val p1 = t.registry.runtimeFor("p1") { FakeRuntime("p1") } // reservation holder
+        t.registry.runtimeFor("p2") { liveChild("p2") } // occupies the other slot
+        t.registry.runtimeFor("p3") { FakeRuntime("p3") }
+        assertNull(t.registry.requestStart("p1"))
+        // The supervisor gives up: Failed(willRetry = false) and RETURNS, so
+        // neither recordRunning nor stop ever touches this key's grain.
+        p1.state = EngineState.Failed("x", "y", willRetry = false)
+        assertNull(
+            "a terminal failure must release the slot, not burn it for the whole process",
+            t.registry.requestStart("p3")
+        )
+        assertEquals(
+            "the grain itself is NOT rewritten - the release is a liveness read",
+            EngineInstanceRegistry.Grain.STARTING,
+            t.registry.inspect().single { it.key == "p1" }.grain
+        )
+    }
+
+    @Test
+    fun `a retrying start failure keeps the reservation`() {
+        val t = bed()
+        val p1 = t.registry.runtimeFor("p1") { FakeRuntime("p1") }
+        t.registry.runtimeFor("p2") { liveChild("p2") }
+        t.registry.runtimeFor("p3") { FakeRuntime("p3") }
+        assertNull(t.registry.requestStart("p1"))
+        // Still trying: the supervisor will hold a child on the next attempt,
+        // so the slot stays reserved (a premature release would over-admit).
+        p1.state = EngineState.Failed("x", "y", willRetry = true)
+        val refusal = t.registry.requestStart("p3")
+        assertTrue("a retrying reservation still holds its slot", refusal != null)
+        assertTrue("the refusal names the counts", refusal!!.contains("2/2"))
+    }
+
+    @Test
+    fun `simultaneous starts never both take the last non-legacy slot`() {
+        // A8/A14: budget 2, one key already live -> EXACTLY one free slot; two
+        // keys enter the gate together. Before the lock covered check+reserve,
+        // both read "one free" and both returned null (the defect).
+        val t = bed()
+        t.registry.runtimeFor("existing") { liveChild("existing") }
+        t.registry.runtimeFor("a") { FakeRuntime("a") }
+        t.registry.runtimeFor("b") { FakeRuntime("b") }
+        t.registry.runtimeFor("c") { FakeRuntime("c") }
+
+        val gate = CyclicBarrier(2)
+        val results = ConcurrentHashMap<String, GateResult>()
+        fun racer(key: String) = Thread({
+            gate.await() // both threads enter requestStart as close to together as possible
+            val refusal = t.registry.requestStart(key)
+            results[key] = GateResult(refusal == null, refusal)
+        }, "start-gate-$key")
+
+        val threads = listOf(racer("a"), racer("b"))
+        threads.forEach { it.start() }
+        threads.forEach { it.join(5_000) }
+
+        assertTrue(
+            "both racers must finish; a hung gate would hide the race",
+            threads.none { it.isAlive }
+        )
+        assertEquals("both racers must report an outcome", 2, results.size)
+
+        val accepted = results.filterValues { it.accepted }.keys
+        val refused = results.filterValues { !it.accepted }.keys
+        assertEquals("exactly ONE start may claim the last slot", 1, accepted.size)
+        assertEquals("the other must be refused - never both null", 1, refused.size)
+
+        val winner = accepted.single()
+        val loser = refused.single()
+        assertEquals(
+            "the accepted key holds the reservation before any child exists",
+            EngineInstanceRegistry.Grain.STARTING,
+            t.registry.inspect().single { it.key == winner }.grain
+        )
+        val refusal = results.getValue(loser).refusal!!
+        assertTrue("the refusal names the losing key", refusal.contains("'$loser'"))
+        assertTrue(
+            "the refusal counts the winner's reservation as a held slot",
+            refusal.contains("2/2")
+        )
+        assertTrue(
+            "a third key is refused while the winner's reservation stands",
+            t.registry.requestStart("c") != null
         )
     }
 

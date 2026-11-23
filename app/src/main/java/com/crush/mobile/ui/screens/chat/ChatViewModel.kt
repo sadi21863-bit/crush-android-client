@@ -599,7 +599,8 @@ class ChatViewModel(
      */
     fun startEngine() {
         // Gate-7 §1 liveness budget (2026-11-05): at most TWO non-legacy
-        // instances with live children (chat + one project). The refusal is
+        // instances with live children - two non-legacy projects; chat runs on
+        // the legacy key, which is outside this budget. The refusal is
         // fail-closed with a named reason; surface it EXACTLY in the shape
         // bindEngine gives an EngineState.Failed ("engine failed: ...",
         // engineReady=false) - the state flow itself lives inside each
@@ -3491,7 +3492,8 @@ class ChatViewModel(
         bindProject()
         val boundKey = instanceKey
         // Idempotent: a warm project engine re-survives it. The liveness
-        // budget gate ("chat + one project", Gate-7 §1) is enforced inside.
+        // budget gate (two non-legacy projects; chat runs on the legacy key,
+        // which is outside this budget - Gate-7 §1) is enforced inside.
         startEngine()
         // The spawn is bounded and idempotent; wait for the target engine to
         // answer before binding its port - the honest fail state is a notice,

@@ -22,18 +22,25 @@ import com.crush.mobile.util.AppLog
  *    the permanent process-single pair the container already owns (never
  *    stopped, uncapped by the budget - decisions-open item 9).
  * 4. LIVENESS BUDGET (the plan's max-active-engines item, §1.4): at most
- *    [maxLiveNonLegacy] non-legacy keys with a live engine child; further
- *    starts are refused fail-closed with a named reason ([requestStart]).
- *    With the phase-1 born-or-never interlock in CrushEngine the third child
- *    is structurally unreachable - this gate is the belt to that bracer.
+ *    [maxLiveNonLegacy] non-legacy keys holding a slot - a live engine child
+ *    OR a [Grain.STARTING] reservation (released when the supervisor reaches
+ *    a terminal failure); further starts are refused
+ *    fail-closed with a named reason ([requestStart]). The count and the
+ *    reservation happen in ONE critical section, so two near-simultaneous
+ *    starts can never share the last slot (A8/A14, 2026-11-23). With the
+ *    phase-1 born-or-never interlock in CrushEngine the third child is
+ *    structurally unreachable - this gate is the belt to that bracer.
  *
  * WHAT THIS CLASS IS NOT: it is NOT a supervisor. Spawn, readiness, health
  * and state truth stay owned by each key's [EngineSupervisor]; the phase-1
  * interlock owns child BIRTH safety, so nothing here gates start()/stop()
- * interleavings. [Grain] is bookkeeping for the inspector and tests; the
- * BUDGET never reads it - it derives from the cheap volatile [Liveness]
- * signal, so a stale grain can never lie about liveness (any registry-level
- * bookkeeping writer can legitimately skip a beat, unlike the state flow).
+ * interleavings. [Grain] is bookkeeping for the inspector and tests, with
+ * ONE exception: [Grain.STARTING] is the start gate's slot reservation, so
+ * the budget reads it - at gate time the child does not exist yet, and a
+ * liveness-only count admitted two starts on one remaining slot. Every other
+ * grain value is ignored: liveness TRUTH stays the cheap volatile [Liveness]
+ * read, so a grain lag can only produce a fail-closed false refusal (a
+ * reservation that has not cleared), never an over-admission of a live child.
  *
  * SCOPE/HYGIENE: the class is GENERIC over the runtime record. The container
  * instantiates it with its own `EngineRuntime`, which keeps this file free of
@@ -41,9 +48,10 @@ import com.crush.mobile.util.AppLog
  */
 class EngineInstanceRegistry<R>(
     /**
-     * The liveness budget. 2 is LOAD-BEARING - it is the plan's
-     * "at most two non-legacy keys with live children (chat + one project)"
-     * line; changing it changes how many engine children one device holds.
+     * The liveness budget. 2 is LOAD-BEARING - it is the plan's "at most two
+     * non-legacy keys with live children" line; changing it changes how many
+     * engine children one device holds. The two slots are two non-legacy
+     * projects; chat runs on the legacy key, which is outside this budget.
      */
     private val maxLiveNonLegacy: Int = 2,
     /** Instance key of the permanent process-single pair; never stored here. */
@@ -58,8 +66,10 @@ class EngineInstanceRegistry<R>(
      * Coarse lifecycle bookkeeping per key, written only at registry-owned
      * moments: construction ([runtimeFor]), the start gate ([requestStart]),
      * the per-runtime successful-start hook ([recordRunning]) and stop
-     * ([stop]). The bookkeeping deliberately stays INDEPENDENT of the budget,
-     * which derives truth from [Liveness] - see the class KDoc.
+     * ([stop]). [Grain.STARTING] is the ONE grain the budget reads: it is the
+     * start gate's slot reservation, so check-and-reserve are a single critical
+     * section (A8/A14). The other grains stay out of the budget, which derives
+     * liveness truth from [Liveness] - see the class KDoc.
      */
     enum class Grain { IDLE, STARTING, RUNNING, STOPPING, STOPPED }
 
@@ -80,7 +90,10 @@ class EngineInstanceRegistry<R>(
 
     private class Node<R>(val runtime: R, @Volatile var grain: Grain)
 
-    /** Serializes the check-then-build; the map itself is concurrent. */
+    /**
+     * Serializes the check-then-build ([runtimeFor]) AND the check-then-reserve
+     * ([requestStart]); the map itself is concurrent.
+     */
     private val lock = Any()
     private val runtimes = java.util.concurrent.ConcurrentHashMap<String, Node<R>>()
 
@@ -112,12 +125,31 @@ class EngineInstanceRegistry<R>(
      * The start gate. Returns the refusal reason and refuse-fails-closed, or
      * null to allow the caller's start to proceed.
      *
+     * ATOMIC CHECK-AND-RESERVE (A8/A14, 2026-11-23): counting live children
+     * and painting the [Grain.STARTING] reservation happen in ONE
+     * `synchronized(lock)` section - the same monitor [runtimeFor] uses for
+     * construction. Before that, the count and the reservation were two
+     * separate steps and the reservation was not counted at all, so two
+     * near-simultaneous starts for DIFFERENT keys both read "one slot free"
+     * and both passed. Now the winner's [Grain.STARTING] is visible to the
+     * loser's count, because a start that has not spawned yet still OWNS its
+     * slot. A plain monitor on purpose: this class is synchronous end to end,
+     * and the section does no [stopRuntime], no [runtimeFor] build and no
+     * waiting - it is a map walk plus one volatile write, and on the refusal
+     * path the one [AppLog.w] line the diagnostic requires.
+     *
      * Fail-closed means BOTH: a refusal is an honest named reason (logged
-     * here, surfaced by the caller in the same shape an
-     * [EngineState.Failed] gets), and the predicate is "any OTHER
-     * non-legacy key holds a live child" from the [Liveness] read - never
-     * from bookkeeping. The key's OWN child never counts against its own
-     * start (a re-start reclaims its own slot).
+     * here once, surfaced by the caller in the same shape an
+     * [EngineState.Failed] gets), and the slot predicate is "any OTHER
+     * non-legacy key holds a live child OR a [Grain.STARTING] reservation"
+     * (see [othersHoldingSlots]). The key's OWN child never counts against
+     * its own start (a re-start reclaims its own slot).
+     *
+     * The caller registers the key first ([runtimeFor]) - the app's path is
+     * bindEngine -> runtimeFor -> startEngine - so the node exists and the
+     * reservation sticks. A key with no node is still BUDGET-CHECKED and can
+     * be refused; it just has nowhere to record the reservation (nothing to
+     * start either, since the supervisor comes from the same node).
      *
      * No start()/stop() interleaving is gated here on purpose: the phase-1
      * born-or-never interlock owns child birth safety and each supervisor
@@ -127,20 +159,21 @@ class EngineInstanceRegistry<R>(
      */
     fun requestStart(key: String): String? {
         if (key.isBlank() || key == legacyKey) return null
-        var liveOthers = 0
-        for ((otherKey, node) in runtimes) {
-            if (otherKey == key) continue
-            if (keyHasLiveChild(livenessOf(node.runtime))) liveOthers++
+        synchronized(lock) {
+            val liveOthers = othersHoldingSlots(key)
+            if (!budgetAllows(liveOthers)) {
+                // The refusal itself is the diagnostic (P1-15): a named reason,
+                // once per refusal, key included - and the caller surfaces it to
+                // the UI exactly as an EngineState.Failed would read.
+                val refusal = refusalReason(key, liveOthers)
+                AppLog.w("EngineRegistry", refusal)
+                return refusal
+            }
+            // The reservation: from here the slot is OURS even before a child
+            // exists, so a concurrent gate cannot hand it to another key.
+            runtimes[key]?.grain = Grain.STARTING
+            return null
         }
-        if (!budgetAllows(liveOthers)) {
-            // The refusal itself is the diagnostic (P1-15): a named reason,
-            // once per refusal, key included - and the caller surfaces it to
-            // the UI exactly as an EngineState.Failed would read.
-            AppLog.w("EngineRegistry", refusalReason(key, liveOthers))
-            return refusalReason(key, liveOthers)
-        }
-        runtimes[key]?.grain = Grain.STARTING
-        return null
     }
 
     /** Records a successful start's grain; rides the P1-11 onEngineStart hook. */
@@ -195,25 +228,77 @@ class EngineInstanceRegistry<R>(
             Snapshot(key, node.grain, node.runtime, livenessOf(node.runtime))
         }
 
-    /** PURE: the budget predicate. [liveOthers] excludes the starting key. */
+    /**
+     * §A8/A14: how many OTHER non-legacy keys hold a budget slot right now -
+     * a live child ([keyHasLiveChild]) OR a [Grain.STARTING] reservation from
+     * a gate that has not produced a child yet. The reservation half is what
+     * makes the gate atomic: without it the childless window between
+     * [requestStart] and the spawn was invisible to a concurrent count.
+     *
+     * A reservation is RELEASED by a TERMINAL failure (audit A8 follow-up): a
+     * supervisor that gives up ends in `EngineState.Failed(willRetry = false)`
+     * and returns, so neither [recordRunning] nor [stop] ever rewrites the
+     * grain - counting that [Grain.STARTING] unconditionally would burn a slot
+     * for the rest of the process. A RETRYING failure (`willRetry = true`)
+     * KEEPS the reservation: the supervisor is still trying and will hold a
+     * child on success. Liveness is read once per key here, and a live child
+     * always wins over the state class (a Failed-with-child still holds one).
+     *
+     * Caller MUST hold [lock] (both halves are stable then: [runtimeFor]
+     * builds under the same monitor, and the grain's only gate writer is
+     * [requestStart] itself).
+     */
+    private fun othersHoldingSlots(exceptKey: String): Int {
+        var slots = 0
+        for ((otherKey, node) in runtimes) {
+            if (otherKey == exceptKey || otherKey == legacyKey) continue
+            val liveness = livenessOf(node.runtime)
+            if (keyHasLiveChild(liveness)) {
+                slots++
+                continue
+            }
+            if (node.grain != Grain.STARTING) continue
+            val terminalFailure = (liveness.state as? EngineState.Failed)?.willRetry == false
+            if (!terminalFailure) slots++
+        }
+        return slots
+    }
+
+    /**
+     * PURE: the budget predicate. [liveOthers] excludes the starting key and,
+     * at the [requestStart] call site, counts BOTH keys with a live child and
+     * keys holding a [Grain.STARTING] reservation ([othersHoldingSlots]) - a
+     * reserved start is a slot about to hold a child, so it must never read
+     * as free.
+     */
     internal fun budgetAllows(liveOthers: Int): Boolean = liveOthers < maxLiveNonLegacy
 
     /**
      * PURE: the named refusal for a budget-tripped start. The key and both
      * counts must be present: the user-visible surface is a real
      * "engine failed: ..." string, so vagueness here is what the user reads.
+     *
+     * [liveOthers] may include a pending [Grain.STARTING] reservation as well
+     * as live children (see [othersHoldingSlots]); the message keeps the
+     * user-facing "hold live children" phrasing because a reservation is a
+     * slot about to hold one.
      */
     internal fun refusalReason(key: String, liveOthers: Int, budget: Int = maxLiveNonLegacy): String =
         "engine instance budget: $liveOthers/$budget non-legacy instances hold live children; " +
             "start of '$key' refused until one stops"
 
     /**
-     * PURE: 'has live child' - the only budget-input signal per key. OR of
-     * the child's real liveness and the supervisor's exposed Starting/Running
-     * (the memo's tri-state collapsed to the two cheap reads; the deferred
-     * socket probe of the inspector stays with the S5 instrumentation, since
-     * a supervisor state read cannot false-negative a budget refusal the way
-     * it can a UI badge).
+     * PURE: 'has live child' - the only LIVENESS budget-input signal per key.
+     * OR of the child's real liveness and the supervisor's exposed
+     * Starting/Running (the memo's tri-state collapsed to the two cheap
+     * reads; the deferred socket probe of the inspector stays with the S5
+     * instrumentation, since a supervisor state read cannot false-negative a
+     * budget refusal the way it can a UI badge).
+     *
+     * This is HALF the gate's input: [othersHoldingSlots] ORs it with the
+     * [Grain.STARTING] reservation, because a start reserves its slot before
+     * any child exists (A8/A14). Keep it liveness-only - tests and the
+     * inspector read it as liveness truth.
      */
     internal fun keyHasLiveChild(l: Liveness): Boolean =
         l.childAlive || l.state is EngineState.Starting || l.state is EngineState.Running

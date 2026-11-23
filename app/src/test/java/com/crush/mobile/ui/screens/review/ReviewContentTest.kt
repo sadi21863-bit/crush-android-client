@@ -165,7 +165,12 @@ class ReviewContentTest {
         compose.onNodeWithText("1 file(s) +1 -0").assertExists()
         compose.onNodeWithText("a.txt").assertExists()
         compose.onNodeWithText("Revert this file").assertIsEnabled()
-        compose.onNodeWithText("Export a copy").assertIsEnabled()
+        // A3: the label names what export actually copies - the file on disk
+        // now, never the turn's historical snapshot.
+        compose.onNodeWithText("Export current file").assertIsEnabled()
+        compose.onNodeWithText("Export a copy").assertDoesNotExist()
+        compose.onNodeWithText("Historical turns are read-only", substring = true)
+            .assertIsDisplayed()
     }
 
     @Test
@@ -175,6 +180,9 @@ class ReviewContentTest {
         compose.onNodeWithText("Older turn - read-only", substring = true)
             .assertIsDisplayed()
         compose.onNodeWithText("Revert this file").assertIsNotEnabled()
+        // A3: read-only applies to revert only - export still copies the
+        // current on-disk file from a historical turn.
+        compose.onNodeWithText("Export current file").assertIsEnabled()
     }
 
     @Test
@@ -255,7 +263,7 @@ class ReviewContentTest {
             onExport = { root, path -> exported += root to path },
         )
 
-        compose.onNodeWithText("Export a copy").performClick()
+        compose.onNodeWithText("Export current file").performClick()
         compose.waitForIdle()
 
         assertEquals(

@@ -118,6 +118,20 @@ fun ReviewContent(
                 )
             )
 
+            // A3: "Export a copy" read as "export this turn's snapshot". A
+            // historical turn is read-only here, and export never restores
+            // history - it copies whatever is on disk at tap time.
+            Text(
+                "Historical turns are read-only; Export always copies the " +
+                    "current file on disk, never that turn's snapshot.",
+                style = CrushType.secondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(
+                    horizontal = CrushSpacing.lg,
+                    vertical = CrushSpacing.xs
+                )
+            )
+
             if (state.runInFlight) {
                 CrushBanner(
                     text = "A turn is running; revert is disabled until the agent is idle.",
@@ -348,7 +362,7 @@ private fun ExportRow(path: String, onExport: (String) -> Unit) {
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
     ) {
         Text(
-            "Export a copy",
+            "Export current file",
             style = MaterialTheme.typography.labelSmall
         )
     }

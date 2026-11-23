@@ -241,7 +241,8 @@ class AppContainer(context: Context) {
      * stop it. The registry holds ONE runtime object per non-legacy key,
      * forever: idempotent construction, never-evict, stop-only (registry
      * stop is lookup-or-noop), and the non-legacy liveness budget gate (at
-     * most two keys with live children - chat + one project).
+     * most two keys with live children: two non-legacy projects; chat runs on
+     * the legacy key, which is outside this budget).
      *
      * The generic here is deliberately [EngineRuntime]: the registry file
      * stays engine-layer-pure, and the wiring (liveness reads are
@@ -897,7 +898,14 @@ class AppContainer(context: Context) {
      * because the state flow itself is supervisor-owned and deliberately
      * not writable from container side.
      */
-    fun requestEngineStart(instanceKey: String): String? = engineRegistry.requestStart(instanceKey)
+    fun requestEngineStart(instanceKey: String): String? {
+        // Register BEFORE the gate: requestStart's STARTING reservation lives on
+        // the runtime node, and a key that was never registered would pass the
+        // budget without recording a slot (the exact race A8 closes). Building a
+        // runtime constructs the supervisor objects only - no process starts.
+        runtimeFor(instanceKey)
+        return engineRegistry.requestStart(instanceKey)
+    }
 
     private val _keyAvailable = MutableStateFlow(0)
 

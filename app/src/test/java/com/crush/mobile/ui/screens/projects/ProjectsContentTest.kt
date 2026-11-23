@@ -105,6 +105,14 @@ class ProjectsContentTest {
             "Import a folder to create a Code project.",
             substring = true,
         ).assertIsDisplayed()
+        // A4: one explanation only. The persistent footer that repeated the
+        // home/bind story is gone; the in-place-edit note stays.
+        compose.onNodeWithText(
+            "Crush edits the folder you choose in place.",
+            substring = true,
+        ).assertIsDisplayed()
+        compose.onAllNodesWithText("A project opens its home", substring = true)
+            .assertCountEquals(0)
     }
 
     @Test

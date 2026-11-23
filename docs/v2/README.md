@@ -37,6 +37,7 @@ the owner's trims.
 | `V2-COMPLETION-LEDGER.md` | **the authoritative completion ledger**: every package row split into shipped / JVM-tested / instrumented / device-verified / deferred, with evidence paths and the still-open carry-over rows |
 | `V2-FINAL-INTEGRATION-REVIEW.md` | final integration pass over the Rev 3.1 state contract, composer gates, security boundaries and engine isolation; maps each claim to code and an existing test |
 | `V2-GAP-AUDIT.md` | **external review verified against source (2026-11-23)**: per-claim verdicts with file:line evidence, the two findings that changed severity (permission fail-closed, reattach replay), and the owner decision list for the follow-up batches |
+| `V2-AUDIT-FIXES.md` | 2026-11-23 audit-fix batch: nav veto, review/projects/onboarding copy, settings confirmations + draft retention, atomic engine reservation; gate 997/104/0; A7/A12/A2/A6/A13 remain open |
 | `ui-block-v1.md` | the closed `ui_block/v1` contract: six block types, limits, strict whole-document rejection, security posture, rendering map, producer status |
 | `V2-7-8-codebase-inventory-2026-11-22.md` | read-only inventory of the assistant pipeline, renderers, metadata, security boundary and tests that V2-7/V2-8 must work with |
 | `V2-7-8-web-research-2026-11-22.md` | external research: A2UI, json-render, AG-UI, MCP Apps, structured outputs, native Compose examples, security; verdicts and source table |
@@ -45,6 +46,7 @@ the owner's trims.
 ## Scope
 
 - Complete: V2-0 through V2-7 (7 as foundation scope), plus V2-9 hardening.
+- 2026-11-23 audit-fix batch: A1/A3/A4/A5/A8/A10/A11/A14 + confirmations fixed; A7/A7b needs owner sign-off; A12/A2/A6/A13 remain open. Gate 7 stays separate.
 - Closed as not adopted: V2-8 (V2-A19); its debug lab stays as evidence,
   nothing from it ships.
 - Deferred, separate milestone: Gate 7 (signing, packaging, store listing,
@@ -68,6 +70,7 @@ the owner's trims.
 | V2-7 | **complete (foundation)** | opened 2026-11-22 (V2-A16); closed same day (V2-A18): 7.1 reasoning Collapsed/Off, 7.2 unknown-part fallback, 7.3 `ui_block/v1` validator/renderer. No external UI framework. Evidence: `docs/parity/2026-11-22-v2-7-reasoning/`, `docs/parity/2026-11-22-v2-7-blocks/` |
 | V2-8 | **closed (not adopted)** | opened 2026-11-22 (V2-A17); closed 2026-11-23 (V2-A19): 3 candidate-A runs, **1/3 schema-valid** (runs 1-2 drifted/rejected, run 3 with exact keys rendered). Exit criteria not met; no production renderer adopted. The V2-7 host-authored registry remains. Evidence: `docs/parity/2026-11-22-v2-8-lab/` |
 | V2-9 | **complete (hardening, 2026-11-22)** | ASK default recorded (already closed in code); `SecureKeyStoreInstrumentedTest` OK (3 tests) on `bbf8ca69`; `tools/check-secrets.ps1` PASS over 674 tracked files; recorded 924-test census / 0 failures (test task UP-TO-DATE; ledger §4), lint 0 errors / 1 warning. Gate 7 submission/signing/listing remains deferred. Evidence: `docs/parity/2026-11-22-v2-9-hardening/` |
+| V2-12 (audit fixes) | **complete (authorized subset, 2026-11-23)** | Fixed: A1 nav veto on all three layouts, A3 review "Export current file" + note, A4 projects footer, A5 provider-qualified onboarding heading, A8 atomic engine reservation + terminal-failure release + pre-registration, A10 key draft retention, A11 delete confirmation, auto-approve confirmation, A14 comment reconciliation. Remain open: A7/A7b (needs owner sign-off), A12, A2, A6, A13. Gate `v2-12-gate-2026-11-23.log`: 997 tests / 104 suites / 0 failures / 0 errors / 0 skipped, lint 0 errors / 1 pre-existing warning, 34m01s. Device, TalkBack and API 30+ NOT PERFORMED; Gate 7 untouched. Record: `V2-AUDIT-FIXES.md` |
 
 ## Rules that apply to every package
 

@@ -17,7 +17,7 @@ and **716/0/0 across 76 suites** (lint 0 errors / 1 warning). CI run
 collect above the code HEAD. Later record: §5.10 (2026-11-19) re-verifies
 the repository at code HEAD `1679f25`; the 2026-11-14 figures above remain
 that baseline. The V2 package record through 2026-11-23 (V2-0 to V2-9 plus the
-V2-11 batch) is in §5.10 and `docs/v2/`; it does not re-verify the
+V2-11 and V2-12 batches) is in §5.10 and `docs/v2/`; it does not re-verify the
 2026-11-14 build claims above.
 
 ---
@@ -1119,13 +1119,19 @@ the 2026-11-22 record)**
 | V2-A19 | **V2-8 is closed as NOT ADOPTED (2026-11-23).** Three candidate-A runs produced 1/3 schema-valid documents (runs 1-2 drifted and were rejected whole; run 3 needed exact key names). No prompt-only renderer ships; the V2-7 registry stays host-authored and the debug lab remains evidence. | `docs/v2/V2-8-structured-ui-experiment.md`; `docs/parity/2026-11-22-v2-8-lab/` |
 | V2-A15 | **V2-9 is complete for its hardening scope (2026-11-22).** ASK default recorded (already shipped), real-Keystore instrumented coverage 3/3 on `bbf8ca69`, key-rotation checklist + `tools/check-secrets.ps1` (PASS, 674 tracked files); recorded 924-test census / 0 failures (test task UP-TO-DATE; see `V2-COMPLETION-LEDGER.md` §4), lint 0 errors / 1 pre-existing warning. | `docs/v2/V2-9-release-hardening.md`; `docs/parity/2026-11-22-v2-9-hardening/` |
 | V2-11 (2026-11-23) | **Completion-ledger / final-integration-review / external-audit verification batch.** The completion ledger is in this batch; the final integration review is present at `docs/v2/V2-FINAL-INTEGRATION-REVIEW.md`. The external audit is verified against source in the gap audit, where the diagnostics redaction gap (A9) is closed by `DiagnosticsReportTest` (11 tests) and confirmed findings are assigned batch IDs rather than fixed here. Focused run 19/0 (11 diagnostics + 4 accessibility + 4 container, `v2-ledger-tests-1123g.log`); full four-task gate green: 981 tests / 104 suites / 0 failures, lint 0 errors / 1 pre-existing warning (`v2-11-gate-2026-11-23.log`). | [`V2-GAP-AUDIT.md`](v2/V2-GAP-AUDIT.md); [`V2-COMPLETION-LEDGER.md`](v2/V2-COMPLETION-LEDGER.md); [`V2-FINAL-INTEGRATION-REVIEW.md`](v2/V2-FINAL-INTEGRATION-REVIEW.md) |
+| V2-12 (2026-11-23) | **Audit-fix batch (authorized subset).** Fixes the confirmed findings the owner authorized; it is not a reopening of V2 scope. **A1:** the Chat run-veto now applies on all three shell layouts through one `selectPrimary` path (bottom bar, rail, extended rail). **A3:** Review export reads "Export current file", with a note that historical turns are read-only and export always copies the current file on disk. **A4:** the duplicate Projects footer is removed. **A5:** Onboarding's heading is provider-qualified ("Connect a provider and chat with its available models") with no catalogue count. **A8:** the engine budget check and slot reservation are one critical section - a `Grain.STARTING` reservation holds its slot, a terminal start failure releases it, a retrying failure keeps it, and `AppContainer.requestEngineStart` pre-registers the runtime before the gate. **A10:** a failed Settings key save keeps the editor and draft until the result callback succeeds. **A11:** key deletion confirms and names the provider. Auto-approve now asks first (cancelling leaves ASK; turning it off stays immediate). **A14:** the budget comments describe the Chat/Code split again. Tests: `ShellNavigationTest` +6 (veto/allow on all three layouts), `EngineInstanceRegistryTest` +4 (reservation, terminal release, retry retention, concurrent race), `SettingsContentTest` +5 (delete confirmation, draft retention, auto-approve confirmation), `OnboardingContentTest` +1 (provider-qualified heading), with `ReviewContentTest` and `ProjectsContentTest` updated for the new copy. Full four-task gate green: 997 tests / 104 suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning (34m01s, `v2-12-gate-2026-11-23.log`). **Still open:** A7/A7b permission fail-open (needs owner sign-off), A12 questions, A2 project home, A6 route/binding monitor, A13 runtime disposal. Device, TalkBack and API 30+ NOT PERFORMED; Gate 7 untouched. | [`V2-AUDIT-FIXES.md`](v2/V2-AUDIT-FIXES.md); `v2-12-gate-2026-11-23.log`; [`V2-GAP-AUDIT.md`](v2/V2-GAP-AUDIT.md) |
+
+V2-12 is an audit-fix batch, not a reopening of V2 scope: it implements the
+authorized subset of the external audit's decision list inside the package
+scope already closed above. The fixed and still-open finding IDs are listed in
+the row and in `docs/v2/V2-AUDIT-FIXES.md`.
 
 The four-task gate was run locally on 2026-11-23 (JBR 25): `:app:testDebugUnitTest`,
 `:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintRelease`. CI runs
 the same four tasks on JDK 21.
 
 Gate 7 (signing, packaging, store listing, submission, rollout) remains a
-separate deferred milestone; nothing in this batch touches it.
+separate deferred milestone; nothing in the V2-11 or V2-12 batches touches it.
 
 **Owner decisions that trim Revision 4.0**
 

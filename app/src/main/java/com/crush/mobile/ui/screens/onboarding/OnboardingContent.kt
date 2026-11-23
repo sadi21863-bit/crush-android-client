@@ -109,7 +109,7 @@ fun OnboardingContent(
             Spacer(modifier = Modifier.height(CrushSpacing.sm))
 
             Text(
-                "Chat with 70+ models from a single API key",
+                "Connect a provider and chat with its available models",
                 style = CrushType.body,
                 color = colors.muted,
                 textAlign = TextAlign.Center

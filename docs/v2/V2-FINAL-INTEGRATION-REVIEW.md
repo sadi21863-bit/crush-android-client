@@ -1,11 +1,24 @@
 # V2 final integration review
 
-Status: **verification record, 2026-11-23.** Read-only review of the V2 redesign
-against the Rev 3.1 contract. No source, test or build file was changed by this
-pass. It does not replace `V2-COMPLETION-LEDGER.md` (what shipped and how it was
+Status: **verification record, 2026-11-23, updated after the V2-12 audit-fix
+batch.** Read-only review of the V2 redesign against the Rev 3.1 contract; the
+review itself changed no source, test or build file. The fixes it reports as
+FIXED were made by the separately authorized V2-12 batch, not by this review.
+It does not replace `V2-COMPLETION-LEDGER.md` (what shipped and how it was
 measured) or `V2-GAP-AUDIT.md` (external audit verified against source); it
 cross-checks the claims those records make at the seams between chat, shell,
 security and engine.
+
+> **V2-12 update (2026-11-23, after the audit-fix batch).** The batch named in
+> §8 has landed and the four-task gate is green over the whole tree: **997 tests
+> / 104 suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1
+> pre-existing warning** (`v2-12-gate-2026-11-23.log`, 34m01s). Rows marked
+> **FIXED (V2-12)** were open GAPs in the original pass: F2 (`A1`), F5 (`A3`),
+> E5 (`A8`), plus the copy/confirmation items `A4`, `A5`, `A10`, `A11` and the
+> comment correction `A14`. Their original findings text is kept, marked as the
+> pre-fix state. Still open: `A7`/`A7b` (needs owner sign-off), `A12`, `A2`,
+> `A6`, `A13`. Nothing was device-verified, TalkBack-checked or run on API 30+;
+> Gate 7 is untouched. Batch record: `docs/v2/V2-AUDIT-FIXES.md`.
 
 ## 1. Scope and method
 
@@ -13,7 +26,13 @@ Reviewed tree: `225ce94` plus the uncommitted V2-11 batch (three new JVM test
 classes, a one-line parser fix in `DiagnosticsReport.kt` (`matches` →
 `containsMatchIn`) that the new crash-terminator test exposed,
 `V2-GAP-AUDIT.md`, `V2-COMPLETION-LEDGER.md`,
-`docs/parity/2026-11-23-v2-baseline-perf/`, `tools/perf-baseline.ps1`).
+`docs/parity/2026-11-23-v2-baseline-perf/`, `tools/perf-baseline.ps1`). The
+original pass stopped there. The V2-12 update above adds the audit-fix batch
+(`docs/v2/V2-AUDIT-FIXES.md`, base `ced7bf6`), which changed `CrushShell.kt`,
+`ReviewContent.kt`, `ProjectsContent.kt`, `OnboardingContent.kt`,
+`SettingsContent.kt` and `SettingsScreen.kt`, `EngineInstanceRegistry.kt`,
+`AppContainer.kt`, comments in `ChatViewModel.kt`, and the six test classes named
+in §3.1.
 
 **The brief itself is not in this tree.** A repo-wide search for
 `crush-mobile-v2-design-brief-state-contract-test-plan-2026-11-14.md` returns
@@ -29,21 +48,31 @@ it, not from the brief:
 
 Method and limits:
 
-- Source + JVM/Robolectric evidence only. **No Gradle, adb, device or instrumented
-  run was performed for this review.** Statements about executed results are
-  quoted from the focused-run log and package records, not observed here.
+- Source + JVM/Robolectric evidence only. **The original pass ran no Gradle, adb,
+  device or instrumented command.** The V2-12 update quotes one full four-task
+  gate executed by the fix batch (`v2-12-gate-2026-11-23.log`) and the test-result
+  XML it produced (104 result files, 997 tests, 0 failures / 0 errors / 0
+  skipped). No device or instrumented run happened in either pass; statements
+  about earlier executed results are quoted from package records.
 - The three V2-11 test classes are **green in both runs: a focused run (19
   tests / 0 failures, `v2-ledger-tests-1123g.log`: `DiagnosticsReportTest` 11,
   `ChatAccessibilityTest` 4, `AppContainerBindingTest` 4) and the full four-task
   gate (981 tests / 104 suites / 0 failures; `v2-11-gate-2026-11-23.log`)**.
 - Line numbers were opened at this tree, not recalled. Where a test exists but
-  covers only part of a clause, the row says so instead of rounding up.
+  covers only part of a clause, the row says so instead of rounding up. The
+  V2-12 batch shifted lines in the files it edited; only the rows it touched
+  (T3-01, E5, F2, F5) had their citations re-opened, so numbers elsewhere are
+  pre-batch.
 - A "test exists" claim was checked with a file lookup; a "test pins X" claim was
   checked by reading the assertion.
 
-**Gate status:** Full four-task gate: green — 981 tests / 104 suites / 0
-failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning
-(`v2-11-gate-2026-11-23.log`).
+**Gate status:** the original pass quoted the V2-11 gate — 981 tests / 104
+suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing
+warning (`v2-11-gate-2026-11-23.log`). The V2-12 audit-fix batch re-ran the same
+four tasks over the whole tree: **997 tests / 104 suites / 0 failures / 0 errors
+/ 0 skipped**; lint **0 errors / 1 pre-existing warning**
+(`v2-12-gate-2026-11-23.log`, 34m01s). Counts in this document are the V2-12
+gate's; the V2-11 number is kept only as the superseded baseline.
 
 ## 2. Verdict key
 
@@ -56,10 +85,12 @@ failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning
 Two rules apply to every row:
 
 1. A test must assert **behaviour**, not absence of crash.
-2. A test class that exists is not a test that ran. The V2-11 focused run now
-   satisfies this rule for `DiagnosticsReportTest`, `ChatAccessibilityTest` and
-   `AppContainerBindingTest` (19 tests / 0 failures, `v2-ledger-tests-1123g.log`);
-   the full four-task gate is still pending.
+2. A test class that exists is not a test that ran. The V2-11 focused run
+   satisfied this rule for `DiagnosticsReportTest`, `ChatAccessibilityTest` and
+   `AppContainerBindingTest` (19 tests / 0 failures, `v2-ledger-tests-1123g.log`),
+   and the V2-12 full four-task gate then executed the whole tree (997 tests /
+   104 suites / 0 failures, `v2-12-gate-2026-11-23.log`), so every class named
+   below ran inside a green gate.
 
 ## 3. State contract matrix (Rev 3.1 §5)
 
@@ -88,7 +119,9 @@ Only the IDs whose tests were opened for this review. `T2B3-01` (Review history)
 `T2B5-01` (Onboarding) are outside this pass's chat/composer/security focus; their
 package records stand unchanged. Counts are read from source. Where a class body
 was not re-read line by line, the row relies on its test names plus the package
-record; no row claims a green run.
+record; every class listed ran inside the V2-12 gate (997 tests / 104 suites / 0
+failures), but a row is not a claim that each individual assertion was re-read
+for this review.
 
 | Registry ID | Existing class (current count) | Verdict | Note |
 |---|---|---|---|
@@ -101,7 +134,7 @@ record; no row claims a green run.
 | T2B1-02 | `ChatContentGateTest` 8 | **VERIFIED** | Permission, question, composer enablement. |
 | T2B1-03 | `ChatContentSheetsTest` 16 | **VERIFIED** | Session/model/handoff sheets. |
 | T2B1-04 | `ChatHostCallbackTest` 4 | **VERIFIED** | Draft-callback freshness. |
-| T3-01 | `ShellNavigationTest` 10 | **VERIFIED** | Exists under a different name, as the sign-off records. Count grew from 8; the veto case is still bottom-bar-only (A1). |
+| T3-01 | `ShellNavigationTest` 16 | **VERIFIED** | Exists under a different name, as the sign-off records. Count grew 8 → 10 → 16; the six V2-12 cases drive the veto and the allowed switch separately through the bottom bar, the rail and the extended rail (A1, fixed). |
 | T6-01 | — | **GAP** | Catalogue `isFree` badge not implemented; `ChatViewState.kt:277-280` still uses the suffix. |
 | T6-02 | — | **GAP** | No interaction-parity test of the brief's shape; `ChatDispatchTest`'s ledger is the closest. |
 
@@ -172,14 +205,15 @@ and must not be filed as one.
 | E2 | Per-project data dir: engine state, config, cache, tmp under `crush-<key>` | `EnginePaths.kt:43-57`, `:68-89` (`CRUSH_GLOBAL_CONFIG`/`DATA`/`CACHE`, `HOME`) | **no test** | **GAP** | Code is explicit; nothing pins that two keys cannot share a state tree. This is the isolation claim the session-pool finding depended on. |
 | E3 | Legacy vs project vs chat-pool instances: legacy is the permanent singleton, outside the registry and budget; chat and projects are registry keys | `di/AppContainer.kt:251-257`, `:852-861`; `EngineInstanceRegistry.kt:21-28`, `:128-129`, `:163-164` | `EngineInstanceRegistryTest` `:144` (legacy never stops/counts), `:239` (legacy start uncapped); `AppContainerBindingTest` `binding the chat pool moves the binding and key together` (chat key), `a same-key project label update still moves the snapshot` (project key) | **VERIFIED** | The legacy key `""` hosts Crush Chat; the compatibility `chat` key still exists for pre-split sessions. |
 | E4 | Spawn veto: `maySpawn` consulted at the last moment inside the same monitor as `stopBlocking`; a throw vetoes | `CrushEngine.kt:125` (default true), `:381-398` (critical section), `:639-643` (`spawnVetoed`); `EngineSupervisor.kt:213` installs `{ isWanted() }` | `CrushEngineSpawnVetoTest` 4 (`:40`, `:46`, `:57`, `:68`); `ChatPolicySpawnGateTest` 5 (policy gate) | **PARTIAL** | The pure decision and lazy single evaluation are pinned. The actual "no `exec`, no `process` assignment" path needs a real `Process`/Context and is explicitly left to the device drive in the test KDoc. |
-| E5 | Registry budget: at most two non-legacy live children, fail-closed with a named reason | `EngineInstanceRegistry.kt:128-144`, `:199`, `:206-208` | `EngineInstanceRegistryTest` `:156` boundary, `:185` third refused, `:205` own slot reclaimed, `:216` grains — **none exercises concurrency** | **GAP — A8** | Boundary logic is pinned; check-and-reserve is not atomic. `STARTING` is written after the check and is not counted (`:142`), and the only caller is `ChatViewModel.startEngine` (`:607`) on the main thread today. Structural, not observed. Batch `V2-AUDIT-3`. |
+| E5 | Registry budget: at most two non-legacy live children, fail-closed with a named reason | `EngineInstanceRegistry.kt:114-122` (`runtimeFor` builds under the same monitor), `:160-177` (count + budget verdict + `STARTING` reservation in ONE `synchronized(lock)`), `:251-265` (`othersHoldingSlots` counts a reservation unless its start already failed terminally), `:274` (`budgetAllows`); `AppContainer.kt:901-908` (runtime registered before the gate) | `EngineInstanceRegistryTest` 19 — `:164` boundary, `:193` third refused, `:213` own slot reclaimed, `:247` reservation holds a slot before any child exists, `:267` terminal failure releases it, `:288` retrying failure keeps it, `:303` simultaneous starts never both take the last slot | **FIXED (V2-12)** | Check-and-reserve is now one critical section, so two near-simultaneous starts for different keys cannot both pass; a `STARTING` slot is released on `Failed(willRetry = false)` and kept on a retry; `requestEngineStart` registers the node first so the reservation has somewhere to live. Test count 15 → 19. Real-process concurrency is still not exercised (no device run). |
 | E6 | Engine death/restart supervision: unhealthy child restarts with bounded budget/backoff; idle stop is distinguished from crash | `EngineSupervisor.kt:203-465` (`supervise`), `:504-633` (`monitorUntilUnhealthy`), `:649-655` (`setWorkActive`/`isWanted`) | `SupervisorHysteresisTest` 17 (start budget, hard failures, wedge budget, watchdog thresholds, pressure loop) | **PARTIAL** | Decision functions and the transcribed pressure loop are pinned; the live loop (process table, socket probe, restart) is not JVM-tested. Chaos `S01` history exists but was not run in this review. |
 | E7 | No TCP: engine REST/SSE rides only the UDS; the one loopback listener is the egress relay, not engine ingress | `CrushEngine.kt:27-29`, `:190-194`, `:354-359`; `EngineSockets.kt:58-70`; `AndroidManifest.xml:42` (`usesCleartextTraffic=false`); `EngineProxy` | `EngineSocketsHostnameTest` 3; `CrushApiRestTransportTest` (socket client / absent file / scrubbed path) | **PARTIAL** | Transport selection is pinned at the client factory. No test asserts the engine's spawn args contain `unix://` and no port; that is inspection + instrumentation. |
 
 ## 7. Integration findings
 
-These span two packages and are not owned by any single package record. They are
-recorded, not fixed.
+These span two packages and are not owned by any single package record. They were
+recorded, not fixed, by this review. F2 and F5 were fixed and re-gated by the
+V2-12 audit-fix batch; the rest stand as found.
 
 **F1 — Chat/Code share one route, and `codeActive` decides the selected tab.**
 `MainActivity.kt:261-265` derives `codeActive` from
@@ -188,13 +222,20 @@ recorded, not fixed.
 `:76` pins the selection. This is audit A6 (monitor, no rewrite) and remains the
 one place where "route" and "mode" are not the same thing.
 
-**F2 — The run veto is bottom-bar-only.** The bottom bar consumes the Boolean
-(`CrushShell.kt:188-195`); the rail (`:229-232`) and extended rail (`:293-296`)
-call `onSelectChat` for its side effect and navigate regardless. The only veto
-test runs at `w411dp` (`ShellNavigationTest:98`); the rail tests (`:210`, `:222`)
-never exercise a false callback. This is **GAP — A1**, batch `V2-AUDIT-1`. The
-audit's nuance stands: it is a consistency defect, not a run-safety defect,
-because the veto only suppresses the binding reset.
+**F2 — The run veto is bottom-bar-only. → FIXED (V2-12).** As found: the bottom
+bar consumed the Boolean (`CrushShell.kt:188-195`), while the rail (`:229-232`)
+and extended rail (`:293-296`) called `onSelectChat` for its side effect and
+navigated regardless; the only veto test ran at `w411dp` (`ShellNavigationTest:98`)
+and the rail tests (`:210`, `:222`) never exercised a false callback. Now all
+three layouts call one helper,
+`selectPrimary(destination, navController, onSelectChat): Boolean`
+(`CrushShell.kt:182-192`, called at `:210`, `:244`, `:305`); on a `false` from
+the veto it neither navigates nor asks for a binding change, so the rail can no
+longer offer an escape hatch the bottom bar closes. `ShellNavigationTest` is 16
+(6 new: veto and allowed switch pinned separately for bottom bar, rail and
+extended rail). Audit A1, batch `V2-AUDIT-1`. The audit's nuance stands: it was
+a consistency defect, not a run-safety defect, because the veto only suppresses
+the binding reset.
 
 **F3 — Diagnostics exposes no pinned engine version or contract level.** The
 report data class has no version field (`DiagnosticsReport.kt:22-51`) and
@@ -211,13 +252,18 @@ This is a **deliberate GAP**, not a regression.
 left open shows "now" indefinitely. This is audit A2's design backlog row; there
 is no refresh ticker and no test for staleness.
 
-**F5 — Review export says "as it sits on disk now" but is labelled "Export a
-copy".** `ReviewContent.kt:107-113` states the semantic; `:339-342` repeats it at
-the export seam; the button is `"Export a copy"` (`:351`). `ReviewContentTest`
-`:251` pins the frozen root + relative path and `:268` the outcome message, not
-the current-vs-historical distinction. This is **A3**, copy-only batch
-`V2-AUDIT-2`. The per-turn, latest-turn-only, process-scoped history is a separate
-V2-5 contract and is documented there.
+**F5 — Review export said "as it sits on disk now" but was labelled "Export a
+copy". → FIXED (V2-12).** The semantic never changed: `ReviewContent.kt:107-113`
+and the export KDoc (`:353-357`) both say a byte-exact copy of the file **as it
+sits on disk now**, never a turn snapshot, and a historical turn is read-only.
+The old button read `"Export a copy"` (`:351`), which could be read as "export
+this turn's snapshot". The seam now says it: the button is **"Export current
+file"** (`:365`), and the historical turns carry an explicit read-only note
+(`:121-125`) plus the per-card `"older turn: read-only"` label (`:339`).
+`ReviewContentTest` 13 pins the new label (`:170`, `:266`) and the note
+(`:172`) alongside the frozen root + relative path and the outcome message. Audit
+A3, batch `V2-AUDIT-2`. The per-turn, latest-turn-only, process-scoped history is
+a separate V2-5 contract and is documented there.
 
 **F6 — `canSubmitViaIme` is a projected contract value with no consumer.** It is
 computed at `ChatViewState.kt:352` and pinned at `ChatGateTest:132`, but a
@@ -235,49 +281,64 @@ free.
 
 ## 8. Release statement
 
-**What this review certifies.** At `225ce94` plus the uncommitted V2-11 batch, the
+**What this review certifies.** At `225ce94` plus the V2-11 batch, the
 state-contract clauses that are marked VERIFIED have both an enforcement point
 and a test whose assertions match the code, and the composer table in
 `ChatGateTest` still matches the frozen §5.5.1 formula. Security storage,
 provider scoping, trust re-gating, log masking and report masking have real
 tests. Engine isolation has real code, but several of its claims are partial or
-untested.
+untested. The **V2-12** audit-fix batch then closed two of the release-gating
+gaps this review listed — `A1` (one `selectPrimary` veto shared by the
+bottom bar, rail and extended rail, `ShellNavigationTest` 16) and `A8` (atomic
+check-and-reserve, terminal-failure release, runtime registered before the gate,
+`EngineInstanceRegistryTest` 19) — together with the copy/confirmation items
+`A3`, `A4`, `A5`, `A10`, `A11` and the comment correction `A14`.
 
-**What it does not certify.** A green CI gate would not mean release-ready, for
+**What it does not certify.** A green CI gate does not mean release-ready, for
 four reasons:
 
 1. **The gate compiles more than it executes.** CI builds the androidTest APK;
    instrumented classes are not run there, and only `SecureKeyStoreInstrumentedTest`
    has a stored device result.
-2. **The V2-11 classes are green in both runs.**
-   `AppContainerBindingTest`, `DiagnosticsReportTest` and
-   `ChatAccessibilityTest` passed the focused run (19 tests / 0 failures,
-   `v2-ledger-tests-1123g.log`) and the full four-task gate (981 tests / 104
-   suites / 0 failures, `v2-11-gate-2026-11-23.log`).
+2. **The green gate is the V2-12 one.** 997 tests / 104 suites / 0 failures / 0
+   errors / 0 skipped, lint 0 errors / 1 pre-existing warning
+   (`v2-12-gate-2026-11-23.log`, 34m01s). It supersedes the V2-11 gate quoted
+   when this review was written (981 tests / 104 suites / 0 failures,
+   `v2-11-gate-2026-11-23.log`); the +16 is the audit-fix batch.
 3. **No device run happened here.** The composer, lock overlay, rails, relative
-   time and diagnostics share path were not exercised in this review.
-4. **One security promise is not enforced.** A rejected permission policy is
-   logged and then treated as applied. That is a security-surface gap, not a
+   time, Settings confirmations, Review export label and diagnostics share path
+   were not exercised in this review, and the V2-12 fixes have no device,
+   TalkBack or API 30+ run either.
+4. **One security promise is still not enforced.** A rejected permission policy
+   is logged and then treated as applied. That is a security-surface gap, not a
    polish item.
 
 **Open GAPs (release-gating set):**
 
 | ID | Gap | Where | What closes it |
 |---|---|---|---|
-| **A7 / A7b** | Permission application is fail-open; a failed apply is recorded and replayed by reattach. No read-back. | `WorkspaceManager.kt:233-244`, `:255`, `:282-295` | `V2-AUDIT-0`: treat a non-2xx policy apply as an open failure with a named result; read back the effective mode if the engine exposes it; path-keyed `MockWebServer` tests (create 200 + mode 500 must skip `agent/init`); a failed reattach must not report attached. **Needs owner sign-off (behaviour change).** |
-| **A1** | Rail/extended-rail discard the run veto; the same tap behaves differently by width. | `CrushShell.kt:188-195` vs `:229-232`, `:293-296` | `V2-AUDIT-1`: one `selectPrimary(destination): Boolean`, used by all three layouts, with a 6-case test matrix keyed to each layout's test tag. |
-| **A8** | Budget check and reservation are not atomic; `STARTING` is set after the check and is not counted. | `EngineInstanceRegistry.kt:128-144`, `:199` | `V2-AUDIT-3`: atomic reservation, or an explicit single-thread contract plus an assertion. Today's only caller is main-thread `startEngine`. |
-| **A12** | The app cannot answer agent questions; it can only deny/dismiss, which cancels the batch. | `ChatContent.kt:430-462`; transport already exists at `CrushApi.kt:477`, `:481` | Question milestone (large): choice/free-text UI plus resolution state over `answerQuestions`/`cancelQuestions`; today the dialog is honest and the raw payload is preserved. |
+| **A7 / A7b** | Permission application is fail-open; a failed apply is recorded and replayed by reattach. No read-back. | `WorkspaceManager.kt:233-244`, `:255`, `:282-295` | `V2-AUDIT-0`: treat a non-2xx policy apply as an open failure with a named result; read back the effective mode if the engine exposes it; path-keyed `MockWebServer` tests (create 200 + mode 500 must skip `agent/init`); a failed reattach must not report attached. **Needs owner sign-off (behaviour change).** Still open after V2-12. |
+| **A12** | The app cannot answer agent questions; it can only deny/dismiss, which cancels the batch. | `ChatContent.kt:430-462`; transport already exists at `CrushApi.kt:477`, `:481` | Question milestone (large): choice/free-text UI plus resolution state over `answerQuestions`/`cancelQuestions`; today the dialog is honest and the raw payload is preserved. Still open after V2-12. |
+
+**A1 and A8 left this table in V2-12.** `A1` was closed by the shared
+`selectPrimary` veto (F2) and `A8` by the atomic reservation with a
+terminal-failure release (E5); `V2-AUDIT-1` and `V2-AUDIT-3` are done and inside
+the green gate. Neither is claimed as device-verified.
 
 Non-release coverage gaps also recorded: the locked composer/overlay path has no
 executed test (SEC3, §4); backup exclusion has no test (SEC8); per-project data
-dirs have no test (E2); per-instance socket naming has no JVM test (E1); the
-permission/UI copy items A3, A4, A5, A10 and A11 remain in `V2-AUDIT-2` and were
-not re-verified here.
+dirs have no test (E2); per-instance socket naming has no JVM test (E1). The
+permission/UI copy items A3, A4, A5, A10 and A11 were **fixed and gated in
+V2-12** (`ReviewContentTest` 13, `ProjectsContentTest` 15, `OnboardingContentTest`
+12, `SettingsContentTest` 17); what they still lack is a device row, not a test.
+`A2` (project home), `A6` (route/mode dual meaning, monitored, no rewrite) and
+`A13` (runtime disposal) stay open, and device / TalkBack / API 30+ verification
+of every V2-12 row is **NOT PERFORMED**.
 
-**Closing these is a separate authorized batch.** `V2-AUDIT-0` needs explicit
-owner sign-off; `V2-AUDIT-1` and `V2-AUDIT-3` are small; A12 is a milestone.
-Nothing in this review authorizes a fix, a build, or a release.
+**What still needs a separate authorized batch.** `A7`/`A7b` is `V2-AUDIT-0` and
+needs explicit owner sign-off; it was not part of the fix batch. `A12` is a
+milestone. Gate 7 (signing, packaging, listing, rollout) is untouched by every
+batch recorded here. Nothing in this review authorizes a release.
 
 ## 9. Evidence index
 
@@ -288,7 +349,9 @@ Nothing in this review authorizes a fix, a build, or a release.
 | `docs/v2/V2-4-chat-redesign.md` | frozen composer formula, chat test plan and device findings |
 | `docs/v2/V2-7-8-codebase-inventory-2026-11-22.md` | line-level inventory; repeats the composer freeze |
 | `docs/v2/V2-GAP-AUDIT.md` | A1-A14 verification, severity, batch IDs; not duplicated here |
-| `docs/v2/V2-COMPLETION-LEDGER.md` | shipped/tested/device labels; V2-11 focused-run and full-gate status |
+| `docs/v2/V2-AUDIT-FIXES.md` | the V2-12 audit-fix batch: what each `A` item changed, the tests that pin it, and what stayed open |
+| `v2-12-gate-2026-11-23.log` | the four-task gate that ran the fix batch: 997 tests / 104 suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning (local-only — `.gitignore` excludes `*.log`) |
+| `docs/v2/V2-COMPLETION-LEDGER.md` | shipped/tested/device labels; V2-11 focused run plus the V2-12 gate row |
 | `docs/v2/V2-9-release-hardening.md` | Keystore instrumented run, ASK default, secret scan |
 | `docs/parity/2026-11-19-v2-0-baseline/MANIFEST.md` | the F-E stale-phase capture and its limits |
 | `docs/parity/2026-11-20-v2-4-chat/MANIFEST.md` | chat device set (composer, sheets, Retry, 2.0x) |

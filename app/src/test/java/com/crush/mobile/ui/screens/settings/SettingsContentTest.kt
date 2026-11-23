@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -91,7 +92,7 @@ class SettingsContentTest {
         state: SettingsViewState = state(),
         onOpenDiagnostics: () -> Unit = {},
         onSelectProvider: (String) -> Unit = {},
-        onSaveKey: (String) -> Unit = {},
+        onSaveKey: (String, (Boolean) -> Unit) -> Unit = { _, _ -> },
         onClearKey: () -> Unit = {},
         onSelectTheme: (String) -> Unit = {},
         onSelectEnterSend: (String) -> Unit = {},
@@ -153,16 +154,52 @@ class SettingsContentTest {
         compose.onNodeWithText("...abcd").assertIsDisplayed()
         compose.onNodeWithText("Replace key").assertIsEnabled()
 
-        compose.onNodeWithText("Delete").performClick()
+        // A11: Delete asks first; the confirmation is now part of this path.
+        compose.onNodeWithTag("delete-key").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("confirm-delete-key").performClick()
         compose.waitForIdle()
 
         assertEquals(1, cleared)
     }
 
     @Test
+    fun `delete asks for confirmation naming the provider and dismiss does nothing`() {
+        var cleared = 0
+        setContent(
+            state(settings = AppSettings(hasApiKey = true, apiKeyHint = "...abcd")),
+            onClearKey = { cleared += 1 },
+        )
+
+        compose.onNodeWithTag("delete-key").performClick()
+        compose.waitForIdle()
+
+        // The tap only opened the dialog - nothing is deleted yet.
+        assertEquals(0, cleared)
+        compose.onNodeWithText("Delete saved key?").assertExists()
+        compose.onNodeWithText(
+            "Delete the saved key for OpenCode Zen? " +
+                "You will need to enter it again before sending messages."
+        ).assertExists()
+
+        // Dismissing must leave the vault untouched.
+        compose.onNodeWithTag("cancel-delete-key").performClick()
+        compose.waitForIdle()
+        assertEquals(0, cleared)
+        compose.onNodeWithText("Delete saved key?").assertDoesNotExist()
+
+        // Only the dialog's Delete performs the clear.
+        compose.onNodeWithTag("delete-key").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("confirm-delete-key").performClick()
+        compose.waitForIdle()
+        assertEquals(1, cleared)
+    }
+
+    @Test
     fun `adding a key keeps Save disabled until text and dispatches the trimmed key`() {
         val saved = mutableListOf<String>()
-        setContent(onSaveKey = { saved += it })
+        setContent(onSaveKey = { key, _ -> saved += key })
 
         compose.onNodeWithText("No API key stored").assertIsDisplayed()
         compose.onNodeWithText("Add key").performClick()
@@ -175,6 +212,63 @@ class SettingsContentTest {
         compose.waitForIdle()
 
         assertEquals(listOf("sk-test"), saved)
+    }
+
+    @Test
+    fun `save keeps the editor and draft until the result callback succeeds`() {
+        val saved = mutableListOf<String>()
+        var pending: ((Boolean) -> Unit)? = null
+        setContent(onSaveKey = { key, onResult ->
+            saved += key
+            pending = onResult
+        })
+
+        compose.onNodeWithText("Add key").performClick()
+        compose.waitForIdle()
+        compose.onNode(hasSetTextAction()).performTextInput("sk-live")
+        compose.waitForIdle()
+        compose.onNodeWithText("Save").performClick()
+        compose.waitForIdle()
+
+        // The tap dispatched the key but closed nothing: the write is still in
+        // flight, so the editor must stay open with Save disabled (A10).
+        assertEquals(listOf("sk-live"), saved)
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+
+        // Success is the only thing that closes the editor...
+        compose.runOnIdle { pending!!.invoke(true) }
+        compose.waitForIdle()
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+        compose.onNodeWithText("No API key stored").assertIsDisplayed()
+
+        // ...and clears the draft: a fresh editor has nothing to save.
+        compose.onNodeWithText("Add key").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `a failed save leaves the draft and the editor in place`() {
+        var pending: ((Boolean) -> Unit)? = null
+        setContent(onSaveKey = { _, onResult -> pending = onResult })
+
+        compose.onNodeWithText("Add key").performClick()
+        compose.waitForIdle()
+        compose.onNode(hasSetTextAction()).performTextInput("sk-keep")
+        compose.waitForIdle()
+        compose.onNodeWithText("Save").performClick()
+        compose.waitForIdle()
+
+        compose.runOnIdle { pending!!.invoke(false) }
+        compose.waitForIdle()
+
+        // Editor still open, draft still there: Save enabled means newKey is
+        // still non-blank (the field is password-transformed, so the text
+        // itself is not readable from semantics).
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+        compose.onNodeWithText("Save").assertIsEnabled()
+        compose.onNodeWithText("Cancel").assertIsEnabled()
     }
 
     @Test
@@ -199,10 +293,61 @@ class SettingsContentTest {
         val modes = mutableListOf<PermissionMode>()
         setContent(onPermissionChange = { modes += it })
 
+        // The ON direction is now gated behind a confirmation.
         compose.onNodeWithTag("auto-approve-switch").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("confirm-auto-approve").performClick()
         compose.waitForIdle()
 
         assertEquals(listOf(PermissionMode.AUTO_APPROVE), modes)
+    }
+
+    @Test
+    fun `auto-approve asks first names the consequences and cancels to ASK`() {
+        val modes = mutableListOf<PermissionMode>()
+        setContent(onPermissionChange = { modes += it })
+
+        compose.onNodeWithTag("auto-approve-switch").performClick()
+        compose.waitForIdle()
+
+        // Nothing is written by the tap that opens the dialog, and the switch
+        // still renders ASK because its value comes from settings.
+        assertEquals(0, modes.size)
+        compose.onNodeWithTag("auto-approve-switch").assertIsOff()
+        compose.onNodeWithText("Turn on auto-approve?").assertExists()
+        compose.onNodeWithText("read, change and delete files", substring = true)
+            .assertExists()
+        compose.onNodeWithText("commands in its workspace", substring = true)
+            .assertExists()
+
+        // Cancelling leaves ASK in place and writes nothing.
+        compose.onNodeWithTag("cancel-auto-approve").performClick()
+        compose.waitForIdle()
+        assertEquals(0, modes.size)
+        compose.onNodeWithTag("auto-approve-switch").assertIsOff()
+        compose.onNodeWithText("Turn on auto-approve?").assertDoesNotExist()
+
+        // Confirming is the only path to AUTO_APPROVE.
+        compose.onNodeWithTag("auto-approve-switch").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("confirm-auto-approve").performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(PermissionMode.AUTO_APPROVE), modes)
+    }
+
+    @Test
+    fun `turning auto-approve off is immediate and needs no dialog`() {
+        val modes = mutableListOf<PermissionMode>()
+        setContent(
+            state(settings = AppSettings(permissionMode = PermissionMode.AUTO_APPROVE)),
+            onPermissionChange = { modes += it },
+        )
+
+        compose.onNodeWithTag("auto-approve-switch").performClick()
+        compose.waitForIdle()
+
+        assertEquals(listOf(PermissionMode.ASK), modes)
+        compose.onNodeWithText("Turn on auto-approve?").assertDoesNotExist()
     }
 
     @Test

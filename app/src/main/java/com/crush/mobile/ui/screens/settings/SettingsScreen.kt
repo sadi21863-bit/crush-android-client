@@ -4,10 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crush.mobile.CrushMobileApp
 import com.crush.mobile.domain.provider.Providers
+import kotlinx.coroutines.launch
 
 /**
  * The Settings surface's HOST (Phase 2b.4 extraction).
@@ -28,6 +30,11 @@ fun SettingsScreen(
     )
 
     val uiState by viewModel.uiState.collectAsState()
+    // A10: the suspend save needs a scope for the duration of one tap. The
+    // scope is tied to this composition, so leaving Settings cannot leave a
+    // callback pointing at a screen that is gone; the editor state it updates
+    // dies with the screen anyway.
+    val scope = rememberCoroutineScope()
     val settings = uiState.settings
     val provider = Providers.resolve(settings.providerId)
     val resolvedTuning = remember(settings) {
@@ -49,13 +56,19 @@ fun SettingsScreen(
         ),
         onOpenDiagnostics = onOpenDiagnostics,
         onSelectProvider = viewModel::saveProviderId,
-        onSaveKey = { key ->
+        onSaveKey = { key, onResult ->
             // Clear the previous attempt's error BEFORE starting a new one.
             // Without this a stale failure lingers after a later SUCCESSFUL
             // save, and an identical repeat failure sets the same string twice,
             // which would not re-trigger the snackbar effect.
             viewModel.dismissError()
-            viewModel.saveApiKey(key, provider.id)
+            // A10: report the real outcome instead of fire-and-forget, so the
+            // content can keep the editor and the draft until the Keystore
+            // write actually succeeded.
+            scope.launch {
+                val ok = viewModel.saveApiKeyAwait(key, provider.id)
+                onResult(ok)
+            }
         },
         onClearKey = {
             viewModel.dismissError()

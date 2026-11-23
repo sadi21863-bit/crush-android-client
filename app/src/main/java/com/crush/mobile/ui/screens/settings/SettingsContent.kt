@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -23,6 +24,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +69,11 @@ import kotlinx.coroutines.launch
  *
  * V2-6-D2 puts the sections in the brief's order: provider/credential ->
  * permissions -> appearance -> performance -> about/diagnostics.
+ *
+ * V2-GAP-AUDIT A10/A11 (2026-11-23): the two destructive-ish paths now ask or
+ * report. Save crosses back as [onSaveKey] with a result callback so the editor
+ * stays open (draft intact) until the Keystore write actually succeeded, and
+ * Delete opens a confirmation naming the provider instead of firing at once.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,7 +81,7 @@ fun SettingsContent(
     state: SettingsViewState,
     onOpenDiagnostics: () -> Unit,
     onSelectProvider: (String) -> Unit,
-    onSaveKey: (String) -> Unit,
+    onSaveKey: (String, (Boolean) -> Unit) -> Unit,
     onClearKey: () -> Unit,
     onSelectTheme: (String) -> Unit,
     onSelectEnterSend: (String) -> Unit,
@@ -88,6 +95,13 @@ fun SettingsContent(
     val stored = settings.hasApiKey
     var replacing by remember { mutableStateOf(false) }
     var newKey by remember { mutableStateOf("") }
+    // A10: true from the Save tap until the host reports the result. While it
+    // is true the editor and the draft stay put, and Save cannot be tapped
+    // twice. A failed write leaves both exactly as the user left them.
+    var saving by remember { mutableStateOf(false) }
+    // A11: the delete confirmation. Nothing is deleted until the dialog's
+    // Delete is confirmed - a mis-tap used to destroy the stored credential.
+    var confirmingDelete by remember { mutableStateOf(false) }
 
     // SettingsViewModel has been setting uiState.error on a failed Keystore
     // write since it was written, and nothing ever rendered it: the save failed
@@ -252,8 +266,12 @@ fun SettingsContent(
                         if (stored) {
                             CrushButton(
                                 text = "Delete",
-                                onClick = onClearKey,
-                                modifier = Modifier.weight(1f),
+                                // A11: opens the confirmation; onClearKey only
+                                // runs from the dialog's confirm button.
+                                onClick = { confirmingDelete = true },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("delete-key"),
                                 variant = CrushButtonVariant.Secondary,
                             )
                         }
@@ -261,15 +279,24 @@ fun SettingsContent(
                         CrushButton(
                             text = "Save",
                             onClick = {
-                                // The host clears the previous attempt's error
-                                // before starting a new one, so a stale failure
-                                // cannot linger after a later SUCCESSFUL save.
-                                onSaveKey(newKey.trim())
-                                replacing = false
-                                newKey = ""
+                                val key = newKey.trim()
+                                if (key.isNotBlank() && !saving) {
+                                    // A10: no optimistic close and no clear.
+                                    // The host clears the previous attempt's
+                                    // error before starting a new one, then
+                                    // reports whether the write worked.
+                                    saving = true
+                                    onSaveKey(key) { ok ->
+                                        saving = false
+                                        if (ok) {
+                                            replacing = false
+                                            newKey = ""
+                                        }
+                                    }
+                                }
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = newKey.isNotBlank(),
+                            enabled = newKey.isNotBlank() && !saving,
                             variant = CrushButtonVariant.Primary,
                         )
                         CrushButton(
@@ -279,10 +306,39 @@ fun SettingsContent(
                                 newKey = ""
                             },
                             modifier = Modifier.weight(1f),
+                            enabled = !saving,
                             variant = CrushButtonVariant.Secondary,
                         )
                     }
                 }
+            }
+
+            if (confirmingDelete) {
+                AlertDialog(
+                    onDismissRequest = { confirmingDelete = false },
+                    title = { Text("Delete saved key?") },
+                    text = {
+                        Text(
+                            "Delete the saved key for ${provider.displayName}? " +
+                                "You will need to enter it again before sending messages."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                confirmingDelete = false
+                                onClearKey()
+                            },
+                            modifier = Modifier.testTag("confirm-delete-key"),
+                        ) { Text("Delete") }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { confirmingDelete = false },
+                            modifier = Modifier.testTag("cancel-delete-key"),
+                        ) { Text("Cancel") }
+                    },
+                )
             }
 
             PermissionSection(
@@ -474,6 +530,11 @@ fun SettingsContent(
  * Deliberately not a chip group like the tuning rows: those pick a value from
  * fixed options, this is one boolean whose OFF state is the safe one, and a
  * switch that starts OFF cannot be knocked into AUTO_APPROVE by a mis-tap.
+ *
+ * V2-GAP-AUDIT (2026-11-23): turning it ON now asks first and spells out what
+ * AUTO_APPROVE actually permits. Turning it OFF stays immediate - the safe
+ * direction needs no friction. The switch reads its checked state from
+ * [settings], so an unconfirmed tap simply leaves it ASK.
  */
 @Composable
 private fun PermissionSection(
@@ -482,6 +543,7 @@ private fun PermissionSection(
 ) {
     val auto = settings.permissionMode == PermissionMode.AUTO_APPROVE
     val colors = LocalCrushColors.current
+    var confirming by remember { mutableStateOf(false) }
 
     CrushSectionHeader("Permissions")
     CrushCard {
@@ -501,10 +563,14 @@ private fun PermissionSection(
             }
             Switch(
                 checked = auto,
-                onCheckedChange = {
-                    onChange(
-                        if (it) PermissionMode.AUTO_APPROVE else PermissionMode.ASK
-                    )
+                onCheckedChange = { checked ->
+                    if (checked && !auto) {
+                        // ON is the dangerous direction: ask before writing.
+                        confirming = true
+                    } else {
+                        // OFF is restored immediately, no dialog.
+                        onChange(PermissionMode.ASK)
+                    }
                 },
                 modifier = Modifier.testTag("auto-approve-switch")
             )
@@ -535,6 +601,35 @@ private fun PermissionSection(
             "Takes effect the next time the agent starts a session.",
             style = CrushType.metadata,
             color = colors.muted
+        )
+    }
+
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Turn on auto-approve?") },
+            text = {
+                Text(
+                    "The agent will read, change and delete files and run " +
+                        "commands in its workspace without asking you first. " +
+                        "Only do this for a task you trust."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirming = false
+                        onChange(PermissionMode.AUTO_APPROVE)
+                    },
+                    modifier = Modifier.testTag("confirm-auto-approve"),
+                ) { Text("Turn on") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { confirming = false },
+                    modifier = Modifier.testTag("cancel-auto-approve"),
+                ) { Text("Cancel") }
+            },
         )
     }
 }

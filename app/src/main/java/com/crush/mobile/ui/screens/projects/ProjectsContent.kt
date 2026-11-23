@@ -184,15 +184,6 @@ fun ProjectsContent(
                     }
                 }
             }
-
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "A project opens its home. Open Code chat binds that project " +
-                    "to its own engine instance.",
-                style = CrushType.body,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
         }
     }
 

@@ -1,9 +1,10 @@
 # V2 final integration review
 
 Status: **verification record, 2026-11-23, updated after the V2-12 audit-fix
-batch.** Read-only review of the V2 redesign against the Rev 3.1 contract; the
-review itself changed no source, test or build file. The fixes it reports as
-FIXED were made by the separately authorized V2-12 batch, not by this review.
+batch and the V2-13 permission fail-closed batch.** Read-only review of the V2
+redesign against the Rev 3.1 contract; the review itself changed no source, test
+or build file. The fixes it reports as **FIXED (V2-12)** or **VERIFIED (V2-13)**
+were made by the separately authorized batches, not by this review.
 It does not replace `V2-COMPLETION-LEDGER.md` (what shipped and how it was
 measured) or `V2-GAP-AUDIT.md` (external audit verified against source); it
 cross-checks the claims those records make at the seams between chat, shell,
@@ -16,9 +17,23 @@ security and engine.
 > **FIXED (V2-12)** were open GAPs in the original pass: F2 (`A1`), F5 (`A3`),
 > E5 (`A8`), plus the copy/confirmation items `A4`, `A5`, `A10`, `A11` and the
 > comment correction `A14`. Their original findings text is kept, marked as the
-> pre-fix state. Still open: `A7`/`A7b` (needs owner sign-off), `A12`, `A2`,
-> `A6`, `A13`. Nothing was device-verified, TalkBack-checked or run on API 30+;
+> pre-fix state. Still open **after V2-12** (A7/A7b was then closed by V2-13):
+> `A7`/`A7b` (needed owner sign-off), `A12`, `A2`, `A6`, `A13`. Nothing was
+> device-verified, TalkBack-checked or run on API 30+;
 > Gate 7 is untouched. Batch record: `docs/v2/V2-AUDIT-FIXES.md`.
+>
+> **V2-13 update (2026-11-23, permission fail-closed, owner-authorized).** The
+> `V2-AUDIT-0` behaviour change landed and the four-task gate is green over the
+> whole tree: **1001 tests / 105 suites / 0 failures / 0 errors / 0 skipped**,
+> lint **0 errors / 1 pre-existing warning**
+> (`v2-14-a7-gate-2026-11-23.log`, 33m38s). This closes **A7/A7b** — SEC9 is now
+> **VERIFIED**: a rejected `permissions/mode`/`skip` fails `open()` with a named
+> `PermissionPolicyException` before `agent/init`, flushes the workspace id and
+> generation, and a failed reattach reports not-attached. `WorkspacePermissionPolicyTest`
+> 4 pins it and `BootstrapOrderTest` 9 stays green. What it still does **not**
+> do is read the engine's effective mode back: 2xx on the apply is the proof. No
+> device run. Still open: `A12`, `A2`, `A6`, `A13`, device/TalkBack/API 30+ and
+> Gate 7. Batch record: `docs/v2/V2-A7-PERMISSION-FAIL-CLOSED.md`.
 
 ## 1. Scope and method
 
@@ -32,7 +47,11 @@ original pass stopped there. The V2-12 update above adds the audit-fix batch
 `ReviewContent.kt`, `ProjectsContent.kt`, `OnboardingContent.kt`,
 `SettingsContent.kt` and `SettingsScreen.kt`, `EngineInstanceRegistry.kt`,
 `AppContainer.kt`, comments in `ChatViewModel.kt`, and the six test classes named
-in §3.1.
+in §3.1. The V2-13 update adds the permission fail-closed batch
+(`docs/v2/V2-A7-PERMISSION-FAIL-CLOSED.md`), which changed
+`data/crush/WorkspaceManager.kt` (new `PermissionPolicyException`, hard-failing
+`applyPermissionPolicy`, lease after the apply, failing `reattachIfStale`) and
+the bootstrap catch in `ChatViewModel.kt`, plus `WorkspacePermissionPolicyTest`.
 
 **The brief itself is not in this tree.** A repo-wide search for
 `crush-mobile-v2-design-brief-state-contract-test-plan-2026-11-14.md` returns
@@ -49,11 +68,12 @@ it, not from the brief:
 Method and limits:
 
 - Source + JVM/Robolectric evidence only. **The original pass ran no Gradle, adb,
-  device or instrumented command.** The V2-12 update quotes one full four-task
-  gate executed by the fix batch (`v2-12-gate-2026-11-23.log`) and the test-result
-  XML it produced (104 result files, 997 tests, 0 failures / 0 errors / 0
-  skipped). No device or instrumented run happened in either pass; statements
-  about earlier executed results are quoted from package records.
+  device or instrumented command.** The V2-12 and V2-13 updates each quote one
+  full four-task gate executed by their batch (`v2-12-gate-2026-11-23.log`: 104
+  result files, 997 tests, 0 failures / 0 errors / 0 skipped;
+  `v2-14-a7-gate-2026-11-23.log`: 105 result files, 1001 tests, 0 failures / 0
+  errors / 0 skipped). No device or instrumented run happened in any pass;
+  statements about earlier executed results are quoted from package records.
 - The three V2-11 test classes are **green in both runs: a focused run (19
   tests / 0 failures, `v2-ledger-tests-1123g.log`: `DiagnosticsReportTest` 11,
   `ChatAccessibilityTest` 4, `AppContainerBindingTest` 4) and the full four-task
@@ -61,18 +81,22 @@ Method and limits:
 - Line numbers were opened at this tree, not recalled. Where a test exists but
   covers only part of a clause, the row says so instead of rounding up. The
   V2-12 batch shifted lines in the files it edited; only the rows it touched
-  (T3-01, E5, F2, F5) had their citations re-opened, so numbers elsewhere are
-  pre-batch.
+  (T3-01, E5, F2, F5) had their citations re-opened. The V2-13 batch shifted
+  `WorkspaceManager.kt` and `ChatViewModel.kt`, so SEC9 was re-opened against the
+  current source; numbers elsewhere are pre-batch.
 - A "test exists" claim was checked with a file lookup; a "test pins X" claim was
   checked by reading the assertion.
 
 **Gate status:** the original pass quoted the V2-11 gate — 981 tests / 104
 suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing
 warning (`v2-11-gate-2026-11-23.log`). The V2-12 audit-fix batch re-ran the same
-four tasks over the whole tree: **997 tests / 104 suites / 0 failures / 0 errors
-/ 0 skipped**; lint **0 errors / 1 pre-existing warning**
-(`v2-12-gate-2026-11-23.log`, 34m01s). Counts in this document are the V2-12
-gate's; the V2-11 number is kept only as the superseded baseline.
+four tasks over the whole tree: 997 tests / 104 suites / 0 failures / 0 errors /
+0 skipped; lint 0 errors / 1 pre-existing warning
+(`v2-12-gate-2026-11-23.log`, 34m01s). The V2-13 permission batch re-ran them
+again: **1001 tests / 105 suites / 0 failures / 0 errors / 0 skipped**; lint
+**0 errors / 1 pre-existing warning** (`v2-14-a7-gate-2026-11-23.log`, 33m38s).
+Counts in this document are the V2-13 gate's; the V2-12 and V2-11 numbers are
+kept only as superseded baselines.
 
 ## 2. Verdict key
 
@@ -89,8 +113,9 @@ Two rules apply to every row:
    satisfied this rule for `DiagnosticsReportTest`, `ChatAccessibilityTest` and
    `AppContainerBindingTest` (19 tests / 0 failures, `v2-ledger-tests-1123g.log`),
    and the V2-12 full four-task gate then executed the whole tree (997 tests /
-   104 suites / 0 failures, `v2-12-gate-2026-11-23.log`), so every class named
-   below ran inside a green gate.
+   104 suites / 0 failures, `v2-12-gate-2026-11-23.log`); the V2-13 gate ran it
+   again (1001 tests / 105 suites / 0 failures, `v2-14-a7-gate-2026-11-23.log`),
+   so every class named below ran inside a green gate.
 
 ## 3. State contract matrix (Rev 3.1 §5)
 
@@ -120,7 +145,8 @@ Only the IDs whose tests were opened for this review. `T2B3-01` (Review history)
 package records stand unchanged. Counts are read from source. Where a class body
 was not re-read line by line, the row relies on its test names plus the package
 record; every class listed ran inside the V2-12 gate (997 tests / 104 suites / 0
-failures), but a row is not a claim that each individual assertion was re-read
+failures) and again inside the V2-13 gate (1001 tests / 105 suites / 0 failures),
+but a row is not a claim that each individual assertion was re-read
 for this review.
 
 | Registry ID | Existing class (current count) | Verdict | Note |
@@ -191,7 +217,7 @@ Two honest notes on this matrix:
 | SEC6 | Diagnostics export masking: the copied block, including log tail, crash text and notes, passes the key net | `ui/screens/diagnostics/DiagnosticsReport.kt:192-237` (`buildReport` → `redactSecrets` at `:237`), `:251`; 200-line tail at `:328` | `DiagnosticsReportTest` 11 (`:79` tail key, `:90` crash key, `:107` truncation marker, `:138` notes) | **VERIFIED** | Report-builder level only; focused run 11/11 green. The screen, clipboard and share intent are still **NOT PERFORMED** on device (audit A9 nuance). |
 | SEC7 | Log masking at the sink: persisted lines and logcat both mask key-shaped tokens | `util/AppLog.kt:129-154` (mask before both sinks), `:213-252` (patterns, UUID exemption) | `AppLogTest` 23 (brand keys, generic token, brand-less `sk-`, UUID pass-through, exception names) | **VERIFIED** | Over-masking is an accepted trade recorded in the class KDoc. |
 | SEC8 | Backup exclusion: `allowBackup=false`, full-backup off, cloud/transfer rules exclude every domain | `AndroidManifest.xml:32-34`; `res/xml/data_extraction_rules.xml` | **no test** | **GAP** | Configuration is correct by inspection but no test (instrumented backup check or manifest assertion) proves it. Not a code defect; an unverified claim. |
-| SEC9 | Permission application fails closed: a rejected `permissions/mode`/`skip` must fail the open, not continue | `data/crush/WorkspaceManager.kt:233-244` (log-only `onFailure`), `:255` (`agent/init` still runs), `:282-295` (reattach replays the recorded request) | **no test** | **GAP — A7/A7b** | The engine's effective policy is whatever it was; the app records and replays the request as if applied. No read-back exists. Needs the owner-sign-off batch `V2-AUDIT-0`; see the A7 section of `V2-GAP-AUDIT.md`. |
+| SEC9 | Permission application fails closed: a rejected `permissions/mode`/`skip` must fail the open, not continue | `data/crush/WorkspaceManager.kt:12-18` (`PermissionPolicyException`), `:244-248` (hard prerequisite, call to `applyPermissionPolicy`), `:286-301` (rejection flushes `workspaceId`/`workspaceGeneration`, logs the named mode, throws), `:253` (lease set only after the apply), `:264` (`agent/init` unreachable on rejection), `:311-334` (`reattachIfStale` returns false on a failed re-open); `ChatViewModel.kt:1324-1341` (bootstrap catches, names the phase, `engineReady=false`) | `WorkspacePermissionPolicyTest` 4 — `:86` rejected mode fails the open and never initialises the agent, `:111` rejected legacy skip does the same, `:133` an accepted policy still runs `agent/init`, `:147` a failed reattach reports not attached and flushes the id; `BootstrapOrderTest` 9 (wire order unchanged) | **VERIFIED (V2-13)** | Owner-authorized `V2-AUDIT-0` (2026-11-23). A rejected apply is now a hard open failure with a named mode: the id and generation are flushed, the lease is never set, `agent/init` is skipped, and reattach cannot report attached. **Limit: there is no effective-mode read-back** — a 2xx on the apply is the proof, so an engine that answers 2xx without applying the mode would still pass. The ViewModel catch is inspection-only (no JVM test constructs `ChatViewModel`), and nothing was device-run. Batch record: `docs/v2/V2-A7-PERMISSION-FAIL-CLOSED.md`. |
 
 Enforcement is deliberately ordered: SEC1/2 are storage, SEC3 is the visible
 gate, SEC9 is the engine-policy gate. A failure in SEC9 is not a storage failure
@@ -292,7 +318,12 @@ gaps this review listed — `A1` (one `selectPrimary` veto shared by the
 bottom bar, rail and extended rail, `ShellNavigationTest` 16) and `A8` (atomic
 check-and-reserve, terminal-failure release, runtime registered before the gate,
 `EngineInstanceRegistryTest` 19) — together with the copy/confirmation items
-`A3`, `A4`, `A5`, `A10`, `A11` and the comment correction `A14`.
+`A3`, `A4`, `A5`, `A10`, `A11` and the comment correction `A14`. The **V2-13**
+batch then closed the last release-gating security gap this review listed —
+`A7`/`A7b`: a rejected permission policy is now a hard open failure with a named
+`PermissionPolicyException`, `agent/init` is skipped, the id is flushed, and a
+failed reattach reports not-attached (`WorkspacePermissionPolicyTest` 4,
+`BootstrapOrderTest` 9). SEC9 is **VERIFIED (V2-13)**.
 
 **What it does not certify.** A green CI gate does not mean release-ready, for
 four reasons:
@@ -300,30 +331,33 @@ four reasons:
 1. **The gate compiles more than it executes.** CI builds the androidTest APK;
    instrumented classes are not run there, and only `SecureKeyStoreInstrumentedTest`
    has a stored device result.
-2. **The green gate is the V2-12 one.** 997 tests / 104 suites / 0 failures / 0
+2. **The green gate is the V2-13 one.** 1001 tests / 105 suites / 0 failures / 0
    errors / 0 skipped, lint 0 errors / 1 pre-existing warning
-   (`v2-12-gate-2026-11-23.log`, 34m01s). It supersedes the V2-11 gate quoted
-   when this review was written (981 tests / 104 suites / 0 failures,
-   `v2-11-gate-2026-11-23.log`); the +16 is the audit-fix batch.
+   (`v2-14-a7-gate-2026-11-23.log`, 33m38s). It supersedes the V2-12 gate (997
+   tests / 104 suites / 0 failures, `v2-12-gate-2026-11-23.log`) and the V2-11
+   gate quoted when this review was written (981 tests / 104 suites / 0
+   failures, `v2-11-gate-2026-11-23.log`); the +4 over V2-12 is the permission
+   batch.
 3. **No device run happened here.** The composer, lock overlay, rails, relative
-   time, Settings confirmations, Review export label and diagnostics share path
-   were not exercised in this review, and the V2-12 fixes have no device,
-   TalkBack or API 30+ run either.
-4. **One security promise is still not enforced.** A rejected permission policy
-   is logged and then treated as applied. That is a security-surface gap, not a
-   polish item.
+   time, Settings confirmations, Review export label, diagnostics share path and
+   the permission-rejection phase were not exercised in this review, and the
+   V2-12/V2-13 fixes have no device, TalkBack or API 30+ run either.
+4. **One release-gating product gap remains.** `A12`: the app cannot answer an
+   agent question, only deny or dismiss it, which cancels the batch. That is a
+   feature milestone, not a polish item.
 
 **Open GAPs (release-gating set):**
 
 | ID | Gap | Where | What closes it |
 |---|---|---|---|
-| **A7 / A7b** | Permission application is fail-open; a failed apply is recorded and replayed by reattach. No read-back. | `WorkspaceManager.kt:233-244`, `:255`, `:282-295` | `V2-AUDIT-0`: treat a non-2xx policy apply as an open failure with a named result; read back the effective mode if the engine exposes it; path-keyed `MockWebServer` tests (create 200 + mode 500 must skip `agent/init`); a failed reattach must not report attached. **Needs owner sign-off (behaviour change).** Still open after V2-12. |
-| **A12** | The app cannot answer agent questions; it can only deny/dismiss, which cancels the batch. | `ChatContent.kt:430-462`; transport already exists at `CrushApi.kt:477`, `:481` | Question milestone (large): choice/free-text UI plus resolution state over `answerQuestions`/`cancelQuestions`; today the dialog is honest and the raw payload is preserved. Still open after V2-12. |
+| **A12** | The app cannot answer agent questions; it can only deny/dismiss, which cancels the batch. | `ChatContent.kt:430-462`; transport already exists at `CrushApi.kt:477`, `:481` | Question milestone (large): choice/free-text UI plus resolution state over `answerQuestions`/`cancelQuestions`; today the dialog is honest and the raw payload is preserved. Still open after V2-13. |
 
-**A1 and A8 left this table in V2-12.** `A1` was closed by the shared
-`selectPrimary` veto (F2) and `A8` by the atomic reservation with a
-terminal-failure release (E5); `V2-AUDIT-1` and `V2-AUDIT-3` are done and inside
-the green gate. Neither is claimed as device-verified.
+**A1 and A8 left this table in V2-12; A7/A7b left it in V2-13.** `A1` was closed
+by the shared `selectPrimary` veto (F2) and `A8` by the atomic reservation with a
+terminal-failure release (E5); `A7`/`A7b` by the fail-closed apply with the
+`PermissionPolicyException` and the not-attached reattach (SEC9). `V2-AUDIT-1`,
+`V2-AUDIT-3` and `V2-AUDIT-0` are done and inside the green gate. None is claimed
+as device-verified.
 
 Non-release coverage gaps also recorded: the locked composer/overlay path has no
 executed test (SEC3, §4); backup exclusion has no test (SEC8); per-project data
@@ -333,12 +367,13 @@ V2-12** (`ReviewContentTest` 13, `ProjectsContentTest` 15, `OnboardingContentTes
 12, `SettingsContentTest` 17); what they still lack is a device row, not a test.
 `A2` (project home), `A6` (route/mode dual meaning, monitored, no rewrite) and
 `A13` (runtime disposal) stay open, and device / TalkBack / API 30+ verification
-of every V2-12 row is **NOT PERFORMED**.
+of every V2-12 and V2-13 row is **NOT PERFORMED**.
 
-**What still needs a separate authorized batch.** `A7`/`A7b` is `V2-AUDIT-0` and
-needs explicit owner sign-off; it was not part of the fix batch. `A12` is a
-milestone. Gate 7 (signing, packaging, listing, rollout) is untouched by every
-batch recorded here. Nothing in this review authorizes a release.
+**What still needs a separate authorized batch.** `A12` is a milestone. `A7`/`A7b`
+no longer does: `V2-AUDIT-0` was owner-authorized and landed as V2-13, with its
+one limit named (no effective-mode read-back). Gate 7 (signing, packaging,
+listing, rollout) is untouched by every batch recorded here. Nothing in this
+review authorizes a release.
 
 ## 9. Evidence index
 
@@ -350,8 +385,10 @@ batch recorded here. Nothing in this review authorizes a release.
 | `docs/v2/V2-7-8-codebase-inventory-2026-11-22.md` | line-level inventory; repeats the composer freeze |
 | `docs/v2/V2-GAP-AUDIT.md` | A1-A14 verification, severity, batch IDs; not duplicated here |
 | `docs/v2/V2-AUDIT-FIXES.md` | the V2-12 audit-fix batch: what each `A` item changed, the tests that pin it, and what stayed open |
-| `v2-12-gate-2026-11-23.log` | the four-task gate that ran the fix batch: 997 tests / 104 suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning (local-only — `.gitignore` excludes `*.log`) |
-| `docs/v2/V2-COMPLETION-LEDGER.md` | shipped/tested/device labels; V2-11 focused run plus the V2-12 gate row |
+| `docs/v2/V2-A7-PERMISSION-FAIL-CLOSED.md` | the V2-13 permission fail-closed batch: `PermissionPolicyException`, the failing apply/reattach, the bootstrap phase, and the read-back limit |
+| `v2-12-gate-2026-11-23.log` | the four-task gate that ran the V2-12 fix batch: 997 tests / 104 suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning (local-only — `.gitignore` excludes `*.log`) |
+| `v2-14-a7-gate-2026-11-23.log` | the four-task gate that ran the V2-13 batch: 1001 tests / 105 suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning; 33m38s (local-only) |
+| `docs/v2/V2-COMPLETION-LEDGER.md` | shipped/tested/device labels; V2-11 focused run plus the V2-12 and V2-13 gate rows |
 | `docs/v2/V2-9-release-hardening.md` | Keystore instrumented run, ASK default, secret scan |
 | `docs/parity/2026-11-19-v2-0-baseline/MANIFEST.md` | the F-E stale-phase capture and its limits |
 | `docs/parity/2026-11-20-v2-4-chat/MANIFEST.md` | chat device set (composer, sheets, Retry, 2.0x) |

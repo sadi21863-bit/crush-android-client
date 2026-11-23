@@ -35,6 +35,7 @@ import com.crush.mobile.domain.file.WorkspaceSnapshotter
 import com.crush.mobile.data.crush.SetModelRequest
 import com.crush.mobile.data.crush.StreamMessage
 import com.crush.mobile.data.crush.WorkspaceLease
+import com.crush.mobile.data.crush.PermissionPolicyException
 import com.crush.mobile.data.crush.WorkspaceManager
 import com.crush.mobile.data.handoff.HandoffDao
 import com.crush.mobile.data.handoff.HandoffEntity
@@ -1312,13 +1313,32 @@ class ChatViewModel(
             "bootstrap permission wire: instance=$boundKey engineVersion=$boundEngineVersion " +
                 "wire=${EngineProtocol.permissionWireFor(boundEngineVersion)}"
         )
-        val opened = session.openWorkspace(
-            workspacePathFor(),
-            engineStateDirFor(),
-            effectivePermissionMode,
-            providerId,
-            engineVersion = boundEngineVersion
-        )
+        val opened = try {
+            session.openWorkspace(
+                workspacePathFor(),
+                engineStateDirFor(),
+                effectivePermissionMode,
+                providerId,
+                engineVersion = boundEngineVersion
+            )
+        } catch (e: PermissionPolicyException) {
+            // A7 (2026-11-23): fail CLOSED. The engine accepted the workspace but
+            // did not accept the requested policy, so no turn may run under an
+            // unknown effective mode. agent/init was skipped by open().
+            AppLog.e(
+                TAG,
+                "bootstrap: engine rejected permission policy '${e.requestedMode}'",
+                e
+            )
+            _state.update {
+                it.copy(
+                    phase = "engine rejected the permission policy (${e.requestedMode}). " +
+                        "Nothing was sent; check the engine version and try again.",
+                    engineReady = false
+                )
+            }
+            return
+        }
         // Read the key for the provider we are about to configure, not for whatever
         // was cached last.
         val key = container.keySession.require(secureKeys, providerId)

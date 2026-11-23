@@ -4,6 +4,20 @@ import com.crush.mobile.util.AppLog
 import java.util.UUID
 
 /**
+ * A7/A7b (2026-11-23): the engine accepted the workspace but rejected the
+ * requested permission policy. This is a hard open failure: the app must not
+ * run an agent under an unknown effective mode, so [WorkspaceManager.open]
+ * throws this before `agent/init` and flushes the workspace id.
+ */
+class PermissionPolicyException(
+    val requestedMode: String,
+    cause: Throwable,
+) : java.io.IOException(
+    "engine rejected the permission policy ($requestedMode)",
+    cause,
+)
+
+/**
  * Owns the workspace lifecycle.
  *
  * Crush assigns a workspace a random UUID id and resolves identity by canonical
@@ -218,7 +232,6 @@ class WorkspaceManager(private val api: CrushApi) {
         val id = ws.id.ifBlank { requestedId }
         workspaceId = id
         workspaceGeneration = WorkspaceManager.currentEngineGeneration()
-        lastAttachedAtMs = System.currentTimeMillis()
 
         // ALWAYS applied, in both directions.
         //
@@ -227,21 +240,17 @@ class WorkspaceManager(private val api: CrushApi) {
         // previously-created workspace permanently in auto-approve: a user who
         // switched to ASK would still get silent approvals with no way to tell.
         // Explicitly sending false is what makes the setting reversible.
-        // runCatchingNonCancellation (not plain runCatching): this sits in a
-        // suspend context; a cancelled caller must abort, not be logged as a
-        // permission-mode failure and continue.
-        if (permissionModeWire == null) {
-            runCatchingNonCancellation { api.skipPermissions(id, yolo) }
-                .onFailure { AppLog.w("WorkspaceManager", "skipPermissions($yolo) failed: ${it.message}") }
-        } else {
-            runCatchingNonCancellation { api.setPermissionMode(id, permissionModeWire) }
-                .onFailure {
-                    AppLog.w(
-                        "WorkspaceManager",
-                        "setPermissionMode($permissionModeWire) failed: ${it.message}"
-                    )
-                }
-        }
+        //
+        // A7/A7b (2026-11-23): this is now a HARD PREREQUISITE, not a logged
+        // best-effort. A rejected policy throws [PermissionPolicyException],
+        // flushes the id, and skips `agent/init` below - the app never runs an
+        // agent whose effective mode it cannot trust.
+        applyPermissionPolicy(id, yolo, permissionModeWire)
+
+        // The lease is the ready marker. Set it ONLY after the policy is in
+        // force: a fresh lease recorded before the apply would let a later
+        // non-forced reattach short-circuit and skip the retry.
+        lastAttachedAtMs = System.currentTimeMillis()
 
         // The coordinator must exist before a prompt is accepted, otherwise
         // POST .../agent returns 400 "agent coordinator not initialized".
@@ -260,6 +269,35 @@ class WorkspaceManager(private val api: CrushApi) {
             .isSuccess
 
         return ws.copy(id = id)
+    }
+
+    /**
+     * Applies the requested policy and FAILS CLOSED (A7/A7b).
+     *
+     * The old code logged a failure and continued into `agent/init`, so the UI
+     * could say ASK while the engine kept an earlier auto-approve policy. A
+     * rejection now flushes the workspace id (so a later `newSession()`/send()
+     * cannot use the half-configured workspace) and throws
+     * [PermissionPolicyException]; the caller surfaces the named mode.
+     *
+     * `runCatchingNonCancellation`, not plain runCatching: a cancelled caller
+     * must abort, not be converted into a policy failure.
+     */
+    private suspend fun applyPermissionPolicy(id: String, yolo: Boolean, wire: String?) {
+        val modeLabel = wire ?: "skip=$yolo"
+        val result = if (wire == null) {
+            runCatchingNonCancellation { api.skipPermissions(id, yolo) }
+        } else {
+            runCatchingNonCancellation { api.setPermissionMode(id, wire) }
+        }
+        val failure = result.exceptionOrNull() ?: return
+        workspaceId = null
+        workspaceGeneration = null
+        AppLog.w(
+            "WorkspaceManager",
+            "permission policy apply failed ($modeLabel): ${failure.message?.take(160)}"
+        )
+        throw PermissionPolicyException(modeLabel, failure)
     }
 
     /**

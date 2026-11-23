@@ -266,7 +266,10 @@ internal fun parseUncaughtFromLog(lines: List<String>): RecordedCrash? {
     val index = lines.indexOfLast { it.contains(UNCAUGHT_MARKER) }
     if (index < 0) return null
     var end = index + 1
-    while (end < lines.size && !ENTRY_PREFIX.matches(lines[end])) end++
+    // containsMatchIn, NOT matches: `Regex.matches` demands the pattern cover the
+    // WHOLE line, and the entry regex only describes the prefix. With `matches`
+    // the terminator never fires and a crash trace swallows every later entry.
+    while (end < lines.size && !ENTRY_PREFIX.containsMatchIn(lines[end])) end++
     val trace = lines.subList(index, end).joinToString("\n").trimEnd()
     // The header alone with no trace means the process died mid-write. Still
     // worth showing: "it crashed here" beats an empty section.

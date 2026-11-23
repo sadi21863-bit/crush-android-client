@@ -31,10 +31,12 @@ $patterns = [ordered]@{
     'google'    = 'AIza[0-9A-Za-z_\-]{30,}'
 }
 
-# SHA-256 of the synthetic fixtures in KeyMaskTest and AppLogTest.
+# SHA-256 of the synthetic fixtures in KeyMaskTest, AppLogTest and
+# DiagnosticsReportTest (the last one is the V2-11 report-masking test).
 $allowlisted = @(
     '586b7a5cc995403422eb9fac99238e7429f5b1175b582418bce1ba2367158670',
-    '94349e7be9c26b33ece4351889056d9721bc0f4cb7158ce4efa266908c7e7bc6'
+    '94349e7be9c26b33ece4351889056d9721bc0f4cb7158ce4efa266908c7e7bc6',
+    '34ec1feea5c46780745839d3763c522a04314e729aa2156df42d9978e0ad1a11'
 )
 
 $binaryExtensions = @(

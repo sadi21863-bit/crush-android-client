@@ -1,0 +1,7 @@
+Starting: Intent { cmp=com.crush.mobile/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.crush.mobile/.MainActivity
+TotalTime: 517
+WaitTime: 518
+Complete

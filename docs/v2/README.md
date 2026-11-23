@@ -31,9 +31,12 @@ the owner's trims.
 | `V2-5-chat-code-ia-plan.md` | Corrected Chat/Code IA from the owner notebook: Crush Chat on legacy, Crush Code project sessions, list-first (V2-A11/A12) |
 | `V2-5-chat-code-split-research.md` | Source-plan research for the Chat/Code split, drift list and legacy-history consequence |
 | `V2-6-settings-onboarding.md` | Settings/Onboarding redesign record: V2-A4 trim, brief section order, Finding 13 copy, honest onboarding copy, evidence (complete on phone) |
-| `V2-9-release-hardening.md` | **active (hardening only)**: ASK default recorded (already closed in code), real-Keystore instrumented coverage, key-rotation checklist + local scanner; Gate 7 stays deferred |
-| `V2-7-intelligent-ui.md` | **in progress**: collapsed reasoning + on/off setting, unknown-part text fallback; host-owned closed `ui_block/v1` registry planned; no external UI framework |
-| `V2-8-structured-ui-experiment.md` | **open (research complete, not built)**: debug-only read-only comparison of prompt-only blocks, A2UI alpha02 (blocked by default) and a local json-render-style adapter; exit criteria and hard boundaries |
+| `V2-9-release-hardening.md` | **complete (hardening, V2-A15)**: ASK default recorded (already closed in code), real-Keystore instrumented coverage, key-rotation checklist + local scanner; Gate 7 stays deferred |
+| `V2-7-intelligent-ui.md` | **complete (foundation, V2-A18)**: collapsed reasoning + on/off setting, unknown-part text fallback; host-owned closed `ui_block/v1` registry; no external UI framework |
+| `V2-8-structured-ui-experiment.md` | **closed (not adopted, V2-A19)**: three real model runs, 1/3 schema-valid; no prompt-only renderer ships. Hard boundaries, exit criteria and the rejected run set are recorded in the file |
+| `V2-COMPLETION-LEDGER.md` | **the authoritative completion ledger**: every package row split into shipped / JVM-tested / instrumented / device-verified / deferred, with evidence paths and the still-open carry-over rows |
+| `V2-FINAL-INTEGRATION-REVIEW.md` | final integration pass over the Rev 3.1 state contract, composer gates, security boundaries and engine isolation; maps each claim to code and an existing test |
+| `V2-GAP-AUDIT.md` | **external review verified against source (2026-11-23)**: per-claim verdicts with file:line evidence, the two findings that changed severity (permission fail-closed, reattach replay), and the owner decision list for the follow-up batches |
 | `ui-block-v1.md` | the closed `ui_block/v1` contract: six block types, limits, strict whole-document rejection, security posture, rendering map, producer status |
 | `V2-7-8-codebase-inventory-2026-11-22.md` | read-only inventory of the assistant pipeline, renderers, metadata, security boundary and tests that V2-7/V2-8 must work with |
 | `V2-7-8-web-research-2026-11-22.md` | external research: A2UI, json-render, AG-UI, MCP Apps, structured outputs, native Compose examples, security; verdicts and source table |
@@ -41,9 +44,11 @@ the owner's trims.
 
 ## Scope
 
-- Active: V2-0 to V2-6, as trimmed in §5.10.
-- Parked: V2-7 deterministic intelligent UI, V2-8 structured model UI,
-  V2-9 release/rollout.
+- Complete: V2-0 through V2-7 (7 as foundation scope), plus V2-9 hardening.
+- Closed as not adopted: V2-8 (V2-A19); its debug lab stays as evidence,
+  nothing from it ships.
+- Deferred, separate milestone: Gate 7 (signing, packaging, store listing,
+  submission, rollout). It is not part of V2 and needs its own authorization.
 - Code stays project-bound; three primary destinations: Chat, Projects,
   Settings. Review and Diagnostics are pushed routes.
 - Deferred (not reopened): pinned message/follow, cost/context display, new
@@ -62,7 +67,7 @@ the owner's trims.
 | V2-6 | complete (phone, 2026-11-21) | Settings/Onboarding redesign on the V2-2 components; brief §4.7.4 section order; Finding 13 copy fixed; no new preferences (V2-A4/O5); provider round-trip and relaunch route verified on device (`17`-`21`), ASK restored; 2.0x font scale checked and the provider-badge squeeze fixed (`24`-`27`). Gate `v2-6-gate-1.log`: 919 tests / 96 classes / 0 failures, lint 0 errors / 1 pre-existing warning; the post-fix re-gate `v2-6-gate-4.log` is green. Limits: Onboarding device row, tablet/wide, Onboarding at 2.0x, and key save/delete on device NOT PERFORMED (see manifest); injected-tap harness quirk recorded |
 | V2-7 | **complete (foundation)** | opened 2026-11-22 (V2-A16); closed same day (V2-A18): 7.1 reasoning Collapsed/Off, 7.2 unknown-part fallback, 7.3 `ui_block/v1` validator/renderer. No external UI framework. Evidence: `docs/parity/2026-11-22-v2-7-reasoning/`, `docs/parity/2026-11-22-v2-7-blocks/` |
 | V2-8 | **closed (not adopted)** | opened 2026-11-22 (V2-A17); closed 2026-11-23 (V2-A19): 3 candidate-A runs, **1/3 schema-valid** (runs 1-2 drifted/rejected, run 3 with exact keys rendered). Exit criteria not met; no production renderer adopted. The V2-7 host-authored registry remains. Evidence: `docs/parity/2026-11-22-v2-8-lab/` |
-| V2-9 | **complete (hardening, 2026-11-22)** | ASK default recorded (already closed in code); `SecureKeyStoreInstrumentedTest` OK (3 tests) on `bbf8ca69`; `tools/check-secrets.ps1` PASS over 674 tracked files; gate 924 tests / 0 failures, lint 0 errors / 1 warning. Gate 7 submission/signing/listing remains deferred. Evidence: `docs/parity/2026-11-22-v2-9-hardening/` |
+| V2-9 | **complete (hardening, 2026-11-22)** | ASK default recorded (already closed in code); `SecureKeyStoreInstrumentedTest` OK (3 tests) on `bbf8ca69`; `tools/check-secrets.ps1` PASS over 674 tracked files; recorded 924-test census / 0 failures (test task UP-TO-DATE; ledger §4), lint 0 errors / 1 warning. Gate 7 submission/signing/listing remains deferred. Evidence: `docs/parity/2026-11-22-v2-9-hardening/` |
 
 ## Rules that apply to every package
 

@@ -16,7 +16,9 @@ and **716/0/0 across 76 suites** (lint 0 errors / 1 warning). CI run
 **43592253901 GREEN** (3m12s) covers the `2fef885` push. Only docs commits
 collect above the code HEAD. Later record: §5.10 (2026-11-19) re-verifies
 the repository at code HEAD `1679f25`; the 2026-11-14 figures above remain
-that baseline.
+that baseline. The V2 package record through 2026-11-23 (V2-0 to V2-9 plus the
+V2-11 batch) is in §5.10 and `docs/v2/`; it does not re-verify the
+2026-11-14 build claims above.
 
 ---
 
@@ -257,14 +259,14 @@ mirrored locally with their full reasoning in the plan doc
 
 ## 5. Gate roadmap (owner-pack gate numbering; STATUS is the row's truth)
 
-| Gate | Content | STATUS (last refreshed 2026-11-14) |
+| Gate | Content | STATUS (last refreshed 2026-11-14; gates 3 and 5 refreshed 2026-11-23) |
 |---|---|---|
 | 0 | trust + chat fail-closed + REST transport hardening (S-01, S-02, S-04 above) | **CLOSED, both halves** (supersedes this cell's 2026-11-05/`1d229de`-era PARTIAL reading): S-01 `7ec34ed` + S-04 `f5d24dc` + **S-02 `3a3a233`** (central ProjectTrustService, gate-before-bind on every path incl. restoreLastBinding) — **A03 device drive PASSED 2026-11-06** (capabilities §Gate-0 closures); **2026-11-08: S-01's deny-all scope was REOPENED by an external catalogue audit (9-id gap, proven by binary strings + upstream allToolNames) and RE-CLOSED by `a7e6d14` + live device re-proof (capabilities §S-01 catalogue parity)**; residuals ride the E6 stress pass: 4 JVM-only A03 variants, REST boot-window row, S-01 Failed-badge row + new: stale agent tool advertisement (engine-side, benign under the execution wall, rides the upgrade ladder) |
 | 1 | Gate-7 runtime registry ([`design-runtime-registry-2026-11-05.md`](design-runtime-registry-2026-11-05.md)); pack rows **E1/E3 SHIPPED** (`1d229de` phase-1 interlock + readiness/starting-watchdog); **E2/E4 SHIPPED** (`d818a9c` container registry + connection reclaim); **E6 device stress drive PASS** (2026-11-06, 5 switches, capabilities §Gate-1 device stress drive; two-row limitation noted); **E5 back-nav fix SHIPPED + device-verified** (`f516d1f`, D1-D8 all pass incl. back-from-chat exits on both paths; gh-verified via `526b3a6`); S-04 flake diagnosed + test hardened (`526b3a6`). Residuals: second imported project row to exercise the 2-non-legacy-children ceiling on device; optional nav-restore re-boot dedup | closed 2026-11-07 (residual drives optional) |
 | 2 | Code v1 (Review surface, revert, workspace polish) | **surface DEVICE-PROVEN 2026-11-07** (capabilities §P4 Gate-2: multi-file turn +2 -0, hunks, byte-identical revert `dcb75b2b…`, multi-card review, export byte-exact after `bf5019a` fix; both P4 proof rows closed). Residuals: workspace polish, journal persistence of history across restarts (runtime-only store by design), history card cap choice (MAX_CARDS=8), model-rumor flake ops note (free models flap PAYMENT_REQUIRED/timeout — a retry works; failed turns leave no record lines, empty turns record `+0 -0` but create no cards); owner-directed follow-up batch: chat-output Copy + Save-as-file (app-side, S-01 deny-all untouched) — DELIVERED AND DEVICE-PROVEN 2026-11-08, `fe9e7e8` | ✅ surface proven; residuals queued |
-| 3 | Frontend v2 | **IN PROGRESS — Phase 2a shipped; Phase 2b.1–2b.5 code/test/device-complete (2026-11-18).** 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Findings 10/11 fixed in §5.4. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests), §5.8 Onboarding (`OnboardingContent` + 10 tests, T2B5-01), §5.9 Finding 12 fix + provider offer list (`LaunchRouteState` + 4 tests, `ProvidersTest` +3). Full four-task gate green (2026-11-18, incl. §5.9): 850 tests / 91 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind; Projects top bands pixel-identical, remove dialog/cancel PASS, flow 26 PASS; Review empty content pixel-identical, flow 24 Back PASS (populated card not performed); Settings pixel-identical to `f25-after-settings.png`, Back returns to the same chat with 0 changed pixels; Onboarding pixel-identical (old vs extracted), provider menu open/dismiss PASS. **Finding 12 FIXED in §5.9:** the launch route is pinned per process by `LaunchRouteState`, `NavGraph` takes a `startDestination` instead of deriving one from live settings, and settings are awaited before the graph composes - selecting a key-less provider now keeps the user in Settings. §5.9 also trims every picker to tested providers (`Providers.AVAILABLE`: Zen, OpenRouter, OpenCode Go, Groq; Settings additionally keeps any row with a stored key so a credential is never stranded); hidden ids stay resolvable. **Device-verified 2026-11-18** (`after-f12/MANIFEST.md`): tapping key-less OpenCode Zen stays in Settings, provider restored through the UI, Back returns to the same chat. Owner provider was restored without touching any credential (2b.4 walk: verified DataStore rewrite; §5.9 walk: through the UI). Device records: `after-2b2`, `after-2b3`, `after-2b4`, `after-2b5`, `after-f12`. **Revision 4.0 reviewed 2026-11-19 (§5.10):** hybrid authority - Revision 4.0 is the forward roadmap/design direction; the Rev 3.1 brief stays authoritative for the state contract, test registry, composer gates and parity standard. Active packages V2-0 to V2-6 are trimmed (Code stays project-bound with 3 destinations; pinned/follow, cost/context, new density/nav/response preferences deferred; V2-7/8/9 parked). **2026-11-22: V2-0 to V2-6 are complete** — V2-0 ledger accepted (V2-A14), V2-1 closed for the phone scope (V2-A13), V2-2…V2-6 shipped and device-verified. V2-9 hardening opened and completed the same day (V2-A15). V2-7 opened and completed the same day (V2-A16/A18); V2-8 opened as a debug-only experiment and closed as **not adopted** on 2026-11-23 (V2-A17/A19). |
+| 3 | Frontend v2 | **COMPLETE (package scope, 2026-11-23) — every V2 package is settled; Gate 7 release stays a separate deferred milestone.** Phase 2 record retained: Phase 2a shipped; Phase 2b.1–2b.5 code/test/device-complete (2026-11-18). 2b.1 records stay in `after-2b1/MANIFEST.md` (Set A 10/10 captured, 9 PASS + `a02` PARTIAL; Set B 24 PASS / 0 FAIL / 4 NOT PERFORMED / 0 BLOCKED; flows 18/19/20/28 owner-performed). Findings 10/11 fixed in §5.4. Extraction batches: §5.5 Projects (`ProjectsContent` + 11 tests), §5.6 Review (`ReviewContent` + 10 tests, T2B3-01 +2 store gates), §5.7 Settings (`SettingsContent` + 10 tests), §5.8 Onboarding (`OnboardingContent` + 10 tests, T2B5-01), §5.9 Finding 12 fix + provider offer list (`LaunchRouteState` + 4 tests, `ProvidersTest` +3). Full four-task gate green (2026-11-18, incl. §5.9): 850 tests / 91 suites, 0 failures / 0 errors; lint 0 errors / 1 standing warning. Device: Finding 11 stopped-engine sheet shows the unavailable copy and lists sessions after the first keystroke; Finding 10 dotted-only folder gates before bind; Projects top bands pixel-identical, remove dialog/cancel PASS, flow 26 PASS; Review empty content pixel-identical, flow 24 Back PASS (populated card not performed); Settings pixel-identical to `f25-after-settings.png`, Back returns to the same chat with 0 changed pixels; Onboarding pixel-identical (old vs extracted), provider menu open/dismiss PASS. **Finding 12 FIXED in §5.9:** the launch route is pinned per process by `LaunchRouteState`, `NavGraph` takes a `startDestination` instead of deriving one from live settings, and settings are awaited before the graph composes - selecting a key-less provider now keeps the user in Settings. §5.9 also trims every picker to tested providers (`Providers.AVAILABLE`: Zen, OpenRouter, OpenCode Go, Groq; Settings additionally keeps any row with a stored key so a credential is never stranded); hidden ids stay resolvable. **Device-verified 2026-11-18** (`after-f12/MANIFEST.md`): tapping key-less OpenCode Zen stays in Settings, provider restored through the UI, Back returns to the same chat. Owner provider was restored without touching any credential (2b.4 walk: verified DataStore rewrite; §5.9 walk: through the UI). Device records: `after-2b2`, `after-2b3`, `after-2b4`, `after-2b5`, `after-f12`. **Revision 4.0 reviewed 2026-11-19 (§5.10):** hybrid authority - Revision 4.0 is the forward roadmap/design direction; the Rev 3.1 brief stays authoritative for the state contract, test registry, composer gates and parity standard. Active packages V2-0 to V2-6 are trimmed (Code stays project-bound with 3 destinations; pinned/follow, cost/context, new density/nav/response preferences deferred; V2-7/8/9 were then parked). **2026-11-22: V2-0 to V2-6 are complete** — V2-0 ledger accepted (V2-A14), V2-1 closed for the phone scope (V2-A13), V2-2…V2-6 shipped and device-verified. V2-9 hardening opened and completed the same day (V2-A15). V2-7 opened and completed the same day (V2-A16/A18); V2-8 opened as a debug-only experiment and closed as **not adopted** on 2026-11-23 (V2-A17/A19). |
 | 4 | handoff (Chat→Code P6-style seam) | **CLOSED 2026-11-12** — Batches A–G shipped (`d65ead0`→`4bc5fb7`), both plan proof rows device-proven: (a) fresh-approval dispatch with the verify-first turn live (P4/P5 drives), (b) restart-resume — the cold boot re-gates honestly and opens the dispatched trace's OWN session (`4bc5fb7` fold in capabilities) |
-| 5 | intelligent UI | QUEUED |
+| 5 | intelligent UI | **COMPLETE (foundation, 2026-11-22) — V2-7:** reasoning Collapsed/Off (`OFF` reversible), unknown-part text fallback, host-authored closed `ui_block/v1` registry; no external UI framework. **V2-8 closed 2026-11-23, NOT ADOPTED (V2-A19):** 1/3 schema-valid candidate-A runs; no prompt-only renderer ships. Records: `docs/v2/V2-7-intelligent-ui.md`, `docs/v2/V2-8-structured-ui-experiment.md`. |
 | 6 | compat / Termux L1+ | QUEUED (after modes; roadmap P7 dependency) |
 | 7 | release | **DEFERRED by the owner (2026-11-14) — no Play submission is in flight.** The AFA-first submission package is prepared (`docs/play-afa-submission-2026-11-14.md`) and the import-flow review hardening is shipped (`af178f8`); the store-level app-lock batch (#3) stays parked with the release. Decision record: `decisions-open.md` §11 |
 | 8 | runtime-resource hardening (#4) | OBSERVE — the stale-reader half is closed in code by the Gate-1 registry (`d818a9c`); the supervisor start-latency probe after a manual stop is the remaining measured gap (capabilities §residual) |
@@ -1097,7 +1099,8 @@ authorizes no implementation.
   standard (§8.5). A V2 package links those sections; it does not restate
   or silently replace them.
 - Active V2.0 roadmap, design direction only: **V2-0 to V2-6**, trimmed as
-  below.
+  below. (2026-11-23: the owner extended the active scope on 2026-11-22 to
+  V2-7, V2-8 and V2-9; all three are settled - see the closure ledger below.)
 - **V2-9 is opened for hardening only** (owner, 2026-11-22, V2-A15): ASK
   default evidence, real-Keystore coverage, key-rotation checklist. Gate 7
   store submission stays deferred.
@@ -1106,6 +1109,23 @@ authorizes no implementation.
   closed host registry); V2-8 is a debug-only structured-UI experiment.
 - Parked, not in V2.0: none of the remaining packages. Gate 7 remains deferred
   by the owner (2026-11-14).
+
+**V2 closure ledger (appended 2026-11-23; the "opened" bullets above stay as
+the 2026-11-22 record)**
+
+| Record | Outcome | Evidence |
+|---|---|---|
+| V2-A18 | **V2-7 is complete for its foundation scope (2026-11-22).** Reasoning renders `COLLAPSED` with a persisted `COLLAPSED` / `OFF` choice (`OFF` never shows it, drops it at the transcript boundary and is reversible); unknown message parts render as bounded plain text; `ui_block/v1` is a host-authored closed registry. No external UI framework. | `docs/v2/V2-7-intelligent-ui.md`; `docs/parity/2026-11-22-v2-7-reasoning/`; `docs/parity/2026-11-22-v2-7-blocks/` |
+| V2-A19 | **V2-8 is closed as NOT ADOPTED (2026-11-23).** Three candidate-A runs produced 1/3 schema-valid documents (runs 1-2 drifted and were rejected whole; run 3 needed exact key names). No prompt-only renderer ships; the V2-7 registry stays host-authored and the debug lab remains evidence. | `docs/v2/V2-8-structured-ui-experiment.md`; `docs/parity/2026-11-22-v2-8-lab/` |
+| V2-A15 | **V2-9 is complete for its hardening scope (2026-11-22).** ASK default recorded (already shipped), real-Keystore instrumented coverage 3/3 on `bbf8ca69`, key-rotation checklist + `tools/check-secrets.ps1` (PASS, 674 tracked files); recorded 924-test census / 0 failures (test task UP-TO-DATE; see `V2-COMPLETION-LEDGER.md` §4), lint 0 errors / 1 pre-existing warning. | `docs/v2/V2-9-release-hardening.md`; `docs/parity/2026-11-22-v2-9-hardening/` |
+| V2-11 (2026-11-23) | **Completion-ledger / final-integration-review / external-audit verification batch.** The completion ledger is in this batch; the final integration review is present at `docs/v2/V2-FINAL-INTEGRATION-REVIEW.md`. The external audit is verified against source in the gap audit, where the diagnostics redaction gap (A9) is closed by `DiagnosticsReportTest` (11 tests) and confirmed findings are assigned batch IDs rather than fixed here. Focused run 19/0 (11 diagnostics + 4 accessibility + 4 container, `v2-ledger-tests-1123g.log`); full four-task gate green: 981 tests / 104 suites / 0 failures, lint 0 errors / 1 pre-existing warning (`v2-11-gate-2026-11-23.log`). | [`V2-GAP-AUDIT.md`](v2/V2-GAP-AUDIT.md); [`V2-COMPLETION-LEDGER.md`](v2/V2-COMPLETION-LEDGER.md); [`V2-FINAL-INTEGRATION-REVIEW.md`](v2/V2-FINAL-INTEGRATION-REVIEW.md) |
+
+The four-task gate was run locally on 2026-11-23 (JBR 25): `:app:testDebugUnitTest`,
+`:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:lintRelease`. CI runs
+the same four tasks on JDK 21.
+
+Gate 7 (signing, packaging, store listing, submission, rollout) remains a
+separate deferred milestone; nothing in this batch touches it.
 
 **Owner decisions that trim Revision 4.0**
 
@@ -1120,11 +1140,14 @@ authorizes no implementation.
 2. **No brief deferral is reopened.** Pinned message + follow mode (brief
    decisions #3/#4), cost/context-window display (#8/#9), new
    density/navigation/response-rendering preferences, structured model UI,
-   and release packaging stay backlog. V2-4 tasks 4 and 7 and V2-6 task 2
-   are trimmed accordingly; V2-7/V2-8/V2-9 are parked. (All three were opened
-   on 2026-11-22: V2-9 hardening V2-A15; V2-7/V2-8 V2-A16/A17.) Theme remains the
-   existing setting; reduced-motion behavior stays with the V2-2
-   accessibility work, not a new preference batch.
+   and release packaging stay backlog (V2-A16 later approved one exception:
+   the V2-7 reasoning `COLLAPSED` / `OFF` setting). V2-4 tasks 4 and 7 and
+   V2-6 task 2 are trimmed accordingly; V2-7/V2-8/V2-9 are parked. (All three
+   were opened on 2026-11-22: V2-9 hardening V2-A15; V2-7/V2-8 V2-A16/A17.)
+   **Superseded 2026-11-23:** V2-7 complete for its foundation scope (V2-A18),
+   V2-8 closed as not adopted (V2-A19), V2-9 complete for its hardening scope
+   (V2-A15). Theme remains the existing setting; reduced-motion behavior stays
+   with the V2-2 accessibility work, not a new preference batch.
 3. **Finding 13 copy is folded into V2-6** (copy only; the owner already
    declined a standalone rebuild).
 
@@ -1134,9 +1157,9 @@ authorizes no implementation.
 |---|---|---|
 | V2-0 | **COMPLETE** | Baseline re-lock at `1679f25`; O11 harness landed (`d5a0718`) and the loading row was captured on device on 2026-11-22; ledger accepted 2026-11-22 (V2-A14) — see `docs/v2/V2-0-signoff-2026-11-22.md`. |
 | V2-1 | **COMPLETE (phone scope)** | Prototype within brief §4.6; no drawer-vs-tabs reopen. Closed 2026-11-22 (V2-A13): tasks 3/5/6 superseded by shipped evidence, tablet prototypes carried under O3 — `docs/v2/V2-1-exit-reconciliation-2026-11-22.md`. |
-| V2-2 | ACTIVE | Tokens/components; density is a rendering check, not a user preference. |
-| V2-3 | ACTIVE | 3 destinations; delete the dead `Screen.Models`; no 4th Code destination. |
-| V2-4 | ACTIVE | Drop pinned/follow (task 4) and cost/context (task 7); keep empty state, transcript, composer, session sheet, picker and actions. |
+| V2-2 | **COMPLETE (2026-11-20)** | Tokens/components; density is a rendering check, not a user preference. Status reconciled 2026-11-23: exit criteria met - record `docs/v2/V2-2-token-integration.md`, evidence `docs/parity/2026-11-20-v2-2-tokens/`. |
+| V2-3 | **COMPLETE (2026-11-20)** | 3 destinations; delete the dead `Screen.Models`; no 4th Code destination. Status reconciled 2026-11-23 - record `docs/v2/V2-3-app-shell.md`, evidence `docs/parity/2026-11-20-v2-3-shell/`. |
+| V2-4 | **COMPLETE (2026-11-20)** | Drop pinned/follow (task 4) and cost/context (task 7); keep empty state, transcript, composer, session sheet, picker and actions. Status reconciled 2026-11-23 - record `docs/v2/V2-4-chat-redesign.md`, evidence `docs/parity/2026-11-20-v2-4-chat/`. |
 | V2-5 | DONE (phone) | Code is project-bound; phone-first; tablet panes only after phone acceptance (still parked). |
 | V2-6 | DONE (phone) | Settings/Onboarding redesign; Finding 13 copy; no new preferences. |
 | V2-7 | **COMPLETE (foundation, 2026-11-22)** | 7.1 reasoning Collapsed/Off (device-verified), 7.2 unknown-part fallback, 7.3 `ui_block/v1` closed registry + debug preview. No external UI framework; V2-8 closed as not adopted (V2-A19). |
@@ -1189,7 +1212,7 @@ authorizes no implementation.
 | O3 | OPEN - tablet panes only after phone acceptance |
 | O4 | BACKLOG - tool-activity visibility after usability evidence |
 | O5 | BACKLOG - no preference set beyond existing Settings |
-| O6/O7 | PARKED with V2-7/V2-8 |
+| O6/O7 | PARKED with V2-7/V2-8 — **2026-11-23: both packages are settled (V2-A18/A19); this disposition is unchanged.** |
 | O8 | NO CHANGE - import-only/AFA stands; any policy change needs an ADR and store review |
 | O9 | SEPARATE ROADMAP - not a V2 prerequisite |
 | O10 | DEFERRED - deny-all remains |

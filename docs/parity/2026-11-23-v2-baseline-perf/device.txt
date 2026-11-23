@@ -1,0 +1,8 @@
+serial        : bbf8ca69
+captured      : 2026-11-23T10:55:25.1509661+05:30
+label         : v2-11-baseline-unlocked
+android       : 10
+sdk           : 29
+model         : Redmi Note 7 Pro
+abi           : arm64-v8a
+build         : QKQ1.190915.002

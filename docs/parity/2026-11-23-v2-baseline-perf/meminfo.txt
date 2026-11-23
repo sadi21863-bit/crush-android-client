@@ -1,0 +1,58 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 320622687 Realtime: 391580692
+
+** MEMINFO in pid 29064 [com.crush.mobile] **
+                   Pss  Private  Private  SwapPss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------
+  Native Heap     7743     7624        0      100    24156    17525     6630
+  Dalvik Heap     4339     4320        0       27     8735     4368     4367
+ Dalvik Other     5288     5280        0        1
+        Stack      272      272        0        0
+       Ashmem        2        0        0        0
+      Gfx dev     1444     1444        0        0
+    Other dev       17        0       16        0
+     .so mmap     9208       60     1740       10
+    .jar mmap     8436        0     3836        0
+    .apk mmap    27882        0    27128        0
+    .ttf mmap      249        0       16        0
+    .dex mmap      686        4      680        0
+    .oat mmap      587        0       20        0
+    .art mmap     5915     5668        4       16
+   Other mmap      354       84       44        0
+   EGL mtrack    30216    30216        0        0
+    GL mtrack     6052     6052        0        0
+      Unknown     1275     1244        0       14
+        TOTAL   110133    62268    33484      168    32891    21893    10997
+
+ App Summary
+                       Pss(KB)
+                        ------
+           Java Heap:     9992
+         Native Heap:     7624
+                Code:    33484
+               Stack:      272
+            Graphics:    37712
+       Private Other:     6668
+              System:    14381
+
+               TOTAL:   110133       TOTAL SWAP PSS:      168
+
+ Objects
+               Views:        8         ViewRootImpl:        1
+         AppContexts:        6           Activities:        1
+              Assets:       19        AssetManagers:        0
+       Local Binders:       14        Proxy Binders:       34
+       Parcel memory:        4         Parcel count:       18
+    Death Recipients:        1      OpenSSL Sockets:        0
+            WebViews:        0
+
+ SQL
+         MEMORY_USED:      366
+  PAGECACHE_OVERFLOW:       75          MALLOC_SIZE:      117
+
+ DATABASES
+      pgsz     dbsz   Lookaside(b)          cache  Dbname
+         4       84             32         2/27/3  /data/user/0/com.crush.mobile/databases/projects.db
+         4        8                         0/0/0    (attached) temp
+         4       84             78         8/23/5  /data/user/0/com.crush.mobile/databases/projects.db (1)

@@ -113,8 +113,9 @@ Method and limits:
   `WorkspaceManager.kt` and `ChatViewModel.kt`, so SEC9 was re-opened against the
   current source; numbers elsewhere are pre-batch. The V2-14 batch shifted
   `ChatViewModel.kt`, `ChatViewState.kt`, `ChatContent.kt`, `ChatAction.kt` and
-  `CrushDtos.kt`, so S1, S2, S6, S10, S11, the §4 gate functions and the counts
-  were re-opened against the current files; numbers elsewhere are pre-V2-14.
+  `CrushDtos.kt`, so the counts and the S1/S2/S6/S10/S11 citations, plus the §4
+  gate functions, were re-opened against the current files; other line numbers
+  remain pre-V2-14.
 - A "test exists" claim was checked with a file lookup; a "test pins X" claim was
   checked by reading the assertion.
 
@@ -160,7 +161,7 @@ reconciliation of §5.
 
 | # | Contract clause | Code | Test that pins it | Verdict | Note |
 |---|---|---|---|---|---|
-| S1 | Single source of chat state; the renderable view is a pure projection, not a second state | `ui/screens/chat/ChatViewModel.kt:636` (one `_state`), `:667-702` (`hostState` combine); `ChatViewState.kt:270-375`; `ChatScreen.kt:38`, `:108` | `ChatViewStateTest` 19 (determinism, totality, Android-free source scan at `:376`); `ChatHostInputsTest` 7 | **VERIFIED** | `ChatUiState` is the only mutable authority. `ChatScreen` does read four more flows for effects (S12); none of them builds the rendered view. |
+| S1 | Single source of chat state; the renderable view is a pure projection, not a second state | `ui/screens/chat/ChatViewModel.kt:641` (one `_state`), `:672-706` (`hostState` combine); `ChatViewState.kt:272-379`; `ChatScreen.kt:38`, `:108` | `ChatViewStateTest` 19 (determinism, totality, Android-free source scan at `:376`); `ChatHostInputsTest` 7 | **VERIFIED** | `ChatUiState` is the only mutable authority. `ChatScreen` does read four more flows for effects (S12); none of them builds the rendered view. |
 | S2 | Phase/readiness comes from the same snapshot as the binding; a stale free-text phase cannot claim readiness | `ChatViewState.kt:98-112` (`statusLabel`), `:293` (`readiness`); `ChatHostInputs.kt:99-106` (mismatched key wins, then seed, then ready) | `ChatViewStateTest` `the header status is derived from readiness, not the stale phase` (`:260`), `a failed engine keeps its reason` (`:274`); `ChatHostInputsTest` `a mismatched key is switching for every engine state` (`:130`) | **VERIFIED** | `phase` is still free text and is shown only where readiness is `Starting`/`Failed` and it is the sole detail. The F-E 18-minute-stale header symptom is closed at the render seam. |
 | S3 | Binding identity: a binding and its instance key are published together (Option A) | `di/AppContainer.kt:305-308`, `:715-725` (snapshot written before the same-key early return) | `AppContainerBindingTest` 4 (`the initial snapshot is the legacy pair`, `binding the chat pool moves the binding and key together`, `a same-key project label update still moves the snapshot`, `every published snapshot pairs its binding with its own key`); `EngineBindingTokenTest` 5 | **VERIFIED** | The container-level carry-over test exists in V2-11 and is green in the focused run and the full gate; its assertions are explicit. |
 | S4 | Run-in-flight: a binding switch never kills a running turn; the signal outlives the ViewModel | `AppContainer.kt:340-359` (`engineRunInFlightFor`, key-guarded clear, deferred connection flush); `ChatViewModel.kt:3567-3570`, `:818-822` | No direct test of `reportRunInFlight`; `ConnectionRegistryTest` 15 pins the deferral/flush rule (`:206`) | **PARTIAL** | The registry half is pinned; the container flag and its key guard are inspection-only. A JVM container test should assert a foreign-key clear does nothing. |

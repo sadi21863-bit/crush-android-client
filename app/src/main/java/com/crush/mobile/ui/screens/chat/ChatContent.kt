@@ -423,10 +423,10 @@ fun ChatContent(
     // Question gate (analysis §4 P0-3). In ask-flows the engine BLOCKS the run
     // on a question batch until it is answered or cancelled; without a dialog
     // the turn hangs invisibly until the idle timeout cancels it - the same
-    // failure class the permission dialog fixed. This build cannot answer with
-    // real option choices yet (see resolveQuestion), so both actions release
-    // the run by cancelling the batch; the dialog says so instead of implying
-    // an answer was sent.
+    // failure class the permission dialog fixed. A parsed batch now answers
+    // through AnswerQuestionDialog; an unparsable one keeps the cancel-only
+    // fallback, so both paths release the run instead of leaving it blocked.
+    // (A12, 2026-11-23.)
     state.gate.question?.let { q ->
         if (q.batch != null) {
             // A12: a parsed batch gets real choices. Dismiss is Cancel, never

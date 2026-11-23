@@ -4593,12 +4593,12 @@ class ChatViewModel(
                             CrushEvent.PayloadType.QUESTION_REQUEST -> {
                                 // The agent is blocked on an ask-the-user question
                                 // batch (analysis §4 P0-3). The option vocabulary is
-                                // engine-versioned, so the batch is kept RAW: the
-                                // dialog renders its title and one release path -
-                                // see [resolveQuestion] - until a real option-choice
-                                // UI exists. Never swapped out: like permissions, a
-                                // question must reach this client or the run blocks
-                                // invisibly until the idle timeout cancels it.
+                                // engine-versioned, so the raw body stays as a
+                                // fallback title while the parsed batch drives the
+                                // answer dialog. Never swapped out: like permissions,
+                                // a question must reach this client or the run blocks
+                                // invisibly until the idle timeout cancels it. (A12,
+                                // 2026-11-23.)
                                 val parsed = QuestionBatchParser.parse(ev.body)
                                 val q = PendingQuestion(
                                     id = ev.body.firstText(QUESTION_ID_KEYS)

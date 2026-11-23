@@ -33,6 +33,8 @@ sealed interface ChatAction {
     data class DenyPermission(val requestId: String) : ChatAction
 
     data object ReleaseQuestion : ChatAction
+    /** A12: answers for every prompt in the open batch. */
+    data class SubmitQuestion(val answers: List<AskAnswerDraft>) : ChatAction
 
     data class Retry(val text: String) : ChatAction
     data class UsePlanInCode(val messageIndex: Int) : ChatAction

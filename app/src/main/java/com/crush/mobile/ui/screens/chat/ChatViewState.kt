@@ -242,12 +242,14 @@ fun ChatViewState.emptyCopy(): EmptyChatCopy {
 data class GateView(
     val permission: PermissionRequest?,
     val question: QuestionView?,
+    val questionError: String? = null,
 )
 
-/** The question's display title only; the raw payload is deliberately dropped. */
+/** The question's display title plus the A12 sanitized batch (raw payload dropped). */
 data class QuestionView(
     val id: String,
     val title: String,
+    val batch: AskBatch? = null,
 )
 
 data class HandoffView(
@@ -360,8 +362,10 @@ fun ChatUiState.toViewState(inputs: ChatHostInputs): ChatViewState {
                 QuestionView(
                     id = question.id,
                     title = question.displayTitle(),
+                    batch = question.batch,
                 )
             },
+            questionError = questionError,
         ),
         handoff = HandoffView(
             sheet = handoffSheet,

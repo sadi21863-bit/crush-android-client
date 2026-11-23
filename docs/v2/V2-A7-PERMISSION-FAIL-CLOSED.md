@@ -116,7 +116,7 @@ The tally was re-read from `app/build/test-results/testDebugUnitTest/*.xml` (105
   no phone has seen a real engine reject a real policy.
 - **Engine-side residue.** The workspace was created before the rejection; the
   client discards the id and leaves it to be reaped.
-- Still open: A12, A2, A6, A13, device/TalkBack/API 30+ rows, Gate 7.
+- Still open: A12 (closed by V2-14), A2, A6, A13, device/TalkBack/API 30+ rows, Gate 7.
 
 ## 7. Evidence index
 

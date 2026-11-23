@@ -428,39 +428,49 @@ fun ChatContent(
     // the run by cancelling the batch; the dialog says so instead of implying
     // an answer was sent.
     state.gate.question?.let { q ->
-        AlertDialog(
-            onDismissRequest = { onAction(ChatAction.ReleaseQuestion) },
-            icon = { Icon(Icons.Default.Info, contentDescription = null) },
-            title = {
-                Text(q.title.ifBlank { "The agent has a question" })
-            },
-            text = {
-                // Live region, same rule as the permission dialog above: the
-                // question reaches a screen reader that is currently
-                // elsewhere, once, without disturbing focus.
-                Column(
-                    modifier = Modifier.semantics {
-                        liveRegion = LiveRegionMode.Polite
+        if (q.batch != null) {
+            // A12: a parsed batch gets real choices. Dismiss is Cancel, never
+            // Submit, so a back gesture cannot send a partial answer.
+            AnswerQuestionDialog(
+                view = q,
+                error = state.gate.questionError,
+                onCancel = { onAction(ChatAction.ReleaseQuestion) },
+                onSubmit = { answers -> onAction(ChatAction.SubmitQuestion(answers)) },
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { onAction(ChatAction.ReleaseQuestion) },
+                icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                title = {
+                    Text(q.title.ifBlank { "The agent has a question" })
+                },
+                text = {
+                    // Live region, same rule as the permission dialog above: the
+                    // question reaches a screen reader that is currently
+                    // elsewhere, once, without disturbing focus.
+                    Column(
+                        modifier = Modifier.semantics {
+                            liveRegion = LiveRegionMode.Polite
+                        }
+                    ) {
+                        Text(
+                            "This question's choices could not be parsed. " +
+                                "Cancelling releases the run without an answer."
+                        )
                     }
-                ) {
-                    Text(
-                        "This build can show the question but not pick an answer yet. " +
-                            "Denying or dismissing cancels the question and lets the " +
-                            "run continue without one."
-                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { onAction(ChatAction.ReleaseQuestion) }) {
+                        Text("Deny")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { onAction(ChatAction.ReleaseQuestion) }) {
+                        Text("Dismiss")
+                    }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { onAction(ChatAction.ReleaseQuestion) }) {
-                    Text("Deny")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onAction(ChatAction.ReleaseQuestion) }) {
-                    Text("Dismiss")
-                }
-            }
-        )
+            )
+        }
     }
 
     if (showSessions) {

@@ -199,5 +199,7 @@ data class QuestionAnswer(
 data class QuestionResponse(
     @SerializedName("request_id") val questionId: String,
     @SerializedName("selected_ids") val selectedIds: List<String>? = null,
-    @SerializedName("fill_in_text") val fillInText: String? = null
+    @SerializedName("fill_in_text") val fillInText: String? = null,
+    @SerializedName("yes") val yes: Boolean? = null,
+    @SerializedName("notes") val notes: Map<String, String>? = null,
 )

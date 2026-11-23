@@ -203,6 +203,36 @@ class ChatViewStateTest {
     }
 
     @Test
+    fun `a parsed question batch survives projection while the raw payload is dropped`() {
+        val batch = AskBatch(
+            batchId = "b1",
+            prompts = listOf(
+                AskPrompt(
+                    id = "q1",
+                    kind = AskKind.SINGLE_CHOICE,
+                    text = "Which file?",
+                    choices = listOf(AskChoice("c1", "A.kt"), AskChoice("c2", "B.kt")),
+                )
+            ),
+            confirmTitle = "Ready?",
+        )
+        val question = PendingQuestion(
+            id = "b1",
+            raw = JsonParser.parseString(
+                """{"id":"b1","questions":[{"id":"q1","type":"single_choice",
+                   "question":"Which file?","choices":[{"id":"c1","label":"A.kt"}]}]}"""
+            ),
+            batch = batch,
+        )
+
+        val view = ChatUiState(pendingQuestion = question).toViewState(ChatHostInputs())
+
+        assertEquals(batch, view.gate.question!!.batch)
+        assertEquals("Which file?", view.gate.question.title)
+        assertEquals("Ready?", view.gate.question.batch!!.confirmTitle)
+    }
+
+    @Test
     fun `handoff resume state and destinations survive projection`() {
         val hint = HandoffResumeHint(
             handoffId = "h1",

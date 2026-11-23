@@ -1,10 +1,11 @@
 # V2 final integration review
 
 Status: **verification record, 2026-11-23, updated after the V2-12 audit-fix
-batch and the V2-13 permission fail-closed batch.** Read-only review of the V2
-redesign against the Rev 3.1 contract; the review itself changed no source, test
-or build file. The fixes it reports as **FIXED (V2-12)** or **VERIFIED (V2-13)**
-were made by the separately authorized batches, not by this review.
+batch, the V2-13 permission fail-closed batch and the V2-14 question-answering
+batch.** Read-only review of the V2 redesign against the Rev 3.1 contract; the
+review itself changed no source, test or build file. The fixes it reports as
+**FIXED (V2-12)**, **VERIFIED (V2-13)** or **VERIFIED (V2-14)** were made by the
+separately authorized batches, not by this review.
 It does not replace `V2-COMPLETION-LEDGER.md` (what shipped and how it was
 measured) or `V2-GAP-AUDIT.md` (external audit verified against source); it
 cross-checks the claims those records make at the seams between chat, shell,
@@ -34,6 +35,26 @@ security and engine.
 > do is read the engine's effective mode back: 2xx on the apply is the proof. No
 > device run. Still open: `A12`, `A2`, `A6`, `A13`, device/TalkBack/API 30+ and
 > Gate 7. Batch record: `docs/v2/V2-A7-PERMISSION-FAIL-CLOSED.md`.
+>
+> **V2-14 update (2026-11-23, A12 question answering).** The question milestone
+> landed and the four-task gate is green over the whole tree: **1020 tests /
+> 108 suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1
+> pre-existing warning** (`v2-16-a12-gate-2026-11-23.log`, 17m07s). This closes
+> **A12**. `QuestionBatchParser` parses the confirmed upstream batch schema
+> (`QuestionBatch.kt:55-119`) — yes/no, single choice, multi choice and free
+> text, with `options` accepted as an alias for `choices` and no invented
+> option — and `AnswerQuestionDialog` (`QuestionDialog.kt:46-225`) renders it,
+> keeps Submit disabled until every prompt is answered, and treats dismiss/back
+> as Cancel. `ChatViewModel.submitQuestion` (`ChatViewModel.kt:2696-2740`) posts
+> `answerQuestions` and keeps the dialog open with a visible error on failure;
+> an unparsable batch still falls back to the cancel-only dialog
+> (`ChatContent.kt:440-472`). The release-gating table is now **empty**: `A2`,
+> `A6` and `A13` remain open as non-gating roadmap items, and device, TalkBack,
+> API 30+ and Gate 7 are untouched. Limits: the free-text field is not
+> Compose-tested (its mapping is covered by the answer builder), an open batch
+> does not survive process death, and nothing was device-run. Batch record:
+> `docs/v2/V2-A12-QUESTION-ANSWERING.md`; per-finding detail in the V2-14 phase
+> of `docs/v2/V2-AUDIT-FIXES.md`.
 
 ## 1. Scope and method
 
@@ -52,6 +73,11 @@ in §3.1. The V2-13 update adds the permission fail-closed batch
 `data/crush/WorkspaceManager.kt` (new `PermissionPolicyException`, hard-failing
 `applyPermissionPolicy`, lease after the apply, failing `reattachIfStale`) and
 the bootstrap catch in `ChatViewModel.kt`, plus `WorkspacePermissionPolicyTest`.
+The V2-14 update adds the question batch
+(`docs/v2/V2-A12-QUESTION-ANSWERING.md`), which added `QuestionBatch.kt` (parser
+and wire builder) and `QuestionDialog.kt` (the answer dialog) and changed
+`ChatViewModel.kt`, `ChatViewState.kt`, `ChatContent.kt`, `ChatAction.kt` and
+`CrushDtos.kt`, plus the three new JVM test classes named in §9.
 
 **The brief itself is not in this tree.** A repo-wide search for
 `crush-mobile-v2-design-brief-state-contract-test-plan-2026-11-14.md` returns
@@ -68,12 +94,14 @@ it, not from the brief:
 Method and limits:
 
 - Source + JVM/Robolectric evidence only. **The original pass ran no Gradle, adb,
-  device or instrumented command.** The V2-12 and V2-13 updates each quote one
-  full four-task gate executed by their batch (`v2-12-gate-2026-11-23.log`: 104
-  result files, 997 tests, 0 failures / 0 errors / 0 skipped;
+  device or instrumented command.** The V2-12, V2-13 and V2-14 updates each quote
+  one full four-task gate executed by their batch (`v2-12-gate-2026-11-23.log`:
+  104 result files, 997 tests, 0 failures / 0 errors / 0 skipped;
   `v2-14-a7-gate-2026-11-23.log`: 105 result files, 1001 tests, 0 failures / 0
-  errors / 0 skipped). No device or instrumented run happened in any pass;
-  statements about earlier executed results are quoted from package records.
+  errors / 0 skipped; `v2-16-a12-gate-2026-11-23.log`: 108 result files, 1020
+  tests, 0 failures / 0 errors / 0 skipped). No device or instrumented run
+  happened in any pass; statements about earlier executed results are quoted
+  from package records.
 - The three V2-11 test classes are **green in both runs: a focused run (19
   tests / 0 failures, `v2-ledger-tests-1123g.log`: `DiagnosticsReportTest` 11,
   `ChatAccessibilityTest` 4, `AppContainerBindingTest` 4) and the full four-task
@@ -83,7 +111,10 @@ Method and limits:
   V2-12 batch shifted lines in the files it edited; only the rows it touched
   (T3-01, E5, F2, F5) had their citations re-opened. The V2-13 batch shifted
   `WorkspaceManager.kt` and `ChatViewModel.kt`, so SEC9 was re-opened against the
-  current source; numbers elsewhere are pre-batch.
+  current source; numbers elsewhere are pre-batch. The V2-14 batch shifted
+  `ChatViewModel.kt`, `ChatViewState.kt`, `ChatContent.kt`, `ChatAction.kt` and
+  `CrushDtos.kt`, so S1, S2, S6, S10, S11, the §4 gate functions and the counts
+  were re-opened against the current files; numbers elsewhere are pre-V2-14.
 - A "test exists" claim was checked with a file lookup; a "test pins X" claim was
   checked by reading the assertion.
 
@@ -95,8 +126,11 @@ four tasks over the whole tree: 997 tests / 104 suites / 0 failures / 0 errors /
 (`v2-12-gate-2026-11-23.log`, 34m01s). The V2-13 permission batch re-ran them
 again: **1001 tests / 105 suites / 0 failures / 0 errors / 0 skipped**; lint
 **0 errors / 1 pre-existing warning** (`v2-14-a7-gate-2026-11-23.log`, 33m38s).
-Counts in this document are the V2-13 gate's; the V2-12 and V2-11 numbers are
-kept only as superseded baselines.
+The V2-14 question batch re-ran them once more: **1020 tests / 108 suites / 0
+failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning**
+(`v2-16-a12-gate-2026-11-23.log`, 17m07s). Counts in this document are the
+V2-14 gate's; the V2-13, V2-12 and V2-11 numbers are kept only as superseded
+baselines.
 
 ## 2. Verdict key
 
@@ -114,8 +148,10 @@ Two rules apply to every row:
    `AppContainerBindingTest` (19 tests / 0 failures, `v2-ledger-tests-1123g.log`),
    and the V2-12 full four-task gate then executed the whole tree (997 tests /
    104 suites / 0 failures, `v2-12-gate-2026-11-23.log`); the V2-13 gate ran it
-   again (1001 tests / 105 suites / 0 failures, `v2-14-a7-gate-2026-11-23.log`),
-   so every class named below ran inside a green gate.
+   again (1001 tests / 105 suites / 0 failures, `v2-14-a7-gate-2026-11-23.log`)
+   and the V2-14 gate once more (1020 tests / 108 suites / 0 failures,
+   `v2-16-a12-gate-2026-11-23.log`), so every class named below ran inside a
+   green gate.
 
 ## 3. State contract matrix (Rev 3.1 §5)
 
@@ -124,18 +160,18 @@ reconciliation of §5.
 
 | # | Contract clause | Code | Test that pins it | Verdict | Note |
 |---|---|---|---|---|---|
-| S1 | Single source of chat state; the renderable view is a pure projection, not a second state | `ui/screens/chat/ChatViewModel.kt:636` (one `_state`), `:667-702` (`hostState` combine); `ChatViewState.kt:270-375`; `ChatScreen.kt:38`, `:108` | `ChatViewStateTest` 18 (determinism, totality, Android-free source scan at `:346`); `ChatHostInputsTest` 7 | **VERIFIED** | `ChatUiState` is the only mutable authority. `ChatScreen` does read four more flows for effects (S12); none of them builds the rendered view. |
-| S2 | Phase/readiness comes from the same snapshot as the binding; a stale free-text phase cannot claim readiness | `ChatViewState.kt:98-112` (`statusLabel`), `:291` (`readiness`); `ChatHostInputs.kt:99-106` (mismatched key wins, then seed, then ready) | `ChatViewStateTest` `the header status is derived from readiness, not the stale phase` (`:230`), `a failed engine keeps its reason` (`:244`); `ChatHostInputsTest` `a mismatched key is switching for every engine state` (`:130`) | **VERIFIED** | `phase` is still free text and is shown only where readiness is `Starting`/`Failed` and it is the sole detail. The F-E 18-minute-stale header symptom is closed at the render seam. |
+| S1 | Single source of chat state; the renderable view is a pure projection, not a second state | `ui/screens/chat/ChatViewModel.kt:636` (one `_state`), `:667-702` (`hostState` combine); `ChatViewState.kt:270-375`; `ChatScreen.kt:38`, `:108` | `ChatViewStateTest` 19 (determinism, totality, Android-free source scan at `:376`); `ChatHostInputsTest` 7 | **VERIFIED** | `ChatUiState` is the only mutable authority. `ChatScreen` does read four more flows for effects (S12); none of them builds the rendered view. |
+| S2 | Phase/readiness comes from the same snapshot as the binding; a stale free-text phase cannot claim readiness | `ChatViewState.kt:98-112` (`statusLabel`), `:293` (`readiness`); `ChatHostInputs.kt:99-106` (mismatched key wins, then seed, then ready) | `ChatViewStateTest` `the header status is derived from readiness, not the stale phase` (`:260`), `a failed engine keeps its reason` (`:274`); `ChatHostInputsTest` `a mismatched key is switching for every engine state` (`:130`) | **VERIFIED** | `phase` is still free text and is shown only where readiness is `Starting`/`Failed` and it is the sole detail. The F-E 18-minute-stale header symptom is closed at the render seam. |
 | S3 | Binding identity: a binding and its instance key are published together (Option A) | `di/AppContainer.kt:305-308`, `:715-725` (snapshot written before the same-key early return) | `AppContainerBindingTest` 4 (`the initial snapshot is the legacy pair`, `binding the chat pool moves the binding and key together`, `a same-key project label update still moves the snapshot`, `every published snapshot pairs its binding with its own key`); `EngineBindingTokenTest` 5 | **VERIFIED** | The container-level carry-over test exists in V2-11 and is green in the focused run and the full gate; its assertions are explicit. |
 | S4 | Run-in-flight: a binding switch never kills a running turn; the signal outlives the ViewModel | `AppContainer.kt:340-359` (`engineRunInFlightFor`, key-guarded clear, deferred connection flush); `ChatViewModel.kt:3567-3570`, `:818-822` | No direct test of `reportRunInFlight`; `ConnectionRegistryTest` 15 pins the deferral/flush rule (`:206`) | **PARTIAL** | The registry half is pinned; the container flag and its key guard are inspection-only. A JVM container test should assert a foreign-key clear does nothing. |
 | S5 | Pending permission is presented with all three decisions; dismiss is a deny, never an approval | `ChatViewModel.kt:434`, `:715-729` (stale-id guard); `ChatContent.kt:355-420`; `ChatDispatch.kt:58-69` | `ChatContentGateTest` 8 (`:72` three decisions, `:119` back = deny); `ChatDispatchTest` `:73`; `ChatGateTest` `:142` (does not gate composer) | **VERIFIED** | The stale-request drop (`ChatViewModel.kt:723-727`) is code without a test, but the decision mapping and the dialog are pinned. |
 | S5b | Prompt lifecycle: a prompt from an ended/bootstrap-replaced run cannot survive | `ChatViewModel.kt:1675-1687` (bootstrap), `:3980-3985` (turn `finally`) | **no test** | **GAP (coverage)** | Clearing exists in both places and is correct by inspection, but neither clear is asserted. The dialog tests start from a fabricated pending prompt, so they cannot see lifecycle. |
-| S6 | Pending question is shown without fabricating options; the projection drops the raw payload | `ChatViewState.kt:357-364` (`QuestionView`), `:242-251`; `ChatContent.kt:430-462` | `ChatViewStateTest` `:194` (title kept, raw dropped); `ChatContentGateTest` `:138` and `:156` (no option list; deny and dismiss release) | **VERIFIED** | The dialog is honest about not answering. Answering is absent: see A12 in §8. |
+| S6 | Pending question is shown without fabricating options; the projection drops the raw payload | `ChatViewState.kt:248-253` (`QuestionView`), `:359-368`; parser `QuestionBatch.kt:55-119`; dialog `QuestionDialog.kt:46-225`; answer path `ChatViewModel.kt:2696-2740` (POST `answerQuestions` at `:2726`), dispatch `:754`; `ChatContent.kt:430-472` | `QuestionBatchParserTest` 8 (full schema, `options` alias, no invented choice, unknown type, missing id, caps); `QuestionDialogTest` 6 (single, multi, yes/no, Submit disabled until every prompt is answered, cancel never submits, unanswerable prompt); `QuestionAnswerBuilderTest` 4 (wire mapping, `yes=false` kept, blank/empty omission); `ChatViewStateTest` `:194` (title kept, raw dropped), `:206` (parsed batch survives projection); `ChatContentGateTest` `:138`, `:156` (fallback: no option list, deny and dismiss release) | **VERIFIED (V2-14)** | A12 is fixed: a parsed batch renders yes/no, single, multi and free text; Submit is gated on every prompt, dismiss/back is Cancel, and a failed POST keeps the dialog open with an error (`ChatViewModel.kt:2731-2735`). An unparsable batch keeps the cancel-only fallback dialog. **Limits:** the free-text field is not Compose-tested (Robolectric text-input/cursor loop; its wire mapping is covered by the builder), an open batch does not survive process death, a 2xx on the POST is the proof (there is no read-back that the engine accepted the chosen ids), and nothing was device-run. |
 | S7 | Draft preservation and freshness: the captured callback decides with the current snapshot | `ChatScreen.kt:152-157`; `ChatDispatch.kt:22-33`; `ChatViewModel.kt:3536-3538` | `ChatHostCallbackTest` 4 (`:32`, `:61`, `:87`, `:113`); `ChatDispatchTest` `:19-70` | **PARTIAL** | Freshness is well pinned. **Draft survival is not tested**: `bindProject` (`ChatViewModel.kt:1081-1124`) does not clear `input`, so a draft crosses an instance switch, and no test asserts that. The field is only cleared on an accepted send (`:3741`). |
 | S8 | Error/finish handling: a `finish` with `reason=error` is a failed turn, not an empty reply | `data/crush/CrushEvent.kt:86` (`StreamMessage`); `ChatViewModel.kt:4032-4033`, `:3963-3965` | `CrushProtocolTest` 5 finish rows (`:204`, `:218`, `:237`, `:263`); `ChatHistoryReplayTest` `:43` keeps a failed turn across reopen | **PARTIAL** | Parsing and replay are pinned. The ViewModel's finalisation marker ("no reply received", reserved for non-stopped turns) has no test; no test constructs `ChatViewModel`. |
 | S9 | Transcript replacement: SSE republishes whole messages, so text is replaced, never appended | `ChatViewModel.kt:4371-4414` (`text = m.text.ifBlank { it.text }`), `:4612-4621` (`updateStreaming` maps only the owning bubble) | `RunHandleTest` `:99` pins tool accumulation by call id; `ChatStateMergeTest` 3 pins replay-vs-live merge; **no test asserts text replacement** | **PARTIAL** | The risk is real: an "append" regression would still render. Tool frames are the opposite rule (accumulate across LLM steps) and are pinned; the text rule is inspection-only. |
-| S10 | Model picker state: selected model may be absent without becoming an error; loading, error, "not in current list" | `ChatViewState.kt:137-163`, `:271-282`, `:328-339`; `ChatContent.kt:1693-1700` | `ChatViewStateTest` `:121` (absent is not an error), `:334` (loading); `ChatContentSheetsTest` model rows (error, loading, not-in-list + Reload); `ChatModelMetadataTest` 6 | **VERIFIED** | The badge is still the legacy `-free` suffix rule (`ChatViewState.kt:277-280`), not catalogue `isFree`; T6-01 remains open and is not this clause. |
-| S11 | Composer gates are exactly the frozen §5.5.1 table | `ChatViewState.kt:292-293`, `:352`; `ChatContent.kt:228-239` | `ChatGateTest` (7 methods; 8 rows at `:49-58`); `ChatContentGateTest` `:172`; `ChatAccessibilityTest` `:77`, `:86` | **VERIFIED** | See §4. The projected `canSubmitViaIme` has no production consumer (F6). |
+| S10 | Model picker state: selected model may be absent without becoming an error; loading, error, "not in current list" | `ChatViewState.kt:137-163`, `:279-281`, `:330-341`; `ChatContent.kt:1703-1713` | `ChatViewStateTest` `:121` (absent is not an error), `:364` (loading); `ChatContentSheetsTest` model rows (error, loading, not-in-list + Reload); `ChatModelMetadataTest` 6 | **VERIFIED** | The badge is still the legacy `-free` suffix rule (`ChatViewState.kt:279-281`), not catalogue `isFree`; T6-01 remains open and is not this clause. |
+| S11 | Composer gates are exactly the frozen §5.5.1 table | `ChatViewState.kt:294-295`, `:354`; `ChatContent.kt:228-239` | `ChatGateTest` (7 methods; 8 rows at `:49-58`); `ChatContentGateTest` `:172`; `ChatAccessibilityTest` `:77`, `:86` | **VERIFIED** | See §4. The projected `canSubmitViaIme` has no production consumer (F6). |
 | S12 | 5.5 #11: one collection per screen | `ChatScreen.kt:38-45` collects `hostState`, `engineStateForActiveInstance`, `activeInstanceKey`, `keyAvailable`; `:108` renders only `host` | **no test for the collection count**; the projection is pinned by `ChatGateTest`/`ChatHostInputsTest` | **PARTIAL** | 5 collections remain. They are effect inputs (start/stop/bind/retry), not render inputs, so the original "two sources of render state" defect is closed; the literal clause is not. |
 
 ### 3.1 Test registry (§6) cross-check
@@ -145,13 +181,13 @@ Only the IDs whose tests were opened for this review. `T2B3-01` (Review history)
 package records stand unchanged. Counts are read from source. Where a class body
 was not re-read line by line, the row relies on its test names plus the package
 record; every class listed ran inside the V2-12 gate (997 tests / 104 suites / 0
-failures) and again inside the V2-13 gate (1001 tests / 105 suites / 0 failures),
-but a row is not a claim that each individual assertion was re-read
-for this review.
+failures), again inside the V2-13 gate (1001 tests / 105 suites / 0 failures) and
+once more inside the V2-14 gate (1020 tests / 108 suites / 0 failures), but a row
+is not a claim that each individual assertion was re-read for this review.
 
 | Registry ID | Existing class (current count) | Verdict | Note |
 |---|---|---|---|
-| T2A-01 | `ChatViewStateTest` 18 | **VERIFIED** | Determinism, totality, Android-free source scan. Count grew from the reconciliation's 10. |
+| T2A-01 | `ChatViewStateTest` 19 | **VERIFIED** | Determinism, totality, Android-free source scan. Count grew from the reconciliation's 10; V2-14 added the parsed-batch projection row. |
 | T2A-02 | `ChatGateTest` 7 (eight rows in one method) | **VERIFIED** | The frozen §5.5.1 table. |
 | T2A-03 | `ChatHostInputsTest` 7 | **VERIFIED** | Readiness/seed rules over every `EngineState`. |
 | T2A-04 / T2A-04a | `ChatModelMetadataTest` 6 | **VERIFIED** | Pins the legacy `-free` suffix rule; the catalogue `isFree` replacement (T6-01) is still open. |
@@ -161,7 +197,7 @@ for this review.
 | T2B1-03 | `ChatContentSheetsTest` 16 | **VERIFIED** | Session/model/handoff sheets. |
 | T2B1-04 | `ChatHostCallbackTest` 4 | **VERIFIED** | Draft-callback freshness. |
 | T3-01 | `ShellNavigationTest` 16 | **VERIFIED** | Exists under a different name, as the sign-off records. Count grew 8 → 10 → 16; the six V2-12 cases drive the veto and the allowed switch separately through the bottom bar, the rail and the extended rail (A1, fixed). |
-| T6-01 | — | **GAP** | Catalogue `isFree` badge not implemented; `ChatViewState.kt:277-280` still uses the suffix. |
+| T6-01 | — | **GAP** | Catalogue `isFree` badge not implemented; `ChatViewState.kt:279-281` still uses the suffix. |
 | T6-02 | — | **GAP** | No interaction-parity test of the brief's shape; `ChatDispatchTest`'s ledger is the closest. |
 
 ## 4. Composer gate matrix (Rev 3.1 §5.5.1)
@@ -174,7 +210,7 @@ contract change that needs owner sign-off; the V2-7-8 inventory repeats the
 freeze at line 181. The named states requested by the review are a mapping onto
 that table, not a replacement for it.
 
-Gate functions: `ChatViewState.kt:292` (`canType`), `:293` (`canSend`), `:352`
+Gate functions: `ChatViewState.kt:294` (`canType`), `:295` (`canSend`), `:354`
 (`canSubmitViaIme`).
 
 | Frozen row | Tuple (`ready/recoverable/prewarm/streaming/draft`) | `canType` | `canSend` | Nearest requested state | Verdict |
@@ -195,15 +231,19 @@ Requested labels with **no composer row**:
 | **locked** | App-level overlay (`MainActivity.kt:297-328`) plus a bootstrap refusal (`ChatViewModel.kt:1148-1166`). The composer is not a lock gate. | **GAP (coverage)** — `MainActivityLockFlowTest` exists under `app/src/androidTest` but has no executed result in this batch; no JVM test drives the overlay. |
 | **no-key** | Bootstrap banner/phase (`ChatViewModel.kt:1342-1350`); the composer only sees `engineReady=false`. | **PARTIAL** — row 6 is the same enablement shape, but no test proves the key state produces it. |
 
-Two honest notes on this matrix:
+Three honest notes on this matrix:
 
 - `canSubmitViaIme` is computed and pinned (`ChatGateTest:132`) but **never
-  consumed**. `ChatContent.kt:1377` recomputes
+  consumed**. `ChatContent.kt:1387` recomputes
   `enabled && !streaming && sendEnabled && value.isNotBlank()`. The values are
   equivalent today; the field is a contract witness, not the enforcement point.
 - The frozen table is keyed on four booleans, not on the brief's eight named
   states. Do not add a "locked" boolean to `ComposerView` to make the names fit;
   that would move an app-level gate into the content seam.
+- **V2-14 adds no row here.** Answering a question is a gate outside the
+  composer: `AnswerQuestionDialog` owns its own Submit gate
+  (`QuestionDialog.kt:77`, `:210-216`), and the frozen four-boolean tuple does
+  not model a pending question. A12 did not change any of the eight rows.
 
 ## 5. Security boundaries
 
@@ -222,6 +262,13 @@ Two honest notes on this matrix:
 Enforcement is deliberately ordered: SEC1/2 are storage, SEC3 is the visible
 gate, SEC9 is the engine-policy gate. A failure in SEC9 is not a storage failure
 and must not be filed as one.
+
+**V2-14 changes no boundary in this table.** The answer body is built only from
+engine-published choice ids plus the user's own text (`QuestionBatch.kt:128-141`)
+and is posted through the same per-workspace UDS client
+(`ChatViewModel.kt:2726`); it carries no credential, and the SEC1/SEC4 key path
+is untouched. A12 adds reachability of an existing endpoint, not a new trust
+edge.
 
 ## 6. Engine isolation
 
@@ -323,41 +370,53 @@ batch then closed the last release-gating security gap this review listed —
 `A7`/`A7b`: a rejected permission policy is now a hard open failure with a named
 `PermissionPolicyException`, `agent/init` is skipped, the id is flushed, and a
 failed reattach reports not-attached (`WorkspacePermissionPolicyTest` 4,
-`BootstrapOrderTest` 9). SEC9 is **VERIFIED (V2-13)**.
+`BootstrapOrderTest` 9). SEC9 is **VERIFIED (V2-13)**. The **V2-14** batch then
+closed the last release-gating product gap, `A12`: a question batch is parsed
+into yes/no, single, multi and free-text prompts and answered over
+`answerQuestions`, with a gated Submit, Cancel-on-dismiss and a dialog that
+stays open on failure (`QuestionBatchParserTest` 8, `QuestionDialogTest` 6,
+`QuestionAnswerBuilderTest` 4, `ChatViewStateTest` 19). S6 is **VERIFIED
+(V2-14)**, and the release-gating table below is empty.
 
 **What it does not certify.** A green CI gate does not mean release-ready, for
-four reasons:
+three reasons:
 
 1. **The gate compiles more than it executes.** CI builds the androidTest APK;
    instrumented classes are not run there, and only `SecureKeyStoreInstrumentedTest`
    has a stored device result.
-2. **The green gate is the V2-13 one.** 1001 tests / 105 suites / 0 failures / 0
-   errors / 0 skipped, lint 0 errors / 1 pre-existing warning
-   (`v2-14-a7-gate-2026-11-23.log`, 33m38s). It supersedes the V2-12 gate (997
-   tests / 104 suites / 0 failures, `v2-12-gate-2026-11-23.log`) and the V2-11
-   gate quoted when this review was written (981 tests / 104 suites / 0
-   failures, `v2-11-gate-2026-11-23.log`); the +4 over V2-12 is the permission
-   batch.
+2. **The green gate is the V2-14 one.** 1020 tests / 108 suites / 0 failures /
+   0 errors / 0 skipped, lint 0 errors / 1 pre-existing warning
+   (`v2-16-a12-gate-2026-11-23.log`, 17m07s). It supersedes the V2-13 gate (1001
+   tests / 105 suites / 0 failures, `v2-14-a7-gate-2026-11-23.log`, 33m38s), the
+   V2-12 gate (997 tests / 104 suites / 0 failures,
+   `v2-12-gate-2026-11-23.log`) and the V2-11 gate quoted when this review was
+   written (981 tests / 104 suites / 0 failures,
+   `v2-11-gate-2026-11-23.log`); the +19 over V2-13 is the question milestone.
 3. **No device run happened here.** The composer, lock overlay, rails, relative
-   time, Settings confirmations, Review export label, diagnostics share path and
-   the permission-rejection phase were not exercised in this review, and the
-   V2-12/V2-13 fixes have no device, TalkBack or API 30+ run either.
-4. **One release-gating product gap remains.** `A12`: the app cannot answer an
-   agent question, only deny or dismiss it, which cancels the batch. That is a
-   feature milestone, not a polish item.
+   time, Settings confirmations, Review export label, diagnostics share path,
+   question dialog and the permission-rejection phase were not exercised in this
+   review, and the V2-12/V2-13/V2-14 fixes have no device, TalkBack or API 30+
+   run either.
+
+**No release-gating code item remains.** `A12` closed in V2-14 with the parser,
+the answer dialog and the `submitQuestion` path; what is left is verification
+debt and roadmap scope, not a missing feature that blocks a release.
 
 **Open GAPs (release-gating set):**
 
 | ID | Gap | Where | What closes it |
 |---|---|---|---|
-| **A12** | The app cannot answer agent questions; it can only deny/dismiss, which cancels the batch. | `ChatContent.kt:430-462`; transport already exists at `CrushApi.kt:477`, `:481` | Question milestone (large): choice/free-text UI plus resolution state over `answerQuestions`/`cancelQuestions`; today the dialog is honest and the raw payload is preserved. Still open after V2-13. |
+| — | **None.** A12 closed in V2-14 (question answering); A1/A8 closed in V2-12; A7/A7b closed in V2-13. | — | — |
 
-**A1 and A8 left this table in V2-12; A7/A7b left it in V2-13.** `A1` was closed
-by the shared `selectPrimary` veto (F2) and `A8` by the atomic reservation with a
+**A12 left this table in V2-14; A1 and A8 left it in V2-12; A7/A7b left it in
+V2-13.** `A12` was closed by the parser + `AnswerQuestionDialog` + the
+`submitQuestion` POST (`QuestionBatchParserTest` 8, `QuestionDialogTest` 6,
+`QuestionAnswerBuilderTest` 4, `ChatViewStateTest` 19); `A1` by the shared
+`selectPrimary` veto (F2) and `A8` by the atomic reservation with a
 terminal-failure release (E5); `A7`/`A7b` by the fail-closed apply with the
 `PermissionPolicyException` and the not-attached reattach (SEC9). `V2-AUDIT-1`,
-`V2-AUDIT-3` and `V2-AUDIT-0` are done and inside the green gate. None is claimed
-as device-verified.
+`V2-AUDIT-5`, `V2-AUDIT-3` and `V2-AUDIT-0` are done and inside the green gate.
+None is claimed as device-verified.
 
 Non-release coverage gaps also recorded: the locked composer/overlay path has no
 executed test (SEC3, §4); backup exclusion has no test (SEC8); per-project data
@@ -366,14 +425,17 @@ permission/UI copy items A3, A4, A5, A10 and A11 were **fixed and gated in
 V2-12** (`ReviewContentTest` 13, `ProjectsContentTest` 15, `OnboardingContentTest`
 12, `SettingsContentTest` 17); what they still lack is a device row, not a test.
 `A2` (project home), `A6` (route/mode dual meaning, monitored, no rewrite) and
-`A13` (runtime disposal) stay open, and device / TalkBack / API 30+ verification
-of every V2-12 and V2-13 row is **NOT PERFORMED**.
+`A13` (runtime disposal) stay open as **non-gating roadmap items** — they need
+their own scope, not a release gate. Device / TalkBack / API 30+ verification of
+every V2-12, V2-13 and V2-14 row is **NOT PERFORMED**.
 
-**What still needs a separate authorized batch.** `A12` is a milestone. `A7`/`A7b`
-no longer does: `V2-AUDIT-0` was owner-authorized and landed as V2-13, with its
-one limit named (no effective-mode read-back). Gate 7 (signing, packaging,
-listing, rollout) is untouched by every batch recorded here. Nothing in this
-review authorizes a release.
+**What still needs a separate authorized batch.** No release-gating code item
+does. `A12` landed as V2-14 with its limits named (free text not
+Compose-tested, no process-death persistence, no device run); `V2-AUDIT-0` landed
+as V2-13 with its one limit named (no effective-mode read-back). A2, A6 and A13
+stay open as roadmap items and need scheduling, not authorization. Gate 7
+(signing, packaging, listing, rollout) is untouched by every batch recorded here.
+Nothing in this review authorizes a release.
 
 ## 9. Evidence index
 
@@ -384,11 +446,16 @@ review authorizes a release.
 | `docs/v2/V2-4-chat-redesign.md` | frozen composer formula, chat test plan and device findings |
 | `docs/v2/V2-7-8-codebase-inventory-2026-11-22.md` | line-level inventory; repeats the composer freeze |
 | `docs/v2/V2-GAP-AUDIT.md` | A1-A14 verification, severity, batch IDs; not duplicated here |
-| `docs/v2/V2-AUDIT-FIXES.md` | the V2-12 audit-fix batch: what each `A` item changed, the tests that pin it, and what stayed open |
+| `docs/v2/V2-AUDIT-FIXES.md` | the V2-12 audit-fix batch, the V2-13 fail-closed phase and the V2-14 question phase: what each `A` item changed, the tests that pin it, and what stayed open |
 | `docs/v2/V2-A7-PERMISSION-FAIL-CLOSED.md` | the V2-13 permission fail-closed batch: `PermissionPolicyException`, the failing apply/reattach, the bootstrap phase, and the read-back limit |
+| `docs/v2/V2-A12-QUESTION-ANSWERING.md` | the V2-14 question-answering batch (A12): the upstream schema and parser rules, the dialog and Submit gate, the `submitQuestion` wire path, the fallback, the 18-test focused run over the three new classes, the gate and the limits |
 | `v2-12-gate-2026-11-23.log` | the four-task gate that ran the V2-12 fix batch: 997 tests / 104 suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning (local-only — `.gitignore` excludes `*.log`) |
 | `v2-14-a7-gate-2026-11-23.log` | the four-task gate that ran the V2-13 batch: 1001 tests / 105 suites / 0 failures / 0 errors / 0 skipped; lint 0 errors / 1 pre-existing warning; 33m38s (local-only) |
-| `docs/v2/V2-COMPLETION-LEDGER.md` | shipped/tested/device labels; V2-11 focused run plus the V2-12 and V2-13 gate rows |
+| `v2-16-a12-gate-2026-11-23.log` | the four-task gate that ran the V2-14 batch: **1020 tests / 108 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning**; 17m07s (local-only) |
+| `app/src/test/java/com/crush/mobile/ui/screens/chat/QuestionBatchParserTest.kt` | A12 parser pins: 8 tests over the confirmed schema, the `options` alias, unparsable/unknown prompts and the 5×5 caps |
+| `app/src/test/java/com/crush/mobile/ui/screens/chat/QuestionDialogTest.kt` | A12 dialog pins: 6 Robolectric Compose tests (single, multi, yes/no, gated Submit, cancel-never-submits, unanswerable prompt) |
+| `app/src/test/java/com/crush/mobile/ui/screens/chat/QuestionAnswerBuilderTest.kt` | A12 wire mapping: 4 tests (selected ids, trimmed free text, `yes=false` kept, empty omission) |
+| `docs/v2/V2-COMPLETION-LEDGER.md` | shipped/tested/device labels; V2-11 focused run plus the V2-12, V2-13 and V2-14 gate rows |
 | `docs/v2/V2-9-release-hardening.md` | Keystore instrumented run, ASK default, secret scan |
 | `docs/parity/2026-11-19-v2-0-baseline/MANIFEST.md` | the F-E stale-phase capture and its limits |
 | `docs/parity/2026-11-20-v2-4-chat/MANIFEST.md` | chat device set (composer, sheets, Retry, 2.0x) |

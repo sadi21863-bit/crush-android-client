@@ -334,7 +334,9 @@ data class PendingQuestion(
     /** Engine batch id (top-level `id`); empty when the engine sent none. */
     val id: String,
     /** The whole batch object as the engine published it. */
-    val raw: JsonElement
+    val raw: JsonElement,
+    /** A12: sanitized prompts/choices; null when the payload is unparseable. */
+    val batch: AskBatch? = null,
 )
 
 /** Where a human-readable ask MOST LIKELY lives, ordered by confidence. */
@@ -437,12 +439,13 @@ val selectedModel: String = "",
      * A question batch the agent is blocked on (analysis §4 P0-3).
      *
      * `question_batch_request` is the permission-ask's sibling for multiple
-     * questions. This build can SHOW the batch but cannot answer it with real
-     * option choices, so the state carries the raw payload for the dialog and
-     * [ChatViewModel.resolveQuestion] releases the run by cancelling the
-     * batch. Whole-object replace, never mutated in place.
+     * questions. A12 parses the batch into sanitized prompts/choices and
+     * answers it through `answerQuestions`; an unparseable payload keeps the
+     * cancel-only path. Whole-object replace, never mutated in place.
      */
     val pendingQuestion: PendingQuestion? = null,
+    /** A12: a failed answer POST, shown in the still-open question dialog. */
+    val questionError: String? = null,
     /** Sessions in the current workspace, newest first. See SessionList. */
     val sessions: List<Session> = emptyList(),
     val sessionsLoading: Boolean = false,
@@ -748,6 +751,7 @@ class ChatViewModel(
             is ChatAction.DeleteSession -> deleteSession(action.id)
 
             ChatAction.ReleaseQuestion -> resolveQuestion()
+            is ChatAction.SubmitQuestion -> submitQuestion(action.answers)
 
             is ChatAction.Retry -> {
                 setInput(action.text)
@@ -2634,17 +2638,12 @@ class ChatViewModel(
     val awaitingPermission: Boolean get() = _state.value.pendingPermission != null
 
     /**
-     * Releases an agent blocked on a question batch (analysis §4 P0-3).
+     * Cancels an agent blocked on a question batch (analysis §4 P0-3).
      *
-     * HONEST SCOPE: this build cannot answer with real option choices yet.
-     * [CrushApi.answerQuestions] exists on the wire and is the intended
-     * endpoint, but building QuestionAnswer.selected_ids requires an
-     * option-choice UI this screen does not have - shipping guessed answer
-     * bodies would tell the engine a user chose something they never saw.
-     * What IS verified on the wire (and used by CrushStreamProbe to stop a
-     * probe turn from hanging) is POST .../questions/cancel, which releases
-     * the blocked run without an answer. Both dialog actions land here so the
-     * turn visibly resumes instead of hanging on an invisible ask.
+     * A12 adds the answering path in [submitQuestion]; this function remains
+     * the explicit release: the user declines to answer, the batch is
+     * cancelled, and the blocked run resumes without one. The dialog also
+     * routes back/dismiss here, so a gesture never sends a partial answer.
      */
     fun resolveQuestion() {
         val q = _state.value.pendingQuestion ?: return
@@ -2655,10 +2654,16 @@ class ChatViewModel(
             // resolves, so a failed release cannot silently strand the run.
             if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
                 AppLog.w(TAG, "question release aborted: could not re-attach; dialog kept open")
+                _state.update {
+                    it.copy(questionError = "Could not reach the engine. The question is still open.")
+                }
                 return@launch
             }
             val ws = mgr.currentWorkspaceId ?: run {
                 AppLog.w(TAG, "question release aborted: no workspace attached; dialog kept open")
+                _state.update {
+                    it.copy(questionError = "No workspace is attached. The question is still open.")
+                }
                 return@launch
             }
             val confirmed = runCatching { crushApi(p).cancelQuestions(ws) }
@@ -2666,12 +2671,71 @@ class ChatViewModel(
                     AppLog.w(TAG, "question cancel failed: ${it.message}; dialog kept open")
                 }
                 .isSuccess
-            if (!confirmed) return@launch
+            if (!confirmed) {
+                _state.update {
+                    it.copy(questionError = "Could not cancel the question. Try again.")
+                }
+                return@launch
+            }
             AppLog.i(
                 TAG,
                 "question batch ${q.id.take(12)} cancelled; agent released without an answer"
             )
-            _state.update { it.copy(pendingQuestion = null) }
+            _state.update { it.copy(pendingQuestion = null, questionError = null) }
+        }
+    }
+
+    /**
+     * A12: sends the user's choices for every prompt in the open batch.
+     *
+     * The UI builds [AskAnswerDraft] only from parsed choices, so this never
+     * invents an id. A failed POST keeps the batch and the dialog open with a
+     * visible error; success clears both. The engine resumes the blocked turn
+     * itself once the batch is resolved.
+     */
+    fun submitQuestion(answers: List<AskAnswerDraft>) {
+        val q = _state.value.pendingQuestion ?: return
+        val batch = q.batch ?: return
+        if (answers.size != batch.prompts.size) {
+            _state.update {
+                it.copy(questionError = "Answer every question before submitting.")
+            }
+            return
+        }
+        val mgr = workspaces ?: return
+        val p = port ?: return
+        viewModelScope.launch {
+            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+                AppLog.w(TAG, "question answer aborted: could not re-attach; dialog kept open")
+                _state.update {
+                    it.copy(questionError = "Could not reach the engine. The question is still open.")
+                }
+                return@launch
+            }
+            val ws = mgr.currentWorkspaceId ?: run {
+                AppLog.w(TAG, "question answer aborted: no workspace attached; dialog kept open")
+                _state.update {
+                    it.copy(questionError = "No workspace is attached. The question is still open.")
+                }
+                return@launch
+            }
+            val payload = QuestionAnswerBuilder.build(
+                batchId = batch.batchId.ifBlank { q.id },
+                answers = answers,
+            )
+            val sent = runCatching { crushApi(p).answerQuestions(ws, payload) }
+                .onFailure {
+                    AppLog.w(TAG, "question answer failed: ${it.message}; dialog kept open")
+                }
+                .isSuccess
+            if (!sent) {
+                _state.update {
+                    it.copy(questionError = "Could not send the answer. The question is still open.")
+                }
+                return@launch
+            }
+            AppLog.i(TAG, "question batch ${batch.batchId.take(12)} answered (${answers.size} responses)")
+            _state.update { it.copy(pendingQuestion = null, questionError = null) }
         }
     }
 
@@ -4535,12 +4599,15 @@ class ChatViewModel(
                                 // UI exists. Never swapped out: like permissions, a
                                 // question must reach this client or the run blocks
                                 // invisibly until the idle timeout cancels it.
+                                val parsed = QuestionBatchParser.parse(ev.body)
                                 val q = PendingQuestion(
-                                    id = ev.body.firstText(QUESTION_ID_KEYS).orEmpty(),
-                                    raw = ev.body
+                                    id = ev.body.firstText(QUESTION_ID_KEYS)
+                                        ?: parsed?.batchId.orEmpty(),
+                                    raw = ev.body,
+                                    batch = parsed,
                                 )
                                 AppLog.i(TAG, "question batch requested (raw ${ev.body})")
-                                _state.update { it.copy(pendingQuestion = q) }
+                                _state.update { it.copy(pendingQuestion = q, questionError = null) }
                             }
 
                             CrushEvent.PayloadType.RUN_COMPLETE -> {

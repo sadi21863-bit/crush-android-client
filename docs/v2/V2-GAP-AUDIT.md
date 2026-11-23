@@ -1,15 +1,17 @@
 # V2 gap audit — external review verified against source
 
 Status: **verification record 2026-11-23; resolution update 2026-11-23
-(V2-13).** This file answers one question per claim from the external
+(V2-14).** This file answers one question per claim from the external
 product/architecture review: *is it true in this tree?* The verification pass
 itself was read-only; the defects it confirmed were then fixed in batches
 V2-AUDIT-1/2/3/4, and those rows now read `FIXED (V2-12)`. A7/A7b were fixed
-after owner authorization in V2-13 and read `FIXED (V2-13)`. A2, A6, A12, A13
-and A14's device-budget half stay open on purpose. The diagnostics redaction gap
-(A9) was closed by the earlier V2-11 test batch (three classes, focused-green 19
-tests / 0 failures, `v2-ledger-tests-1123g.log`) and keeps that verdict rather
-than being relabelled.
+after owner authorization in V2-13 and read `FIXED (V2-13)`. A12 was closed as
+its own milestone, V2-14, and reads `FIXED (V2-14)`. A2, A6, A13 and A14's
+device-budget half stay open on purpose; none of them gates a release. The
+diagnostics redaction gap (A9) was closed by the earlier V2-11 test batch
+(three classes, focused-green 19 tests / 0 failures,
+`v2-ledger-tests-1123g.log`) and keeps that verdict rather than being
+relabelled.
 
 ## Method and limits
 
@@ -29,25 +31,30 @@ than being relabelled.
 - The external audit's own limitation stands: it was a source/documentation
   read, not a device test. This file shares that limit and does not upgrade it.
 
-**Gate status:** Full four-task gate after V2-13 (A7/A7b): green — **1001
-tests / 105 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1
-pre-existing warning**; 33m38s (`v2-14-a7-gate-2026-11-23.log`). This supersedes
-the 997-test V2-12 gate; the earlier V2-11 focused run (19 tests, 0 failures,
-`v2-ledger-tests-1123g.log`) remains the evidence behind A9, which this gate
-carries forward.
+**Gate status:** Full four-task gate after V2-14 (A12): green — **1020
+tests / 108 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1
+pre-existing warning**; 17m07s (`v2-16-a12-gate-2026-11-23.log`). This supersedes
+the 1001-test V2-13 gate and the 997-test V2-12 gate; the earlier V2-11 focused
+run (19 tests, 0 failures, `v2-ledger-tests-1123g.log`) remains the evidence
+behind A9, which this gate carries forward.
 
 ## Resolution (2026-11-23)
 
 Batches V2-AUDIT-1/2/3/4 are implemented and verified; the rows they cover say
 `FIXED (V2-12)` below. V2-AUDIT-0 (A7/A7b, owner-authorized 2026-11-23) is now
-implemented as **V2-13**, and those rows say `FIXED (V2-13)`. Per-fix detail —
+implemented as **V2-13**, and those rows say `FIXED (V2-13)`. V2-AUDIT-5 (A12)
+is implemented as **V2-14**, and that row says `FIXED (V2-14)`. Per-fix detail —
 changed symbols, test pins, and the residual limits — is in
-[`docs/v2/V2-AUDIT-FIXES.md`](V2-AUDIT-FIXES.md) for V2-12 and
+[`docs/v2/V2-AUDIT-FIXES.md`](V2-AUDIT-FIXES.md) for V2-12,
 [`docs/v2/V2-A7-PERMISSION-FAIL-CLOSED.md`](V2-A7-PERMISSION-FAIL-CLOSED.md)
-for V2-13.
+for V2-13, and
+[`docs/v2/V2-A12-QUESTION-ANSWERING.md`](V2-A12-QUESTION-ANSWERING.md) for
+V2-14.
 
-Still open by decision: **A2**, **A6**, **A12**, **A13**, and A14's 3-child PSS
-measurement. Device, TalkBack and API 30+ checks remain **NOT PERFORMED**.
+Still open by decision: **A2**, **A6**, **A13** and A14's 3-child PSS
+measurement. Device, TalkBack and API 30+ checks remain **NOT PERFORMED**, and
+Gate 7 is untouched. None of these is release-gating: the release-gating code
+audit set is empty.
 
 Verdict vocabulary:
 
@@ -58,6 +65,7 @@ Verdict vocabulary:
 | **CLOSED IN V2-11** | was true, now pinned by a new test |
 | **FIXED (V2-12)** | confirmed (or confirmed-with-nuance) and corrected in the V2-AUDIT-1/2/3/4 batch; the row names its test pin |
 | **FIXED (V2-13)** | confirmed and corrected in V2-13 (A7/A7b fail-closed permission application); the row names its test pins |
+| **FIXED (V2-14)** | confirmed and corrected in V2-14 (the A12 agent-question answering milestone); the row names its parser/dialog/ViewModel paths and test pins |
 | **DESIGN CHOICE** | implemented as described; whether it is wrong is an owner decision |
 | **NOT CONFIRMED** | could not be reproduced from source |
 
@@ -74,20 +82,21 @@ Verdict vocabulary:
 | A7 | Permission-policy application failure is swallowed | **FIXED (V2-13)** | Was **CONFIRMED**: `data/crush/WorkspaceManager.kt:234-235` (`skipPermissions`), `:237-243` (`setPermissionMode`) both logged and continued; `:255` then ran `agent/init`; `open()` returned success. **Fix:** `applyPermissionPolicy` (`WorkspaceManager.kt:286-301`) hard-fails a rejected `permissions/mode`/`permissions/skip`: it logs, flushes `workspaceId`/generation, and throws `PermissionPolicyException`; `open()` throws before `agent/init` (`:264`) and sets the lease only after the policy applies (`:253`). `ChatViewModel.bootstrap` (`ChatViewModel.kt:1324-1341`) shows a named phase — "engine rejected the permission policy (<mode>). Nothing was sent; check the engine version and try again." — with `engineReady=false`. Pins: `WorkspacePermissionPolicyTest` **4 tests** (mode 500 fails and skips init, skip 500 fails and skips init, 2xx still inits, failed forced reattach returns false and flushes); `BootstrapOrderTest` **9** still green | V2-AUDIT-0 — **done (V2-13)** |
 | A7b | A failed apply is *remembered as applied* on reattach | **FIXED (V2-13)** | Was **CONFIRMED (audit missed)**: `WorkspaceManager.kt:282-295` re-applied the recorded `yoloMode`/wire mode; the recorded value was the request, never a read-back. **Fix:** `reattachIfStale` (`WorkspaceManager.kt:311-334`) returns `false` on a rejected policy, and the flush in `applyPermissionPolicy` (`:294-295`) clears the id, so a failed reattach cannot report "attached". Pin: `WorkspacePermissionPolicyTest` **4 tests**, including the failed forced-reattach case that asserts `false` + a flushed id. Read-back limit: there is still no effective-mode read-back; a 2xx on the apply is the proof | V2-AUDIT-0 — **done (V2-13)** |
 | A8 | Engine budget check and reservation are not atomic | **FIXED (V2-12)** | Was **CONFIRMED-NUANCE**: `engine/EngineInstanceRegistry.kt:128-144` was check-then-act on a `ConcurrentHashMap` (`:85`); `Grain.STARTING` was set *after* the check and was not counted (`:199` counted live children only). **Fix:** `requestStart` now checks and reserves under `synchronized(lock)` (`EngineInstanceRegistry.kt:160-177`), and `othersHoldingSlots` (`:251-265`) counts live children **and** `Grain.STARTING`; a terminal `Failed(willRetry=false)` releases the reservation, a retrying failure keeps it, and `AppContainer.requestEngineStart` registers the runtime before the gate (`AppContainer.kt:902-907`). Pin: `EngineInstanceRegistryTest` **19 tests** (4 new, incl. the `CyclicBarrier` two-thread case) | V2-AUDIT-3 — **done (V2-12)** |
-| A9 | Diagnostics redaction/tail has no tests | **CLOSED IN V2-11** | new `app/src/test/.../diagnostics/DiagnosticsReportTest.kt` (11 tests: block order, key masking in log tail/crash/notes, truncation marker, null-vs-false probe, empty crash section, `parseUncaughtFromLog` terminator/last-crash/mid-write/no-crash); focused run 11/11 green; the terminator test found and drove the `matches` → `containsMatchIn` fix. The 1001-test V2-13 gate re-runs all 11 green. Screen-level, clipboard and share-path remain NOT PERFORMED | closed (V2-11) — green in the V2-13 gate |
+| A9 | Diagnostics redaction/tail has no tests | **CLOSED IN V2-11** | new `app/src/test/.../diagnostics/DiagnosticsReportTest.kt` (11 tests: block order, key masking in log tail/crash/notes, truncation marker, null-vs-false probe, empty crash section, `parseUncaughtFromLog` terminator/last-crash/mid-write/no-crash); focused run 11/11 green; the terminator test found and drove the `matches` → `containsMatchIn` fix. The 1020-test V2-14 gate re-runs all 11 green. Screen-level, clipboard and share-path remain NOT PERFORMED | closed (V2-11) — green in the V2-14 gate |
 | A10 | A failed Settings key save discards the draft | **FIXED (V2-12)** | Was **CONFIRMED**: `ui/screens/settings/SettingsContent.kt:267-269` closed the editor and cleared `newKey` before the async save reported; Onboarding already kept a `saving` state (`OnboardingContent.kt:41-42`). **Fix:** Save calls `onSaveKey(key) { ok -> }` and clears `replacing`/`newKey` only on `ok`; a failure keeps the editor and the draft (`SettingsContent.kt:279-301`). Pin: `SettingsContentTest` **17 tests** | V2-AUDIT-2 — **done (V2-12)** |
 | A11 | Key deletion has no confirmation | **FIXED (V2-12)** | Was **CONFIRMED**: `SettingsContent.kt:254-259` called `onClearKey` directly; project removal does confirm (`ProjectsContent.kt:228-248`). **Fix:** Delete opens a dialog naming the provider, and `onClearKey` runs only from `confirm-delete-key` (`SettingsContent.kt:266-277`, dialog `:316-342`). Pin: `SettingsContentTest` **17 tests** | V2-AUDIT-2 — **done (V2-12)** |
-| A12 | The app cannot answer agent questions | **CONFIRMED-NUANCE** | dialog `ui/screens/chat/ChatContent.kt:423-460` is honest about it; the raw payload is preserved (`ChatViewModel.kt:325-329`); the transport already exists: `data/crush/CrushApi.kt:477` `answerQuestions`, `:481` `cancelQuestions`. Only the choice UI + resolution state are missing | roadmap (large) — **open** |
+| A12 | The app cannot answer agent questions | **FIXED (V2-14)** | Was **CONFIRMED-NUANCE**: the old dialog (`ui/screens/chat/ChatContent.kt:423-460`) offered only deny/dismiss; the raw payload was preserved (`ChatViewModel.kt:325-329`) and the transport already existed — `data/crush/CrushApi.kt:477` `answerQuestions`, `:481` `cancelQuestions` — so only the choice UI and resolution state were missing. **Fix:** `QuestionBatchParser` (`ui/screens/chat/QuestionBatch.kt:55`) parses the confirmed schema (yes_no/single_choice/multi_choice/free_text), accepts `options` as an alias for `choices`, caps at 5 questions × 5 choices, and returns a cancel-only fallback for an unparsable batch; `AnswerQuestionDialog` (`QuestionDialog.kt:46`) renders choices/free text/yes-no and disables Submit until every prompt is answered, with Cancel always releasing; `ChatAction.SubmitQuestion` (`ChatAction.kt:37`) → `ChatViewModel.submitQuestion` (`ChatViewModel.kt:2696`) posts `answerQuestions` via `QuestionAnswerBuilder` (`QuestionBatch.kt:128`), and a failure keeps the dialog open with `questionError` (`ChatViewState.kt:245`). Pins: `QuestionBatchParserTest` **8**, `QuestionDialogTest` **6**, `QuestionAnswerBuilderTest` **4** (focused 18 green) and one new `ChatViewStateTest` case — all inside the 1020-test gate. Limits: free text is not Compose-tested (Robolectric cursor loop; the wire mapping is covered by the builder), no process-death persistence, and no device run | V2-AUDIT-5 — **done (V2-14)** |
 | A13 | Registry retains every runtime for the process lifetime | **CONFIRMED** | `EngineInstanceRegistry.kt:85` `ConcurrentHashMap`; `stop()` (`:163-180`, `stopRuntime` at `:175`) stops the child but retains the registry entry; there is no removal API in the public surface (`:101-197`) | architecture decision — **open** |
 | A14 | Budget comments no longer match the Chat/Code split | **FIXED (V2-12)** | Was **CONFIRMED (doc drift)**: `EngineInstanceRegistry.kt:43-48` and `ChatViewModel.kt:601-603` still said "chat + one project". **Fix:** comments now say two non-legacy projects, chat on the legacy key (`EngineInstanceRegistry.kt:53`, `ChatViewModel.kt:602-603`, `AppContainer.kt:244`). Doc-only; the 3-child PSS measurement is still NOT PERFORMED | doc fix — **done (V2-12)**; device budget open (V2-AUDIT-6) |
 | A15 | Auto-approve enables on one tap (review item, unnumbered) | **FIXED (V2-12)** | `SettingsContent.kt:607-634`: `PermissionMode.AUTO_APPROVE` is now behind a confirmation that names the blast radius ("read, change and delete files and run commands"); the switch opens it (`:564-576`) and nothing changes until `confirm-auto-approve`. "Show only confirmed effective state" is **not** part of this fix — without an effective-mode read-back Settings cannot display what the engine actually has in force. Pin: `SettingsContentTest` **17 tests** | V2-AUDIT-4 — **done (V2-12)** |
 
-## The two that gated a release — both now fixed
+## The release-gating set — closed
 
-A7/A7b (V2-13) and A1 (V2-12) are closed; nothing in this section is
-release-gating any more. **A12** — the app cannot answer agent questions — is
-the remaining product gap, tracked as a roadmap milestone below, not a safety
-gate.
+A7/A7b (V2-13) and A1 (V2-12) are closed, and **A12** — the app could not answer
+agent questions — closed as V2-14. **No release-gating code audit item remains.**
+A2, A6 and A13 stay open as roadmap/architecture decisions, not release gates.
+The A7 security gate is met at JVM level only: there is still no effective-mode
+read-back, and no device run covers it.
 
 ### A7 — permission application must fail closed (P0 candidate) — **FIXED (V2-13)**
 
@@ -165,6 +174,33 @@ just the binding reset. `ShellNavigationTest` is **16 tests**, with 6 new cases
 at 411/700/1000dp asserting veto and allowed per layout. The source reading above
 is kept as of `225ce94`.
 
+### A12 — the app cannot answer agent questions (product gap) — **FIXED (V2-14)**
+
+The old dialog (`ChatContent.kt:423-460`) was honest about the limit — it offered
+only deny/dismiss — and the raw payload was preserved
+(`ChatViewModel.kt:325-329`). The transport already existed
+(`CrushApi.kt:477` `answerQuestions`, `:481` `cancelQuestions`); the audit's
+point was that this was a product gap, not an engine-capability gap.
+
+**Resolution (V2-14).** `QuestionBatchParser` (`QuestionBatch.kt:55`) parses the
+confirmed upstream schema — `yes_no`, `single_choice`, `multi_choice`,
+`free_text` — accepts `options` as an alias for `choices`, caps a batch at 5
+questions × 5 choices, and returns a cancel-only fallback when nothing usable
+parses. `AnswerQuestionDialog` (`QuestionDialog.kt:46`) renders choices, free
+text and yes/no, disables Submit until every prompt is answered, and keeps
+Cancel as the release path.
+`ChatAction.SubmitQuestion` (`ChatAction.kt:37`) →
+`ChatViewModel.submitQuestion` (`ChatViewModel.kt:2696`) POSTs `answerQuestions`
+via `QuestionAnswerBuilder` (`QuestionBatch.kt:128`); a failure keeps the dialog
+open and shows `questionError` (`ChatViewState.kt:245`). Pins:
+`QuestionBatchParserTest` **8**, `QuestionDialogTest` **6**,
+`QuestionAnswerBuilderTest` **4** (focused 18 green) and one new
+`ChatViewStateTest` case; all inside the 1020-test gate. Limits: the free-text
+input itself is not Compose-tested (the Robolectric cursor loop makes typed input
+unreliable there; the wire mapping is covered by `QuestionAnswerBuilderTest`),
+there is no process-death persistence, and no device run was performed. Detail:
+[`docs/v2/V2-A12-QUESTION-ANSWERING.md`](V2-A12-QUESTION-ANSWERING.md).
+
 ## The rest, in release order
 
 | Batch | Items | Size | Decision needed | Status |
@@ -174,7 +210,7 @@ is kept as of `225ce94`.
 | **V2-AUDIT-2** | A3 "Export current file" + current-vs-historical note; A4 footer copy; A5 provider-qualified onboarding; A10 keep key draft on failure; A11 delete confirmation naming the provider | small each | copy/UX approval | **DONE (V2-12)** — `ReviewContentTest` 13, `ProjectsContentTest` 15, `OnboardingContentTest` 12, `SettingsContentTest` 17 |
 | **V2-AUDIT-3** | A8 atomic reservation (or an explicit single-thread contract + assertion) | small | none if documented | **DONE (V2-12)** — atomic under `lock`; `EngineInstanceRegistryTest` 19 |
 | **V2-AUDIT-4** | auto-approve confirmation dialog + effective-state display after apply | small | product decision | **DONE (V2-12)** — confirmation shipped (`SettingsContentTest` 17); effective-state display still awaits an effective-mode read-back |
-| **Questions** | A12 option/free-text UI over the existing `answerQuestions` transport | large | roadmap milestone | **OPEN** — the remaining product gap |
+| **V2-AUDIT-5 (Questions)** | A12 option/free-text UI over the existing `answerQuestions` transport | large | roadmap milestone | **DONE (V2-14)** — `QuestionBatchParserTest` 8, `QuestionDialogTest` 6, `QuestionAnswerBuilderTest` 4 (18 focused green) + one `ChatViewStateTest` case; limits: free text not Compose-tested, no process-death persistence, no device run |
 | **Architecture** | A13 runtime disposal contract + stress test; A14 total process budget including legacy (measure PSS with 3 children) | medium | owner decision | **A14 done (V2-12)** — comments corrected; A13 and the 3-child PSS remain **OPEN** |
 | **Design** | A2 project home as a destination; review readability; relative-time freshness (`ChatListContent.kt:62`, `ChatContent.kt:1428` snapshot `now`) | medium | owner decision | **OPEN** |
 
@@ -185,8 +221,9 @@ is kept as of `225ce94`.
 - Review's process-local history, latest-turn-only revert and current-file export:
   V2-5 scoped and documented these; the audit's complaint is about *labelling*,
   which A3 accepts.
-- Questions cannot be answered: recorded in the V2-5 limits; the audit correctly
-  promotes it from "known limitation" to a product gap.
+- Questions could not be answered: recorded in the V2-5 limits; the audit
+  correctly promoted it from "known limitation" to a product gap, and V2-14
+  closed it.
 - No measured frame baseline: carried in the V2-0 sign-off; `tools/perf-baseline.ps1`
   now captures cold-start/gfxinfo/PSS/engine-boot so the claim can become a
   number. The capture itself does not create a budget.
@@ -196,8 +233,8 @@ is kept as of `225ce94`.
 
 1. **A7b**: the failed apply is not just logged and forgotten — it is recorded and
    replayed by `reattachIfStale`. This raises A7's severity.
-2. **A12 nuance**: `answerQuestions` already exists in the client; this is a UI +
-   state milestone, not an engine-capability gap.
+2. **A12 nuance**: `answerQuestions` already exists in the client; this was a UI +
+   state milestone, not an engine-capability gap. Closed in V2-14.
 3. **A8 nuance**: the race is real in the code but unreachable today because the
    only caller is the main-thread `startEngine()`. The fix is cheap; the priority
    is lower than the audit implies.
@@ -206,9 +243,9 @@ is kept as of `225ce94`.
 5. **A5 evidence**: the onboarding promise contradicts the provider-scoped key
    model that V2-6 itself shipped, so this is a copy regression, not a new idea.
 
-Status after V2-13: items 1 (A7b), 3 (A8), 4 (A1) and 5 (A5) are fixed; item 2
-(A12) stays open. The analyses above are the original readings, not post-fix
-rewrites.
+Status after V2-14: items 1 (A7b), 3 (A8), 4 (A1), 5 (A5) and 2 (A12) are fixed;
+no item in this list remains open. The analyses above are the original readings,
+not post-fix rewrites.
 
 ## Owner decision list (append to the V2 ADR register)
 
@@ -219,7 +256,7 @@ rewrites.
 | V2-AUDIT-2 | Review export label + projects copy + onboarding claim + key-draft retention + delete confirmation | accept; all copy/state, no data migration | **accepted; done (V2-12)** |
 | V2-AUDIT-3 | Atomic engine-slot reservation | accept; document the current single-thread contract either way | **accepted; done (V2-12)** |
 | V2-AUDIT-4 | Confirmation before enabling auto-approve; show only confirmed effective state | accept as product safety control | **accepted; done (V2-12)** — confirmation shipped, effective-state display still awaits a read-back (V2-13's 2xx-only limit) |
-| V2-AUDIT-5 | Question answering milestone | schedule next after V2-13; needs its own scope | **OPEN** — question milestone not started |
+| V2-AUDIT-5 | Question answering milestone | schedule next after V2-13; needs its own scope | **DONE (V2-14)** — parser/dialog/`SubmitQuestion` shipped; 18 focused tests green, inside the 1020-test gate; see [`docs/v2/V2-A12-QUESTION-ANSWERING.md`](V2-A12-QUESTION-ANSWERING.md) |
 | V2-AUDIT-6 | Runtime disposal + total engine budget | schedule as architecture work; measure 3-child PSS first | **OPEN** — A13 + PSS still to do |
 | V2-AUDIT-7 | Project home as a destination | keep on the roadmap; do not reopen V2-5 without a design pass | **OPEN** — roadmap |
 
@@ -231,12 +268,13 @@ rewrites.
 | A7 | **Was:** path-keyed fake engine returning 500 on `permissions/mode`; call `open()`; observe `initAgent` still invoked and `open()` returning a workspace. **Now pinned** by `WorkspacePermissionPolicyTest` (create 200 + mode 500 must fail the open and never reach `agent/init`); replay by hand only if the pin is disputed |
 | A8 | two threads calling `requestStart` behind a `CyclicBarrier` with one live other engine; both must not pass |
 | A10 | Settings → Replace key → type → Save with the Keystore writer forced to fail; observe the editor already closed and the draft gone |
-| A12 | trigger an ask-flow question; observe only Deny/Dismiss |
+| A12 | **Was:** trigger an ask-flow question; observe only Deny/Dismiss. **Now pinned** by `QuestionBatchParserTest`, `QuestionDialogTest` and `QuestionAnswerBuilderTest`; replay by hand only if a pin is disputed |
 
-Status after V2-13: A1, A7/A7b, A8 and A10 now have automated pins
+Status after V2-14: A1, A7/A7b, A8, A10 and A12 now have automated pins
 (`ShellNavigationTest`, `WorkspacePermissionPolicyTest`,
 `EngineInstanceRegistryTest` — the `CyclicBarrier` case is the A8 procedure
-above — and `SettingsContentTest`); these manual steps remain the replay if a
-pin is disputed. A12 is still open.
+above — `SettingsContentTest`, and the three question classes); these manual
+steps remain the replay if a pin is disputed. No audit row is open for lack of a
+pin.
 
 No credential value is read, written or printed by any of these procedures.

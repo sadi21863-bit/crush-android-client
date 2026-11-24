@@ -105,6 +105,10 @@ class WorkspacePermissionPolicyTest {
             "the workspace id must be flushed so no turn can use the half-configured workspace",
             manager.currentWorkspaceId,
         )
+        assertFalse(
+            "no credential-bearing request may follow a rejected policy: $seen",
+            seen.any { it.endsWith("/config/provider-key") },
+        )
     }
 
     @Test
@@ -127,6 +131,10 @@ class WorkspacePermissionPolicyTest {
             seen.any { it.endsWith("/agent/init") },
         )
         assertNull(manager.currentWorkspaceId)
+        assertFalse(
+            "no credential-bearing request may follow a rejected policy: $seen",
+            seen.any { it.endsWith("/config/provider-key") },
+        )
     }
 
     @Test

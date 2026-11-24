@@ -132,6 +132,12 @@ tracked; the gate logs cited in §4 sit at the repo root and are not.
   1 pre-existing warning** (`v2-23-fix-gate.log`, 2026-11-24, 33m01s). The
   pre-correction gate (`v2-21-phasec-gate-final.log`) was 1049/113/0; the
   earlier `v2-20-phasec-gate.log` was interrupted mid-lint.
+- V2-15 Phase D (permission-policy verification) adds 9 `@Test` methods over
+  the post-push gate: `WorkspacePermissionPolicyScenariosTest` 0 → 9; the
+  existing `WorkspacePermissionPolicyTest` (4) now also asserts no
+  `/config/provider-key` request on rejection. The full gate ran **1059 tests /
+  115 suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1
+  pre-existing warning** (`v2-30-phaseD-gate.log`, 2026-11-24, 18m12s).
 - Instrumented: 6 classes / 15 `@Test` methods exist under `app/src/androidTest`;
   only `SecureKeyStoreInstrumentedTest` (3 tests) has a stored device run.
 - `:app:assembleDebugAndroidTest` compiles the test APK in every gate. Compiling
@@ -250,6 +256,25 @@ terminal-startup cleanup: the supervisor's terminal `Failed` branch now calls
 `containerScope` cancellation is documented as deliberately deferred (it owns
 no engine resource), and no start/stop concurrency change was introduced; see
 `V2-15-POST-PUSH-AUDIT-CORRECTION.md`.
+
+**V2-15 Phase D (2026-11-24, committed on `v2-15-lifecycle-hardening` as a
+follow-up to `a1be361`).** The V2-13 A7/A7b
+fail-closed implementation was re-verified across the ten permission-policy
+scenarios. Rejection and transport failure stop before `agent/init`, never issue
+`/config/provider-key`, flush id and generation, and surface the named
+policy-rejection phase; generation changes flush the id and `ensureAgentReady`
+returns “no workspace” without using the key; a failed reattach reports false
+and a retry recovers. One reproducible defect was found: a cancelled re-open
+could leave the old fresh `lastAttachedAtMs` covering a newly claimed id, so a
+later non-forced reattach could return true without re-applying the policy.
+`WorkspaceManager.open()` now clears the lease when it claims the id and flushes
+id/generation/lease on `CancellationException`. No trustworthy effective-mode
+read-back exists — `GET /permissions/skip` and the workspace `yolo` field are
+booleans, not the v0.100.0 mode enum — so a 2xx apply remains the only proof.
+The scenario suite is `WorkspacePermissionPolicyScenariosTest` (9), plus the
+existing policy class (4, now credential-asserting) and `WorkspaceLeaseTest`
+(14); focused 27/27 green and full gate 1059/115/0 (`v2-30-phaseD-gate.log`).
+No device, instrumented or TalkBack run covers Phase D.
 
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no

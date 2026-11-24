@@ -1,7 +1,8 @@
 # V2-15 integration report
 
-Status: **implementation + Phase C validation + post-push L2 correction,
-2026-11-24.** The initial batch is committed and pushed as `1990118` on
+Status: **implementation + Phase C validation + post-push L2 correction +
+Phase D permission-policy verification, 2026-11-24.** The initial batch is
+committed and pushed as `1990118` on
 `v2-15-lifecycle-hardening` (not merged into `main`); the L2 terminal-startup
 correction is committed on the same branch as a follow-up to `1990118`. No
 merge, PR, issue or tag; no Go-engine or dependency change. Device PSS/stop
@@ -29,6 +30,7 @@ This report ties the V2-15 batches together:
 | `data/crush/ConnectionRegistry.kt` | L3 `isSuperseded(key, ownerEpoch)` reads only the live `entries[key]`; `registrationKey` deleted; test-only retained-count seam |
 | `ui/screens/chat/ChatViewModel.kt` | L3 `registeredConnectionKey` captured at successful attach; stale check and `onCleared` use it, never the mutable `instanceKey` |
 | `engine/EngineSupervisor.kt` | L4 test-only `hasActiveSupervisionForTest()` seam; post-push L2 correction calls `stopBlocking()` in the terminal `Failed` branch before publishing the state |
+| `data/crush/WorkspaceManager.kt` | Phase D: clear `lastAttachedAtMs` when claiming a new id and flush id/generation/lease on `CancellationException`; no request-shape or policy-mapping change |
 
 No other production file changed. Phase C itself added only the `Int` return
 from `shutdown()`; the post-push correction adds the terminal `stopBlocking()`
@@ -92,6 +94,7 @@ works.
 | `EngineInstanceRegistryTest` | 26 | 19 prior + 7 Phase C (repeated start, stop-during-STARTING, stop/start race, stale RUNNING, own restart, ten-racer barrier, 50 projects) |
 | `EngineRuntimeLifecycleTest` | 1 | Phase C, no active loop/child after stop |
 | `EngineTerminalStartupCleanupTest` | 1 | Post-push L2: real exec failure → supervisor terminal → bridge released |
+| `WorkspacePermissionPolicyScenariosTest` | 9 | Phase D: transport, cancellation, retry, restart/generation, concurrency; credential-order assertions |
 | `AppContainerShutdownTest` | 1 | Phase C/D, container mapping + one-shot count |
 
 No test was removed or weakened in this batch.
@@ -108,6 +111,8 @@ No test was removed or weakened in this batch.
 | Post-push L2 correction, focused | **BUILD SUCCESSFUL in 8m06s**; **10 tests / 5 classes / 0 failures / 0 errors / 0 skipped** (`v2-22-fix-focused2.log`) |
 | Full gate after Phase C | **BUILD SUCCESSFUL in 10m25s** (95 tasks, 1 executed / 94 up-to-date); **1049 tests / 113 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-21-phasec-gate-final.log`) |
 | Post-push correction full gate | **BUILD SUCCESSFUL in 33m01s**; **1050 tests / 114 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-23-fix-gate.log`) |
+| Phase D permission-policy focused | **BUILD SUCCESSFUL in 44s**; **27 tests / 3 classes / 0 failures / 0 errors / 0 skipped** (`v2-29-phaseD-focused3.log`) |
+| Phase D full gate | **BUILD SUCCESSFUL in 18m12s**; **1059 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-30-phaseD-gate.log`) |
 
 The full gate runs `:app:testDebugUnitTest :app:assembleDebug
 :app:assembleDebugAndroidTest :app:lintRelease`.
@@ -161,15 +166,44 @@ override.
 | 3-child PSS | NOT PERFORMED | ordinary switching stops the outgoing non-legacy engine; needs the run-in-flight/handoff path or a budget override (separate experiment). |
 | Thread census after stop | NOT PERFORMED | child/socket census performed; thread count per process was not sampled. |
 | Instrumented / TalkBack | NOT PERFORMED | no instrumented run or TalkBack session in this phase. |
+| Effective permission-mode read-back | **does not exist** | the spec exposes `yolo`/`skip` booleans, not the v0.100.0 mode enum; a 2xx apply remains the only proof (Phase D §5). |
+| Phase D device validation | NOT PERFORMED | all ten scenarios are JVM/MockWebServer; no device re-run of `/permissions/mode` or engine restart. |
 
-## 7. Restrictions honored
+## 7. Phase D — permission-policy verification (2026-11-24)
+
+The A7/A7b fail-closed implementation was re-verified across all ten scenarios
+in `docs/v2/V2-15-PERMISSION-POLICY-VERIFICATION.md`.
+
+| Contract | Verdict |
+|---|---|
+| Rejected `permissions/mode` / `permissions/skip` → no `agent/init` | holds |
+| Rejection/transport failure → no provider-key request | holds |
+| Transport failure during apply → fail closed | holds |
+| Cancellation → no unconfirmed attachment | **one defect found and fixed** |
+| Engine restart / generation change → stale id not reused | holds |
+| Failed reattach → reported false, retry recovers | holds |
+| Effective-mode read-back | **no trustworthy endpoint; limitation retained** |
+| Concurrent opens/reattaches | same-mode converge; no serialization (documented) |
+
+The defect: a cancelled re-open could leave the old fresh
+`lastAttachedAtMs` while the new id was already claimed, so a later non-forced
+`reattachIfStale()` could return true without re-applying the new policy.
+`WorkspaceManager.open()` now clears the lease when it claims the id and flushes
+id/generation/lease on `CancellationException`. No L1/L2/L3 file was touched.
+
+Tests: `WorkspacePermissionPolicyScenariosTest` (9 new), the existing
+`WorkspacePermissionPolicyTest` (4, now also asserting no provider-key request),
+and `WorkspaceLeaseTest` (14). The full gate result is in §4.
+
+## 8. Restrictions honored
 
 - No runtime eviction, `removeStopped(key)` or LRU added.
 - No Go engine, dependency, workflow or unrelated UI change.
 - The initial V2-15 batch was committed and pushed to
   `v2-15-lifecycle-hardening` as `1990118` on owner instruction; it is not
   merged into `main`, and no PR or issue was created. The post-push correction
-  is committed on the same branch as a follow-up.
+  is committed on the same branch as a follow-up. Phase D is committed on the
+  same branch; no PR or issue was created for it.
 - All V2-15 reports, test evidence and implementation changes are preserved.
 - No historical record was rewritten; the Phase C and correction reports state
   what was and was not executed.

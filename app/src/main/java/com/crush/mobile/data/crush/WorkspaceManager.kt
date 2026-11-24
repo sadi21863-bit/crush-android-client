@@ -1,6 +1,7 @@
 package com.crush.mobile.data.crush
 
 import com.crush.mobile.util.AppLog
+import kotlinx.coroutines.CancellationException
 import java.util.UUID
 
 /**
@@ -232,6 +233,12 @@ class WorkspaceManager(private val api: CrushApi) {
         val id = ws.id.ifBlank { requestedId }
         workspaceId = id
         workspaceGeneration = WorkspaceManager.currentEngineGeneration()
+        // The id is NOT attached until the policy below succeeds. Clear any
+        // lease from a previous successful attach BEFORE claiming this id:
+        // without this, a cancelled re-open left the old fresh timestamp
+        // covering an unconfirmed policy, and a later non-forced reattach
+        // returned true without re-applying the mode.
+        lastAttachedAtMs = null
 
         // ALWAYS applied, in both directions.
         //
@@ -241,11 +248,21 @@ class WorkspaceManager(private val api: CrushApi) {
         // switched to ASK would still get silent approvals with no way to tell.
         // Explicitly sending false is what makes the setting reversible.
         //
-        // A7/A7b (2026-11-23): this is now a HARD PREREQUISITE, not a logged
+        // A7/A7b (2026-11-23): this is a HARD PREREQUISITE, not a logged
         // best-effort. A rejected policy throws [PermissionPolicyException],
         // flushes the id, and skips `agent/init` below - the app never runs an
         // agent whose effective mode it cannot trust.
-        applyPermissionPolicy(id, yolo, permissionModeWire)
+        try {
+            applyPermissionPolicy(id, yolo, permissionModeWire)
+        } catch (c: CancellationException) {
+            // Cancellation is not a policy result: abort without leaving a
+            // workspace claim that a later operation could mistake for an
+            // attached, policy-confirmed workspace.
+            workspaceId = null
+            workspaceGeneration = null
+            lastAttachedAtMs = null
+            throw c
+        }
 
         // The lease is the ready marker. Set it ONLY after the policy is in
         // force: a fresh lease recorded before the apply would let a later

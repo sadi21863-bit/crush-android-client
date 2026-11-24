@@ -51,7 +51,7 @@ class WorkspacePermissionPolicyScenariosTest {
 
     /** Runs on the dispatcher thread before the response is produced. */
     @Volatile
-    private var onRequest: ((String) -> Unit)? = null
+    private var onRequest: ((Seen) -> Unit)? = null
 
     @Volatile
     private var policyEntered: CountDownLatch? = null
@@ -70,8 +70,9 @@ class WorkspacePermissionPolicyScenariosTest {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val path = request.path.orEmpty()
-                seen += Seen(request.method.orEmpty(), path, request.body.readUtf8())
-                onRequest?.invoke(path)
+                val entry = Seen(request.method.orEmpty(), path, request.body.readUtf8())
+                seen += entry
+                onRequest?.invoke(entry)
                 if (path.endsWith("/permissions/mode") || path.endsWith("/permissions/skip")) {
                     policyEntered?.countDown()
                     policyRelease?.await(5, TimeUnit.SECONDS)
@@ -302,8 +303,8 @@ class WorkspacePermissionPolicyScenariosTest {
     @Test
     fun `engine restart between policy and init invalidates the id before key use`() {
         val manager = WorkspaceManager(api)
-        onRequest = { path ->
-            if (path.endsWith("/permissions/mode")) {
+        onRequest = { request ->
+            if (request.path.endsWith("/permissions/mode")) {
                 // Simulate the supervisor announcing a new engine run after the
                 // policy was accepted but before agent/init.
                 WorkspaceManager.onEngineRestarted()
@@ -381,5 +382,66 @@ class WorkspacePermissionPolicyScenariosTest {
             "both opens must apply the policy; saw ${seen.map { it.path }}",
             seen.count { it.path.endsWith("/permissions/mode") } >= 2,
         )
+    }
+
+    @Test
+    fun `out-of-order ASK and YOLO apply the later intent last`() = runBlocking {
+        val askEntered = CountDownLatch(1)
+        val releaseAsk = CountDownLatch(1)
+        val yoloApplied = CountDownLatch(1)
+        val finalMode = java.util.concurrent.atomic.AtomicReference<String?>(null)
+        onRequest = { request ->
+            if (request.path.endsWith("/permissions/mode")) {
+                val mode = Regex("\"mode\"\\s*:\\s*\"([^\"]+)\"")
+                    .find(request.body)?.groupValues?.get(1)
+                if (mode == "normal") {
+                    askEntered.countDown()
+                    releaseAsk.await(5, TimeUnit.SECONDS)
+                }
+                finalMode.set(mode)
+                if (mode == "yolo") yoloApplied.countDown()
+            }
+        }
+
+        val managerAsk = WorkspaceManager(api)
+        val apiYolo = CrushApi(0, baseUrlOverride = server.url("/").toString().trimEnd('/'))
+        val managerYolo = WorkspaceManager(apiYolo)
+
+        try {
+            val ask = async(Dispatchers.IO) {
+                managerAsk.open("/data/tmp", "/data/tmp/state", yolo = false, permissionModeWire = "normal")
+            }
+            assertTrue(
+                "the ASK open must reach its policy request",
+                askEntered.await(5, TimeUnit.SECONDS),
+            )
+
+            val yolo = async(Dispatchers.IO) {
+                managerYolo.open("/data/tmp", "/data/tmp/state", yolo = true, permissionModeWire = "yolo")
+            }
+            val yoloBeforeRelease = yoloApplied.await(1, TimeUnit.SECONDS)
+
+            releaseAsk.countDown()
+            val askWorkspace = ask.await()
+            val yoloWorkspace = yolo.await()
+
+            assertFalse(
+                "the second manager must not apply while the first holds the path lock",
+                yoloBeforeRelease,
+            )
+            assertEquals(
+                "the later call's YOLO mode must be the final applied mode",
+                "yolo",
+                finalMode.get(),
+            )
+            assertEquals("ws-scenario", askWorkspace.id)
+            assertEquals("ws-scenario", yoloWorkspace.id)
+            assertEquals("ws-scenario", managerAsk.currentWorkspaceId)
+            assertEquals("ws-scenario", managerYolo.currentWorkspaceId)
+            assertFalse("no credentials on any open", hasKey())
+        } finally {
+            releaseAsk.countDown()
+            onRequest = null
+        }
     }
 }

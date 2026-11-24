@@ -276,6 +276,22 @@ existing policy class (4, now credential-asserting) and `WorkspaceLeaseTest`
 (14); focused 27/27 green and full gate 1059/115/0 (`v2-30-phaseD-gate.log`).
 No device, instrumented or TalkBack run covers Phase D.
 
+**V2-15 Phase D follow-up (2026-11-24, committed on
+`v2-15-lifecycle-hardening` as a follow-up to `6379165`).** Different-mode
+concurrent opens are reachable: `WorkspaceManager` instances are created per
+bootstrap, the `ChatViewModel.bootstrapping` guard is per instance, and a
+cleared ViewModel's blocking OkHttp policy call can outlive it while a
+replacement reads a changed mode. `WorkspaceManager.open()` now takes a
+companion per-path `Mutex` and holds it through create/policy/init, so the
+later call's ASK/YOLO mode is the final apply; `reattachIfStale()` uses the same
+path lock through `open()`. The out-of-order ASK/YOLO regression is the tenth
+scenario test; disabling the lock makes it fail at the serialization assertion
+(`v2-34-phaseD-serialization-mutation.log`), and the restored fix passes
+focused 28/28. The full gate is **1060 tests / 115 suites / 0 failures / 0
+errors / 0 skipped**, lint **0 errors / 1 pre-existing warning**
+(`v2-35-phaseD-serialization-gate.log`, 17m53s). No device or instrumented
+run covers this follow-up.
+
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no
 hypervisor driver (`emulator -accel-check`, code 6) and its only AVD is arm64;

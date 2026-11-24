@@ -4,8 +4,10 @@ Status: **verification complete, 2026-11-24.** Scope is the existing V2-13
 A7/A7b fail-closed implementation. One reproducible defect was found and
 narrowly corrected (a cancelled re-open could leave a fresh old lease covering
 an unconfirmed policy). No permission-policy redesign, no L1/L3 change, no Go
-engine or dependency change, no device claim from JVM tests. Phase D is
-committed on `v2-15-lifecycle-hardening` as a follow-up to `a1be361`; no PR or
+engine or dependency change, no device claim from JVM tests. Phase D was
+committed on `v2-15-lifecycle-hardening` as a follow-up to `a1be361`. A
+follow-up serializes different-mode concurrent opens per workspace path; it is
+committed on the same branch as a follow-up to `a1be361`/`6379165`. No PR or
 issue was made.
 
 ## 1. Verdict
@@ -20,13 +22,17 @@ issue was made.
 | A stale workspace id is not reused across engine generations | **Holds** | Scenario 8/9; `liveIdOrNull()` flushes on generation mismatch; `CrushSession.ensureAgentReady` returns “no workspace” before using the key |
 | Failed reattachment is not reported as success | **Holds** | Scenario 6: `reattachIfStale` returns false, id flushed; a later retry can recover |
 | Effective permission mode can be read back | **No trustworthy read-back exists** | §5; a 2xx apply remains the only proof |
-| Concurrent opens/reattaches are serialized | **Not serialized (documented limit)** | Scenario 10: same-mode overlapping opens converge; different-mode races are outside the single-bootstrap path and remain last-writer at the engine |
+| Concurrent opens/reattaches are serialized | **Holds per workspace path** | Scenario 10/10b: `open()` takes a companion `Mutex` keyed by path; the later call's ASK/YOLO mode is the final apply |
 
 ## 2. Implementation trace
 
 `WorkspaceManager.open()` (`WorkspaceManager.kt:193`) is the only path that
-creates/reattaches and applies the policy:
+creates/reattaches and applies the policy. The public method takes a
+companion-level `Mutex` keyed by workspace path, then runs `openLocked`:
 
+0. Acquire the per-path open lock (the follow-up correction). Managers are
+   created per bootstrap, so an instance lock would not serialize a cleared
+   ViewModel's in-flight request against its replacement.
 1. `POST /v1/workspaces` (`createWorkspace`). Nothing is committed until it
    returns.
 2. Commit `yoloMode`, `permissionModeWire`, `workspacePath`, `workspaceDataDir`,
@@ -76,6 +82,12 @@ path-keyed and records method/path/body in order. `agent/init` means
 | 9 | Generation change during reattach | create → mode → init on new generation; then bump + reject | live after success; flushed after rejection | yes on success; no on rejection | not sent | lease after success; none after rejection | recovery or named failure |
 | 10 | Concurrent opens (same mode) | two overlapping create → mode → init chains | final id live, current generation | twice | not sent | final lease set | both calls return the same workspace |
 
+Scenario 10b (`out-of-order ASK and YOLO apply the later intent last`) uses two
+managers and two API clients for the same path: ASK is held at the fake, YOLO
+is launched behind it. With the per-path lock YOLO cannot apply until ASK
+finishes, so the later call's YOLO mode is final; the mutation run without the
+lock failed exactly here.
+
 Credential **read** is source-inspected in `ChatViewModel`; the tests assert the
 wire requests (no `/config/provider-key` on any fail-closed path). The
 successful case asserts the first provider-key request comes after the policy
@@ -118,6 +130,38 @@ Why this is the right scope:
   reattach semantics are preserved.
 - No L1/L2/L3 file is touched.
 
+### 4b. Different-mode concurrent opens (follow-up)
+
+**Reachable.** Source-level ownership and lifecycle:
+
+- `ChatViewModel.bootstrap()` guards with an **instance** field
+  (`bootstrapping`, `ChatViewModel.kt:983`) and `doBootstrap()` constructs a
+  new `WorkspaceManager(api)` per boot (`:1239`); there is no process-wide
+  manager.
+- `onCleared()` (`:1890`) cancels `viewModelScope`, but `CrushApi` executes
+  blocking OkHttp calls inside `withContext(Dispatchers.IO)` (`CrushApi.kt:583-584`).
+  Cancellation does not un-send an already-issued policy request; a cleared
+  Activity's request can complete after its replacement starts.
+- The replacement reads the current persisted mode (`ChatViewModel.kt:1283`);
+  `SettingsViewModel.savePermissionMode` (`SettingsViewModel.kt:141-142`) can
+  change it between the two boots.
+- The engine keys a workspace by **path** (deterministic id from path,
+  `WorkspaceManager.kt:209-210`), so both managers target the same engine
+  workspace.
+
+The narrow fix is a companion `Mutex` per workspace path:
+`open()` takes `openLock(path).withLock { openLocked(...) }`. The first open
+holds the lock through create/policy/init; the second applies its mode after
+the first releases. A cancelled holder releases on cancellation; a slow
+in-flight request may delay the next open but cannot reorder the final policy.
+
+The regression is `out-of-order ASK and YOLO apply the later intent last`:
+two managers, two `CrushApi` clients, one ASK policy held at the fake, one
+YOLO open launched behind it. It asserts YOLO is not applied while ASK holds
+the lock and is the final applied mode. A mutation run with serialization
+disabled failed at exactly this assertion (`v2-34-phaseD-serialization-mutation.log`);
+the fix was restored byte-identically and the focused suite re-ran green.
+
 ## 5. Effective-mode read-back
 
 **No trustworthy read-back exists in the bindable protocol.**
@@ -146,12 +190,12 @@ the app relies on it.
   before the key/model are set (existing V2-13/V2-12 behaviour). On an engine
   restart between policy and init, that call targets the old id; the generation
   flush prevents any subsequent key use or turn, but the redundant call remains.
-- **Concurrent different-mode opens:** `WorkspaceManager` has no mutex. Two
-  overlapping same-mode opens converge (scenario 10), but a concurrent
-  ASK/AUTO pair would be last-writer at the engine and at the manager. The
-  production path uses one bootstrap/manager per ViewModel; this is documented
-  as a limit, not treated as a policy bypass (a rejected open still flushes and
-  cannot leave a confirmed claim).
+- **Per-path serialization cost:** the lock is held through create/policy/init.
+  A cancelled holder whose blocking HTTP call is still unwinding can delay the
+  next open until that call returns, but it cannot reorder the final mode. The
+  lock map is never evicted; it is bounded by the number of distinct workspace
+  paths (legacy + projects). Two engine instances that share one path also
+  serialize unnecessarily, which is harmless.
 - **No device verification:** all scenario evidence is JVM/MockWebServer. The
   v0.100.0 `/permissions/mode` route and a real engine restart were not
   re-exercised on `bbf8ca69` in this phase.
@@ -163,9 +207,12 @@ the app relies on it.
 
 | Run | Result |
 |---|---|
-| Focused A7/A7b (`v2-29-phaseD-focused3.log`) | **BUILD SUCCESSFUL in 44s**; **27 tests / 3 classes / 0 failures / 0 errors / 0 skipped**: `WorkspacePermissionPolicyScenariosTest` 9, `WorkspacePermissionPolicyTest` 4, `WorkspaceLeaseTest` 14. |
+| Focused A7/A7b, pre-serialization (`v2-29-phaseD-focused3.log`) | **BUILD SUCCESSFUL in 44s**; **27 tests / 3 classes / 0 failures**: scenarios 9, policy 4, lease 14. |
 | Pre-fix reproduction (`v2-26-phaseD-prefix.log`) | The cancellation test failed exactly as expected: `a cancelled open must not leave a usable workspace claim expected null, but was:<ws-scenario>`. The first transport fake used `DISCONNECT_AT_START` and did not surface an I/O failure, so that test was corrected to `DISCONNECT_AFTER_REQUEST`; that was a harness defect, not a product defect. |
-| Full JVM + compile + lint gate (`v2-30-phaseD-gate.log`) | **BUILD SUCCESSFUL in 18m12s**; **1059 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning**; `assembleDebug` and `assembleDebugAndroidTest` completed. |
+| Full gate before serialization (`v2-30-phaseD-gate.log`) | **BUILD SUCCESSFUL in 18m12s**; **1059 tests / 115 suites / 0 failures**; lint **0 errors / 1 pre-existing warning**. |
+| Focused A7/A7b + serialization (`v2-33-phaseD-serialization-focused2.log`) | **BUILD SUCCESSFUL in 2m57s**; **28 tests / 3 classes / 0 failures**: scenarios 10, policy 4, lease 14. |
+| Serialization mutation (`v2-34-phaseD-serialization-mutation.log`) | **FAILED as intended**: `out-of-order ASK and YOLO apply the later intent last` failed at `the second manager must not apply while the first holds the path lock`. The fix was restored byte-identically. |
+| Full gate after serialization (`v2-35-phaseD-serialization-gate.log`) | **BUILD SUCCESSFUL in 17m53s**; **1060 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning**; `assembleDebug` and `assembleDebugAndroidTest` completed. |
 
 The successful-policy case also pins ordering: `permissions/mode` is on the wire
 before the first `/config/provider-key` request; the rejection/transport/
@@ -174,10 +221,9 @@ cancellation cases pin that no provider-key request occurs at all.
 ## 8. Restrictions and state
 
 - No feature work, permission redesign, Go engine/dependency change, or L1/L2/L3
-  change. The only production change is the `WorkspaceManager.open()`
-  lease/cancellation correction above.
-- No commit, push, PR or issue.
-- Branch `v2-15-lifecycle-hardening` stands at `a1be361`; the Phase D changes
-  are committed on the same branch as a follow-up. Historical evidence is
-  untouched.
+  change. The only production change is `WorkspaceManager.open()`: the
+  lease/cancellation correction and the per-path open lock.
+- Phase D was committed on `v2-15-lifecycle-hardening` as `6379165` (follow-up
+  to `a1be361`). The serialization follow-up is committed on the same branch;
+  no PR or issue was made for it.
 - No device claim is made from JVM tests.

@@ -2,7 +2,10 @@ package com.crush.mobile.data.crush
 
 import com.crush.mobile.util.AppLog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A7/A7b (2026-11-23): the engine accepted the workspace but rejected the
@@ -65,6 +68,26 @@ class WorkspaceManager(private val api: CrushApi) {
     companion object {
         /** Bumped once per NEW engine run; monotonic, any thread, at any time. */
         private val engineGeneration = java.util.concurrent.atomic.AtomicLong(0L)
+
+        /**
+         * One open/attach mutex per workspace path.
+         *
+         * WorkspaceManager instances are created per bootstrap
+         * (`ChatViewModel.doBootstrap`), and the ViewModel's `bootstrapping`
+         * guard is per instance. A cleared Activity's blocking OkHttp policy
+         * request can therefore outlive its ViewModel while a new manager for
+         * the same path applies a different mode. The engine keys a workspace
+         * by PATH, so the path is the narrowest shared identity: serializing
+         * here orders policy applies even across distinct managers and APIs.
+         *
+         * Bounded by the number of distinct workspace paths on the install
+         * (legacy + projects); entries are deliberately never evicted because
+         * a path can be reopened for the life of the process.
+         */
+        private val openLocks = ConcurrentHashMap<String, Mutex>()
+
+        private fun openLock(path: String): Mutex =
+            openLocks.computeIfAbsent(path) { Mutex() }
 
         /**
          * Called by the DI wiring when a new engine run starts. Doing the bump
@@ -196,6 +219,18 @@ class WorkspaceManager(private val api: CrushApi) {
         dataDir: String,
         yolo: Boolean,
         permissionModeWire: String? = null,
+    ): Workspace = openLock(path).withLock {
+        openLocked(path, dataDir, yolo, permissionModeWire)
+    }
+
+    /**
+     * Implementation of [open]; the caller holds the per-path open lock.
+     */
+    private suspend fun openLocked(
+        path: String,
+        dataDir: String,
+        yolo: Boolean,
+        permissionModeWire: String?,
     ): Workspace {
         // P2-22: createWorkspace can legitimately throw (engine cold-boot,
         // mid-restart socket churn). NOTHING below this line runs until it

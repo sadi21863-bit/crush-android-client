@@ -1,8 +1,10 @@
 # V2-15 Phase C — engine budget and lifecycle validation
 
 Status: **investigation + deterministic JVM tests + device stop/PSS capture,
-2026-11-24.** No runtime eviction, no Go engine/dependency change, no commit.
-L1/L2/L3 stay as accepted. Instrumented execution was **NOT PERFORMED**; the
+2026-11-24.** No runtime eviction, no Go engine/dependency change. The batch is
+committed as `1990118` on `v2-15-lifecycle-hardening` (pushed, not merged); the
+post-push L2 terminal-cleanup correction is committed on the same branch. L1/L2/L3 stay as
+accepted. Instrumented execution was **NOT PERFORMED**; the
 device PSS and post-stop census are recorded in
 `V2-15-RUNTIME-RETENTION-MEASUREMENTS.md` §6 (1 project child + legacy; a
 3-child sample was not reachable through ordinary navigation).
@@ -132,6 +134,7 @@ V2-15.
 | Focused Phase C, second pass (all four classes) | one new registry test failed on its own model (it reserved a restart while the supervisor still reported terminal `Failed`); the container, lifecycle and registry suites otherwise passed. The test was corrected to model the supervisor's `Starting` repaint; no production defect. |
 | Focused Phase C, registry final | **26/26 green in 2m27s** (`v2-15-phasec-focused3.log`) |
 | Full gate (JVM, compile, lint) | **BUILD SUCCESSFUL in 10m25s**; **1049 tests / 113 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-21-phasec-gate-final.log`). `v2-20-phasec-gate.log` executed tests+assemble but was interrupted mid-lint; the final run reused those up-to-date results and completed lint. |
+| Post-push correction full gate | **BUILD SUCCESSFUL in 33m01s**; **1050 tests / 114 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-23-fix-gate.log`). |
 
 ## 6. Remaining limits
 

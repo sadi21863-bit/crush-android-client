@@ -126,8 +126,21 @@ class CrushEngine(
 
     private val logBuffer = StringBuilder()
 
+    /**
+     * Spawn seam (V2-15 post-push audit): production is
+     * `ProcessBuilder.start()`. A test can inject a thrower to exercise the
+     * terminal exec-failure path AFTER the egress bridge has started, without
+     * a real arm64 child. The rest of the birth block (env, proxy vars) still
+     * runs unchanged.
+     */
+    internal var processStarter: (ProcessBuilder) -> Process = { it.start() }
+
     val binaryPath: String get() = paths.binary.absolutePath
     val isBinaryUsable: Boolean get() = paths.isBinaryUsable
+
+    /** Test seam: whether the egress bridge currently holds a live listener. */
+    internal val isEgressProxyRunningForTest: Boolean
+        get() = egressBridge.isRunning
 
     /** True if we already own a live process. Guards against double-start. */
     fun isAlive(): Boolean = process?.isAlive == true
@@ -177,6 +190,12 @@ class CrushEngine(
      * Starts `crush server` and suspends until it serves HTTP over the Unix
      * domain socket. Returns [EngineState.Running] or [EngineState.Failed].
      * Never throws.
+     *
+     * Lifecycle ownership: the egress bridge is deliberately left up across
+     * RETRYABLE failures so the next attempt can reuse it. A terminal failure
+     * (or an owner abandoning the engine) must call [stopBlocking], which is
+     * null-safe and releases the bridge even when no child was assigned.
+     * [EngineSupervisor] does exactly that at its terminal branch.
      *
      * Re-entrant: if an engine is already running, returns the current state
      * instead of spawning a second engine.
@@ -398,28 +417,30 @@ class CrushEngine(
                 }
                 Log.i(TAG, "exec: ${cmd.joinToString(" ") { redactAppPriv(it) }}")
                 try {
-                    ProcessBuilder(cmd).apply {
-                        environment().putAll(paths.env())
-                        // Route ALL engine egress through the loopback bridge: the
-                        // engine's Go http honours these vars (stdlib
-                        // ProxyFromEnvironment), so it never resolves a hostname
-                        // itself and never depends on the broken Android DNS
-                        // fallback. NO_PROXY keeps loopback targets out of the
-                        // bridge so nothing can loop into itself. The bridge only
-                        // relays: TLS stays end-to-end engine<->provider.
-                        if (egressBridge.port > 0) {
-                            val proxyUrl = "http://127.0.0.1:${egressBridge.port}"
-                            with(environment()) {
-                                this["HTTPS_PROXY"] = proxyUrl
-                                this["https_proxy"] = proxyUrl
-                                this["HTTP_PROXY"] = proxyUrl
-                                this["http_proxy"] = proxyUrl
-                                this["NO_PROXY"] = "127.0.0.1,localhost,::1"
-                                this["no_proxy"] = "127.0.0.1,localhost,::1"
+                    processStarter(
+                        ProcessBuilder(cmd).apply {
+                            environment().putAll(paths.env())
+                            // Route ALL engine egress through the loopback bridge: the
+                            // engine's Go http honours these vars (stdlib
+                            // ProxyFromEnvironment), so it never resolves a hostname
+                            // itself and never depends on the broken Android DNS
+                            // fallback. NO_PROXY keeps loopback targets out of the
+                            // bridge so nothing can loop into itself. The bridge only
+                            // relays: TLS stays end-to-end engine<->provider.
+                            if (egressBridge.port > 0) {
+                                val proxyUrl = "http://127.0.0.1:${egressBridge.port}"
+                                with(environment()) {
+                                    this["HTTPS_PROXY"] = proxyUrl
+                                    this["https_proxy"] = proxyUrl
+                                    this["HTTP_PROXY"] = proxyUrl
+                                    this["http_proxy"] = proxyUrl
+                                    this["NO_PROXY"] = "127.0.0.1,localhost,::1"
+                                    this["no_proxy"] = "127.0.0.1,localhost,::1"
+                                }
                             }
+                            redirectErrorStream(true)
                         }
-                        redirectErrorStream(true)
-                    }.start().also { process = it }
+                    ).also { process = it }
                 } catch (e: IOException) {
                     Log.e(TAG, "exec failed", e)
                     return@withContext EngineState.Failed(

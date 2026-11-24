@@ -454,6 +454,17 @@ class EngineSupervisor(
                         // Report through the same state the caller would have
                         // seen; only the retry promise flips, so the UI shows
                         // a terminal error instead of an eternal spinner.
+                        //
+                        // V2-15 post-push audit: a terminal start failure owns
+                        // the whole attempt's resources. `stopBlocking()` is
+                        // null-safe, so it still closes the egress bridge when
+                        // exec failed before a child was ever assigned (the
+                        // exact case the old path leaked), and it also cleans
+                        // the bridge left up by retryable attempts whose
+                        // budget just ran out. This mirrors the watchdog and
+                        // wedge terminal paths above; it runs BEFORE the
+                        // terminal state is published.
+                        engine.stopBlocking()
                         _state.value = if (result.willRetry) result.copy(willRetry = false) else result
                         return
                     }

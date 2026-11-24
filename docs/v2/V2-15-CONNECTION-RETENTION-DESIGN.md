@@ -5,7 +5,9 @@ weak-tombstone recommendation after the adversarial review. Production changes
 are limited to `ConnectionRegistry` and `ChatViewModel`; the 15 existing
 registry cases were retained/adapted and 10 adversarial cases added. Focused
 suite 25 green; full gate **1040 tests / 111 suites / 0 failures**, lint 0
-errors / 1 pre-existing warning (`v2-19-l3-gate.log`). No commit.
+errors / 1 pre-existing warning (`v2-19-l3-gate.log`). Committed with the V2-15
+batch as `1990118` on `v2-15-lifecycle-hardening` (pushed, not merged to
+`main`).
 
 ## 0. Review and implementation verdict
 
@@ -258,7 +260,10 @@ that VM still needs it.
 capture and its two uses are source-inspected, not unit-tested. No device,
 instrumented or TalkBack run covers L3. L1/L2's previously recorded evidence
 gaps (container-level shutdown mapping; real spawned-engine timeout after proxy
-startup) remain unchanged. No commit or push was made.
+startup) remain unchanged. The V2-15 batch is committed as `1990118` on
+`v2-15-lifecycle-hardening` (pushed, not merged to `main`); the later L2
+terminal-startup correction is recorded in
+`V2-15-POST-PUSH-AUDIT-CORRECTION.md`.
 
 The implementation changed two production files and one test file; no
 dependency, engine, workflow or unrelated UI change was made.

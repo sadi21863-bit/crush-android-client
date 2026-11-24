@@ -1,9 +1,12 @@
 # V2-15 integration report
 
-Status: **implementation + Phase C validation, uncommitted, 2026-11-24.** No
-commit, push, PR, issue, tag, Go-engine change or dependency change. Device
-PSS/stop census was performed on `bbf8ca69` (1 project child + legacy); a
-3-child sample, instrumented execution and TalkBack remain **NOT PERFORMED**.
+Status: **implementation + Phase C validation + post-push L2 correction,
+2026-11-24.** The initial batch is committed and pushed as `1990118` on
+`v2-15-lifecycle-hardening` (not merged into `main`); the L2 terminal-startup
+correction is committed on the same branch as a follow-up to `1990118`. No
+merge, PR, issue or tag; no Go-engine or dependency change. Device PSS/stop
+census was performed on `bbf8ca69` (1 project child + legacy); a 3-child
+sample, instrumented execution and TalkBack remain **NOT PERFORMED**.
 
 This report ties the V2-15 batches together:
 
@@ -21,15 +24,15 @@ This report ties the V2-15 batches together:
 | File | Change |
 |---|---|
 | `di/AppContainer.kt` | L1 `ShutdownPlan` + `buildShutdownPlan()`; `shutdown()` now returns the completed stop count (same one-shot behavior; the only caller ignores the value) |
-| `engine/CrushEngine.kt` | L2 `stopBlocking()` always runs child and proxy teardown through `runEngineStop`; proxy stop is failure-isolated from child stop |
+| `engine/CrushEngine.kt` | L2 `stopBlocking()` always runs child and proxy teardown through `runEngineStop`; proxy stop is failure-isolated from child stop. Post-push: test-only `processStarter`/`isEgressProxyRunningForTest` seams and the `start()` ownership KDoc; production default unchanged. |
 | `engine/EngineProxy.kt` | L2 one cancellable `CoroutineScope` per start; `stop()` cancels it and clears relays; a restart gets a fresh scope |
 | `data/crush/ConnectionRegistry.kt` | L3 `isSuperseded(key, ownerEpoch)` reads only the live `entries[key]`; `registrationKey` deleted; test-only retained-count seam |
 | `ui/screens/chat/ChatViewModel.kt` | L3 `registeredConnectionKey` captured at successful attach; stale check and `onCleared` use it, never the mutable `instanceKey` |
-| `engine/EngineSupervisor.kt` | L4 test-only `hasActiveSupervisionForTest()` seam (no behavior change) |
+| `engine/EngineSupervisor.kt` | L4 test-only `hasActiveSupervisionForTest()` seam; post-push L2 correction calls `stopBlocking()` in the terminal `Failed` branch before publishing the state |
 
-No other production file changed. The L1/L2/L3 behavior is unchanged by Phase C;
-its only production edit is the `Int` return from `shutdown()`, which does not
-alter the stop sequence.
+No other production file changed. Phase C itself added only the `Int` return
+from `shutdown()`; the post-push correction adds the terminal `stopBlocking()`
+call. L1 and L3 behaviour is unchanged.
 
 ## 2. What each finding now guarantees
 
@@ -44,7 +47,13 @@ stop still stops the proxy, a throwing proxy stop does not undo the child stop,
 and both are attempted; `CrushEngineLifecycleTest` (1) pins stop-before-start and
 repeat stop; `EngineProxyConnectTest` (+2) pins stop/restart and a fresh scope
 after cancellation. `EngineProxy.stop()` now cancels the per-start scope, so L6
-is closed at the scope level.
+is closed at the scope level. **Post-push correction:** the supervisor's
+terminal `Failed` branch did not call `stopBlocking()`, so an exec failure after
+the bridge started (`process == null`) leaked the listener/scope; the branch now
+calls it before publishing the terminal state (`EngineSupervisor.kt:467`).
+`EngineTerminalStartupCleanupTest` (1) drives the real
+`CrushEngine.start()` → `supervise()` → terminal path and fails if that line is
+removed.
 
 **L3 — connection retention.** `ConnectionRegistryTest` (25 = 15 retained/adapted
 + 10 adversarial) pins: newer owner supersedes, own registration does not,
@@ -82,6 +91,7 @@ works.
 | `ConnectionRegistryTest` | 25 | L3; 15 prior cases retained/adapted, 10 adversarial |
 | `EngineInstanceRegistryTest` | 26 | 19 prior + 7 Phase C (repeated start, stop-during-STARTING, stop/start race, stale RUNNING, own restart, ten-racer barrier, 50 projects) |
 | `EngineRuntimeLifecycleTest` | 1 | Phase C, no active loop/child after stop |
+| `EngineTerminalStartupCleanupTest` | 1 | Post-push L2: real exec failure → supervisor terminal → bridge released |
 | `AppContainerShutdownTest` | 1 | Phase C/D, container mapping + one-shot count |
 
 No test was removed or weakened in this batch.
@@ -95,7 +105,9 @@ No test was removed or weakened in this batch.
 | L3 full gate | **BUILD SUCCESSFUL in 30m01s**; **1040 tests / 111 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-19-l3-gate.log`) |
 | Focused Phase C, first pass | BUILD SUCCESSFUL in 17m18s (`v2-15-phasec-focused.log`) |
 | Focused Phase C, registry final | 26/26 green in 2m27s (`v2-15-phasec-focused3.log`) |
+| Post-push L2 correction, focused | **BUILD SUCCESSFUL in 8m06s**; **10 tests / 5 classes / 0 failures / 0 errors / 0 skipped** (`v2-22-fix-focused2.log`) |
 | Full gate after Phase C | **BUILD SUCCESSFUL in 10m25s** (95 tasks, 1 executed / 94 up-to-date); **1049 tests / 113 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-21-phasec-gate-final.log`) |
+| Post-push correction full gate | **BUILD SUCCESSFUL in 33m01s**; **1050 tests / 114 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-23-fix-gate.log`) |
 
 The full gate runs `:app:testDebugUnitTest :app:assembleDebug
 :app:assembleDebugAndroidTest :app:lintRelease`.
@@ -106,6 +118,9 @@ run (`v2-21-phasec-gate-final.log`) reused those up-to-date test/assemble
 outputs, re-ran lint to completion and reported the totals above. Test counts
 were re-read from the 113 `TEST-*.xml` files; lint counts from
 `app/build/reports/lint-results-release.xml` (1 warning, 0 errors).
+
+Correction details, including the `containerScope` review and the start/stop
+concurrency analysis, are in `docs/v2/V2-15-POST-PUSH-AUDIT-CORRECTION.md`.
 
 ## 5. Device evidence (2026-11-24)
 
@@ -140,7 +155,8 @@ override.
 | Gap | Status | Why |
 |---|---|---|
 | `registeredConnectionKey` unit test | not added | no JVM `ChatViewModel` harness; construction pulls Keystore/DataStore and the capture is a single field. Source-inspected: set at attach, used by the only stale check and `onCleared`; no mutable-binding use. |
-| L2 real spawned-engine timeout after proxy startup | not added | JVM cannot execute the bundled arm64 engine; cleanup mechanics are pinned by the stop helper and proxy tests. |
+| L2 real spawned-engine timeout after proxy startup | not added | JVM cannot execute the bundled arm64 engine; cleanup mechanics are pinned by the stop helper, the proxy tests and the injected-spawn terminal test. |
+| L2 terminal cleanup with a real exec failure | covered by injection | `EngineTerminalStartupCleanupTest` injects the `IOException` at the production `processStarter` point after the real bridge starts; a real arm64 exec failure remains device-only. |
 | Device PSS + post-stop census | **performed** | `bbf8ca69`, debug build, 1 legacy + 1 project child; see §5 and `docs/parity/v2-15-device/`. |
 | 3-child PSS | NOT PERFORMED | ordinary switching stops the outgoing non-legacy engine; needs the run-in-flight/handoff path or a budget override (separate experiment). |
 | Thread census after stop | NOT PERFORMED | child/socket census performed; thread count per process was not sampled. |
@@ -150,8 +166,11 @@ override.
 
 - No runtime eviction, `removeStopped(key)` or LRU added.
 - No Go engine, dependency, workflow or unrelated UI change.
-- No commit/push/PR/issue/tag.
-- All uncommitted L1/L2/L3 work and the three V2-15 reports are preserved.
-- No historical record was rewritten; the Phase C reports state what was and was
-  not executed.
+- The initial V2-15 batch was committed and pushed to
+  `v2-15-lifecycle-hardening` as `1990118` on owner instruction; it is not
+  merged into `main`, and no PR or issue was created. The post-push correction
+  is committed on the same branch as a follow-up.
+- All V2-15 reports, test evidence and implementation changes are preserved.
+- No historical record was rewritten; the Phase C and correction reports state
+  what was and was not executed.
 - No device claim is made from JVM tests.

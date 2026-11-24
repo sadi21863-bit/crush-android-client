@@ -1,5 +1,8 @@
 package com.crush.mobile.ui.screens.chat
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -156,6 +159,52 @@ class QuestionDialogTest {
 
         compose.onNodeWithTag("question-submit").assertIsNotEnabled()
         compose.onNodeWithTag("question-cancel").assertIsEnabled()
+        assertTrue(actions.isEmpty())
+    }
+
+    @Test
+    fun `a replacement batch starts with no selection from the old batch`() {
+        val actions = mutableListOf<ChatAction>()
+        var question by mutableStateOf(
+            QuestionView("batch-1", "First", batch(single()))
+        )
+        compose.setContent {
+            ChatContent(
+                state = ChatFixtures.view(question = question),
+                onAction = { actions += it },
+                pendingTrust = null,
+                onTrustConfirm = {},
+                onTrustDismiss = {},
+            )
+        }
+
+        compose.onNodeWithText("A.kt").performClick()
+        compose.onNodeWithTag("question-submit").assertIsEnabled()
+
+        compose.runOnIdle {
+            question = QuestionView(
+                "batch-2",
+                "Second",
+                AskBatch(
+                    batchId = "batch-2",
+                    prompts = listOf(
+                        AskPrompt(
+                            id = "q1",
+                            kind = AskKind.SINGLE_CHOICE,
+                            text = "Second?",
+                            choices = listOf(
+                                AskChoice("c3", "C.kt"),
+                                AskChoice("c4", "D.kt"),
+                            ),
+                        )
+                    ),
+                ),
+            )
+        }
+        compose.waitForIdle()
+
+        // The old A.kt selection must not satisfy the new batch's q1.
+        compose.onNodeWithTag("question-submit").assertIsNotEnabled()
         assertTrue(actions.isEmpty())
     }
 }

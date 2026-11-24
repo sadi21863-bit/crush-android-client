@@ -2,7 +2,8 @@
 
 Status: **implementation + Phase C validation + post-push L2 correction +
 Phase D permission-policy verification + Phase D serialization follow-up +
-reattach fast-path follow-up, 2026-11-24.** The initial batch is
+reattach fast-path follow-up + Phase E question-answering verification,
+2026-11-24.** The initial batch is
 committed and pushed as `1990118` on
 `v2-15-lifecycle-hardening` (not merged into `main`); the L2 terminal-startup
 correction is committed on the same branch as a follow-up to `1990118`. No
@@ -96,6 +97,7 @@ works.
 | `EngineRuntimeLifecycleTest` | 1 | Phase C, no active loop/child after stop |
 | `EngineTerminalStartupCleanupTest` | 1 | Post-push L2: real exec failure → supervisor terminal → bridge released |
 | `WorkspacePermissionPolicyScenariosTest` | 11 | Phase D: transport, cancellation, retry, restart/generation, serialization/concurrency, reattach fast path; credential-order assertions |
+| `QuestionDialogTest` | +1 | Phase E: a replacement batch starts with no selection from the old batch |
 | `AppContainerShutdownTest` | 1 | Phase C/D, container mapping + one-shot count |
 
 No test was removed or weakened in this batch.
@@ -118,6 +120,7 @@ No test was removed or weakened in this batch.
 | Phase D serialization full gate | **BUILD SUCCESSFUL in 17m53s**; **1060 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-35-phaseD-serialization-gate.log`) |
 | Phase D reattach fast-path focused | **BUILD SUCCESSFUL in 50m43s** (Gradle tooling stall; tests green); **29 tests / 3 classes / 0 failures** (`v2-36-reattach-focused.log`) |
 | Phase D reattach fast-path full gate | **BUILD SUCCESSFUL in 16m26s**; **1061 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-38-reattach-gate.log`) |
+| Phase E question-answering focused | **BUILD SUCCESSFUL in 1m16s**; **38 tests / 4 classes / 0 failures / 0 errors / 0 skipped** (`v2-42-phaseE-focused-final.log`); no production change, so the full gate was not rerun |
 
 The full gate runs `:app:testDebugUnitTest :app:assembleDebug
 :app:assembleDebugAndroidTest :app:lintRelease`.
@@ -173,6 +176,9 @@ override.
 | Instrumented / TalkBack | NOT PERFORMED | no instrumented run or TalkBack session in this phase. |
 | Effective permission-mode read-back | **does not exist** | the spec exposes `yolo`/`skip` booleans, not the v0.100.0 mode enum; a 2xx apply remains the only proof (Phase D §5). |
 | Phase D device validation | NOT PERFORMED | the Phase D scenario matrix is JVM/MockWebServer; no device re-run of `/permissions/mode` or engine restart. |
+| Question batch lifecycle (E1/E2) | **open risk** | Phase E: a stale answer success can clear a newer batch; duplicate Submit/Cancel is not gated. Source-inspected; no `ChatViewModel` JVM harness; not fixed in verification. |
+| Question answer read-back | **does not exist** | a 2xx on `/questions/answer` is the only proof the engine accepted the ids. |
+| Question device/Compose coverage | NOT PERFORMED | Phase E focused tests are JVM/Robolectric; no device, TalkBack or API 30+ run. |
 
 ## 7. Phase D — permission-policy verification (2026-11-24)
 
@@ -221,7 +227,40 @@ Tests: `WorkspacePermissionPolicyScenariosTest` (11 new), the existing
 `WorkspacePermissionPolicyTest` (4, now also asserting no provider-key request),
 and `WorkspaceLeaseTest` (14). The full gate result is in §4.
 
-## 8. Restrictions honored
+## 8. Phase E — question-answering verification (2026-11-24)
+
+The A12 question-answering implementation was verified against its parser,
+dialog, wire and lifecycle contracts. Full detail is in
+`docs/v2/V2-15-QUESTION-ANSWERING-VERIFICATION.md`.
+
+- Parser: four question kinds, `options` alias, caps, missing ids, unknown
+  types and choice-less prompts are pinned by 8 tests; malformed batches keep
+  the cancel-only fallback.
+- Dialog: 7 Compose tests cover single/multi/yes-no, Submit gating, Cancel,
+  UNKNOWN and batch replacement; the new case proves a replacement batch
+  inherits no old selection.
+- Wire: 4 builder tests pin batch/question ids, selected ids, free-text
+  trim/omission and `yes = false`.
+- Focused run: **38 tests / 4 classes / 0 failures** (1m16s,
+  `v2-42-phaseE-focused-final.log`). No production change, so the full gate was
+  not rerun; the latest full gate (`v2-38-reattach-gate.log`) is 1061/115/0 and
+  predates the new UI test.
+
+Open findings (not fixed in this verification phase):
+
+- **E1:** a stale `submitQuestion`/`resolveQuestion` success clears
+  `pendingQuestion` unconditionally; a newer batch arriving during the POST can
+  be dropped.
+- **E2:** Submit/Cancel are not marked in flight; duplicate taps can launch two
+  POSTs and race a replacement batch.
+- **E3:** question ownership is engine-side (`current-session` scoping);
+  `PendingQuestion` carries no `session_id`/`tool_call_id`, and the
+  fire-and-forget report falls back to workspace broadcast.
+- **E4:** a pending question has no engine-generation identity; after a restart
+  the old dialog can remain until an answer/cancel fails or the user cancels.
+- No answer read-back, no process-death persistence, no device/TalkBack run.
+
+## 9. Restrictions honored
 
 - No runtime eviction, `removeStopped(key)` or LRU added.
 - No Go engine, dependency, workflow or unrelated UI change.
@@ -231,7 +270,8 @@ and `WorkspaceLeaseTest` (14). The full gate result is in §4.
   is committed on the same branch as a follow-up. Phase D is committed on the
   same branch; no PR or issue was created for it. The serialization follow-up
   is committed as `3a261e6`. The reattach fast-path follow-up is committed on
-  the same branch.
+  the same branch. Phase E adds only the batch-replacement test and reports;
+  it is committed on the same branch.
 - All V2-15 reports, test evidence and implementation changes are preserved.
 - No historical record was rewritten; the Phase C and correction reports state
   what was and was not executed.

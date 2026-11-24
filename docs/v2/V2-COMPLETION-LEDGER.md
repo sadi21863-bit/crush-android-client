@@ -138,6 +138,11 @@ tracked; the gate logs cited in §4 sit at the repo root and are not.
   `/config/provider-key` request on rejection. The full gate ran **1059 tests /
   115 suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1
   pre-existing warning** (`v2-30-phaseD-gate.log`, 2026-11-24, 18m12s).
+- V2-15 Phase E (question-answering verification) adds 1 `@Test` method:
+  `QuestionDialogTest` 6 → 7 (replacement batch inherits no old selection).
+  Focused A12 run: **38 tests / 4 classes / 0 failures** (`v2-42-phaseE-focused-final.log`,
+  1m16s). No production change, so the full gate was not rerun; the latest
+  1061-test gate predates the new test.
 - Instrumented: 6 classes / 15 `@Test` methods exist under `app/src/androidTest`;
   only `SecureKeyStoreInstrumentedTest` (3 tests) has a stored device run.
 - `:app:assembleDebugAndroidTest` compiles the test APK in every gate. Compiling
@@ -310,6 +315,23 @@ the final mode is YOLO; with the fast path mutation it fails at
 115 suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1
 pre-existing warning** (`v2-38-reattach-gate.log`, 16m26s). No device or
 instrumented run covers this follow-up.
+
+**V2-15 Phase E (2026-11-24, committed on `v2-15-lifecycle-hardening` as a
+follow-up to `878afa9`).** A12 question answering was
+verified against its parser, dialog, wire and lifecycle contracts. Parser (8),
+dialog (7, including a replacement batch that inherits no old selection), wire
+builder (4) and the view-state projection (19) ran focused: **38 tests / 4
+classes / 0 failures** (`v2-42-phaseE-focused-final.log`, 1m16s). No production
+change was made, so the full gate was not rerun; the latest 1061-test gate
+predates the new UI test. Open source-inspected findings: E1, a stale
+`submitQuestion`/`resolveQuestion` success clears `pendingQuestion`
+unconditionally and can drop a newer batch; E2, Submit/Cancel have no
+in-flight guard and duplicate taps can race; E3, ownership relies on the
+engine's current-session scoping because `PendingQuestion` carries no
+session/run identity; E4, a pending question has no engine-generation identity
+across restart. No answer read-back, no process-death persistence, no
+device/TalkBack run. Detail:
+`docs/v2/V2-15-QUESTION-ANSWERING-VERIFICATION.md`.
 
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no

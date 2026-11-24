@@ -7,6 +7,10 @@ TalkBack run. Findings E1/E2 below are source-inspected lifecycle risks, not
 fixed in this phase. Phase E is committed on `v2-15-lifecycle-hardening` as a
 follow-up to `878afa9`; no PR or issue was made.
 
+> **Post-verification remediation (2026-11-24):** E1/E2/E5 were fixed after
+> this report. See `V2-15-QUESTION-ANSWERING-REMEDIATION.md`. The open E1/E2
+> findings below are the pre-remediation record and are retained as history.
+
 ## 1. Verdict
 
 | Contract | Verdict | Evidence |

@@ -119,6 +119,70 @@ object QuestionBatchParser {
 }
 
 /**
+ * V2-15 Phase E remediation (E5): validates a submission against the parsed
+ * batch before any operation is claimed or HTTP request issued.
+ *
+ * The UI already builds drafts from parsed ids, but the ViewModel must not
+ * trust that alone. Every expected prompt id must appear exactly once; no
+ * unexpected/duplicate ids; choice ids must belong to their prompt; and the
+ * answer shape must match the prompt kind. `yes = false` is a valid answer.
+ *
+ * @return null when valid, otherwise a user-visible error.
+ */
+internal object QuestionAnswerValidator {
+    private const val NOMATCH =
+        "That answer does not match the question. Nothing was sent."
+
+    fun validate(batch: AskBatch, answers: List<AskAnswerDraft>): String? {
+        if (answers.size != batch.prompts.size) {
+            return "Answer every question before submitting."
+        }
+        val promptIds = batch.prompts.map { it.id }
+        if (promptIds.distinct().size != promptIds.size) return NOMATCH
+        if (promptIds.any { it.isBlank() }) return NOMATCH
+
+        val byId = LinkedHashMap<String, AskAnswerDraft>()
+        for (answer in answers) {
+            if (answer.promptId.isBlank() || byId.put(answer.promptId, answer) != null) {
+                return NOMATCH
+            }
+        }
+        if (byId.keys != promptIds.toSet()) return NOMATCH
+
+        for (prompt in batch.prompts) {
+            val answer = byId.getValue(prompt.id)
+            val choiceIds = prompt.choices.map { it.id }
+            if (choiceIds.distinct().size != choiceIds.size) return NOMATCH
+            val allowed = choiceIds.toSet()
+            val hasText = answer.fillInText?.isNotBlank() == true
+
+            val shapeOk = when (prompt.kind) {
+                AskKind.YES_NO ->
+                    answer.yes != null && answer.selectedIds.isEmpty() && !hasText
+                AskKind.SINGLE_CHOICE ->
+                    answer.yes == null &&
+                        !hasText &&
+                        answer.selectedIds.size == 1 &&
+                        allowed.contains(answer.selectedIds.single())
+                AskKind.MULTI_CHOICE ->
+                    answer.yes == null &&
+                        !hasText &&
+                        answer.selectedIds.isNotEmpty() &&
+                        answer.selectedIds.distinct().size == answer.selectedIds.size &&
+                        allowed.containsAll(answer.selectedIds)
+                AskKind.FREE_TEXT ->
+                    answer.yes == null &&
+                        answer.selectedIds.isEmpty() &&
+                        !answer.fillInText.isNullOrBlank()
+                AskKind.UNKNOWN -> false
+            }
+            if (!shapeOk) return NOMATCH
+        }
+        return null
+    }
+}
+
+/**
  * A12: the exact wire body for `POST /questions/answer`.
  *
  * Pure and separated from the ViewModel so the mapping (including the

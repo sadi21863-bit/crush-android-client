@@ -250,6 +250,8 @@ data class QuestionView(
     val id: String,
     val title: String,
     val batch: AskBatch? = null,
+    /** Non-null while Submit/Cancel is in flight; both buttons are disabled. */
+    val operation: QuestionOperation? = null,
 )
 
 data class HandoffView(
@@ -363,6 +365,7 @@ fun ChatUiState.toViewState(inputs: ChatHostInputs): ChatViewState {
                     id = question.id,
                     title = question.displayTitle(),
                     batch = question.batch,
+                    operation = questionOperation,
                 )
             },
             questionError = questionError,

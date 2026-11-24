@@ -2,8 +2,8 @@
 
 Status: **implementation + Phase C validation + post-push L2 correction +
 Phase D permission-policy verification + Phase D serialization follow-up +
-reattach fast-path follow-up + Phase E question-answering verification,
-2026-11-24.** The initial batch is
+reattach fast-path follow-up + Phase E question-answering verification +
+A12 lifecycle remediation, 2026-11-24.** The initial batch is
 committed and pushed as `1990118` on
 `v2-15-lifecycle-hardening` (not merged into `main`); the L2 terminal-startup
 correction is committed on the same branch as a follow-up to `1990118`. No
@@ -97,7 +97,9 @@ works.
 | `EngineRuntimeLifecycleTest` | 1 | Phase C, no active loop/child after stop |
 | `EngineTerminalStartupCleanupTest` | 1 | Post-push L2: real exec failure → supervisor terminal → bridge released |
 | `WorkspacePermissionPolicyScenariosTest` | 11 | Phase D: transport, cancellation, retry, restart/generation, serialization/concurrency, reattach fast path; credential-order assertions |
-| `QuestionDialogTest` | +1 | Phase E: a replacement batch starts with no selection from the old batch |
+| `QuestionDialogTest` | +3 | Phase E: replacement batch resets draft; in-flight Submit/Cancel disabled; new batch does not inherit operation state |
+| `QuestionOperationControllerTest` | 12 | E1/E2: stale completion identity, duplicate Submit/Cancel, mutual exclusion, retries, cancellation, new-batch concurrency |
+| `QuestionAnswerValidatorTest` | 7 | E5: ids exactly once, choice ownership, prompt-kind shape, `yes = false`, UNKNOWN rejected |
 | `AppContainerShutdownTest` | 1 | Phase C/D, container mapping + one-shot count |
 
 No test was removed or weakened in this batch.
@@ -121,6 +123,8 @@ No test was removed or weakened in this batch.
 | Phase D reattach fast-path focused | **BUILD SUCCESSFUL in 50m43s** (Gradle tooling stall; tests green); **29 tests / 3 classes / 0 failures** (`v2-36-reattach-focused.log`) |
 | Phase D reattach fast-path full gate | **BUILD SUCCESSFUL in 16m26s**; **1061 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-38-reattach-gate.log`) |
 | Phase E question-answering focused | **BUILD SUCCESSFUL in 1m16s**; **38 tests / 4 classes / 0 failures / 0 errors / 0 skipped** (`v2-42-phaseE-focused-final.log`); no production change, so the full gate was not rerun |
+| Phase E remediation focused | **BUILD SUCCESSFUL in 2m48s**; **59 tests / 6 classes / 0 failures** (`v2-49-phaseE-remediation-focused-final.log`) |
+| Phase E remediation full gate | **BUILD SUCCESSFUL in 22m29s**; **1083 tests / 117 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-50-phaseE-remediation-gate.log`) |
 
 The full gate runs `:app:testDebugUnitTest :app:assembleDebug
 :app:assembleDebugAndroidTest :app:lintRelease`.
@@ -176,7 +180,9 @@ override.
 | Instrumented / TalkBack | NOT PERFORMED | no instrumented run or TalkBack session in this phase. |
 | Effective permission-mode read-back | **does not exist** | the spec exposes `yolo`/`skip` booleans, not the v0.100.0 mode enum; a 2xx apply remains the only proof (Phase D §5). |
 | Phase D device validation | NOT PERFORMED | the Phase D scenario matrix is JVM/MockWebServer; no device re-run of `/permissions/mode` or engine restart. |
-| Question batch lifecycle (E1/E2) | **open risk** | Phase E: a stale answer success can clear a newer batch; duplicate Submit/Cancel is not gated. Source-inspected; no `ChatViewModel` JVM harness; not fixed in verification. |
+| Question lifecycle E1/E2 | **fixed** | `QuestionOperationController`: identity-checked completion and synchronous per-identity claim; stale completions cannot clear/overwrite a newer batch, duplicate Submit/Cancel is prevented |
+| Question answer validation E5 | **fixed** | `QuestionAnswerValidator` rejects duplicate/unexpected prompt ids, foreign choice ids, wrong prompt-kind shape and UNKNOWN before any claim/HTTP; `yes = false` preserved |
+| Question lifecycle E3/E4 | **deferred** | app-side session/run ownership and engine-generation identity for pending questions remain documented limitations; process-death persistence is not implemented |
 | Question answer read-back | **does not exist** | a 2xx on `/questions/answer` is the only proof the engine accepted the ids. |
 | Question device/Compose coverage | NOT PERFORMED | Phase E focused tests are JVM/Robolectric; no device, TalkBack or API 30+ run. |
 
@@ -246,13 +252,21 @@ dialog, wire and lifecycle contracts. Full detail is in
   not rerun; the latest full gate (`v2-38-reattach-gate.log`) is 1061/115/0 and
   predates the new UI test.
 
-Open findings (not fixed in this verification phase):
+**Remediation (2026-11-24, committed on the same branch as a follow-up to
+`9af99c1`).** E1 and E2 are fixed at the
+question-operation lifecycle boundary. `QuestionOperationController` captures
+the exact batch identity, claims synchronously, keys the guard by identity,
+checks identity before every clear/error/operation write, and releases in
+`finally`; `QuestionAnswerValidator` rejects malformed answers before any
+claim/HTTP (E5). The dialog disables Submit and Cancel while an operation is in
+flight. Focused remediation: **59 tests / 6 classes / 0 failures** (2m48s);
+mutations removing identity protection and the operation guard failed as
+intended; full gate **1083/117/0**, lint 0/1, 22m29s
+(`v2-50-phaseE-remediation-gate.log`). Detail:
+`docs/v2/V2-15-QUESTION-ANSWERING-REMEDIATION.md`.
 
-- **E1:** a stale `submitQuestion`/`resolveQuestion` success clears
-  `pendingQuestion` unconditionally; a newer batch arriving during the POST can
-  be dropped.
-- **E2:** Submit/Cancel are not marked in flight; duplicate taps can launch two
-  POSTs and race a replacement batch.
+Deferred findings (still not fixed):
+
 - **E3:** question ownership is engine-side (`current-session` scoping);
   `PendingQuestion` carries no `session_id`/`tool_call_id`, and the
   fire-and-forget report falls back to workspace broadcast.
@@ -271,7 +285,8 @@ Open findings (not fixed in this verification phase):
   same branch; no PR or issue was created for it. The serialization follow-up
   is committed as `3a261e6`. The reattach fast-path follow-up is committed on
   the same branch. Phase E adds only the batch-replacement test and reports;
-  it is committed on the same branch.
+  it is committed on the same branch. The E1/E2/E5 remediation is committed on
+  the same branch.
 - All V2-15 reports, test evidence and implementation changes are preserved.
 - No historical record was rewritten; the Phase C and correction reports state
   what was and was not executed.

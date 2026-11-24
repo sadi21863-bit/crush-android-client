@@ -446,6 +446,8 @@ val selectedModel: String = "",
     val pendingQuestion: PendingQuestion? = null,
     /** A12: a failed answer POST, shown in the still-open question dialog. */
     val questionError: String? = null,
+    /** Phase E remediation: the in-flight Submit/Cancel for the current batch. */
+    val questionOperation: QuestionOperation? = null,
     /** Sessions in the current workspace, newest first. See SessionList. */
     val sessions: List<Session> = emptyList(),
     val sessionsLoading: Boolean = false,
@@ -640,6 +642,53 @@ class ChatViewModel(
 
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
+
+    /**
+     * Phase E remediation: the sole Submit/Cancel lifecycle gate. Claims are
+     * synchronous (see [claimQuestionOperation]), so a double tap cannot enqueue
+     * two POSTs. Callbacks are identity-checked again at the state boundary.
+     */
+    private val questionOps = QuestionOperationController(
+        current = {
+            _state.value.pendingQuestion?.let { q ->
+                QuestionRef(q.id, q.batch?.batchId)
+            }
+        },
+        onOperation = { ref, operation ->
+            _state.update { st ->
+                if (questionMatches(ref, st)) st.copy(questionOperation = operation) else st
+            }
+        },
+        onError = { ref, message ->
+            _state.update { st ->
+                if (questionMatches(ref, st)) st.copy(questionError = message) else st
+            }
+        },
+        onClear = { ref ->
+            _state.update { st ->
+                if (questionMatches(ref, st)) {
+                    st.copy(
+                        pendingQuestion = null,
+                        questionError = null,
+                        questionOperation = null,
+                    )
+                } else {
+                    st
+                }
+            }
+        },
+    )
+
+    private fun questionMatches(ref: QuestionRef, st: ChatUiState): Boolean =
+        st.pendingQuestion?.let { q ->
+            q.id == ref.questionId && q.batch?.batchId == ref.batchId
+        } == true
+
+    private fun claimQuestionOperation(
+        ref: QuestionRef,
+        operation: QuestionOperation,
+    ): QuestionOperationLease? =
+        questionOps.claim(ref, operation)
 
     /**
      * S4: the sheet's surface label - what pool the CURRENT binding hosts
@@ -2668,95 +2717,93 @@ class ChatViewModel(
      */
     fun resolveQuestion() {
         val q = _state.value.pendingQuestion ?: return
-        val mgr = workspaces ?: return
-        val p = port ?: return
-        viewModelScope.launch {
-            // Mirror resolvePermission: the dialog stays open until the POST
-            // resolves, so a failed release cannot silently strand the run.
-            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
-                AppLog.w(TAG, "question release aborted: could not re-attach; dialog kept open")
-                _state.update {
-                    it.copy(questionError = "Could not reach the engine. The question is still open.")
+        val ref = QuestionRef(q.id, q.batch?.batchId)
+        val lease = claimQuestionOperation(ref, QuestionOperation.CANCEL) ?: return
+        val mgr = workspaces
+        val p = port
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            questionOps.execute(lease) {
+                val manager = mgr ?: return@execute "No workspace is attached. The question is still open."
+                val portNow = p ?: return@execute "No workspace is attached. The question is still open."
+                // Mirror resolvePermission: the dialog stays open until the POST
+                // resolves, so a failed release cannot silently strand the run.
+                if (!runCatching { manager.reattachIfStale() }.getOrDefault(false)) {
+                    AppLog.w(TAG, "question release aborted: could not re-attach; dialog kept open")
+                    return@execute "Could not reach the engine. The question is still open."
                 }
-                return@launch
+                val ws = manager.currentWorkspaceId ?: run {
+                    AppLog.w(TAG, "question release aborted: no workspace attached; dialog kept open")
+                    return@execute "No workspace is attached. The question is still open."
+                }
+                val confirmed = runCatching { crushApi(portNow).cancelQuestions(ws) }
+                    .onFailure {
+                        AppLog.w(TAG, "question cancel failed: ${it.message}; dialog kept open")
+                    }
+                    .isSuccess
+                if (!confirmed) {
+                    return@execute "Could not cancel the question. Try again."
+                }
+                AppLog.i(
+                    TAG,
+                    "question batch ${q.id.take(12)} cancelled; agent released without an answer"
+                )
+                null
             }
-            val ws = mgr.currentWorkspaceId ?: run {
-                AppLog.w(TAG, "question release aborted: no workspace attached; dialog kept open")
-                _state.update {
-                    it.copy(questionError = "No workspace is attached. The question is still open.")
-                }
-                return@launch
-            }
-            val confirmed = runCatching { crushApi(p).cancelQuestions(ws) }
-                .onFailure {
-                    AppLog.w(TAG, "question cancel failed: ${it.message}; dialog kept open")
-                }
-                .isSuccess
-            if (!confirmed) {
-                _state.update {
-                    it.copy(questionError = "Could not cancel the question. Try again.")
-                }
-                return@launch
-            }
-            AppLog.i(
-                TAG,
-                "question batch ${q.id.take(12)} cancelled; agent released without an answer"
-            )
-            _state.update { it.copy(pendingQuestion = null, questionError = null) }
         }
     }
 
     /**
      * A12: sends the user's choices for every prompt in the open batch.
      *
-     * The UI builds [AskAnswerDraft] only from parsed choices, so this never
-     * invents an id. A failed POST keeps the batch and the dialog open with a
-     * visible error; success clears both. The engine resumes the blocked turn
-     * itself once the batch is resolved.
+     * E5: the submission is validated against the parsed batch before an
+     * operation is claimed or HTTP is issued. E2: the claim is synchronous, so
+     * two taps cannot enqueue two POSTs; Cancel is mutually exclusive with
+     * Submit for the same batch. E1: [QuestionOperationController] clears or
+     * reports only when the displayed batch still has the claimed identity.
      */
     fun submitQuestion(answers: List<AskAnswerDraft>) {
         val q = _state.value.pendingQuestion ?: return
         val batch = q.batch ?: return
-        if (answers.size != batch.prompts.size) {
-            _state.update {
-                it.copy(questionError = "Answer every question before submitting.")
+        val ref = QuestionRef(q.id, batch.batchId)
+
+        val invalid = QuestionAnswerValidator.validate(batch, answers)
+        if (invalid != null) {
+            _state.update { st ->
+                if (questionMatches(ref, st)) st.copy(questionError = invalid) else st
             }
             return
         }
-        val mgr = workspaces ?: return
-        val p = port ?: return
-        viewModelScope.launch {
-            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
-                AppLog.w(TAG, "question answer aborted: could not re-attach; dialog kept open")
-                _state.update {
-                    it.copy(questionError = "Could not reach the engine. The question is still open.")
+
+        val lease = claimQuestionOperation(ref, QuestionOperation.SUBMIT) ?: return
+        val mgr = workspaces
+        val p = port
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            questionOps.execute(lease) {
+                val manager = mgr ?: return@execute "No workspace is attached. The question is still open."
+                val portNow = p ?: return@execute "No workspace is attached. The question is still open."
+                if (!runCatching { manager.reattachIfStale() }.getOrDefault(false)) {
+                    AppLog.w(TAG, "question answer aborted: could not re-attach; dialog kept open")
+                    return@execute "Could not reach the engine. The question is still open."
                 }
-                return@launch
+                val ws = manager.currentWorkspaceId ?: run {
+                    AppLog.w(TAG, "question answer aborted: no workspace attached; dialog kept open")
+                    return@execute "No workspace is attached. The question is still open."
+                }
+                val payload = QuestionAnswerBuilder.build(
+                    batchId = batch.batchId.ifBlank { q.id },
+                    answers = answers,
+                )
+                val sent = runCatching { crushApi(portNow).answerQuestions(ws, payload) }
+                    .onFailure {
+                        AppLog.w(TAG, "question answer failed: ${it.message}; dialog kept open")
+                    }
+                    .isSuccess
+                if (!sent) {
+                    return@execute "Could not send the answer. The question is still open."
+                }
+                AppLog.i(TAG, "question batch ${batch.batchId.take(12)} answered (${answers.size} responses)")
+                null
             }
-            val ws = mgr.currentWorkspaceId ?: run {
-                AppLog.w(TAG, "question answer aborted: no workspace attached; dialog kept open")
-                _state.update {
-                    it.copy(questionError = "No workspace is attached. The question is still open.")
-                }
-                return@launch
-            }
-            val payload = QuestionAnswerBuilder.build(
-                batchId = batch.batchId.ifBlank { q.id },
-                answers = answers,
-            )
-            val sent = runCatching { crushApi(p).answerQuestions(ws, payload) }
-                .onFailure {
-                    AppLog.w(TAG, "question answer failed: ${it.message}; dialog kept open")
-                }
-                .isSuccess
-            if (!sent) {
-                _state.update {
-                    it.copy(questionError = "Could not send the answer. The question is still open.")
-                }
-                return@launch
-            }
-            AppLog.i(TAG, "question batch ${batch.batchId.take(12)} answered (${answers.size} responses)")
-            _state.update { it.copy(pendingQuestion = null, questionError = null) }
         }
     }
 
@@ -4628,7 +4675,13 @@ class ChatViewModel(
                                     batch = parsed,
                                 )
                                 AppLog.i(TAG, "question batch requested (raw ${ev.body})")
-                                _state.update { it.copy(pendingQuestion = q, questionError = null) }
+                                _state.update {
+                                    it.copy(
+                                        pendingQuestion = q,
+                                        questionError = null,
+                                        questionOperation = null,
+                                    )
+                                }
                             }
 
                             CrushEvent.PayloadType.RUN_COMPLETE -> {

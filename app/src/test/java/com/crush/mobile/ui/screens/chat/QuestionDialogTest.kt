@@ -207,4 +207,89 @@ class QuestionDialogTest {
         compose.onNodeWithTag("question-submit").assertIsNotEnabled()
         assertTrue(actions.isEmpty())
     }
+
+    @Test
+    fun `operations in flight disable submit and cancel`() {
+        val actions = mutableListOf<ChatAction>()
+        var question by mutableStateOf(
+            QuestionView("batch-1", "First", batch(single()))
+        )
+        compose.setContent {
+            ChatContent(
+                state = ChatFixtures.view(question = question),
+                onAction = { actions += it },
+                pendingTrust = null,
+                onTrustConfirm = {},
+                onTrustDismiss = {},
+            )
+        }
+
+        compose.onNodeWithText("A.kt").performClick()
+        compose.onNodeWithTag("question-submit").assertIsEnabled()
+
+        compose.runOnIdle {
+            question = question.copy(operation = QuestionOperation.SUBMIT)
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("question-submit").assertIsNotEnabled()
+        compose.onNodeWithTag("question-cancel").assertIsNotEnabled()
+
+        compose.runOnIdle {
+            question = question.copy(operation = QuestionOperation.CANCEL)
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("question-submit").assertIsNotEnabled()
+        compose.onNodeWithTag("question-cancel").assertIsNotEnabled()
+        assertTrue(actions.isEmpty())
+    }
+
+    @Test
+    fun `a new batch does not inherit an in-flight operation`() {
+        val actions = mutableListOf<ChatAction>()
+        var question by mutableStateOf(
+            QuestionView(
+                "batch-1",
+                "First",
+                batch(single()),
+                operation = QuestionOperation.SUBMIT,
+            )
+        )
+        compose.setContent {
+            ChatContent(
+                state = ChatFixtures.view(question = question),
+                onAction = { actions += it },
+                pendingTrust = null,
+                onTrustConfirm = {},
+                onTrustDismiss = {},
+            )
+        }
+
+        compose.runOnIdle {
+            question = QuestionView(
+                "batch-2",
+                "Second",
+                AskBatch(
+                    batchId = "batch-2",
+                    prompts = listOf(
+                        AskPrompt(
+                            id = "q1",
+                            kind = AskKind.SINGLE_CHOICE,
+                            text = "Second?",
+                            choices = listOf(
+                                AskChoice("c3", "C.kt"),
+                                AskChoice("c4", "D.kt"),
+                            ),
+                        )
+                    ),
+                ),
+                operation = null,
+            )
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithText("C.kt").performClick()
+        compose.onNodeWithTag("question-submit").assertIsEnabled()
+        compose.onNodeWithTag("question-cancel").assertIsEnabled()
+        assertTrue(actions.isEmpty())
+    }
 }

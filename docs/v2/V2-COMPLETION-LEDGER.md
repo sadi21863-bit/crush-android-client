@@ -143,6 +143,12 @@ tracked; the gate logs cited in §4 sit at the repo root and are not.
   Focused A12 run: **38 tests / 4 classes / 0 failures** (`v2-42-phaseE-focused-final.log`,
   1m16s). No production change, so the full gate was not rerun; the latest
   1061-test gate predates the new test.
+- V2-15 Phase E remediation (A12 E1/E2/E5) adds 21 `@Test` methods:
+  `QuestionOperationControllerTest` 12, `QuestionAnswerValidatorTest` 7,
+  `QuestionDialogTest` +2 (9 total). Focused **59 tests / 6 classes / 0
+  failures** in 2m48s; full gate **1083 tests / 117 suites / 0 failures / 0
+  errors / 0 skipped**, lint **0 errors / 1 pre-existing warning** in 22m29s
+  (`v2-50-phaseE-remediation-gate.log`).
 - Instrumented: 6 classes / 15 `@Test` methods exist under `app/src/androidTest`;
   only `SecureKeyStoreInstrumentedTest` (3 tests) has a stored device run.
 - `:app:assembleDebugAndroidTest` compiles the test APK in every gate. Compiling
@@ -332,6 +338,26 @@ session/run identity; E4, a pending question has no engine-generation identity
 across restart. No answer read-back, no process-death persistence, no
 device/TalkBack run. Detail:
 `docs/v2/V2-15-QUESTION-ANSWERING-VERIFICATION.md`.
+
+**V2-15 Phase E remediation (2026-11-24, committed on
+`v2-15-lifecycle-hardening` as a follow-up to `9af99c1`).** E1/E2 are fixed at
+the question-operation boundary: `QuestionOperationController` captures the
+exact `(questionId, batchId)`, claims synchronously, keys the in-flight guard by
+that identity, and only clears/errors/clears-operation when the displayed
+batch still matches; a token prevents an old completion from releasing a newer
+guard. `ChatViewModel` claims before launching, uses `UNDISPATCHED` so the
+`finally` is entered, exposes `SUBMIT`/`CANCEL`, and resets the operation state
+on a new question. E5 is enforced by `QuestionAnswerValidator` before any claim
+or HTTP (expected ids exactly once, no duplicates/unexpected ids, choice
+ownership, prompt-kind shape; `yes = false` valid; UNKNOWN rejected). The
+dialog disables both buttons while in flight. Focused **59 tests / 6 classes /
+0 failures** in 2m48s; mutation of identity protection failed the stale-batch
+tests and mutation of the guard failed the duplicate/mutual-exclusion tests
+(`v2-47`/`v2-48`). Full gate **1083 tests / 117 suites / 0 failures / 0 errors
+/ 0 skipped**, lint **0 errors / 1 pre-existing warning** in 22m29s
+(`v2-50-phaseE-remediation-gate.log`). E3/E4, process-death persistence, answer
+read-back and device/TalkBack remain deferred. Detail:
+`docs/v2/V2-15-QUESTION-ANSWERING-REMEDIATION.md`.
 
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no

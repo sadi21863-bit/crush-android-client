@@ -75,6 +75,7 @@ internal fun AnswerQuestionDialog(
     }
 
     val ready = batch.prompts.all { draftFor(it) != null }
+    val busy = view.operation != null
 
     AlertDialog(
         onDismissRequest = onCancel,
@@ -208,7 +209,7 @@ internal fun AnswerQuestionDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = ready,
+                enabled = ready && !busy,
                 onClick = {
                     onSubmit(batch.prompts.mapNotNull { draftFor(it) })
                 },
@@ -217,6 +218,7 @@ internal fun AnswerQuestionDialog(
         },
         dismissButton = {
             TextButton(
+                enabled = !busy,
                 onClick = onCancel,
                 modifier = Modifier.testTag("question-cancel")
             ) { Text("Cancel") }

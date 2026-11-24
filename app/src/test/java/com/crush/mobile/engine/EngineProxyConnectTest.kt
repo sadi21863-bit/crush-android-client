@@ -1,6 +1,7 @@
 package com.crush.mobile.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.BufferedReader
@@ -119,5 +120,47 @@ class EngineProxyConnectTest {
         } finally {
             proxy.stop()
         }
+    }
+
+    @Test(timeout = 15_000)
+    fun `stop before start and repeated stop are safe`() {
+        val proxy = EngineProxy(resolver = { null }, log = {})
+        assertFalse(proxy.isRunning)
+        proxy.stop()
+        proxy.stop()
+        assertFalse("stop must not manufacture a listener", proxy.isRunning)
+    }
+
+    @Test(timeout = 15_000)
+    fun `restart after stop gets a fresh live accept loop`() {
+        val proxy = EngineProxy(resolver = { null }, log = {})
+        assertTrue(proxy.start())
+        val firstPort = proxy.port
+        proxy.stop()
+        assertFalse("stop closes the first listener", proxy.isRunning)
+
+        // A cancelled old scope must not be reused: this new accept loop is the
+        // proof that start() built a fresh scope and listener.
+        assertTrue("restart must bind", proxy.start())
+        assertTrue(proxy.port in 1024..65535)
+        var client: Socket? = null
+        try {
+            client = Socket(InetAddress.getLoopbackAddress(), proxy.port)
+            client.getOutputStream().apply {
+                write("CONNECT dead.test:443 HTTP/1.1\r\n\r\n".toByteArray(Charsets.US_ASCII))
+                flush()
+            }
+            val reader = BufferedReader(
+                InputStreamReader(client.getInputStream(), Charsets.US_ASCII)
+            )
+            assertEquals("HTTP/1.1 502 Bad Gateway", reader.readLine())
+        } finally {
+            runCatching { client?.close() }
+            proxy.stop()
+        }
+        assertFalse("the restarted listener stops cleanly", proxy.isRunning)
+        // The old port is informational, not an identity guarantee (the OS may
+        // reuse it); the live handshake above is the actual assertion.
+        assertTrue(firstPort in 1024..65535)
     }
 }

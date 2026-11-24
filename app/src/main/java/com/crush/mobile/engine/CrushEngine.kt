@@ -537,16 +537,22 @@ class CrushEngine(
         val proc = process
         process = null
         cachedVersion = ""
-        if (proc == null) return
-        runCatching {
-            proc.destroy()
-            if (!proc.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
-                proc.destroyForcibly()
+        // Child teardown and proxy teardown are separate steps. The helper
+        // proves a throwing child stop cannot skip the proxy, and a proxy
+        // failure cannot undo the child stop. stop() is idempotent.
+        val childStop: (() -> Unit)? = proc?.let { p ->
+            {
+                p.destroy()
+                if (!p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+                    p.destroyForcibly()
+                }
             }
-        }.onFailure { Log.w(TAG, "stop failed", it) }
-        // The child is gone, so the bridge has no more peers; a later
-        // start() brings it back up (idempotent).
-        egressBridge.stop()
+        }
+        runEngineStop(
+            child = childStop,
+            proxy = { egressBridge.stop() },
+            onFailure = { what, failure -> Log.w(TAG, "stop $what failed", failure) },
+        )
     }
 
     @Volatile
@@ -672,4 +678,31 @@ internal fun chatPolicyGate(result: ChatPolicyResult): ChatPolicyDecision = when
     is ChatPolicyResult.PolicyInstalled -> ChatPolicyDecision.Proceed
     is ChatPolicyResult.AlreadyVerified -> ChatPolicyDecision.Proceed
     is ChatPolicyResult.PolicyFailure -> ChatPolicyDecision.FailFast(result.reason)
+}
+
+/**
+ * V2-15 L2: runs the two independent teardown steps in a fixed order.
+ *
+ * A child teardown exception must not skip the proxy stop, and a proxy stop
+ * exception must not undo the child stop. Both failures are reported and the
+ * remaining step always runs. Pure/top-level so a plain JVM test can prove the
+ * intermediate-throw cleanup without spawning an engine.
+ *
+ * @return how many steps completed successfully (0..2).
+ */
+internal fun runEngineStop(
+    child: (() -> Unit)?,
+    proxy: () -> Unit,
+    onFailure: (String, Throwable) -> Unit,
+): Int {
+    var completed = 0
+    child?.let { stop ->
+        runCatching { stop() }
+            .onSuccess { completed++ }
+            .onFailure { onFailure("child", it) }
+    }
+    runCatching { proxy() }
+        .onSuccess { completed++ }
+        .onFailure { onFailure("proxy", it) }
+    return completed
 }

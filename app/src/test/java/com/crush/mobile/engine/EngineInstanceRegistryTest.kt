@@ -402,4 +402,232 @@ class EngineInstanceRegistryTest {
         assertEquals("every registered key is visited exactly once", 2, count)
         assertEquals("visited keys are the registered keys", setOf("p1", "p2"), visited.toSet())
     }
+
+    // ------------------------------------------------------------------
+    // Phase C: budget/lifecycle transitions
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `repeated start requests for one key keep one reservation`() {
+        val t = bed()
+        t.registry.runtimeFor("p1") { FakeRuntime("p1") }
+        t.registry.runtimeFor("p2") { FakeRuntime("p2") }
+        t.registry.runtimeFor("p3") { FakeRuntime("p3") }
+
+        assertNull(t.registry.requestStart("p1"))
+        assertNull("a repeated request reuses its own slot", t.registry.requestStart("p1"))
+        assertEquals(
+            EngineInstanceRegistry.Grain.STARTING,
+            t.registry.inspect().single { it.key == "p1" }.grain
+        )
+        assertNull(
+            "the second key can still use the remaining slot",
+            t.registry.requestStart("p2")
+        )
+        val refusal = t.registry.requestStart("p3")
+        assertTrue("the repeated request must not double-count p1", refusal != null)
+        assertTrue(refusal!!.contains("2/2"))
+    }
+
+    @Test
+    fun `stop during STARTING releases the reservation`() {
+        val t = bed()
+        t.registry.runtimeFor("p1") { FakeRuntime("p1") }
+        t.registry.runtimeFor("p2") { FakeRuntime("p2") }
+        t.registry.runtimeFor("p3") { FakeRuntime("p3") }
+
+        assertNull(t.registry.requestStart("p1"))
+        assertNull(t.registry.requestStart("p2"))
+        assertTrue("both reservations fill the budget", t.registry.requestStart("p3") != null)
+
+        assertTrue(t.registry.stop("p1", "project removed during startup"))
+        assertEquals(
+            EngineInstanceRegistry.Grain.STOPPED,
+            t.registry.inspect().single { it.key == "p1" }.grain
+        )
+        assertNull(
+            "the released slot is usable again",
+            t.registry.requestStart("p3")
+        )
+    }
+
+    @Test
+    fun `stop racing requestStart for one key leaves a coherent budget`() {
+        val reg = EngineInstanceRegistry<FakeRuntime>(
+            maxLiveNonLegacy = 1,
+            legacyKey = "",
+            livenessOf = { rt -> EngineInstanceRegistry.Liveness(rt.childAlive, rt.state) },
+            stopRuntime = { it.stopped = true },
+        )
+        reg.runtimeFor("p1") { FakeRuntime("p1") }
+        reg.runtimeFor("p2") { FakeRuntime("p2") }
+
+        val gate = CyclicBarrier(2)
+        val errors = java.util.Collections.synchronizedList(mutableListOf<Throwable>())
+        val start = Thread({
+            runCatching {
+                gate.await()
+                reg.requestStart("p1")
+            }.onFailure { errors += it }
+        }, "phase-c-start")
+        val stop = Thread({
+            runCatching {
+                gate.await()
+                reg.stop("p1", "phase-c stop race")
+            }.onFailure { errors += it }
+        }, "phase-c-stop")
+        start.start()
+        stop.start()
+        start.join(5_000)
+        stop.join(5_000)
+
+        assertTrue("no thread threw: $errors", errors.isEmpty())
+        assertFalse("both finished", start.isAlive || stop.isAlive)
+        val grain = reg.inspect().single { it.key == "p1" }.grain
+        assertTrue(
+            "the race may leave a reservation or a stop, never an impossible grain: $grain",
+            grain == EngineInstanceRegistry.Grain.STARTING ||
+                grain == EngineInstanceRegistry.Grain.STOPPED
+        )
+        if (grain == EngineInstanceRegistry.Grain.STARTING) {
+            assertTrue(
+                "a final reservation must still hold the only slot",
+                reg.requestStart("p2") != null
+            )
+        } else {
+            assertNull(
+                "a final stop must free the only slot",
+                reg.requestStart("p2")
+            )
+        }
+    }
+
+    @Test
+    fun `a stale RUNNING grain after terminal failure does not consume a slot`() {
+        val reg = EngineInstanceRegistry<FakeRuntime>(
+            maxLiveNonLegacy = 1,
+            legacyKey = "",
+            livenessOf = { rt -> EngineInstanceRegistry.Liveness(rt.childAlive, rt.state) },
+            stopRuntime = {},
+        )
+        val p1 = reg.runtimeFor("p1") { FakeRuntime("p1") }
+        reg.recordRunning("p1")
+        assertEquals(EngineInstanceRegistry.Grain.RUNNING, reg.inspect().single().grain)
+
+        // The supervisor gives up after a start: no live child, terminal state.
+        p1.state = EngineState.Failed("engine died", "terminal", willRetry = false)
+
+        val p2 = reg.runtimeFor("p2") { FakeRuntime("p2") }
+        assertNull(
+            "only STARTING/live children count; a stale RUNNING grain must not burn the slot",
+            reg.requestStart("p2")
+        )
+        assertEquals(
+            "the grain is bookkeeping, not liveness",
+            EngineInstanceRegistry.Grain.RUNNING,
+            reg.inspect().single { it.key == "p1" }.grain
+        )
+        assertEquals(2, reg.inspect().size)
+    }
+
+    @Test
+    fun `a terminal failure does not block the key's own restart`() {
+        val reg = EngineInstanceRegistry<FakeRuntime>(
+            maxLiveNonLegacy = 2,
+            legacyKey = "",
+            livenessOf = { rt -> EngineInstanceRegistry.Liveness(rt.childAlive, rt.state) },
+            stopRuntime = {},
+        )
+        val p1 = reg.runtimeFor("p1") { FakeRuntime("p1") }
+        assertNull(reg.requestStart("p1"))
+        reg.recordRunning("p1")
+        p1.state = EngineState.Failed("died after running", null, willRetry = false)
+
+        reg.runtimeFor("p2") { FakeRuntime("p2") }
+        assertNull("the freed slot is available to another key", reg.requestStart("p2"))
+        // A real restart calls requestEngineStart and then supervisor.start();
+        // start() repaints Starting (EngineSupervisor.kt:233-235) before it
+        // spawns, which is what makes the reservation count again.
+        p1.state = EngineState.Starting(1)
+        assertNull(
+            "the failed key may restart itself: its own dead child is not counted against it",
+            reg.requestStart("p1")
+        )
+        assertEquals(
+            "a restart repaints the owner's reservation",
+            EngineInstanceRegistry.Grain.STARTING,
+            reg.inspect().single { it.key == "p1" }.grain
+        )
+        assertTrue(
+            "two reservations fill a budget of two",
+            reg.requestStart("p3") != null
+        )
+    }
+
+    @Test
+    fun `ten simultaneous starts for ten keys admit exactly the two slots`() {
+        val reg = EngineInstanceRegistry<FakeRuntime>(
+            maxLiveNonLegacy = 2,
+            legacyKey = "",
+            livenessOf = { rt -> EngineInstanceRegistry.Liveness(rt.childAlive, rt.state) },
+            stopRuntime = { it.stopped = true },
+        )
+        val keys = (1..10).map { "p$it" }
+        keys.forEach { key -> reg.runtimeFor(key) { FakeRuntime(key) } }
+
+        val gate = CyclicBarrier(keys.size)
+        val results = ConcurrentHashMap<String, GateResult>()
+        val errors = java.util.Collections.synchronizedList(mutableListOf<Throwable>())
+        val threads = keys.map { key ->
+            Thread({
+                runCatching {
+                    gate.await()
+                    val refusal = reg.requestStart(key)
+                    results[key] = GateResult(refusal == null, refusal)
+                }.onFailure { errors += it }
+            }, "phase-c-many-$key")
+        }
+        threads.forEach { it.start() }
+        threads.forEach { it.join(10_000) }
+
+        assertTrue("no racer threw: $errors", errors.isEmpty())
+        assertFalse("every racer finished", threads.any { it.isAlive })
+        assertEquals("every racer recorded an outcome", keys.size, results.size)
+        val accepted = results.filterValues { it.accepted }.keys
+        assertEquals("exactly the two slots may be reserved", 2, accepted.size)
+        assertEquals(
+            "the two accepted keys are the two STARTING grains",
+            2,
+            reg.inspect().count { it.grain == EngineInstanceRegistry.Grain.STARTING }
+        )
+        results.filterValues { !it.accepted }.values.forEach { result ->
+            assertTrue(
+                "a refusal names the budget: ${result.refusal}",
+                result.refusal!!.contains("2/2")
+            )
+        }
+    }
+
+    @Test
+    fun `fifty distinct projects stay registered with one stopped node each`() {
+        val t = bed()
+        val keys = (1..50).map { "p$it" }
+        keys.forEach { key -> t.registry.runtimeFor(key) { FakeRuntime(key) } }
+
+        keys.forEach { key -> assertTrue(t.registry.stop(key, "phase-c stress")) }
+
+        val snapshots = t.registry.inspect()
+        assertEquals("no eviction: one node per distinct project", 50, snapshots.size)
+        assertTrue(
+            "every node is stopped bookkeeping, not a live child",
+            snapshots.all { it.grain == EngineInstanceRegistry.Grain.STOPPED }
+        )
+        assertTrue(
+            "the stop reached every fake runtime",
+            snapshots.all { it.runtime.stopped }
+        )
+        var fannedOut = 0
+        t.registry.forEachRuntime { fannedOut++ }
+        assertEquals("tuning still reaches all 50 stopped nodes", 50, fannedOut)
+    }
 }

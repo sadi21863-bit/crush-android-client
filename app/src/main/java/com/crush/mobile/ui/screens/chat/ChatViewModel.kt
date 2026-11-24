@@ -899,6 +899,18 @@ class ChatViewModel(
     private val connectionOwnerEpoch: Long = container.connectionRegistry.nextOwnerEpoch()
 
     /**
+     * L3 (2026-11-24): the instance key THIS VM's event connection was
+     * REGISTERED under - the latest successful attach (a VM owns one event
+     * connection at a time; a rebind replaces it, and the container revokes
+     * the previous key on the switch). Captured beside the attach and never
+     * re-derived from the mutable [instanceKey], so the stale check and
+     * [onCleared] ask about the key the registry actually holds for this VM,
+     * not the binding the screen shows now.
+     */
+    @Volatile
+    private var registeredConnectionKey: String? = null
+
+    /**
      * Set once when the registry says this VM's connection was superseded for
      * its key (Gate-7 §3 reclaim). A stale VM logs ONE line and gives up
      * observing permanently - its back-stack entry is gone and it must never
@@ -1749,11 +1761,14 @@ class ChatViewModel(
         // reconnect ladder - the container's revoke or a newer VM's
         // attach already owns the key. Stop, log once, observe never again.
         if (reclaimedBySupersession) return
-        if (container.connectionRegistry.isSuperseded(connectionOwnerEpoch, eventConnection)) {
+        val registeredKey = registeredConnectionKey
+        if (registeredKey != null &&
+            container.connectionRegistry.isSuperseded(registeredKey, connectionOwnerEpoch)
+        ) {
             reclaimedBySupersession = true
             AppLog.i(
                 TAG,
-                "event connection superseded for instance '$instanceKey'; stale observer retires, " +
+                "event connection superseded for instance '$registeredKey'; stale observer retires, " +
                     "no reconnect retries"
             )
             runCatching { eventConnection?.stop() }
@@ -1810,7 +1825,9 @@ class ChatViewModel(
         // guard applies: while a run is in flight on the key, the superseded
         // reader's stop pins and completes off reportRunInFlight(key,false).
         // Register BEFORE ensureAttached so a reader that starts breathing
-        // here can never be the unregistered one.
+        // here can never be the unregistered one. Capture the key BESIDE the
+        // registration; callbacks use the captured value, never [instanceKey].
+        registeredConnectionKey = instanceKey
         container.connectionRegistry.attach(
             instanceKey,
             fresh,
@@ -1874,11 +1891,15 @@ class ChatViewModel(
         // Gate-7 §3 (2026-11-05): drop this VM's registry record FIRST, and
         // ONLY if it is still ours - a newer VM's registration for the same
         // key must not be killed by an old entry's cleanup (revoke-only-if-
-        // own). The direct stop below remains this VM's own teardown and
-        // runs regardless of what the registry holds.
-        container.connectionRegistry.revokeIfOwn(
-            instanceKey, connectionOwnerEpoch, "chat entry cleared"
-        )
+        // own). L3: revoke the key the connection was REGISTERED under, not
+        // the mutable current binding. The direct stop below remains this VM's
+        // own teardown and runs regardless of what the registry holds.
+        registeredConnectionKey?.let { key ->
+            container.connectionRegistry.revokeIfOwn(
+                key, connectionOwnerEpoch, "chat entry cleared"
+            )
+        }
+        registeredConnectionKey = null
         runCatching { eventConnection?.stop() }
         runCatching { eventRouter.close() }
     }

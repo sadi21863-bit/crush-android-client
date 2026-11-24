@@ -39,11 +39,10 @@ import java.util.concurrent.atomic.AtomicLong
  * TOLERANCE, stated on purpose (P1-15 style): production operations all run
  * on the main thread (attach from the chat VM, revoke from the container's
  * binding setter, flush from `reportRunInFlight`), so [lock] protects an
- * interleaving that cannot exist today, plus same-thread tests. `entries` /
- * `registrationKey` are concurrent maps so the reclaim read
- * ([isSuperseded]) needs no lock at all - a stale-VM touch racing an attach
- * may at worst observe one beat old truth, which is exactly as honest as
- * the cached state a fresh subscription serves.
+ * interleaving that cannot exist today, plus same-thread tests. `entries` is a
+ * concurrent map so the reclaim read ([isSuperseded]) needs no lock at all - a
+ * stale-VM touch racing an attach may at worst observe one beat old truth,
+ * which is exactly as honest as the cached state a fresh subscription serves.
  */
 class ConnectionRegistry(
     /** Stops a connection; production passes [CrushConnection.stop]. */
@@ -56,15 +55,6 @@ class ConnectionRegistry(
 
     /** key -> the LIVE registration (at most one per key). Legacy "" included. */
     private val entries = ConcurrentHashMap<String, Entry>()
-
-    /**
-     * conn -> the key it was registered under, NEVER removed. This is the
-     * tombstone memory the reclaim predicate needs: a revoked or superseded
-     * connection is no longer in [entries], but "what key did this VM use to
-     * observe" is exactly what decides whether a newer VM has since taken
-     * that key over. Scope is one chat connection per attach per process.
-     */
-    private val registrationKey = ConcurrentHashMap<CrushConnection, String>()
 
     /**
      * key -> deferred stops. Only touched under [lock] (attach, revoke,
@@ -111,7 +101,6 @@ class ConnectionRegistry(
         runInFlightOnKey: () -> Boolean = { false },
     ) {
         synchronized(lock) {
-            registrationKey[conn] = key
             val previous = entries[key]
             entries[key] = Entry(conn, ownerEpoch)
             if (previous != null && previous.conn !== conn && previous.ownerEpoch != ownerEpoch) {
@@ -181,33 +170,37 @@ class ConnectionRegistry(
     }
 
     /**
-     * The reclaim predicate (the memo's `isSuperseded`), consulted by the
-     * STALE VM at the reader-retry seam before it re-enters the reconnect
-     * ladder:
+     * The reclaim predicate, consulted by the STALE VM at the reader-retry
+     * seam before it re-enters the reconnect ladder:
      *
-     * - never-registered connection -> not superseded (the pre-register
-     *   first touch of a fresh VM must pass through);
-     * - still THE live registration with my epoch -> not superseded;
-     * - registered under someone else's epoch -> superseded;
-     * - seen-but-no-longer-registered (revoked / superseded / deferred) ->
-     *   superseded ONLY when a DIFFERENT-epoch VM now holds the live spot on
-     *   my key - that is the round-trip case where a newer VM took the
-     *   surface. My OWN revoke with nothing newer (a plug-delete through the
-     *   container's guard) is NOT a supersession: the surviving VM's
-     *   re-bind under its adopted key registers fresh and proceeds.
+     * - unknown key (never registered, or revoked with nothing newer) -> false;
+     * - a live registration for [key] belongs to another owner epoch ->
+     *   superseded;
+     * - the live registration belongs to [ownerEpoch] (including a same-epoch
+     *   rebuild by the same VM) -> not superseded.
      *
-     * Both the map reads are lock-free, so the stale-VM touch stays cheap
-     * (volatile + reference compare, as the memo demands).
+     * L3 (2026-11-24): the caller passes the key captured when ITS connection
+     * was registered, not the mutable current binding. This replaces the old
+     * connection->key tombstone map: the answer never needs the connection
+     * object, so a stopped/replaced connection can be collected immediately.
+     *
+     * The read is a single atomic [entries] access; attach/revoke still
+     * serialize their logical transitions under [lock]. It can observe the
+     * state before or after a concurrent transition (the same one-beat
+     * tolerance the old tombstone read had).
      */
-    fun isSuperseded(ownerEpoch: Long, conn: CrushConnection?): Boolean {
-        if (conn == null) return false
-        for ((_, e) in entries) {
-            if (e.conn === conn) return e.ownerEpoch != ownerEpoch
-        }
-        val key = registrationKey[conn] ?: return false
+    fun isSuperseded(key: String, ownerEpoch: Long): Boolean {
         val current = entries[key] ?: return false
         return current.ownerEpoch != ownerEpoch
     }
+
+    /**
+     * L3 test seam: live entries plus connections pinned in deferred stops.
+     * After a normal revoke this is 0; the registry keeps no per-connection
+     * history (there is no tombstone map).
+     */
+    internal fun retainedRegistrationCountForTest(): Int =
+        entries.size + pending.values.sumOf { it.size }
 
     /**
      * PURE: the deferral rule. Mirrors the engine-stop guard byte-for-byte,

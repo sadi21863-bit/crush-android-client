@@ -147,6 +147,9 @@ class EngineSupervisor(
     private val sync = Any()
     private var wanted = false
 
+    /** L4 test seam: a stopped supervisor must hold no active loop. */
+    internal fun hasActiveSupervisionForTest(): Boolean = supervisorJob?.isActive == true
+
     fun start() {
         synchronized(sync) {
             com.crush.mobile.util.AppLog.i(TAG, "[$instanceKey] start() activeJob=${supervisorJob?.isActive}")

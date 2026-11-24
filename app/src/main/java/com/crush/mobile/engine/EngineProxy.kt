@@ -4,6 +4,7 @@ import com.crush.mobile.util.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -61,9 +62,9 @@ class EngineProxy(
      */
     private val log: (String) -> Unit = { AppLog.d(TAG, it) },
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var scope: CoroutineScope? = null
     private val relays = ConcurrentHashMap<Socket, Boolean>()
-    private var server: ServerSocket? = null
+    @Volatile private var server: ServerSocket? = null
 
     @Volatile
     private var boundPort: Int = -1
@@ -82,6 +83,7 @@ class EngineProxy(
      * engine on the broken system resolver, which is degraded but not fatal,
      * so the caller proceeds rather than hard-failing the engine start.
      */
+    @Synchronized
     fun start(): Boolean {
         if (isRunning) return true
         val s = try {
@@ -95,12 +97,16 @@ class EngineProxy(
         }
         server = s
         boundPort = s.localPort
+        // One scope per START: stop() cancels it, so a later restart must not
+        // reuse a cancelled scope (the deterministic restart test covers this).
+        val cs = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        scope = cs
         log("bridge up on 127.0.0.1:$boundPort")
-        scope.launch {
+        cs.launch {
             try {
                 while (server === s && !s.isClosed) {
                     val client = s.accept()
-                    scope.launch { serve(client) }
+                    cs.launch { serve(client, cs) }
                 }
             } catch (e: IOException) {
                 if (server === s && !s.isClosed) log("accept loop ended: ${e.message}")
@@ -115,13 +121,18 @@ class EngineProxy(
      * process is destroyed), but cleaning up here keeps reusing the instance
      * (supervisor retry ladder) honest.
      */
+    @Synchronized
     fun stop() {
-        val s = server ?: return
+        val s = server
         server = null
         boundPort = -1
-        runCatching { s.close() }
+        runCatching { s?.close() }
         relays.keys.forEach { runCatching { it.close() } }
         relays.clear()
+        // The scope belongs to this start generation. Cancel it BEFORE a
+        // possible restart creates a fresh one; never reuse a cancelled scope.
+        scope?.cancel()
+        scope = null
         log("bridge stop")
     }
 
@@ -130,7 +141,7 @@ class EngineProxy(
      * [resolver], answers 200 or 502, then relays bytes in both directions
      * until either side closes. Peer TLS is opaque here by construction.
      */
-    private fun serve(client: Socket) {
+    private fun serve(client: Socket, cs: CoroutineScope) {
         var upstream: Socket? = null
         try {
             client.tcpNoDelay = true
@@ -164,7 +175,7 @@ class EngineProxy(
             client.soTimeout = 0
             writeReply(client, "HTTP/1.1 200 Connection established\r\n\r\n")
             log("CONNECT $host:$port ok")
-            relay(client, up)
+            relay(client, up, cs)
         } catch (e: SocketTimeoutException) {
             log("handshake timeout")
             runCatching { writeReply(client, badGateway()) }
@@ -203,10 +214,10 @@ class EngineProxy(
         }
     }
 
-    private fun relay(a: Socket, b: Socket) {
+    private fun relay(a: Socket, b: Socket, cs: CoroutineScope) {
         relays[a] = true
         relays[b] = true
-        scope.launch {
+        cs.launch {
             // Two structured children; each ends on EOF (half-closing its
             // output) or a hard reset (closing both sockets, which wakes the
             // sibling's blocked read). stop() closes the sockets, which stops

@@ -45,6 +45,40 @@ import kotlinx.coroutines.launch
  * The engine is genuinely process-scoped, so the supervisor that owns it must be
  * too. The scope is a container-owned one so it outlives any single Activity.
  */
+/**
+ * V2-15 L1: one-shot orchestration for explicit application termination.
+ *
+ * The container is the only shutdown owner. This plan snapshots the legacy
+ * supervisor and every registered project supervisor at the FIRST call, stops
+ * each in isolation (one failure cannot prevent the others), and is idempotent:
+ * a second run is a no-op. It intentionally does not remove registry entries or
+ * evict runtimes; shutdown is terminal for the process.
+ */
+internal class ShutdownPlan(
+    private val legacy: (() -> Unit)?,
+    private val projects: List<() -> Unit>,
+    private val onFailure: (String, Throwable) -> Unit,
+) {
+    private val started = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** @return how many stop actions completed successfully. */
+    fun run(): Int {
+        if (!started.compareAndSet(false, true)) return 0
+        var stopped = 0
+        projects.forEachIndexed { index, stop ->
+            runCatching { stop() }
+                .onSuccess { stopped++ }
+                .onFailure { onFailure("project[$index]", it) }
+        }
+        legacy?.let { stop ->
+            runCatching { stop() }
+                .onSuccess { stopped++ }
+                .onFailure { onFailure("legacy", it) }
+        }
+        return stopped
+    }
+}
+
 class AppContainer(context: Context) {
 
     private val appContext = context.applicationContext
@@ -945,26 +979,47 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * Production teardown path (P1-10).
+     * Production teardown path (P1-10), completed for every runtime in L1.
      *
-     * Until today ONLY the spike harness (SpikeActivity) called
-     * EngineSupervisor.stop(), so a UI-launched engine process outlived the UI
-     * and kept binding the app-private socket for nothing. Android does not
-     * guarantee Application.onTerminate() will ever be called (the process is
-     * usually killed outright with no callback), so this hook ENABLES clean
-     * teardown for the termination paths that do call back - it cannot
-     * guarantee the OS honours it. That limitation is documented at the call
-     * site in CrushMobileApp.onTerminate(); the honest goal of this fix is
-     * "teardown exists and is wired", not "teardown is guaranteed".
+     * Stops the legacy supervisor AND every registered project supervisor.
+     * The plan is built once (snapshot at first call), each stop is isolated,
+     * and a second call is a no-op. Android does not guarantee
+     * Application.onTerminate() will ever be called (the process is usually
+     * killed outright with no callback), so this hook ENABLES clean teardown
+     * for the termination paths that do call back - it cannot guarantee the OS
+     * honours it. That limitation is documented at the call site in
+     * CrushMobileApp.onTerminate().
      *
-     * Only touches an ALREADY-MATERIALISED supervisor: constructing it here
-     * would lazily build the engine, spawn the settings collector - and for an
-     * app being torn down that is pure waste, plus the collector would race
-     * stop() on the new instance.
+     * @return how many stop actions completed (legacy included); a second call
+     * returns 0 because the plan is one-shot. The count is the container-level
+     * proof that the registry's supervisors actually reached the plan.
      */
-    fun shutdown() {
-        val s = synchronized(this) { supervisorInstance }
-        s?.stop()
+    fun shutdown(): Int {
+        val plan = shutdownPlan ?: synchronized(this) {
+            shutdownPlan ?: buildShutdownPlan().also { shutdownPlan = it }
+        }
+        return plan.run()
+    }
+
+    @Volatile
+    private var shutdownPlan: ShutdownPlan? = null
+
+    private fun buildShutdownPlan(): ShutdownPlan {
+        val legacy = synchronized(this) { supervisorInstance }
+        val projectStops = engineRegistry.inspect().map { snapshot ->
+            val supervisor = snapshot.runtime.supervisor
+            { supervisor.stop() }
+        }
+        return ShutdownPlan(
+            legacy = legacy?.let { supervisor -> { supervisor.stop() } },
+            projects = projectStops,
+            onFailure = { what, failure ->
+                com.crush.mobile.util.AppLog.w(
+                    "Lifecycle",
+                    "shutdown $what failed: ${failure.message?.take(160)}"
+                )
+            },
+        )
     }
 }
 

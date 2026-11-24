@@ -14,7 +14,9 @@ its own line in §4; its four-task gate ran green at 997 tests / 104 suites / 0
 failures (`v2-12-gate-2026-11-23.log`). The **V2-13** permission fail-closed
 batch (2026-11-23, owner-authorized) is appended the same way; its gate ran green
 at 1001 tests / 105 suites / 0 failures (`v2-14-a7-gate-2026-11-23.log`). The
-V2-11 and V2-12 rows stay as written.
+V2-11 and V2-12 rows stay as written. The **V2-15** lifecycle batch
+(2026-11-24, owner-authorized, uncommitted) is appended as its own row in §2 and
+its own line in §4.
 
 ## 1. Reading guide for the five evidence labels
 
@@ -55,6 +57,8 @@ Rules that hold across this ledger:
 | **V2-12** | `ui/navigation/CrushShell.kt` (`selectPrimary` shared by bottom bar, rail and extended rail); `ui/screens/review/ReviewContent.kt` ("Export current file" label + historical read-only note); `ui/screens/projects/ProjectsContent.kt` (duplicate footer removed); `ui/screens/onboarding/OnboardingContent.kt` (provider-qualified heading, no hardcoded model count); `engine/EngineInstanceRegistry.kt` (atomic check-and-reserve in one monitor, terminal-failure release, `STARTING` counted) + `di/AppContainer.kt` (`requestEngineStart` registers the runtime before the gate); `ui/screens/settings/SettingsContent.kt` and `SettingsScreen.kt` (key save reports its real result and keeps the draft, delete confirmation, auto-approve confirmation); comment-only corrections in `ChatViewModel.kt`/`AppContainer.kt` describing two non-legacy project slots with chat on legacy | `ShellNavigationTest` (16; 6 new — veto and allowed switch per layout), `EngineInstanceRegistryTest` (19; 4 new — reservation, terminal release, retry keeps it, simultaneous starts), `SettingsContentTest` (17; 5 new), `OnboardingContentTest` (12; 1 new), `ProjectsContentTest` (15), `ReviewContentTest` (13) — all inside the full gate, 997/104/0 (`v2-12-gate-2026-11-23.log`) | — | — (gate only; no device or instrumented run) | device / TalkBack / API 30+ verification of every surface above; `A7`/`A7b` (owner sign-off), `A12` (answering agent questions), `A2`, `A6`, `A13` — §6 row 13 | `docs/v2/V2-AUDIT-FIXES.md`; `v2-12-gate-2026-11-23.log` |
 | **V2-13** | `data/crush/WorkspaceManager.kt` — new `PermissionPolicyException`; `applyPermissionPolicy` hard-fails a rejected `permissions/mode`/`skip` (logs, flushes `workspaceId`/`workspaceGeneration`, throws); `open()` throws before `agent/init`; the lease is set only after the policy applies; `reattachIfStale` returns false on rejection and flushes the id. `ui/screens/chat/ChatViewModel.kt` — bootstrap catches the exception, sets a named phase and `engineReady=false` (this row supersedes the V2-12 row's `A7`/`A7b` deferral; that row is kept as written) | `WorkspacePermissionPolicyTest` (4; rejected mode fails the open without `agent/init`, rejected legacy skip does the same, an accepted policy still inits, a failed reattach reports not-attached and flushes the id); `BootstrapOrderTest` (9; unchanged) — all inside the full gate, 1001/105/0 (`v2-14-a7-gate-2026-11-23.log`) | — | — (gate only; no device or instrumented run) | effective-mode read-back (a 2xx on the apply is the proof); device row for the rejection phase; `A12` (answering agent questions), `A2`, `A6`, `A13` — §6 row 13 | `docs/v2/V2-A7-PERMISSION-FAIL-CLOSED.md`; `v2-14-a7-gate-2026-11-23.log` |
 | **V2-14** | `ui/screens/chat/QuestionBatch.kt` (`AskKind`, `AskChoice`, `AskPrompt`, `AskBatch`, `AskAnswerDraft`, `QuestionBatchParser`, `QuestionAnswerBuilder`); `ui/screens/chat/QuestionDialog.kt` (`AnswerQuestionDialog`: yes/no radios, single-choice radios, multi-choice checkboxes, free-text field, Submit disabled until every prompt is answered); `ChatContent.kt` chooses the answer dialog when the batch parses and keeps the cancel-only `AlertDialog` otherwise; `ChatAction.SubmitQuestion`; `ChatViewModel.submitQuestion` POSTs `answerQuestions` and keeps the dialog open on failure; `data/crush/CrushDtos.kt` `QuestionResponse.yes` (this row supersedes the `A12` deferral in the V2-12 and V2-13 rows; those rows are kept as written) | `QuestionBatchParserTest` (8), `QuestionDialogTest` (6), `QuestionAnswerBuilderTest` (4), `ChatViewStateTest` (19; +1 for the batch projection) — focused run of the three new classes green at 18 tests; all inside the full gate, 1020/108/0 (`v2-16-a12-gate-2026-11-23.log`) | — | — (gate only; no device or instrumented run) | free-text field has no Compose test (Robolectric never reaches idle during the cursor animation; the wire mapping is covered by `QuestionAnswerBuilderTest`); no process-death persistence for a pending batch; malformed payload keeps the cancel-only fallback; no device/TalkBack/API 30+ run; no read-back that the engine accepted the chosen ids; `A2`, `A6`, `A13` — §6 row 13 | `docs/v2/V2-A12-QUESTION-ANSWERING.md`; `v2-16-a12-gate-2026-11-23.log` |
+
+| **V2-15** | L1 `di/AppContainer.kt` (`ShutdownPlan`, `shutdown(): Int` snapshots the legacy supervisor plus every registered project supervisor; each stop isolated, one-shot); L2 `engine/CrushEngine.kt` (`runEngineStop` always runs child and proxy teardown) and `engine/EngineProxy.kt` (one cancellable scope per start, cancelled on stop); L3 `data/crush/ConnectionRegistry.kt` (`isSuperseded(key, ownerEpoch)` and `registrationKey` deleted) plus `ui/screens/chat/ChatViewModel.kt` (`registeredConnectionKey` captured at attach, used by the stale check and `onCleared`); Phase C test-only `EngineSupervisor.hasActiveSupervisionForTest()`; L5 accepted as bookkeeping (no production change) | `ShutdownPlanTest` (4), `EngineStopCleanupTest` (3), `CrushEngineLifecycleTest` (1), `EngineProxyConnectTest` (+2), `ConnectionRegistryTest` (25; 15 retained/adapted + 10 adversarial), `EngineInstanceRegistryTest` (26; +7 Phase C), `EngineRuntimeLifecycleTest` (1), `AppContainerShutdownTest` (1) — all inside the full gate, **1049/113/0** (`v2-21-phasec-gate-final.log`) | — | — (gate + device switch-stop/PSS capture; no instrumented run) | instrumented/TalkBack; real spawned-engine timeout after proxy startup; `ChatViewModel` registration-key unit; 3-child PSS; thread census; L5 stays bookkeeping; `A13` runtime disposal covered at JVM level and one device switch-stop, not process termination | `docs/v2/V2-15-RECONCILIATION.md`, `docs/v2/V2-15-RUNTIME-LIFECYCLE-AUDIT.md`, `docs/v2/V2-15-CONNECTION-RETENTION-DESIGN.md`, `docs/v2/V2-15-ENGINE-BUDGET-VALIDATION.md`, `docs/v2/V2-15-RUNTIME-RETENTION-MEASUREMENTS.md`, `docs/v2/V2-15-INTEGRATION-REPORT.md`, `docs/parity/v2-15-device/V215-DEVICE-EVIDENCE.md` |
 
 ## 3. Capture sets referenced above
 
@@ -114,6 +118,17 @@ tracked; the gate logs cited in §4 sit at the repo root and are not.
   four-task gate then executed the whole tree: **1020 tests / 108 suites / 0
   failures / 0 errors / 0 skipped**, lint **0 errors / 1 pre-existing warning**
   (`v2-16-a12-gate-2026-11-23.log`, 2026-11-23, 17m07s).
+- V2-15 (the lifecycle batch, uncommitted) adds 29 `@Test` methods over V2-14:
+  L1/L2 10 (`ShutdownPlanTest` 0 → 4, `EngineStopCleanupTest` 0 → 3,
+  `CrushEngineLifecycleTest` 0 → 1, `EngineProxyConnectTest` +2), L3 10
+  (`ConnectionRegistryTest` 15 → 25), Phase C 9 (`EngineInstanceRegistryTest`
+  19 → 26, `EngineRuntimeLifecycleTest` 0 → 1, `AppContainerShutdownTest` 0 → 1).
+  The full four-task gate then executed the whole tree: **1049 tests / 113
+  suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1 pre-existing
+  warning** (`v2-21-phasec-gate-final.log`, 2026-11-24). The earlier
+  `v2-20-phasec-gate.log` executed tests and both APK assemblies but was
+  interrupted mid-lint; the final run reused those up-to-date results and
+  completed `lintRelease` (95 tasks, 1 executed / 94 up-to-date).
 - Instrumented: 6 classes / 15 `@Test` methods exist under `app/src/androidTest`;
   only `SecureKeyStoreInstrumentedTest` (3 tests) has a stored device run.
 - `:app:assembleDebugAndroidTest` compiles the test APK in every gate. Compiling
@@ -214,6 +229,19 @@ The row keeps `A2`, `A6` and `A13` open and adds no device claim: the free-text
 field has no Compose test, nothing is persisted across process death, and a 2xx
 on `answerQuestions` is still the only proof that an answer was accepted.
 
+**V2-15 (2026-11-24, uncommitted).** Row 13's `A13` runtime-disposal half changes
+class: L1 stops every registered supervisor through one snapshot plan, L2 always
+tears down the egress proxy and cancels its per-start scope, L3 deletes the
+connection tombstone map, and Phase C shows a stopped runtime retains bounded
+metadata only. L5 is accepted as bookkeeping with no production change. The
+classes that pin each half are named in the V2-15 row of §2. A device run on
+`bbf8ca69` added switch-stop/PSS evidence: the project child and its socket file
+were gone after the switch, with no listener left and the app alive. `A13` stays
+open for process-termination verification: the device stop was a binding switch,
+not `Application.onTerminate`; there is no real spawned-engine timeout after
+proxy startup and no 3-child PSS. The V2-15 row adds a device switch-stop/PSS
+claim but no instrumented or TalkBack claim.
+
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no
 hypervisor driver (`emulator -accel-check`, code 6) and its only AVD is arm64;
@@ -262,6 +290,11 @@ for the V2-12 fixes (rail veto, Review export label, Projects footer, Settings
 confirmations); any device row for the V2-13 permission-rejection phase; an
 effective-mode read-back from the engine (a 2xx on the policy apply is the only
 proof today).
+
+For V2-15, the switch-stop/PSS capture in `docs/parity/v2-15-device/` was
+performed (manifest + raw evidence there); a 3-child PSS sample, a per-process
+thread census, and a shutdown-on-process-termination capture remain NOT
+PERFORMED.
 
 Each item above appears in a package record's limits section or in
 `docs/v2/V2-GAP-AUDIT.md`. None is implied to work.

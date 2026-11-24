@@ -385,6 +385,69 @@ class WorkspacePermissionPolicyScenariosTest {
     }
 
     @Test
+    fun `fresh-lease reattach waits for a concurrent YOLO open`() = runBlocking {
+        val manager = WorkspaceManager(api)
+        openSync(manager, "ask")
+        val leaseAtStart = manager.lastAttachedAtMs ?: error("ASK open must establish a lease")
+
+        val yoloCreateEntered = CountDownLatch(1)
+        val releaseYoloCreate = CountDownLatch(1)
+        val lastMode = java.util.concurrent.atomic.AtomicReference<String?>(null)
+        onRequest = { request ->
+            if (request.path.endsWith("/workspaces") &&
+                request.body.contains("\"permission_mode\":\"yolo\"")
+            ) {
+                yoloCreateEntered.countDown()
+                releaseYoloCreate.await(5, TimeUnit.SECONDS)
+            }
+            if (request.path.endsWith("/permissions/mode")) {
+                lastMode.set(
+                    Regex("\"mode\"\\s*:\\s*\"([^\"]+)\"")
+                        .find(request.body)?.groupValues?.get(1),
+                )
+            }
+        }
+
+        try {
+            val yoloOpen = async(Dispatchers.IO) {
+                manager.open("/data/tmp", "/data/tmp/state", yolo = true, permissionModeWire = "yolo")
+            }
+            assertTrue(
+                "the YOLO open must be held inside createWorkspace",
+                yoloCreateEntered.await(5, TimeUnit.SECONDS),
+            )
+            assertEquals(
+                "the old lease must still be present while createWorkspace is held",
+                leaseAtStart,
+                manager.lastAttachedAtMs,
+            )
+
+            // Unconfined runs until the first suspension. With the lock this
+            // suspends on the path mutex; without it the freshness fast path
+            // returns true synchronously.
+            val reattach = async(Dispatchers.Unconfined) {
+                manager.reattachIfStale(nowMs = leaseAtStart, force = false)
+            }
+            assertFalse(
+                "reattach must not accept the old lease while the YOLO open is in progress",
+                reattach.isCompleted,
+            )
+
+            releaseYoloCreate.countDown()
+            assertEquals("ws-scenario", yoloOpen.await().id)
+            assertTrue(
+                "reattach may proceed only after the serialized open resolves",
+                reattach.await(),
+            )
+            assertEquals("the final applied mode must be YOLO", "yolo", lastMode.get())
+            assertNotNull(manager.currentWorkspaceId)
+        } finally {
+            releaseYoloCreate.countDown()
+            onRequest = null
+        }
+    }
+
+    @Test
     fun `out-of-order ASK and YOLO apply the later intent last`() = runBlocking {
         val askEntered = CountDownLatch(1)
         val releaseAsk = CountDownLatch(1)

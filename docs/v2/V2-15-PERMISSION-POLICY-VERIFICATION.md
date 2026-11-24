@@ -5,10 +5,12 @@ A7/A7b fail-closed implementation. One reproducible defect was found and
 narrowly corrected (a cancelled re-open could leave a fresh old lease covering
 an unconfirmed policy). No permission-policy redesign, no L1/L3 change, no Go
 engine or dependency change, no device claim from JVM tests. Phase D was
-committed on `v2-15-lifecycle-hardening` as a follow-up to `a1be361`. A
-follow-up serializes different-mode concurrent opens per workspace path; it is
-committed on the same branch as a follow-up to `a1be361`/`6379165`. No PR or
-issue was made.
+committed on `v2-15-lifecycle-hardening` as a follow-up to `a1be361`. A first
+follow-up serialized different-mode concurrent opens per workspace path
+(committed as a follow-up to `6379165`). A second follow-up moves the
+`reattachIfStale()` freshness fast path under the same per-path lock; it is
+committed on the same branch as a follow-up to `3a261e6`. No PR or issue was
+made.
 
 ## 1. Verdict
 
@@ -23,6 +25,7 @@ issue was made.
 | Failed reattachment is not reported as success | **Holds** | Scenario 6: `reattachIfStale` returns false, id flushed; a later retry can recover |
 | Effective permission mode can be read back | **No trustworthy read-back exists** | §5; a 2xx apply remains the only proof |
 | Concurrent opens/reattaches are serialized | **Holds per workspace path** | Scenario 10/10b: `open()` takes a companion `Mutex` keyed by path; the later call's ASK/YOLO mode is the final apply |
+| A fresh-lease reattach cannot proceed during an in-flight open | **Holds** | Scenario 10c: the fast path is evaluated under the same path lock; a YOLO create held before the lease is cleared blocks the reattach |
 
 ## 2. Implementation trace
 
@@ -57,9 +60,12 @@ version and try again.`, and returns **before** `keySession.require(...)`.
 `Ready("", …, false, ["no workspace"])` before `setProviderKey` when the
 manager has no live id.
 
-`reattachIfStale()` (`WorkspaceManager.kt:311`) short-circuits only when the
-lease is fresh **and** `liveIdOrNull()` is non-null. `liveIdOrNull()` flushes an
-id whose minting generation differs from the current engine generation.
+`reattachIfStale()` (`WorkspaceManager.kt:370`) takes the same per-path
+`Mutex` before evaluating its freshness fast path. It short-circuits only when
+the lease is fresh **and** `liveIdOrNull()` is non-null; otherwise, while still
+holding the lock, it calls `openLocked()` (not `open()`, avoiding recursive
+acquisition of the non-reentrant mutex). `liveIdOrNull()` flushes an id whose
+minting generation differs from the current engine generation.
 
 ## 3. Scenario matrix
 
@@ -87,6 +93,15 @@ managers and two API clients for the same path: ASK is held at the fake, YOLO
 is launched behind it. With the per-path lock YOLO cannot apply until ASK
 finishes, so the later call's YOLO mode is final; the mutation run without the
 lock failed exactly here.
+
+Scenario 10c (`fresh-lease reattach waits for a concurrent YOLO open`):
+establishes an ASK lease, starts a YOLO open and holds its `createWorkspace`
+before the lease is cleared, then calls `reattachIfStale(force = false)` with
+the old fresh timestamp. With the fast path under the path lock, the reattach
+is still suspended while the create is held; after release it accepts the
+newly applied YOLO lease. The mutation with the fast path outside the lock
+fails at `reattach must not accept the old lease while the YOLO open is in
+progress` (`v2-37-reattach-mutation.log`).
 
 Credential **read** is source-inspected in `ChatViewModel`; the tests assert the
 wire requests (no `/config/provider-key` on any fail-closed path). The
@@ -162,6 +177,45 @@ the lock and is the final applied mode. A mutation run with serialization
 disabled failed at exactly this assertion (`v2-34-phaseD-serialization-mutation.log`);
 the fix was restored byte-identically and the focused suite re-ran green.
 
+### 4c. Reattach fast path (follow-up)
+
+`reattachIfStale()` originally evaluated its freshness short-circuit **before**
+`openLock()`. `openLocked()` clears the old lease only after
+`createWorkspace()` returns, so a concurrent reattach could accept the old
+lease while a new open was still inside create. The fast path and the reopen
+are now both inside `openLock(path).withLock { ... }`; the reopen calls
+`openLocked()` directly, so the non-reentrant mutex is never taken recursively.
+
+Caller trace (production, all `ChatViewModel` `viewModelScope` coroutines;
+each can overlap another because the `bootstrapping` guard only covers
+`bootstrap()`):
+
+| Caller | `force` | Why it matters |
+|---|---|---|
+| `doBootstrap` recovery (`:1639`) | true | Can run beside a later bootstrap/recovery; must not bypass an in-flight open. |
+| `loadSessions` (`:2277`) | false | Session-list coroutine; can overlap a send/handoff open. |
+| `openSession` (`:2308`) | false | Session-open coroutine. |
+| `newThread` (`:2465`) | false | New-thread coroutine. |
+| `deleteSession` (`:2528`, `:2549`) | false / true | Delete plus forced recovery. |
+| `resolvePermission` (`:2620`) | false | Approval coroutine. |
+| `resolveQuestion` (`:2676`) | false | Answer coroutine. |
+| `submitQuestion` (`:2729`) | false | Free-text answer coroutine. |
+| `dispatchHandoff` (`:3501`) | false | Handoff coroutine. |
+| `send` (`:3690`) | false | Turn preflight; the caller proceeds to key/model work. |
+| `streamSend` (`:3980`) | true | Forced recovery inside a stream. |
+| `scheduleLateReportRefresh` (`:4801`) | false | Deferred report coroutine. |
+
+Test callers are `WorkspacePermissionPolicyTest` and `BootstrapOrderTest`, all
+sequential. The important production property is that none of these can observe
+the old lease while an `open()` is in progress.
+
+Preserved behaviour: a failed create leaves the old lease truthful; a cancelled
+fast-path waiter releases without state change; a policy rejection flushes the
+id and returns false; a generation change is flushed by `liveIdOrNull()` before
+the reopen; a successful fresh lease returns true only after the in-flight open
+has resolved. Scenario 10c and the mutation run `v2-37-reattach-mutation.log`
+pin the fast-path case.
+
 ## 5. Effective-mode read-back
 
 **No trustworthy read-back exists in the bindable protocol.**
@@ -190,12 +244,12 @@ the app relies on it.
   before the key/model are set (existing V2-13/V2-12 behaviour). On an engine
   restart between policy and init, that call targets the old id; the generation
   flush prevents any subsequent key use or turn, but the redundant call remains.
-- **Per-path serialization cost:** the lock is held through create/policy/init.
-  A cancelled holder whose blocking HTTP call is still unwinding can delay the
-  next open until that call returns, but it cannot reorder the final mode. The
-  lock map is never evicted; it is bounded by the number of distinct workspace
-  paths (legacy + projects). Two engine instances that share one path also
-  serialize unnecessarily, which is harmless.
+- **Per-path serialization cost:** the lock is held through create/policy/init
+  and the reattach freshness check. A cancelled holder whose blocking HTTP call
+  is still unwinding can delay the next open until that call returns, but it
+  cannot reorder the final mode. The lock map is never evicted; it is bounded by
+  the number of distinct workspace paths (legacy + projects). Two engine
+  instances that share one path also serialize unnecessarily, which is harmless.
 - **No device verification:** all scenario evidence is JVM/MockWebServer. The
   v0.100.0 `/permissions/mode` route and a real engine restart were not
   re-exercised on `bbf8ca69` in this phase.
@@ -213,6 +267,9 @@ the app relies on it.
 | Focused A7/A7b + serialization (`v2-33-phaseD-serialization-focused2.log`) | **BUILD SUCCESSFUL in 2m57s**; **28 tests / 3 classes / 0 failures**: scenarios 10, policy 4, lease 14. |
 | Serialization mutation (`v2-34-phaseD-serialization-mutation.log`) | **FAILED as intended**: `out-of-order ASK and YOLO apply the later intent last` failed at `the second manager must not apply while the first holds the path lock`. The fix was restored byte-identically. |
 | Full gate after serialization (`v2-35-phaseD-serialization-gate.log`) | **BUILD SUCCESSFUL in 17m53s**; **1060 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning**; `assembleDebug` and `assembleDebugAndroidTest` completed. |
+| Focused A7/A7b + reattach fast path (`v2-36-reattach-focused.log`) | **BUILD SUCCESSFUL in 50m43s** (Gradle tooling stall; tests green); **29 tests / 3 classes / 0 failures**: scenarios 11, policy 4, lease 14. |
+| Reattach fast-path mutation (`v2-37-reattach-mutation.log`) | **FAILED as intended**: `fresh-lease reattach waits for a concurrent YOLO open` failed at `reattach must not accept the old lease while the YOLO open is in progress`. The fix was restored byte-identically. |
+| Full gate after reattach fast path (`v2-38-reattach-gate.log`) | **BUILD SUCCESSFUL in 16m26s**; **1061 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning**; `assembleDebug` and `assembleDebugAndroidTest` completed. |
 
 The successful-policy case also pins ordering: `permissions/mode` is on the wire
 before the first `/config/provider-key` request; the rejection/transport/
@@ -221,9 +278,11 @@ cancellation cases pin that no provider-key request occurs at all.
 ## 8. Restrictions and state
 
 - No feature work, permission redesign, Go engine/dependency change, or L1/L2/L3
-  change. The only production change is `WorkspaceManager.open()`: the
-  lease/cancellation correction and the per-path open lock.
+  change. The only production change is `WorkspaceManager`: the
+  lease/cancellation correction, the per-path open lock, and the reattach fast
+  path under that lock.
 - Phase D was committed on `v2-15-lifecycle-hardening` as `6379165` (follow-up
-  to `a1be361`). The serialization follow-up is committed on the same branch;
-  no PR or issue was made for it.
+  to `a1be361`); the serialization follow-up is committed as `3a261e6`. The
+  reattach fast-path follow-up is committed on the same branch; no PR or issue
+  was made for it.
 - No device claim is made from JVM tests.

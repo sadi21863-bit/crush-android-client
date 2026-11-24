@@ -1,8 +1,8 @@
 # V2-15 integration report
 
 Status: **implementation + Phase C validation + post-push L2 correction +
-Phase D permission-policy verification + Phase D serialization follow-up,
-2026-11-24.** The initial batch is
+Phase D permission-policy verification + Phase D serialization follow-up +
+reattach fast-path follow-up, 2026-11-24.** The initial batch is
 committed and pushed as `1990118` on
 `v2-15-lifecycle-hardening` (not merged into `main`); the L2 terminal-startup
 correction is committed on the same branch as a follow-up to `1990118`. No
@@ -31,7 +31,7 @@ This report ties the V2-15 batches together:
 | `data/crush/ConnectionRegistry.kt` | L3 `isSuperseded(key, ownerEpoch)` reads only the live `entries[key]`; `registrationKey` deleted; test-only retained-count seam |
 | `ui/screens/chat/ChatViewModel.kt` | L3 `registeredConnectionKey` captured at successful attach; stale check and `onCleared` use it, never the mutable `instanceKey` |
 | `engine/EngineSupervisor.kt` | L4 test-only `hasActiveSupervisionForTest()` seam; post-push L2 correction calls `stopBlocking()` in the terminal `Failed` branch before publishing the state |
-| `data/crush/WorkspaceManager.kt` | Phase D: clear `lastAttachedAtMs` when claiming a new id and flush id/generation/lease on `CancellationException`; follow-up adds a companion per-path `Mutex` so `open()`/reattach serializes across managers; no request-shape or policy-mapping change |
+| `data/crush/WorkspaceManager.kt` | Phase D: clear `lastAttachedAtMs` when claiming a new id and flush id/generation/lease on `CancellationException`; follow-ups add a companion per-path `Mutex` around `open()` and move `reattachIfStale()`'s fast path under that lock (calling `openLocked()` to avoid recursion); no request-shape or policy-mapping change |
 
 No other production file changed. Phase C itself added only the `Int` return
 from `shutdown()`; the post-push correction adds the terminal `stopBlocking()`
@@ -95,7 +95,7 @@ works.
 | `EngineInstanceRegistryTest` | 26 | 19 prior + 7 Phase C (repeated start, stop-during-STARTING, stop/start race, stale RUNNING, own restart, ten-racer barrier, 50 projects) |
 | `EngineRuntimeLifecycleTest` | 1 | Phase C, no active loop/child after stop |
 | `EngineTerminalStartupCleanupTest` | 1 | Post-push L2: real exec failure → supervisor terminal → bridge released |
-| `WorkspacePermissionPolicyScenariosTest` | 10 | Phase D: transport, cancellation, retry, restart/generation, serialization/concurrency; credential-order assertions |
+| `WorkspacePermissionPolicyScenariosTest` | 11 | Phase D: transport, cancellation, retry, restart/generation, serialization/concurrency, reattach fast path; credential-order assertions |
 | `AppContainerShutdownTest` | 1 | Phase C/D, container mapping + one-shot count |
 
 No test was removed or weakened in this batch.
@@ -116,6 +116,8 @@ No test was removed or weakened in this batch.
 | Phase D full gate, pre-serialization | **BUILD SUCCESSFUL in 18m12s**; **1059 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-30-phaseD-gate.log`) |
 | Phase D serialization focused | **BUILD SUCCESSFUL in 2m57s**; **28 tests / 3 classes / 0 failures** (`v2-33-phaseD-serialization-focused2.log`) |
 | Phase D serialization full gate | **BUILD SUCCESSFUL in 17m53s**; **1060 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-35-phaseD-serialization-gate.log`) |
+| Phase D reattach fast-path focused | **BUILD SUCCESSFUL in 50m43s** (Gradle tooling stall; tests green); **29 tests / 3 classes / 0 failures** (`v2-36-reattach-focused.log`) |
+| Phase D reattach fast-path full gate | **BUILD SUCCESSFUL in 16m26s**; **1061 tests / 115 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-38-reattach-gate.log`) |
 
 The full gate runs `:app:testDebugUnitTest :app:assembleDebug
 :app:assembleDebugAndroidTest :app:lintRelease`.
@@ -187,6 +189,7 @@ in `docs/v2/V2-15-PERMISSION-POLICY-VERIFICATION.md`.
 | Failed reattach → reported false, retry recovers | holds |
 | Effective-mode read-back | **no trustworthy endpoint; limitation retained** |
 | Concurrent opens/reattaches | **serialized per workspace path; later intent wins** |
+| Fresh-lease reattach during an in-flight open | **waits on the path lock; cannot accept the old lease** |
 
 The defect: a cancelled re-open could leave the old fresh
 `lastAttachedAtMs` while the new id was already claimed, so a later non-forced
@@ -204,7 +207,17 @@ call's mode is the final apply. The out-of-order ASK/YOLO regression
 removed (mutation run `v2-34-phaseD-serialization-mutation.log`) and passes with
 it.
 
-Tests: `WorkspacePermissionPolicyScenariosTest` (10 new), the existing
+**Follow-up — reattach fast path.** `reattachIfStale()` evaluated its fresh-lease
+short-circuit before taking the path lock, so it could return true while an open
+was still inside `createWorkspace` and the old lease had not been cleared. The
+fast path is now inside the same lock and the reopen calls `openLocked()` (not
+`open()`), avoiding recursive mutex acquisition. Scenario 10c holds a YOLO
+create before the lease is cleared and asserts the concurrent reattach is still
+suspended; the mutation with the fast path outside the lock fails at
+`reattach must not accept the old lease while the YOLO open is in progress`
+(`v2-37-reattach-mutation.log`).
+
+Tests: `WorkspacePermissionPolicyScenariosTest` (11 new), the existing
 `WorkspacePermissionPolicyTest` (4, now also asserting no provider-key request),
 and `WorkspaceLeaseTest` (14). The full gate result is in §4.
 
@@ -217,7 +230,8 @@ and `WorkspaceLeaseTest` (14). The full gate result is in §4.
   merged into `main`, and no PR or issue was created. The post-push correction
   is committed on the same branch as a follow-up. Phase D is committed on the
   same branch; no PR or issue was created for it. The serialization follow-up
-  is committed on the same branch.
+  is committed as `3a261e6`. The reattach fast-path follow-up is committed on
+  the same branch.
 - All V2-15 reports, test evidence and implementation changes are preserved.
 - No historical record was rewritten; the Phase C and correction reports state
   what was and was not executed.

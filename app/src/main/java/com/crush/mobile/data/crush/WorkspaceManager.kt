@@ -359,6 +359,13 @@ class WorkspaceManager(private val api: CrushApi) {
      * by id. Returns true when the caller may proceed, false when the workspace
      * could not be re-acquired (in which case the caller must surface an error
      * rather than send into a dead id).
+     *
+     * The freshness fast path is evaluated under the SAME per-path mutex as
+     * [open]. A concurrent open can therefore not be bypassed by an old lease:
+     * while that open is still in `createWorkspace` (before it clears the
+     * lease), this call waits at the mutex; afterwards it either accepts the
+     * newly applied mode or re-opens. It calls [openLocked] rather than [open]
+     * to avoid recursively acquiring the non-reentrant mutex.
      */
     suspend fun reattachIfStale(
         nowMs: Long = System.currentTimeMillis(),
@@ -369,20 +376,29 @@ class WorkspaceManager(private val api: CrushApi) {
         // id plus its attach timestamp - which is what forces the re-POST
         // below even when the lease is seconds old: an id attached right
         // before a restart IS "fresh" and IS dead.
-        if (!force &&
-            WorkspaceLease.isFresh(lastAttachedAtMs, nowMs) &&
-            liveIdOrNull() != null
-        ) return true
+        //
+        // Both the fast path and the reopen are under the per-path lock: the
+        // fast path must not observe a lease that a concurrent open is about
+        // to replace (openLocked clears it only after createWorkspace returns).
         val path = workspacePath ?: return false
         val dir = workspaceDataDir ?: return false
-        // Reuse the mode this workspace was opened with. `?: false` so an
-        // unopened workspace fails SAFE to asking rather than to auto-approve.
-        // runCatchingNonCancellation: a cancelled caller must NOT be recorded
-        // as "reattach failed" and retried after the coroutine was already
-        // told to stop.
-        return runCatchingNonCancellation {
-            open(path, dir, yolo = yoloMode ?: false, permissionModeWire = permissionModeWire)
-        }.isSuccess
+        return openLock(path).withLock {
+            if (!force &&
+                WorkspaceLease.isFresh(lastAttachedAtMs, nowMs) &&
+                liveIdOrNull() != null
+            ) {
+                true
+            } else {
+                // Reuse the mode this workspace was opened with. `?: false` so
+                // an unopened workspace fails SAFE to asking rather than to
+                // auto-approve. runCatchingNonCancellation: a cancelled caller
+                // must NOT be recorded as "reattach failed" and retried after
+                // the coroutine was already told to stop.
+                runCatchingNonCancellation {
+                    openLocked(path, dir, yoloMode ?: false, permissionModeWire)
+                }.isSuccess
+            }
+        }
     }
 
     @Volatile

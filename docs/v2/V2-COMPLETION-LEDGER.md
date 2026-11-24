@@ -292,6 +292,25 @@ errors / 0 skipped**, lint **0 errors / 1 pre-existing warning**
 (`v2-35-phaseD-serialization-gate.log`, 17m53s). No device or instrumented
 run covers this follow-up.
 
+**V2-15 reattach fast-path follow-up (2026-11-24, committed on
+`v2-15-lifecycle-hardening` as a follow-up to `3a261e6`).**
+`reattachIfStale()` evaluated its fresh-lease short-circuit before taking the
+per-path lock, so while an open was still inside `createWorkspace` (the old
+lease was not yet cleared) it could return true and let a caller proceed under
+the old policy. The fast path and the reopen now both run under
+`openLock(path).withLock`; the reopen calls `openLocked()` directly, avoiding
+recursive acquisition of the non-reentrant mutex. Failed create, cancellation,
+policy rejection, generation changes and successful fresh-lease reattachments
+retain their prior outcomes. The tenth scenario test
+(`fresh-lease reattach waits for a concurrent YOLO open`) holds the YOLO
+create, asserts the reattach is still suspended, then releases it and verifies
+the final mode is YOLO; with the fast path mutation it fails at
+`reattach must not accept the old lease while the YOLO open is in progress`
+(`v2-37-reattach-mutation.log`). Focused 29/29 green; full gate **1061 tests /
+115 suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1
+pre-existing warning** (`v2-38-reattach-gate.log`, 16m26s). No device or
+instrumented run covers this follow-up.
+
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no
 hypervisor driver (`emulator -accel-check`, code 6) and its only AVD is arm64;

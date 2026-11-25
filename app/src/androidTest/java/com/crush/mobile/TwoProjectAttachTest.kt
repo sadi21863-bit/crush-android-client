@@ -5,7 +5,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.core.app.ApplicationProvider
 import com.crush.mobile.data.crush.CrushApi
 import com.crush.mobile.data.crush.CreateSessionRequest
+import com.crush.mobile.data.crush.EngineProtocol
 import com.crush.mobile.data.crush.WorkspaceManager
+import com.crush.mobile.domain.model.PermissionMode
 import com.crush.mobile.engine.CrushEngine
 import com.crush.mobile.engine.EngineSockets
 import com.crush.mobile.engine.EngineState
@@ -99,8 +101,24 @@ class TwoProjectAttachTest {
         // engine state stays engine-owned (ADR invariant I7); the project
         // boundary lives on the workspace path.
         val stateDir = File(context.filesDir, "crush/state").absolutePath
-        val openedA = managerA.open(projectA.workspacePath, stateDir, yolo = false)
-        val openedB = managerB.open(projectB.workspacePath, stateDir, yolo = false)
+        // The bundled engine is v0.100.0, which REMOVED /permissions/skip:
+        // opening without the wire selects the legacy family and the engine
+        // rejects the attach (measured on bbf8ca69, Phase F 2026-11-25).
+        // Production resolves this from the observed version; this test pins
+        // the v0.100.0 value directly.
+        val askWire = EngineProtocol.modeFor(PermissionMode.ASK)
+        val openedA = managerA.open(
+            projectA.workspacePath,
+            stateDir,
+            yolo = false,
+            permissionModeWire = askWire
+        )
+        val openedB = managerB.open(
+            projectB.workspacePath,
+            stateDir,
+            yolo = false,
+            permissionModeWire = askWire
+        )
 
         // 1. Distinct paths -> distinct logical workspaces.
         assertNotEquals(
@@ -128,7 +146,8 @@ class TwoProjectAttachTest {
         val reopenedA = WorkspaceManager(api).open(
             projectA.workspacePath,
             stateDir,
-            yolo = false
+            yolo = false,
+            permissionModeWire = askWire
         )
         assertEquals(
             "re-opening project A's path is an idempotent re-attach",

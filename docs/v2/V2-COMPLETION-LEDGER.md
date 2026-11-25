@@ -380,6 +380,37 @@ green; full gate **1087/117/0**, lint 0/1, 21m37s
 (`v2-61-phaseE-followup-gate2.log`). E3/E4 and the previously deferred limits
 are unchanged.
 
+**V2-15 Phase F — device matrix (2026-11-25, local commit only).** The deferred
+matrix rows were executed on `bbf8ca69` (Redmi Note 7 Pro, **API 29**, 1080x2340,
+440 dpi, `en-IN`, engine `v0.100.0`). Instrumented classes were run one at a
+time: `SecureKeyStoreInstrumentedTest` 3/3, `ProjectStoreRoomPersistenceTest`
+2/2, `MainActivitySmokeTest` 2/2, `TwoProjectAttachTest` 1/1 and
+`TwoEngineInstancesPerProjectTest` 1/1 — **14 test methods green, 0
+app-behaviour failures**. `MainActivityLockFlowTest` returned 5 PASS and 1
+BLOCKED: `recreationKeepsGateDecisionAndLockStateObject` cannot pass on a device
+that auto-prompts through a system credential activity (the prompt holds the
+activity PAUSED past `recreate()`'s timeout, and a real unlock legitimately turns
+`PROMPT` into `OPEN`); it is a test-design limit, not an app defect, and the
+decision inputs stay pinned by `LockStateTest` (9). The two engine-isolation
+classes failed only because they predated the `v0.100.0` permission wire; they
+now pass `EngineProtocol.modeFor(ASK)` and needed no production change.
+
+UI rows: 1.3x font scale PASS; Diagnostics copy (toast) and share
+(`ChooserActivity`) PASS; A12 `yes_no` dialog PASS end-to-end against a real
+engine `question` tool call (dialog → Submit gated → answer accepted → run
+finished); TalkBack PASS for focus traversal on Settings, the chat list and both
+navigation layouts, with speech text not captured; wide window + extended rail
+PASS **simulated** at 1066 dp via `wm size 1600x1000`/`wm density 240`, restored
+to native afterwards. NOT PERFORMED with reasons: RTL (`debug.force_rtl` is
+ignored by this ROM — launcher and app both stayed LTR after restart and
+rotation; `am start` has no `--locale` on API 29; a real test needs a system
+locale change plus reboots), API 30+, tablet/foldable hardware, and the
+`single_choice`/`multi_choice`/`free_text` device dialogs. Environment finding:
+MIUI defers instrumentation activity starts for minutes until an explicit
+launcher-category `am start`; wall times are not test times, and one lock-suite
+run was killed externally by `OneKeyClean` (signal 9) and is not counted as a
+failure. Detail: `docs/v2/V2-15-DEVICE-MATRIX-VERIFICATION.md`.
+
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no
 hypervisor driver (`emulator -accel-check`, code 6) and its only AVD is arm64;
@@ -414,6 +445,9 @@ signs, uploads or publishes anything.
 
 ## 8. Still NOT PERFORMED anywhere (consolidated)
 
+Status line as at 2026-11-24; the Phase F note below records what changed on
+2026-11-25 without rewriting this list.
+
 Extended rail ≥840dp on hardware; tablet/foldable/wide windows (O3); any API 30+
 run; landscape beyond the compact rail; TalkBack on any surface; 1.3x font
 scale; reduced motion; density overrides; dynamic colour; screenshot/image
@@ -433,6 +467,20 @@ For V2-15, the switch-stop/PSS capture in `docs/parity/v2-15-device/` was
 performed (manifest + raw evidence there); a 3-child PSS sample, a per-process
 thread census, and a shutdown-on-process-termination capture remain NOT
 PERFORMED.
+
+**Phase F (2026-11-25) closed part of this list on the API 29 phone:** TalkBack
+focus traversal (Settings, chat list, both navigation layouts; speech not
+captured), the 1.3x font scale, the Diagnostics copy/share path, the A12
+`yes_no` question dialog end-to-end, the five previously unexecuted instrumented
+classes, and the wide/extended-rail layout **as a 1066 dp `wm size` simulation,
+not hardware**. Still NOT PERFORMED after Phase F: extended rail on ≥840dp
+hardware, any tablet/foldable, any API 30+ run, RTL (this ROM ignores
+`debug.force_rtl`), landscape beyond the compact rail, 2.0x on the V2-15
+surfaces, reduced motion, density overrides, TalkBack speech content, the
+`single_choice`/`multi_choice`/`free_text` device dialogs, and the
+`recreationKeepsGateDecisionAndLockStateObject` device test (blocked by the
+system credential activity). Detail:
+`docs/v2/V2-15-DEVICE-MATRIX-VERIFICATION.md`.
 
 Each item above appears in a package record's limits section or in
 `docs/v2/V2-GAP-AUDIT.md`. None is implied to work.

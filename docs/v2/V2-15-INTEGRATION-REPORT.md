@@ -296,3 +296,44 @@ Deferred findings (still not fixed):
 - No historical record was rewritten; the Phase C and correction reports state
   what was and was not executed.
 - No device claim is made from JVM tests.
+- Phase F (device matrix) added one verification record and two test-only fixes
+  to the instrumented classes; it changed no production code. It is not pushed,
+  merged or opened as a PR without owner approval.
+
+## 10. Phase F — device matrix and verification (2026-11-25)
+
+Phase F executed the deferred matrix rows on the only available device
+(`bbf8ca69`, API 29) and recorded the rest as NOT PERFORMED. Full detail:
+`docs/v2/V2-15-DEVICE-MATRIX-VERIFICATION.md`.
+
+| Group | Result |
+|---|---|
+| `SecureKeyStoreInstrumentedTest` | 3/3 PASS (0.287s) |
+| `ProjectStoreRoomPersistenceTest` | 2/2 PASS (0.286s) |
+| `MainActivitySmokeTest` | 2/2 PASS (401.11s, MIUI-deferred) |
+| `TwoProjectAttachTest` | 1/1 PASS (4.293s) after the v0.100.0 permission-wire fix |
+| `TwoEngineInstancesPerProjectTest` | 1/1 PASS (6.463s) after the same fix |
+| `MainActivityLockFlowTest` | 5 PASS, 1 BLOCKED (test design) |
+
+- **14 test methods passed, 0 app-behaviour failures, 1 blocked.** The blocked
+  test is `recreationKeepsGateDecisionAndLockStateObject`: the auto credential
+  prompt either pauses the activity past `recreate()`'s timeout or legitimately
+  flips `PROMPT → OPEN`, so the pre-auth snapshot assertion cannot hold on this
+  device. It is a test-design limit, not an app defect; the decision logic stays
+  pinned by `LockStateTest` (9).
+- **UI rows:** 1.3x font scale PASS; Diagnostics copy PASS (toast) and share
+  PASS (`ChooserActivity`); A12 `yes_no` dialog PASS end-to-end against a real
+  engine question (dialog → gated Submit → answer accepted → run finished);
+  TalkBack PASS for focus traversal (5 captures), speech not captured; wide
+  window + extended rail PASS **simulated** at 1066 dp (`wm size`/`wm density`,
+  restored afterwards).
+- **NOT PERFORMED, with reasons:** RTL (`debug.force_rtl` ignored by MIUI; no
+  `--locale` on API 29; would need a system locale change + reboots), API 30+,
+  tablet/foldable hardware, and the `single_choice`/`multi_choice`/`free_text`
+  device dialogs.
+- The earlier Phase E limits stand unchanged: E3/E4, no process-death
+  persistence and no answer read-back.
+- Environment finding: MIUI defers `ActivityScenario` launches for minutes until
+  an explicit launcher-category `am start` arrives; wall times are not test
+  times. One lock-suite run was killed externally by MIUI `OneKeyClean`
+  (signal 9) and is not counted as a failure.

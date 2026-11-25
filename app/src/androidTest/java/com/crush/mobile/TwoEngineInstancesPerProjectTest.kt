@@ -5,7 +5,9 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.crush.mobile.data.crush.CreateSessionRequest
 import com.crush.mobile.data.crush.CrushApi
+import com.crush.mobile.data.crush.EngineProtocol
 import com.crush.mobile.data.crush.WorkspaceManager
+import com.crush.mobile.domain.model.PermissionMode
 import com.crush.mobile.engine.CrushEngine
 import com.crush.mobile.engine.EngineSockets
 import com.crush.mobile.engine.EngineState
@@ -100,8 +102,20 @@ class TwoEngineInstancesPerProjectTest {
         val managerB = WorkspaceManager(apiB)
         val stateDirA = File(context.filesDir, "crush-pa/state").absolutePath
         val stateDirB = File(context.filesDir, "crush-pb/state").absolutePath
-        val openedA = managerA.open(projectA.workspacePath, stateDirA, yolo = false)
-        val openedB = managerB.open(projectB.workspacePath, stateDirB, yolo = false)
+        // v0.100.0 removed /permissions/skip; see TwoProjectAttachTest.
+        val askWire = EngineProtocol.modeFor(PermissionMode.ASK)
+        val openedA = managerA.open(
+            projectA.workspacePath,
+            stateDirA,
+            yolo = false,
+            permissionModeWire = askWire
+        )
+        val openedB = managerB.open(
+            projectB.workspacePath,
+            stateDirB,
+            yolo = false,
+            permissionModeWire = askWire
+        )
 
         // 1. Different engines, different id spaces (fresh state dirs -> both
         //    ids are the path-derived value, but assert distinct anyway).

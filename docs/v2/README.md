@@ -40,6 +40,7 @@ the owner's trims.
 | `V2-AUDIT-FIXES.md` | 2026-11-23 audit-fix batch: nav veto, review/projects/onboarding copy, settings confirmations + draft retention, atomic engine reservation; gate 997/104/0; A7/A12/A2/A6/A13 were still open at that batch (A7/A7b closed by V2-13, A12 by V2-14) |
 | `V2-A7-PERMISSION-FAIL-CLOSED.md` | **complete (2026-11-23)**: A7/A7b permission fail-closed — `PermissionPolicyException` before `agent/init`, the bootstrap phase, reattach rejection, 4 policy tests + 9 bootstrap tests, gate `v2-14-a7-gate-2026-11-23.log`; A12 was then closed by V2-14; A2/A6/A13 remain open |
 | `V2-A12-QUESTION-ANSWERING.md` | **complete (2026-11-23)**: A12 question answering — `yes_no`/`single_choice`/`multi_choice`/`free_text` parsing, the answer dialog with Submit gating and dismiss-as-Cancel, the answer/cancel wire over the existing transport, gate `v2-16-a12-gate-2026-11-23.log`; A2/A6/A13 remain open |
+| `V2-15-DEVICE-MATRIX-VERIFICATION.md` | **Phase F device matrix (2026-11-25)**: the deferred instrumented classes (14 passed, 1 blocked by test design), TalkBack focus traversal, 1.3x font scale, Diagnostics copy/share, a live A12 `yes_no` dialog, and the extended rail as a simulated 1066 dp window; RTL, API 30+ and tablet hardware stay NOT PERFORMED with reasons |
 | `ui-block-v1.md` | the closed `ui_block/v1` contract: six block types, limits, strict whole-document rejection, security posture, rendering map, producer status |
 | `V2-7-8-codebase-inventory-2026-11-22.md` | read-only inventory of the assistant pipeline, renderers, metadata, security boundary and tests that V2-7/V2-8 must work with |
 | `V2-7-8-web-research-2026-11-22.md` | external research: A2UI, json-render, AG-UI, MCP Apps, structured outputs, native Compose examples, security; verdicts and source table |
@@ -53,6 +54,12 @@ the owner's trims.
 - 2026-11-23 A12 follow-up (V2-14): question answering is closed (parser, answer dialog, answer/cancel wire for all four question types); A2/A6/A13 remain open and no release-gating code item remains. Gate 7 stays separate.
 - Closed as not adopted: V2-8 (V2-A19); its debug lab stays as evidence,
   nothing from it ships.
+- 2026-11-25 V2-15 Phase F (device matrix, verification only): instrumented
+  classes 14 passed / 1 blocked by test design, TalkBack focus traversal, 1.3x
+  font scale, Diagnostics copy/share and a live A12 `yes_no` dialog verified on
+  `bbf8ca69`; extended rail verified as a simulated 1066 dp window. RTL,
+  API 30+ and tablet hardware stay NOT PERFORMED. Record:
+  `V2-15-DEVICE-MATRIX-VERIFICATION.md`.
 - Deferred, separate milestone: Gate 7 (signing, packaging, store listing,
   submission, rollout). It is not part of V2 and needs its own authorization.
 - Code stays project-bound; three primary destinations: Chat, Projects,

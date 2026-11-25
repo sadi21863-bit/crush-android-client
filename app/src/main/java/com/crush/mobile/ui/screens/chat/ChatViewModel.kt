@@ -2722,33 +2722,44 @@ class ChatViewModel(
         val mgr = workspaces
         val p = port
         viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            questionOps.execute(lease) {
-                val manager = mgr ?: return@execute "No workspace is attached. The question is still open."
-                val portNow = p ?: return@execute "No workspace is attached. The question is still open."
-                // Mirror resolvePermission: the dialog stays open until the POST
-                // resolves, so a failed release cannot silently strand the run.
-                if (!runCatching { manager.reattachIfStale() }.getOrDefault(false)) {
-                    AppLog.w(TAG, "question release aborted: could not re-attach; dialog kept open")
-                    return@execute "Could not reach the engine. The question is still open."
-                }
-                val ws = manager.currentWorkspaceId ?: run {
-                    AppLog.w(TAG, "question release aborted: no workspace attached; dialog kept open")
-                    return@execute "No workspace is attached. The question is still open."
-                }
-                val confirmed = runCatching { crushApi(portNow).cancelQuestions(ws) }
-                    .onFailure {
-                        AppLog.w(TAG, "question cancel failed: ${it.message}; dialog kept open")
+            questionOps.executeWithReattach(
+                lease = lease,
+                reattach = {
+                    val manager = mgr
+                    if (manager == null) {
+                        "No workspace is attached. The question is still open."
+                    } else if (!runCatching { manager.reattachIfStale() }.getOrDefault(false)) {
+                        AppLog.w(TAG, "question release aborted: could not re-attach; dialog kept open")
+                        "Could not reach the engine. The question is still open."
+                    } else {
+                        null
                     }
-                    .isSuccess
-                if (!confirmed) {
-                    return@execute "Could not cancel the question. Try again."
-                }
-                AppLog.i(
-                    TAG,
-                    "question batch ${q.id.take(12)} cancelled; agent released without an answer"
-                )
-                null
-            }
+                },
+                post = {
+                    val manager = mgr
+                    val portNow = p
+                    val ws = manager?.currentWorkspaceId
+                    if (manager == null || portNow == null || ws == null) {
+                        AppLog.w(TAG, "question release aborted: no workspace attached; dialog kept open")
+                        "No workspace is attached. The question is still open."
+                    } else {
+                        val confirmed = runCatching { crushApi(portNow).cancelQuestions(ws) }
+                            .onFailure {
+                                AppLog.w(TAG, "question cancel failed: ${it.message}; dialog kept open")
+                            }
+                            .isSuccess
+                        if (!confirmed) {
+                            "Could not cancel the question. Try again."
+                        } else {
+                            AppLog.i(
+                                TAG,
+                                "question batch ${q.id.take(12)} cancelled; agent released without an answer"
+                            )
+                            null
+                        }
+                    }
+                },
+            )
         }
     }
 
@@ -2778,32 +2789,49 @@ class ChatViewModel(
         val mgr = workspaces
         val p = port
         viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            questionOps.execute(lease) {
-                val manager = mgr ?: return@execute "No workspace is attached. The question is still open."
-                val portNow = p ?: return@execute "No workspace is attached. The question is still open."
-                if (!runCatching { manager.reattachIfStale() }.getOrDefault(false)) {
-                    AppLog.w(TAG, "question answer aborted: could not re-attach; dialog kept open")
-                    return@execute "Could not reach the engine. The question is still open."
-                }
-                val ws = manager.currentWorkspaceId ?: run {
-                    AppLog.w(TAG, "question answer aborted: no workspace attached; dialog kept open")
-                    return@execute "No workspace is attached. The question is still open."
-                }
-                val payload = QuestionAnswerBuilder.build(
-                    batchId = batch.batchId.ifBlank { q.id },
-                    answers = answers,
-                )
-                val sent = runCatching { crushApi(portNow).answerQuestions(ws, payload) }
-                    .onFailure {
-                        AppLog.w(TAG, "question answer failed: ${it.message}; dialog kept open")
+            questionOps.executeWithReattach(
+                lease = lease,
+                reattach = {
+                    val manager = mgr
+                    if (manager == null) {
+                        "No workspace is attached. The question is still open."
+                    } else if (!runCatching { manager.reattachIfStale() }.getOrDefault(false)) {
+                        AppLog.w(TAG, "question answer aborted: could not re-attach; dialog kept open")
+                        "Could not reach the engine. The question is still open."
+                    } else {
+                        null
                     }
-                    .isSuccess
-                if (!sent) {
-                    return@execute "Could not send the answer. The question is still open."
-                }
-                AppLog.i(TAG, "question batch ${batch.batchId.take(12)} answered (${answers.size} responses)")
-                null
-            }
+                },
+                post = {
+                    val manager = mgr
+                    val portNow = p
+                    val ws = manager?.currentWorkspaceId
+                    if (manager == null || portNow == null || ws == null) {
+                        AppLog.w(TAG, "question answer aborted: no workspace attached; dialog kept open")
+                        "No workspace is attached. The question is still open."
+                    } else {
+                        val payload = QuestionAnswerBuilder.build(
+                            batchId = batch.batchId.ifBlank { q.id },
+                            answers = answers,
+                        )
+                        val sent = runCatching { crushApi(portNow).answerQuestions(ws, payload) }
+                            .onFailure {
+                                AppLog.w(TAG, "question answer failed: ${it.message}; dialog kept open")
+                            }
+                            .isSuccess
+                        if (!sent) {
+                            "Could not send the answer. The question is still open."
+                        } else {
+                            AppLog.i(
+                                TAG,
+                                "question batch ${batch.batchId.take(12)} answered " +
+                                    "(${answers.size} responses)"
+                            )
+                            null
+                        }
+                    }
+                },
+            )
         }
     }
 

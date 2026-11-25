@@ -46,6 +46,83 @@ class QuestionOperationControllerTest {
     private val second = QuestionRef("q2", "batch-2")
 
     @Test
+    fun `a claim for a non-current identity is rejected`() {
+        val state = FakeState(current = second)
+        val ops = controller(state)
+
+        assertNull(ops.claim(first, QuestionOperation.SUBMIT))
+        assertNull(state.operation)
+    }
+
+    @Test
+    fun `null and empty batch ids are distinct identity keys`() {
+        val nullBatch = QuestionRef("q1", null)
+        val emptyBatch = QuestionRef("q1", "")
+        val state = FakeState(current = nullBatch)
+        val ops = controller(state)
+
+        assertNotNull(ops.claim(nullBatch, QuestionOperation.SUBMIT))
+        state.current = emptyBatch
+        assertNotNull(ops.claim(emptyBatch, QuestionOperation.SUBMIT))
+    }
+
+    @Test
+    fun `submit replaced during reattach sends no answer`() = runBlocking {
+        val state = FakeState(current = first)
+        val ops = controller(state)
+        val lease = ops.claim(first, QuestionOperation.SUBMIT)!!
+        val reattachGate = CompletableDeferred<Unit>()
+        var posts = 0
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            ops.executeWithReattach(
+                lease = lease,
+                reattach = { reattachGate.await(); null },
+                post = { posts++; null },
+            )
+        }
+
+        state.current = second
+        state.operation = null
+        state.error = null
+        reattachGate.complete(Unit)
+        job.join()
+
+        assertEquals("obsolete submit must not reach the API", 0, posts)
+        assertSame(second, state.current)
+        assertEquals(0, state.clearCount)
+        assertNull(state.error)
+        assertNull(state.operation)
+    }
+
+    @Test
+    fun `cancel replaced during reattach sends no cancel`() = runBlocking {
+        val state = FakeState(current = first)
+        val ops = controller(state)
+        val lease = ops.claim(first, QuestionOperation.CANCEL)!!
+        val reattachGate = CompletableDeferred<Unit>()
+        var posts = 0
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            ops.executeWithReattach(
+                lease = lease,
+                reattach = { reattachGate.await(); null },
+                post = { posts++; null },
+            )
+        }
+
+        state.current = second
+        state.operation = null
+        state.error = null
+        reattachGate.complete(Unit)
+        job.join()
+
+        assertEquals("obsolete cancel must not reach the API", 0, posts)
+        assertSame(second, state.current)
+        assertEquals(0, state.clearCount)
+        assertNull(state.error)
+        assertNull(state.operation)
+    }
+
+    @Test
     fun `old submit success cannot clear a newer batch`() = runBlocking {
         val state = FakeState(current = first)
         val ops = controller(state)
@@ -232,6 +309,7 @@ class QuestionOperationControllerTest {
 
         newGate.complete(Unit)
         newJob.join()
+        state.current = second
         assertNotNull("new guard releases only on its own completion", ops.claim(second, QuestionOperation.SUBMIT))
     }
 

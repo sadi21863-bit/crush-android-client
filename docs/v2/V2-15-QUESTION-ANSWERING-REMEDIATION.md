@@ -3,30 +3,34 @@
 Status: **implemented and verified, 2026-11-24.** This is the narrow
 E1/E2/E5 remediation on top of the Phase E verification. No question-answering
 redesign, no Go engine/dependency change, no device or instrumented claim. The
-work is committed on `v2-15-lifecycle-hardening` as a follow-up to `9af99c1`;
-E3/E4, process-death persistence and answer read-back remain deferred.
+work is committed on `v2-15-lifecycle-hardening` as `289de6f` (follow-up to
+`9af99c1`); the narrow stale-engine/typed-key follow-up is committed on the
+same branch as a follow-up to `289de6f`. E3/E4, process-death persistence and
+answer read-back remain deferred.
 
 ## 1. E1 — stale completion protection
 
 A question operation now captures an exact `QuestionRef(questionId, batchId)`.
-`QuestionOperationController.execute()` performs every terminal transition only
-when `current() == lease.ref`:
+`QuestionOperationController`:
 
-- success clears the pending question only for the claimed identity;
-- failure sets `questionError` only for the claimed identity;
-- the in-flight marker is cleared only for the claimed identity;
-- a stale completion releases only its own guard entry and never touches a
-  newer batch.
+- rejects a claim outright when that identity is no longer current;
+- keys the in-flight guard by the typed `QuestionRef` itself (no string
+  encoding, so null/empty batch ids cannot collide);
+- revalidates the lease after reattachment and immediately before the POST;
+- performs every terminal transition only when `current() == lease.ref`.
 
-This covers both Submit and Cancel. A failed operation still keeps its own
-dialog open with the existing error strings; a stale failure cannot overwrite a
-newer batch's error.
+`executeWithReattach()` owns the reattach → identity-revalidate → POST sequence.
+A batch replaced while reattachment is suspended returns without invoking the
+POST at all, so an obsolete answer/cancel sends zero HTTP requests. Success
+clears only the claimed batch; failure sets `questionError` only on it; a stale
+completion cannot touch a newer batch. This covers both Submit and Cancel.
 
 ## 2. E2 — single in-flight operation
 
 `QuestionOperationController.claim()` is synchronous and `@Synchronized`:
 
-- the guard is keyed by `(questionId, batchId)`;
+- the guard is keyed by the typed `(questionId, batchId)` ref;
+- a claim whose identity is already stale is rejected outright;
 - a second claim for the same identity returns null, so no coroutine/POST is
   created;
 - Submit and Cancel share the same key, making them mutually exclusive;
@@ -62,7 +66,7 @@ Invalid submissions get `questionError` and never reach the engine.
 
 | File | Change |
 |---|---|
-| `QuestionLifecycle.kt` (new) | `QuestionOperation`, `QuestionRef`, token lease, synchronous per-identity guard, identity-checked `execute()` |
+| `QuestionLifecycle.kt` (new) | `QuestionOperation`, `QuestionRef`, token lease, synchronous per-identity guard, stale-claim rejection, identity-checked `execute()`, and `executeWithReattach()` revalidation before POST |
 | `QuestionBatch.kt` | `QuestionAnswerValidator` |
 | `ChatViewModel.kt` | synchronous claim, UNDISTPATCHED execute, identity-checked callbacks, new-batch operation reset, validator before HTTP |
 | `ChatViewState.kt` | `questionOperation` projection into `QuestionView.operation` |
@@ -74,37 +78,38 @@ No unrelated UI or architecture work.
 
 | Class | Tests | Focus |
 |---|---:|---|
-| `QuestionOperationControllerTest` | 12 | stale success/failure, duplicate Submit/Cancel, mutual exclusion, failure retry, cancellation, new-batch concurrency, guard release |
+| `QuestionOperationControllerTest` | 16 | stale success/failure, stale-claim rejection, null/empty identity keys, duplicate Submit/Cancel, mutual exclusion, failure retry, cancellation, new-batch concurrency, replacement-during-reattach zero-POST for both Submit/Cancel |
 | `QuestionAnswerValidatorTest` | 7 | ids exactly once, unexpected/duplicate ids, choice ownership, kind shape, false yes, UNKNOWN |
 | `QuestionDialogTest` | 9 | existing 7 + both buttons disabled in flight + new batch does not inherit operation state |
 | `QuestionBatchParserTest` | 8 | unchanged parser contract |
 | `QuestionAnswerBuilderTest` | 4 | unchanged wire contract |
 | `ChatViewStateTest` | 19 | unchanged projection |
 
-Focused run: **59 tests / 6 classes / 0 failures** in 2m48s
-(`v2-49-phaseE-remediation-focused-final.log`). Full gate: **1083 tests / 117
-suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1 pre-existing
-warning** in 22m29s (`v2-50-phaseE-remediation-gate.log`). The new suites are
-`QuestionOperationControllerTest` (12) and `QuestionAnswerValidatorTest` (7);
-`QuestionDialogTest` grew 7 → 9.
+Focused run: **63 tests / 6 classes / 0 failures** in 1m26s
+(`v2-57-phaseE-followup-final.log`). Full gate: **1087 tests / 117 suites / 0
+failures / 0 errors / 0 skipped**, lint **0 errors / 1 pre-existing warning** in
+21m37s (`v2-61-phaseE-followup-gate2.log`).
 
 ## 6. Mutation evidence
 
 | Mutation | Result |
 |---|---|
-| Identity check removed from `execute()` | **FAILED as intended** — stale submit/cancel success cleared the newer batch; stale failure overwrote the newer error; new-batch guard test failed (`v2-47-phaseE-mutation-identity2.log`) |
-| Operation-guard check removed from `claim()` | **FAILED as intended** — duplicate submits/cancels and mutual-exclusion tests failed; old completion released the newer guard (`v2-48-phaseE-mutation-guard.log`) |
+| Identity check removed from `execute()` | **FAILED as intended** — stale submit/cancel success cleared the newer batch; stale failure overwrote the newer error; new-batch guard test failed (`v2-47-phaseE-mutation-identity2.log`, previous remediation pass) |
+| Operation-guard check removed from `claim()` | **FAILED as intended** — duplicate submits/cancels and mutual-exclusion tests failed; old completion released the newer guard (`v2-48-phaseE-mutation-guard.log`, previous remediation pass) |
+| Stale-engine revalidation removed from `executeWithReattach()` | **FAILED as intended** — replacement during reattachment posted the obsolete submit and cancel (`expected 0, was 1` in both; `v2-59-phaseE-mutation-stale-engine2.log`, final code) |
 
-The controller was restored byte-identically after each mutation (SHA-256
-`1513A1DDAEF6795B1173C7DE1093394A9E2023723C706E5F99E50A91A46F6598`).
+The controller was restored byte-identically after each mutation. The final
+`QuestionLifecycle.kt` SHA-256 is
+`9281764B609B84A8C004D47E765FF1FE8751EC7B473A411A96D09122186E3BBD`.
 
 ## 7. Full gate
 
 `:app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintRelease`
 
-**BUILD SUCCESSFUL in 22m29s**; **1083 tests / 117 suites / 0 failures / 0 errors /
-0 skipped**; lint **0 errors / 1 pre-existing warning**; both APK assemblies
-completed (`v2-50-phaseE-remediation-gate.log`).
+**BUILD SUCCESSFUL in 21m37s**; **1087 tests / 117 suites / 0 failures /
+0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning**; both APK
+assemblies completed (`v2-61-phaseE-followup-gate2.log`; the test task was
+up-to-date from the immediately preceding run, then lint completed).
 
 ## 8. Deferred / limitations
 
@@ -119,6 +124,6 @@ completed (`v2-50-phaseE-remediation-gate.log`).
 
 ## 9. State
 
-Branch `v2-15-lifecycle-hardening` remains at the `9af99c1` history; this
-remediation is committed on the same branch as a follow-up. No PR, issue or
-merge was made.
+Branch `v2-15-lifecycle-hardening` remains at the `289de6f` history; the
+stale-engine and typed-key follow-up is committed on the same branch as a
+follow-up. No PR, issue or merge was made.

@@ -125,6 +125,8 @@ No test was removed or weakened in this batch.
 | Phase E question-answering focused | **BUILD SUCCESSFUL in 1m16s**; **38 tests / 4 classes / 0 failures / 0 errors / 0 skipped** (`v2-42-phaseE-focused-final.log`); no production change, so the full gate was not rerun |
 | Phase E remediation focused | **BUILD SUCCESSFUL in 2m48s**; **59 tests / 6 classes / 0 failures** (`v2-49-phaseE-remediation-focused-final.log`) |
 | Phase E remediation full gate | **BUILD SUCCESSFUL in 22m29s**; **1083 tests / 117 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-50-phaseE-remediation-gate.log`) |
+| Phase E follow-up focused | **BUILD SUCCESSFUL in 1m26s**; **63 tests / 6 classes / 0 failures** (`v2-57-phaseE-followup-final.log`) |
+| Phase E follow-up full gate | **BUILD SUCCESSFUL in 21m37s**; **1087 tests / 117 suites / 0 failures / 0 errors / 0 skipped**; lint **0 errors / 1 pre-existing warning** (`v2-61-phaseE-followup-gate2.log`) |
 
 The full gate runs `:app:testDebugUnitTest :app:assembleDebug
 :app:assembleDebugAndroidTest :app:lintRelease`.
@@ -252,17 +254,19 @@ dialog, wire and lifecycle contracts. Full detail is in
   not rerun; the latest full gate (`v2-38-reattach-gate.log`) is 1061/115/0 and
   predates the new UI test.
 
-**Remediation (2026-11-24, committed on the same branch as a follow-up to
-`9af99c1`).** E1 and E2 are fixed at the
+**Remediation (2026-11-24, committed as `289de6f`, follow-up to `9af99c1`) +
+stale-engine follow-up.** E1 and E2 are fixed at the
 question-operation lifecycle boundary. `QuestionOperationController` captures
-the exact batch identity, claims synchronously, keys the guard by identity,
-checks identity before every clear/error/operation write, and releases in
-`finally`; `QuestionAnswerValidator` rejects malformed answers before any
-claim/HTTP (E5). The dialog disables Submit and Cancel while an operation is in
-flight. Focused remediation: **59 tests / 6 classes / 0 failures** (2m48s);
-mutations removing identity protection and the operation guard failed as
-intended; full gate **1083/117/0**, lint 0/1, 22m29s
-(`v2-50-phaseE-remediation-gate.log`). Detail:
+the exact batch identity, rejects stale claims, keys the guard by typed
+`QuestionRef`, revalidates after reattachment before the POST, checks identity
+before every clear/error/state write, and releases in `finally`;
+`QuestionAnswerValidator` rejects malformed answers before any claim/HTTP
+(E5). The dialog disables Submit and Cancel while an operation is in flight.
+Focused remediation: **59 tests / 6 classes / 0 failures** (2m48s); the
+stale-engine follow-up is **63 tests / 6 classes / 0 failures** (1m26s).
+Mutations removing identity protection, the operation guard and stale-engine
+revalidation failed as intended; full gate **1087/117/0**, lint 0/1, 21m37s
+(`v2-61-phaseE-followup-gate2.log`). Detail:
 `docs/v2/V2-15-QUESTION-ANSWERING-REMEDIATION.md`.
 
 Deferred findings (still not fixed):
@@ -285,8 +289,9 @@ Deferred findings (still not fixed):
   same branch; no PR or issue was created for it. The serialization follow-up
   is committed as `3a261e6`. The reattach fast-path follow-up is committed on
   the same branch. Phase E adds only the batch-replacement test and reports;
-  it is committed on the same branch. The E1/E2/E5 remediation is committed on
-  the same branch.
+  it is committed on the same branch. The E1/E2/E5 remediation is committed as
+  `289de6f`; the stale-engine/typed-key follow-up is committed on the same
+  branch.
 - All V2-15 reports, test evidence and implementation changes are preserved.
 - No historical record was rewritten; the Phase C and correction reports state
   what was and was not executed.

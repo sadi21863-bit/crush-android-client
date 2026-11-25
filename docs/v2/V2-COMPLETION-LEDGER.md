@@ -149,6 +149,13 @@ tracked; the gate logs cited in §4 sit at the repo root and are not.
   failures** in 2m48s; full gate **1083 tests / 117 suites / 0 failures / 0
   errors / 0 skipped**, lint **0 errors / 1 pre-existing warning** in 22m29s
   (`v2-50-phaseE-remediation-gate.log`).
+- V2-15 Phase E stale-engine follow-up adds 4 `@Test` methods (controller
+  12 → 16): stale-claim rejection, null/empty identity keys, and
+  replacement-during-reattach zero-POST for Submit and Cancel. Focused **63
+  tests / 6 classes / 0 failures** in 1m26s; full gate **1087 tests / 117
+  suites / 0 failures / 0 errors / 0 skipped**, lint **0 errors / 1 pre-existing
+  warning** in 21m37s (`v2-61-phaseE-followup-gate2.log`); the stale-engine
+  mutation failed as intended (`v2-59-phaseE-mutation-stale-engine2.log`).
 - Instrumented: 6 classes / 15 `@Test` methods exist under `app/src/androidTest`;
   only `SecureKeyStoreInstrumentedTest` (3 tests) has a stored device run.
 - `:app:assembleDebugAndroidTest` compiles the test APK in every gate. Compiling
@@ -340,7 +347,7 @@ device/TalkBack run. Detail:
 `docs/v2/V2-15-QUESTION-ANSWERING-VERIFICATION.md`.
 
 **V2-15 Phase E remediation (2026-11-24, committed on
-`v2-15-lifecycle-hardening` as a follow-up to `9af99c1`).** E1/E2 are fixed at
+`v2-15-lifecycle-hardening` as `289de6f`).** E1/E2 are fixed at
 the question-operation boundary: `QuestionOperationController` captures the
 exact `(questionId, batchId)`, claims synchronously, keys the in-flight guard by
 that identity, and only clears/errors/clears-operation when the displayed
@@ -358,6 +365,20 @@ tests and mutation of the guard failed the duplicate/mutual-exclusion tests
 (`v2-50-phaseE-remediation-gate.log`). E3/E4, process-death persistence, answer
 read-back and device/TalkBack remain deferred. Detail:
 `docs/v2/V2-15-QUESTION-ANSWERING-REMEDIATION.md`.
+
+**V2-15 Phase E stale-engine follow-up (2026-11-24, committed on
+`v2-15-lifecycle-hardening` as a follow-up to `289de6f`).**
+`QuestionOperationController.claim()` now rejects a non-current identity, the
+guard is keyed by the typed `QuestionRef` (no string encoding/null-empty
+collision), and `executeWithReattach()` revalidates the lease after
+reattachment before invoking the POST. A batch replaced while reattachment is
+suspended therefore sends zero answer/cancel requests; both Submit and Cancel
+are covered by deterministic replacement tests. Mutation of this revalidation
+posted the obsolete submit and cancel (`expected 0, was 1`), proving the tests
+are meaningful (`v2-59-phaseE-mutation-stale-engine2.log`). Focused 63/63
+green; full gate **1087/117/0**, lint 0/1, 21m37s
+(`v2-61-phaseE-followup-gate2.log`). E3/E4 and the previously deferred limits
+are unchanged.
 
 **Device-matrix decision (2026-11-23).** No emulator CI job was added in this
 batch. The rows stay NOT PERFORMED because: the local machine reports no

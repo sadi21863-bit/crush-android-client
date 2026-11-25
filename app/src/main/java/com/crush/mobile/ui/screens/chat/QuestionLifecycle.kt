@@ -41,19 +41,31 @@ internal class QuestionOperationController(
     private val onClear: (QuestionRef) -> Unit,
 ) {
 
-    private val active = HashMap<String, QuestionOperationLease>()
+    private val active = HashMap<QuestionRef, QuestionOperationLease>()
     private var nextToken = 0L
 
-    /** Claims synchronously; returns null when this batch already has an operation. */
+    /**
+     * Claims synchronously. A stale identity (no longer current) is rejected
+     * outright, as is a second operation for the same identity. Because the
+     * map is keyed by [QuestionRef], null/empty batch ids cannot collide and no
+     * custom string encoding is involved.
+     */
     @Synchronized
     fun claim(ref: QuestionRef, operation: QuestionOperation): QuestionOperationLease? {
-        val key = keyOf(ref)
-        if (active.containsKey(key)) return null
+        if (current() != ref) return null
+        if (active.containsKey(ref)) return null
         val lease = QuestionOperationLease(ref, operation, ++nextToken)
-        active[key] = lease
-        if (current() == ref) onOperation(ref, operation)
+        active[ref] = lease
+        onOperation(ref, operation)
         return lease
     }
+
+    /**
+     * True only while the claimed batch is still the displayed batch.
+     * ChatViewModel revalidates this after reattachment and immediately before
+     * issuing the HTTP request.
+     */
+    fun isCurrent(lease: QuestionOperationLease): Boolean = current() == lease.ref
 
     /**
      * Runs one already-claimed operation. [block] returns null on success or a
@@ -75,12 +87,26 @@ internal class QuestionOperationController(
         }
     }
 
-    @Synchronized
-    private fun release(lease: QuestionOperationLease) {
-        val key = keyOf(lease.ref)
-        if (active[key]?.token == lease.token) active.remove(key)
+    /**
+     * The ChatViewModel operation sequence: reattach, revalidate the identity,
+     * then issue the POST. A batch replaced while reattachment is suspended
+     * returns without invoking [post] (zero HTTP requests).
+     */
+    suspend fun executeWithReattach(
+        lease: QuestionOperationLease,
+        reattach: suspend () -> String?,
+        post: suspend () -> String?,
+    ) {
+        execute(lease) {
+            val reattachError = reattach()
+            if (reattachError != null) return@execute reattachError
+            if (!isCurrent(lease)) return@execute null
+            post()
+        }
     }
 
-    private fun keyOf(ref: QuestionRef): String =
-        ref.questionId + "\u0000" + (ref.batchId ?: "")
+    @Synchronized
+    private fun release(lease: QuestionOperationLease) {
+        if (active[lease.ref]?.token == lease.token) active.remove(lease.ref)
+    }
 }

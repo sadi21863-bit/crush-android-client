@@ -3,13 +3,16 @@
 Status: **implementation + Phase C validation + post-push L2 correction +
 Phase D permission-policy verification + Phase D serialization follow-up +
 reattach fast-path follow-up + Phase E question-answering verification +
-A12 lifecycle remediation, 2026-11-24.** The initial batch is
-committed and pushed as `1990118` on
+A12 lifecycle remediation + Phase F device matrix, 2026-11-25.** The initial
+batch is committed and pushed as `1990118` on
 `v2-15-lifecycle-hardening` (not merged into `main`); the L2 terminal-startup
 correction is committed on the same branch as a follow-up to `1990118`. No
 merge, PR, issue or tag; no Go-engine or dependency change. Device PSS/stop
 census was performed on `bbf8ca69` (1 project child + legacy); a 3-child
-sample, instrumented execution and TalkBack remain **NOT PERFORMED**.
+sample, instrumented execution and TalkBack were **performed in Phase F**
+(§10 — five of six classes green, one blocked by test design). API 30+,
+tablet/foldable hardware, RTL, TalkBack speech content and three question
+kinds remain **NOT PERFORMED**.
 
 This report ties the V2-15 batches together:
 
@@ -33,10 +36,14 @@ This report ties the V2-15 batches together:
 | `ui/screens/chat/ChatViewModel.kt` | L3 `registeredConnectionKey` captured at successful attach; stale check and `onCleared` use it, never the mutable `instanceKey` |
 | `engine/EngineSupervisor.kt` | L4 test-only `hasActiveSupervisionForTest()` seam; post-push L2 correction calls `stopBlocking()` in the terminal `Failed` branch before publishing the state |
 | `data/crush/WorkspaceManager.kt` | Phase D: clear `lastAttachedAtMs` when claiming a new id and flush id/generation/lease on `CancellationException`; follow-ups add a companion per-path `Mutex` around `open()` and move `reattachIfStale()`'s fast path under that lock (calling `openLocked()` to avoid recursion); no request-shape or policy-mapping change |
+| `ui/screens/chat/QuestionLifecycle.kt` | **Phase E (new file):** `QuestionOperationController` — synchronous per-identity claim, identity-checked success/error/clear, typed `QuestionRef` keys, token-guarded release, and `executeWithReattach()` revalidating the identity after reattachment and before the POST |
+| `ui/screens/chat/QuestionBatch.kt` | **Phase E:** `QuestionAnswerValidator` — rejects wrong count, blank/duplicate/unexpected prompt ids, foreign choice ids and wrong prompt-kind shape before any claim or HTTP |
+| `ui/screens/chat/QuestionDialog.kt` | **Phase E:** both Submit and Cancel disabled while an operation is in flight (`busy`) |
+| `ui/screens/chat/ChatViewState.kt` | **Phase E:** `QuestionView.operation` projects the in-flight state so the dialog can disable its buttons |
 
-No other production file changed. Phase C itself added only the `Int` return
-from `shutdown()`; the post-push correction adds the terminal `stopBlocking()`
-call. L1 and L3 behaviour is unchanged.
+No production file outside this table changed on the branch. The L1-L5/Phase D
+batch changed the first seven rows; Phase E added the last four (the A12
+lifecycle remediation, committed as `289de6f` and `1111b37`).
 
 ## 2. What each finding now guarantees
 
@@ -179,14 +186,14 @@ override.
 | Device PSS + post-stop census | **performed** | `bbf8ca69`, debug build, 1 legacy + 1 project child; see §5 and `docs/parity/v2-15-device/`. |
 | 3-child PSS | NOT PERFORMED | ordinary switching stops the outgoing non-legacy engine; needs the run-in-flight/handoff path or a budget override (separate experiment). |
 | Thread census after stop | NOT PERFORMED | child/socket census performed; thread count per process was not sampled. |
-| Instrumented / TalkBack | NOT PERFORMED | no instrumented run or TalkBack session in this phase. |
+| Instrumented / TalkBack | **partly performed in Phase F** | Phase F ran the five previously unexecuted instrumented classes (14 tests green) and a TalkBack focus traversal; `MainActivityLockFlowTest`'s recreation test is blocked by test design, and TalkBack speech content is not captured. |
 | Effective permission-mode read-back | **does not exist** | the spec exposes `yolo`/`skip` booleans, not the v0.100.0 mode enum; a 2xx apply remains the only proof (Phase D §5). |
 | Phase D device validation | NOT PERFORMED | the Phase D scenario matrix is JVM/MockWebServer; no device re-run of `/permissions/mode` or engine restart. |
 | Question lifecycle E1/E2 | **fixed** | `QuestionOperationController`: identity-checked completion and synchronous per-identity claim; stale completions cannot clear/overwrite a newer batch, duplicate Submit/Cancel is prevented |
 | Question answer validation E5 | **fixed** | `QuestionAnswerValidator` rejects duplicate/unexpected prompt ids, foreign choice ids, wrong prompt-kind shape and UNKNOWN before any claim/HTTP; `yes = false` preserved |
 | Question lifecycle E3/E4 | **deferred** | app-side session/run ownership and engine-generation identity for pending questions remain documented limitations; process-death persistence is not implemented |
 | Question answer read-back | **does not exist** | a 2xx on `/questions/answer` is the only proof the engine accepted the ids. |
-| Question device/Compose coverage | NOT PERFORMED | Phase E focused tests are JVM/Robolectric; no device, TalkBack or API 30+ run. |
+| Question device/Compose coverage | **partly performed in Phase F** | the `yes_no` dialog was driven end-to-end on device (§10); `single_choice`, `multi_choice` and `free_text` remain JVM/Robolectric-only. |
 
 ## 7. Phase D — permission-policy verification (2026-11-24)
 
@@ -276,7 +283,8 @@ Deferred findings (still not fixed):
   fire-and-forget report falls back to workspace broadcast.
 - **E4:** a pending question has no engine-generation identity; after a restart
   the old dialog can remain until an answer/cancel fails or the user cancels.
-- No answer read-back, no process-death persistence, no device/TalkBack run.
+- No answer read-back and no process-death persistence. Phase F (§10) added a
+  device/TalkBack run for the `yes_no` dialog and focus traversal only.
 
 ## 9. Restrictions honored
 

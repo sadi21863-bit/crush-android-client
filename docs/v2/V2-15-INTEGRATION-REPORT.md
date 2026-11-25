@@ -311,7 +311,7 @@ Phase F executed the deferred matrix rows on the only available device
 | `SecureKeyStoreInstrumentedTest` | 3/3 PASS (0.287s) |
 | `ProjectStoreRoomPersistenceTest` | 2/2 PASS (0.286s) |
 | `MainActivitySmokeTest` | 2/2 PASS (401.11s, MIUI-deferred) |
-| `TwoProjectAttachTest` | 1/1 PASS (4.293s) after the v0.100.0 permission-wire fix |
+| `TwoProjectAttachTest` | 1/1 PASS (4.293s) after the v0.100.0 permission-wire fix (test supplies the wire; production version selection is not covered by it) |
 | `TwoEngineInstancesPerProjectTest` | 1/1 PASS (6.463s) after the same fix |
 | `MainActivityLockFlowTest` | 5 PASS, 1 BLOCKED (test design) |
 
@@ -337,3 +337,11 @@ Phase F executed the deferred matrix rows on the only available device
   an explicit launcher-category `am start` arrives; wall times are not test
   times. One lock-suite run was killed externally by MIUI `OneKeyClean`
   (signal 9) and is not counted as a failure.
+- **Timing correction (2026-11-25):** the FLAG_SECURE test's JUnit
+  `Time: 1,432.201` is **1432.201 s**, not 1.432 s (the comma is a thousands
+  separator). The value includes the scenario's wait for RESUMED, so it is not
+  an assertion duration.
+- **Not CI-confirmed:** GitHub reports no Actions run and no commit status for
+  the pushed Phase F commit (`android-ci.yml` runs on `main` pushes and pull
+  requests only). All Phase F results are local instrumentation evidence and
+  raw logs.

@@ -81,7 +81,7 @@ Full narrative, verdicts and NOT PERFORMED reasons:
 | `v2-78-phaseF-twoengine-rerun.log` | `TwoEngineInstancesPerProjectTest` OK (1 test), 6.463s. |
 | `v2-79-phaseF-lockflow.log` | Lock suite: tests 1–3 pass, test 4 interrupted by MIUI `OneKeyClean` (signal 9). |
 | `v2-80-phaseF-lock-keystore-roundtrip.log` | Keystore round-trip test OK (0.149s). |
-| `v2-81-phaseF-lock-foreground-flag.log` | FLAG_SECURE test OK (1.432s test time, ~24 min MIUI wait). |
+| `v2-81-phaseF-lock-foreground-flag.log` | FLAG_SECURE test OK; `Time: 1,432.201` = 1432.201 s (23m52.2 s), including the ~24 min MIUI wait for RESUMED. |
 | `v2-82-phaseF-lock-recreation.log` | Recreation test attempt A: `recreate()` timeout behind the credential screen. |
 | `v2-83-phaseF-lock-recreation-retry.log` | Recreation test attempt B: `expected:<PROMPT> but was:<OPEN>` after a real unlock. |
 

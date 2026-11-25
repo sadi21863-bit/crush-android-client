@@ -393,7 +393,13 @@ activity PAUSED past `recreate()`'s timeout, and a real unlock legitimately turn
 `PROMPT` into `OPEN`); it is a test-design limit, not an app defect, and the
 decision inputs stay pinned by `LockStateTest` (9). The two engine-isolation
 classes failed only because they predated the `v0.100.0` permission wire; they
-now pass `EngineProtocol.modeFor(ASK)` and needed no production change.
+now pass `EngineProtocol.modeFor(ASK)` and needed no production change (the tests
+supply the wire directly, so they do not cover the production version-selection
+path). Correction (same day): the FLAG_SECURE test's `Time: 1,432.201` is
+**1432.201 s**, not 1.432 s — the figure includes the MIUI wait for RESUMED and
+is not an assertion duration. GitHub reports no Actions run and no commit status
+for the pushed commit (`android-ci.yml` runs on `main` pushes and pull requests
+only), so every Phase F result is local evidence, not a CI result.
 
 UI rows: 1.3x font scale PASS; Diagnostics copy (toast) and share
 (`ChooserActivity`) PASS; A12 `yes_no` dialog PASS end-to-end against a real

@@ -60,6 +60,13 @@ both now pass `EngineProtocol.modeFor(PermissionMode.ASK)` (`"normal"`) through
 changed for them. First (failing) runs are `v2-74`/`v2-75`; the passing reruns
 are `v2-77`/`v2-78`.
 
+Scope limit: because the tests supply the wire **directly**, they prove that the
+engine accepts `"normal"` and that two projects attach in isolation — they do
+**not** exercise the production version-negotiation path inside
+`EngineProtocol` (which picks the family from the observed engine version). That
+selection remains covered by the JVM `EngineProtocol`/bootstrap tests only, and
+the passing device runs must not be read as device proof of it.
+
 ### 2.2 `MainActivityLockFlowTest` — six tests
 
 | # | Test | Result | Evidence |
@@ -67,7 +74,7 @@ are `v2-77`/`v2-78`.
 | 1 | `keySessionRequireServesTheKeyButNeverCachesIt` | **PASS** | `v2-79` (`STATUS_CODE 0`) |
 | 2 | `freshProcessWithStoredCredentialHoldsNoDecryptedKey` | **PASS** | `v2-79` |
 | 3 | `realCipherTamperedCiphertextClearsTheSlot` | **PASS** | `v2-79` |
-| 4 | `foregroundWindowFlagAgreesWithTheLockGate` | **PASS** | `v2-81` (1.432s test time) |
+| 4 | `foregroundWindowFlagAgreesWithTheLockGate` | **PASS** | `v2-81` (`Time: 1,432.201` = 1432.201 s, matching the 1437.05 s wall) |
 | 5 | `secureKeyStoreRealCipherRoundTripAndPerProviderIsolation` | **PASS** | `v2-80` (0.149s, 5.76s wall) |
 | 6 | `recreationKeepsGateDecisionAndLockStateObject` | **BLOCKED** | `v2-82`, `v2-83` |
 
@@ -84,8 +91,13 @@ Run history, all of it recorded:
 - **Test 4 rerun alone (`v2-81`).** `ActivityScenario` waited ~24 minutes for
   its activity start. Issuing the exact launcher intent
   (`am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER
-  -n com.crush.mobile/.MainActivity`) unblocked it; the test then passed in
-  1.432s. A plain `am start -n …/.MainActivity` was ignored by
+  -n com.crush.mobile/.MainActivity`) unblocked it; the test then passed.
+  **The log's `Time: 1,432.201` is 1432.201 s (23m52.2 s), not 1.432 s** — the
+  comma is a thousands separator on this `en-IN` device, and the value agrees
+  with the 1437.05 s wall clock. JUnit reports one duration for the whole test
+  method, so that figure **includes** the scenario's wait for RESUMED; the log
+  does not separate assertion time from launch wait. A plain
+  `am start -n …/.MainActivity` was ignored by
   `ActivityScenario` (`activity.getIntent()` did not match the scenario's
   `flg=0x10008000` intent) and did not unblock it.
 - **Test 6, attempt A (`v2-82`).** No unlock: `ActivityScenario.recreate()` threw
@@ -231,8 +243,9 @@ a verification pass; the row stays NOT PERFORMED rather than being claimed.
 The lock-suite process started at 11:48:25, but tests 1–3 only ran at
 11:59:46–48 — roughly 11 minutes later. Test 4 then sat until an explicit
 launcher-category `am start` was issued. `MainActivitySmokeTest` shows the same
-class of delay: `Time: 401.11` for two tests whose assertions take
-milliseconds. The app was not hung (`alive t=…` heartbeats continued at 30s
+class of delay: `Time: 401.11` for a launch-and-check body (`activityReaches…`),
+where the JUnit duration again includes the scenario's wait. The app was not
+hung (`alive t=…` heartbeats continued at 30s
 intervals the whole time) and bootstrapping worked once the activity resumed
 (`ChatViewModel: permissionMode=ASK providerId=opencode-go`). The delay is
 MIUI's background-activity-start policy for an instrumentation process, not an
@@ -251,6 +264,13 @@ key masker matches the engine's UUID-shaped tool-call id. This is log-cosmetic
   RTL, no TalkBack speech, no `single_choice`/`multi_choice`/`free_text` device
   dialog, no cross-process question persistence and no answer read-back.
 - No JVM or Robolectric suite was rerun in Phase F; the last full gate remains
-  `v2-61-phaseE-followup-gate2.log` (1087/117/0). The instrumented APK was
-  rebuilt from the current tree, so the compiled state matches the working tree.
-- No CI run, PR, merge or issue exists for Phase F.
+  Phase E's `v2-61-phaseE-followup-gate2.log` (**1087 tests / 117 suites / 0
+  failures**, lint 0 errors / 1 warning). The instrumented APK was rebuilt from
+  this working tree, so the *compiled* state is current; the *JVM suite result*
+  is a Phase E result, not a Phase F one.
+- **Not CI-confirmed.** The Phase F commit is pushed to
+  `v2-15-lifecycle-hardening`, but GitHub reports **no Actions run and no commit
+  status** for it: `android-ci.yml` triggers on `main` pushes and pull requests
+  only. Every passing result in this record is local instrumentation evidence and
+  raw logs, not an independently confirmed CI result.
+- No PR, merge or issue exists for Phase F.

@@ -20,13 +20,17 @@ records on every claim inspected; no production defect was found; the
 outstanding items are documented limitations and owner decisions, not
 undisclosed behaviour.
 
-Two conditions before a merge is requested:
+**Owner decisions (2026-11-25), recorded after this review:**
 
-1. **Engine-version record conflict** (R12) must be resolved or explicitly
-   accepted — the branch runs `v0.100.0`, the ledger still records the bundled
-   version as `0.98.1` and "keeps the conflict".
-2. **E3/E4 and the process-death/read-back limits** must be accepted as
-   limitations of the release, not silently carried.
+1. **R12 settled — `v0.100.0` is the engine version of record** for this
+   baseline (V2-A20). The `0.98.1` references are historical bundle
+   references, kept as history. Qualification: this confirms the declared
+   baseline and the binary actually run, not an independent audit of the Go
+   engine or of every packaged artifact.
+2. **R1, R2, R7, R10 accepted as documented limitations** — not as proof of
+   release readiness. E3/E4 stay correctness concerns for future architecture;
+   R7 needs a defined release-device matrix before a broad release; R10 is an
+   accepted lifecycle trade-off, not guaranteed cleanup.
 
 Three documentation corrections were required and are made in this review
 (§7). They were the only disagreements found between docs and code.
@@ -178,18 +182,18 @@ accept.
 
 | ID | Risk | Sev | State | Blocks merge |
 |---|---|---|---|---|
-| R1 | **E3** — a pending question carries no `session_id`/`run_id`; the answer is posted to the engine's current session. One project chat at a time makes this benign; concurrent asks could be answered against the wrong session. | Med | deferred, documented | Owner decision |
-| R2 | **E4** — a pending question has no engine-generation identity; after an engine restart the stale dialog survives until an answer/cancel fails or the user cancels. | Med | deferred, documented | Owner decision |
+| R1 | **E3** — a pending question carries no `session_id`/`run_id`; the answer is posted to the engine's current session. One project chat at a time makes this benign; concurrent asks could be answered against the wrong session. | Med | **accepted 2026-11-25** as a documented limitation; stays a correctness concern for future architecture | No |
+| R2 | **E4** — a pending question has no engine-generation identity; after an engine restart the stale dialog survives until an answer/cancel fails or the user cancels. | Med | **accepted 2026-11-25** as a documented limitation; stays a correctness concern for future architecture | No |
 | R3 | No process-death persistence for a pending question; the batch is lost with the process and the blocked run is abandoned. | Low | documented | No |
 | R4 | No answer read-back; a 2xx on `/questions/answer` is the only proof of acceptance. | Low | documented | No |
 | R5 | Free-text question UI has no Compose test (Robolectric cursor loop); only the wire mapping is pinned. | Low | documented | No |
 | R6 | `recreationKeepsGateDecisionAndLockStateObject` cannot run on a device with the system credential prompt; JVM `LockStateTest` (9) is the coverage. | Low | blocked, test-only | No |
-| R7 | Device matrix gaps: API 30+, tablet/foldable, RTL, TalkBack speech, `single_choice`/`multi_choice`/`free_text` dialogs, real extended-rail hardware. | Med | NOT PERFORMED | Owner decision (release scope) |
+| R7 | Device matrix gaps: API 30+, tablet/foldable, RTL, TalkBack speech, `single_choice`/`multi_choice`/`free_text` dialogs, real extended-rail hardware. | Med | **accepted for the V2-15 scope 2026-11-25; not cleared for a broad production release** — a release-device matrix is still required | No for merge; release gate |
 | R8 | **A2** — project home is still a modal sheet; owner design decision. | Low | open by design | No |
 | R9 | **A6** — `chat` route + `codeActive` carry two meanings; works as built, monitor only. | Low | open, monitor | No |
-| R10 | **A13** — runtime disposal: stop/restart paths are verified, but `onTerminate()` is not guaranteed by Android, so process death relies on the engine's idle timeout for cleanup. Documented at the call site; shutdown-on-process-termination is NOT PERFORMED. | Med | documented limitation | Owner decision |
+| R10 | **A13** — runtime disposal: stop/restart paths are verified, but `onTerminate()` is not guaranteed by Android, so process death relies on the engine's idle timeout for cleanup. Documented at the call site; shutdown-on-process-termination is NOT PERFORMED. | Med | **accepted 2026-11-25** as an Android lifecycle trade-off, not guaranteed cleanup | No |
 | R11 | 3-child PSS and per-process thread census were never measured; the budget claim rests on a 2-child sample. | Low | NOT PERFORMED | No |
-| R12 | **Engine-version record conflict:** `README.md` names v0.100.0 as the engine of record, the ledger still records the bundled version as 0.98.1 and "keeps the conflict"; the device reports `v0.100.0`. A future fetch could pick the wrong binary. | Med | **unresolved** | **Yes, unless accepted** |
+| R12 | **Engine-version record conflict:** `README.md` names v0.100.0 as the engine of record, the ledger still records the bundled version as 0.98.1 and "keeps the conflict"; the device reports `v0.100.0`. A future fetch could pick the wrong binary. | Med | **resolved 2026-11-25 (V2-A20):** `v0.100.0` is the version of record; `0.98.1` is classified historical. Qualification: declared baseline, not an independent engine audit | No |
 | R13 | Issue #2: x86_64 emulator with ARM native bridge SIGSEGVs in the Go runtime; README qualification deferred. | Low | open, deferred | No |
 | R14 | CI is engine-less by design and the branch has **no CI run**; a green CI would prove compile + JVM + lint only. | Med | structural | No (state it in the PR) |
 | R15 | Gate 7 (signing, listing, submission, rollout) is untouched and needs its own authorization. | — | deferred | No (out of V2) |
@@ -204,14 +208,17 @@ phase wrote no key.
 
 1. **Accept V2-15** as an implementation + verification package on the scope the
    records define, with the limitations in §8 carried explicitly.
-2. **Before any merge:** settle R12 (version of record) and record the owner's
-   decisions on R1, R2, R7 and R10.
+2. **Decision status:** R12 is settled by V2-A20 (`v0.100.0` of record);
+   R1, R2, R7 and R10 are accepted as documented limitations (2026-11-25).
+   V2-15 acceptance is **not** a production-release approval.
 3. **If a PR is opened:** state that CI is engine-less, that the branch has no CI
    run today, and that the 1087/117 gate is Phase E's. Link
    `V2-15-INTEGRATION-REPORT.md` §10 and
    `V2-15-DEVICE-MATRIX-VERIFICATION.md`.
 4. **Do not** describe the device matrix as complete: API 30+, tablet, RTL,
-   TalkBack speech and three question kinds remain unverified.
+   TalkBack speech and three question kinds remain unverified. A release-device
+   matrix is a prerequisite for a broad production release, not for this
+   acceptance.
 
 ## 10. What this review does not claim
 

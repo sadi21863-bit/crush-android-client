@@ -19,7 +19,9 @@ Crush ships for macOS, Linux, Windows and BSD. **Android is not one of those pla
 > `tool_result observed … duration=8031ms`). The repo-root plaintext test key
 > is closed (`decisions-open.md` §3: rotated at the provider and removed
 > 2026-11-14). The **Crush engine v0.100.0** remains the engine of record
-> (merged as `6800c0e` after the T3 device-rail pass and rollback drill); the
+> (merged as `6800c0e` after the T3 device-rail pass and rollback drill; owner
+> decision V2-A20, 2026-11-25 — older `v0.98.1` references are historical
+> bundle records, not a competing current version); the
 > current capability ledger is [docs/capabilities.md](docs/capabilities.md);
 > the commit chain and the acceptance kit live in
 > [docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md](docs/CRUSH-MOBILE-STATUS-AND-DECISIONS.md)

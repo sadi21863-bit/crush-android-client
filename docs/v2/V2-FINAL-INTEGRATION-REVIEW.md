@@ -316,8 +316,9 @@ report data class has no version field (`DiagnosticsReport.kt:22-51`) and
 `describeEngineState` (`:282-293`) drops `EngineState.Running.version` even
 though the state carries it (`EngineState.kt:11-14`). About hard-codes
 `"Version 1.0.0"` (`SettingsContent.kt:432`). V2-6 D7 records this as a decision
-("no host-exposed value exists; inventing one is out of bounds"), and the records
-disagree about the bundled version (0.100.0 vs 0.98.1; ledger §6 row 3 keeps both).
+("no host-exposed value exists; inventing one is out of bounds"). The
+version-of-record conflict is now settled: **owner decision 2026-11-25
+(V2-A20) — `v0.100.0` is current, `0.98.1` is a historical bundle reference**.
 This is a **deliberate GAP**, not a regression.
 
 **F4 — Relative-time labels freeze at composition.** `ChatListContent.kt:62` and

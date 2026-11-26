@@ -162,7 +162,7 @@ buildFeatures { buildConfig = true }
 - `src/play/AndroidManifest.xml`: remove `MANAGE_EXTERNAL_STORAGE`, `READ_EXTERNAL_STORAGE`, and `WRITE_EXTERNAL_STORAGE` with `tools:node="remove"`; set `android:requestLegacyExternalStorage="false"` with `tools:replace`. Keep only `INTERNET` and `ACCESS_NETWORK_STATE`.
 - `src/sideload/AndroidManifest.xml`: keep the current storage permissions and legacy flag.
 - Runtime: a `StorageMode` enum (`DIRECT`, `MIRROR`) selected by `BuildConfig`, or a `StorageAccess` interface with `DirectAccess` and `MirrorAccess` implementations. Do not let Play code call `Environment.isExternalStorageManager()` or the AFA settings intent.
-- `ProjectEntity` gains `storageMode`, `sourceTreeUri`, `sourceGrantState`, `lastSyncAtMs` (Room migration v3→v4; the database is currently version 3). `ProjectRef.workspacePath` stays the engine cwd; the engine does not need to know the mode.
+- `ProjectEntity` gains `storageMode`, `sourceTreeUri`, `sourceGrantState`, `lastSyncAtMs` (planned Room migration v4→v5; V2-16 A2 owns v4 for the `executions` table, and the database is currently version 3). `ProjectRef.workspacePath` stays the engine cwd; the engine does not need to know the mode.
 - With flavors, the existing `r8probe` build type needs `matchingFallbacks` for the new dimension; verify variant names before building.
 - Verify the merged manifest, not the source file: `aapt dump permissions` or `bundletool dump manifest` on the Play artifact must show no `MANAGE_EXTERNAL_STORAGE`.
 

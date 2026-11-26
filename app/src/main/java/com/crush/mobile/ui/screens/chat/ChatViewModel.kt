@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
+import com.crush.mobile.execution.EventConnectionPort
+import com.crush.mobile.execution.ExecutionTarget
 import com.crush.mobile.data.api.LiveZenModel
 import com.crush.mobile.data.api.ZenModelsApi
 import com.crush.mobile.data.crush.AgentMessageRequest
@@ -931,7 +933,7 @@ class ChatViewModel(
     @Volatile
     private var eventRouter = CrushEventRouter()
     @Volatile
-    private var eventConnection: CrushConnection? = null
+    private var eventConnection: EventConnectionPort? = null
 
     /** Engine port the current connection is bound to; a change means a restart. */
     @Volatile
@@ -1820,8 +1822,9 @@ class ChatViewModel(
                 "event connection superseded for instance '$registeredKey'; stale observer retires, " +
                     "no reconnect retries"
             )
-            runCatching { eventConnection?.stop() }
-            runCatching { eventRouter.close() }
+            // A newer observer already superseded this registration in
+            // ConnectionRegistry.attach. Do not revoke here: revoke stops the
+            // process-owned reader, which a stale screen must never do.
             return
         }
         if (ws.isNullOrBlank()) return
@@ -1838,52 +1841,40 @@ class ChatViewModel(
         // whenever the CURRENTLY BOUND instance's socket file differs.
         val socketFile = EngineSockets.socketPath(context, instanceKey)
         val identity = socketFile.absolutePath
-        val conn = eventConnection
-        if (conn != null && identity == connectionIdentity) {
-            conn.ensureAttached(ws, clientId)
+        val current = eventConnection
+        if (current != null && identity == connectionIdentity) {
+            container.executionEventAdapter.ensureAttached(instanceKey, ws, clientId)
             return
         }
         AppLog.i(
             TAG,
             "event transport identity change -> ${CrushConnection.scrubbedPath(identity)}; rebuilding connection"
         )
-        // Socket identity changed; the old connection may hold a reader on the
-        // previous file. Stop it and close its router before replacing both.
-        runCatching { conn?.stop() }
-        runCatching { eventRouter.close() }
-        val router = CrushEventRouter()
-        // SSE timeouts live on the base client (readTimeout 0 = no idle limit,
-        // the same shape CrushApi's stream client used); the supplier lets the
-        // transport resolve the socket file PER ATTEMPT (S0/F03+F11).
+        // A1: the process-scoped adapter now owns the CrushConnection and
+        // CrushEventRouter. The VM keeps references only for per-turn
+        // register/complete/unregister; it no longer constructs or stops them.
+        val adapter = container.executionEventAdapter
+        adapter.close(instanceKey)
         val sseBase = OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
-        val fresh = CrushConnection(p, router, gson, socketFile) { EngineSockets.okClient(it, sseBase) }
-        // Assign before attaching so a send racing bootstrap sees a consistent
-        // (router, connection) pair.
-        eventRouter = router
-        eventConnection = fresh
-        connectionIdentity = identity
-        // Gate-7 §3 registration (2026-11-05): this VM owns the live reader
-        // for its instance key from this moment. Registering supersedes any
-        // OTHER VM's registration for the same key - the legacy "" key
-        // included - the same deferral rule the container's stop-on-switch
-        // guard applies: while a run is in flight on the key, the superseded
-        // reader's stop pins and completes off reportRunInFlight(key,false).
-        // Register BEFORE ensureAttached so a reader that starts breathing
-        // here can never be the unregistered one. Capture the key BESIDE the
-        // registration; callbacks use the captured value, never [instanceKey].
-        registeredConnectionKey = instanceKey
-        container.connectionRegistry.attach(
+        adapter.attach(
             instanceKey,
-            fresh,
+            ws,
+            clientId,
+            p,
+            socketFile,
             connectionOwnerEpoch,
-            runInFlightOnKey = { container.engineRunInFlightFor == instanceKey }
+            runInFlightOnKey = { container.engineRunInFlightFor == instanceKey },
+            clientSource = { file -> EngineSockets.okClient(file, sseBase) },
         )
-        fresh.ensureAttached(ws, clientId)
+        eventRouter = adapter.router(instanceKey) ?: return
+        eventConnection = adapter.connection(instanceKey)
+        connectionIdentity = identity
+        registeredConnectionKey = instanceKey
         AppLog.i(TAG, "long-lived event stream attached to $ws")
     }
 
@@ -1937,20 +1928,13 @@ class ChatViewModel(
     }
 
     override fun onCleared() {
-        // Gate-7 §3 (2026-11-05): drop this VM's registry record FIRST, and
-        // ONLY if it is still ours - a newer VM's registration for the same
-        // key must not be killed by an old entry's cleanup (revoke-only-if-
-        // own). L3: revoke the key the connection was REGISTERED under, not
-        // the mutable current binding. The direct stop below remains this VM's
-        // own teardown and runs regardless of what the registry holds.
-        registeredConnectionKey?.let { key ->
-            container.connectionRegistry.revokeIfOwn(
-                key, connectionOwnerEpoch, "chat entry cleared"
-            )
-        }
+        AppLog.i(TAG, "A1 onCleared: detach only; process transport stays")
+        // A1: leaving a screen only detaches observation. The controller keeps
+        // the execution; no cancel, no engine stop, no prompt discard, and
+        // NO registry revoke: revoke stops the process-owned reader, and the
+        // registry's epoch-checked attach already supersedes stale observers.
+        container.executionController.unsubscribeOwner(connectionOwnerEpoch)
         registeredConnectionKey = null
-        runCatching { eventConnection?.stop() }
-        runCatching { eventRouter.close() }
     }
 
     /**
@@ -2189,7 +2173,7 @@ class ChatViewModel(
         sessionId = null
         workspaces = null
         workspaceSnapshot = null
-        eventConnection?.stop()
+        container.executionEventAdapter.stop(instanceKey)
         bootstrap()
     }
 
@@ -3966,6 +3950,14 @@ class ChatViewModel(
             // between attempts must not retry (audit P1-05).
             while (attempt < 2 && !accepted && handle.mayPost()) {
                 val runId = UUID.randomUUID().toString()
+                // A1 submission ordering: register the in-memory intent and the
+                // pre-send attempt marker BEFORE any HTTP call, so an engine
+                // acceptance can never leave an untracked execution. This is
+                // not durable until A2; ambiguity is preserved below.
+                val execution = container.executionController.onIntent(
+                    ExecutionTarget(instanceKey, targetWs, targetSid),
+                    runId,
+                )
                 // Subscribe BEFORE prompting, on the long-lived connection when
                 // it is healthy.
                 //
@@ -4037,6 +4029,9 @@ class ChatViewModel(
                     accepted = true
                     failure = null
                     acceptedSid = targetSid
+                    // A1: the intent already exists; only now do we record the
+                    // documented acceptance. 202 is NOT running/completed.
+                    container.executionController.markSubmissionAcknowledged(execution.executionId)
                     try {
                         awaitStream(events, runId, handle)
                     } finally {
@@ -4047,6 +4042,16 @@ class ChatViewModel(
                     }
                 } else {
                     failure = msg
+                    // A1 submission outcome: a documented 4xx rejection is a
+                    // proven failure; timeout/reset/unknown server outcomes stay
+                    // UNKNOWN. Nothing here auto-resends an ambiguous send.
+                    val retryableWire = msg.contains("workspace not found", true) ||
+                        msg.contains("session not found", true)
+                    if (!retryableWire && msg.startsWith("HTTP 4", true)) {
+                        container.executionController.markSubmitRejected(execution.executionId, msg)
+                    } else {
+                        container.executionController.markAmbiguousSend(execution.executionId, msg)
+                    }
                     // A failed attempt must not leave a subscription behind.
                     sharedChannel?.let { eventRouter.unregister(runId, it) }
                     val workspaceGone = msg.contains("workspace not found", ignoreCase = true)

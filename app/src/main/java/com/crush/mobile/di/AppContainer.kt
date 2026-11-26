@@ -17,6 +17,12 @@ import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.CrushEngine
 import com.crush.mobile.engine.EngineInstanceRegistry
 import com.crush.mobile.engine.EngineInvalidationProbe
+import com.crush.mobile.execution.CrushConnectionPort
+import com.crush.mobile.execution.ExecutionController
+import com.crush.mobile.execution.ExecutionEventAdapter
+import com.crush.mobile.data.crush.CrushConnection
+import com.crush.mobile.data.crush.CrushEventRouter
+import com.google.gson.Gson
 import com.crush.mobile.engine.EnginePaths
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.engine.EngineSupervisor
@@ -302,6 +308,40 @@ class AppContainer(context: Context) {
      * re-enter the reconnect ladder.
      */
     val connectionRegistry = ConnectionRegistry()
+
+    // A1: process-scoped execution ownership. In-memory only until A2 adds the
+    // durable record; the epoch map is the A1 stand-in for the D7 invalidation
+    // guard and is bumped by the production probe listener below.
+    private val executionEpochs = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private fun executionEpochOf(key: String): Long = executionEpochs[key] ?: 0L
+
+    private val executionGson: Gson by lazy { Gson() }
+
+    val executionEventAdapter: ExecutionEventAdapter by lazy {
+        ExecutionEventAdapter(
+            epochOf = ::executionEpochOf,
+            newRouter = { CrushEventRouter() },
+            newConnection = { p, router, socketFile, clientSource ->
+                CrushConnectionPort(
+                    CrushConnection(p, router, executionGson, socketFile, clientSource)
+                )
+            },
+            attachToRegistry = { key, port, epoch, runInFlight ->
+                (port as? CrushConnectionPort)?.let {
+                    connectionRegistry.attach(key, it.delegate, epoch, runInFlight)
+                }
+            },
+            revokeFromRegistry = { key, epoch, reason ->
+                connectionRegistry.revokeIfOwn(key, epoch, reason)
+            },
+            isSupersededInRegistry = { key, epoch -> connectionRegistry.isSuperseded(key, epoch) },
+            scope = containerScope,
+        )
+    }
+
+    val executionController: ExecutionController by lazy {
+        ExecutionController(epochOf = ::executionEpochOf)
+    }
 
     /**
      * S3: WHICH surface the chat layer is bound to. The derived
@@ -733,6 +773,16 @@ class AppContainer(context: Context) {
     }
 
     init {
+        // A1: the production invalidation listener. Every registry/supervisor/
+        // shutdown/fault path already fires this probe; bump the per-instance
+        // epoch BEFORE telling the controller, so a provisional attachment
+        // committing after the invalidation sees the new epoch and rejects.
+        // No engine is started or stopped here.
+        EngineInvalidationProbe.listener = { source, key ->
+            executionEpochs[key] = (executionEpochs[key] ?: 0L) + 1L
+            executionController.onInvalidated(key, source)
+        }
+
         // A11/A12: prime the restore ahead of composition. The chat layer's
         // LaunchedEffect(activeInstanceKey) re-drives bindProject on ANY later
         // emission, so a restore landing a frame or two late still rebinds -

@@ -4,6 +4,7 @@ import com.crush.mobile.data.crush.CrushConnection
 import com.crush.mobile.data.crush.CrushEvent
 import com.crush.mobile.data.crush.CrushEventRouter
 import com.crush.mobile.data.crush.runIdOrNull
+import com.crush.mobile.engine.EngineInvalidationProbe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -227,11 +228,13 @@ class ExecutionEventAdapter(
 
     /** Stop the reader but keep the router, matching the provider-switch shape. */
     fun stop(key: String) {
+        EngineInvalidationProbe.fire("adapter.stop", key)
         connections[key]?.conn?.stop()
     }
 
     /** Stops the reader and closes the router, matching identity-change teardown. */
     fun close(key: String) {
+        EngineInvalidationProbe.fire("adapter.close", key)
         connections.remove(key)?.let { entry ->
             entry.feedJob?.cancel()
             entry.conn?.stop()

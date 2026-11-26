@@ -1,0 +1,3 @@
+﻿03:07:36.436 I/Lifecycle: stopping project engine for instance 'pd871eee8' (no run in flight)
+03:07:36.440 I/ExecutionController: invalidated key=pd871eee8 source=registry.stop epoch=1
+03:07:36.441 I/ExecutionController: invalidated key=pd871eee8 source=supervisor.stop epoch=2

@@ -176,6 +176,12 @@ class ExecutionController(
 
     /** Called by the container's invalidation listener. Never claims completion. */
     fun onInvalidated(instanceKey: String, source: String) {
+        // A1 device evidence: a production invalidation route actually reached
+        // the controller. No prompt, transcript or credential is logged.
+        com.crush.mobile.util.AppLog.i(
+            "ExecutionController",
+            "invalidated key=$instanceKey source=$source epoch=${epochOf(instanceKey)}",
+        )
         val ids = activeByKey[instanceKey]?.toList() ?: return
         ids.forEach { id ->
             mutate(id) {

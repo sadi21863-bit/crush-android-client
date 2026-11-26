@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.crush.mobile.execution.ExecutionEventAdapterTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T19:18:03.038Z" hostname="LAPTOP-5US7QL1L" time="3.47">
+<testsuite name="com.crush.mobile.execution.ExecutionEventAdapterTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T22:11:10.701Z" hostname="LAPTOP-5US7QL1L" time="1.74">
   <properties/>
-  <testcase name="staleTokenCannotCommitOrRollbackAnotherTransaction" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.653"/>
-  <testcase name="realRouterFramesReachAdapterWithNoScreenObserver" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="2.304"/>
-  <testcase name="commitReplaysBufferedEventsWithAttributionUnchanged" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.048"/>
-  <testcase name="concurrentAttachCreatesExactlyOneReader" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.272"/>
-  <testcase name="invalidatedEpochRejectsCommitAndRollbackReturnsBuffer" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.006"/>
-  <testcase name="bufferOverflowRejectsCommitAndDoesNotPublish" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.002"/>
-  <testcase name="closeStopsDeliveryWhileFramesAreArriving" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.045"/>
-  <testcase name="closeReleasesSubscribers" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.005"/>
-  <testcase name="eventsAfterCommitGoStraightToSubscribers" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.005"/>
-  <testcase name="repeatedAttachIsIdempotentForTheSameSocketIdentity" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.033"/>
-  <testcase name="delayedFrameFromInvalidatedInstanceIsRejected" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.039"/>
+  <testcase name="staleTokenCannotCommitOrRollbackAnotherTransaction" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.128"/>
+  <testcase name="realRouterFramesReachAdapterWithNoScreenObserver" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="1.215"/>
+  <testcase name="commitReplaysBufferedEventsWithAttributionUnchanged" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.002"/>
+  <testcase name="concurrentAttachCreatesExactlyOneReader" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.221"/>
+  <testcase name="invalidatedEpochRejectsCommitAndRollbackReturnsBuffer" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.002"/>
+  <testcase name="bufferOverflowRejectsCommitAndDoesNotPublish" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.003"/>
+  <testcase name="closeStopsDeliveryWhileFramesAreArriving" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.031"/>
+  <testcase name="closeReleasesSubscribers" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.004"/>
+  <testcase name="eventsAfterCommitGoStraightToSubscribers" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.002"/>
+  <testcase name="repeatedAttachIsIdempotentForTheSameSocketIdentity" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.058"/>
+  <testcase name="delayedFrameFromInvalidatedInstanceIsRejected" classname="com.crush.mobile.execution.ExecutionEventAdapterTest" time="0.07"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

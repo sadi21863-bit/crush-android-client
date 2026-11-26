@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.di.AppContainerExecutionInvalidationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-26T22:05:13.259Z" hostname="LAPTOP-5US7QL1L" time="356.502">
+  <properties/>
+  <testcase name="adapterCloseMarksTheExecutionUnknownThroughTheContainerListener" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="344.7"/>
+  <testcase name="adapterStopMarksTheExecutionUnknownThroughTheContainerListener" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="4.687"/>
+  <testcase name="invalidationBumpsThePerInstanceEpoch" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="4.484"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+I/ExecutionController: invalidated key=p-close source=adapter.close epoch=1
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+I/ExecutionController: invalidated key=p-stop source=adapter.stop epoch=1
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+I/ExecutionController: invalidated key=p-epoch source=adapter.stop epoch=1
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

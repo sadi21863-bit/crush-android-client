@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.crush.mobile.execution.ExecutionControllerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T19:18:07.036Z" hostname="LAPTOP-5US7QL1L" time="0.607">
+<testsuite name="com.crush.mobile.execution.ExecutionControllerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T22:11:10.396Z" hostname="LAPTOP-5US7QL1L" time="0.192">
   <properties/>
-  <testcase name="invalidationMarksActiveExecutionsUnknownWithReason" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.042"/>
-  <testcase name="staleObserverCannotDetachAnotherObserver" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.52"/>
-  <testcase name="definitiveRejectionIsFailedAndAcknowledgementIsNotRunning" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.013"/>
+  <testcase name="invalidationMarksActiveExecutionsUnknownWithReason" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.073"/>
+  <testcase name="staleObserverCannotDetachAnotherObserver" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.025"/>
+  <testcase name="definitiveRejectionIsFailedAndAcknowledgementIsNotRunning" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.079"/>
   <testcase name="intentIsRegisteredBeforePostAndAmbiguousOutcomeStaysUnknown" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
   <testcase name="retryCreatesNewIdentityAndKeepsOldRecord" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
-  <testcase name="cancelResolvedIsNotAnExecutionTerminal" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.003"/>
-  <testcase name="unsubscribeIsDetachOnlyAndNeverCancels" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.009"/>
-  <testcase name="ambiguousPromptCannotOwnExecutionAndResolvedPromptDoesNotResume" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.004"/>
-  <testcase name="plausibleActivityCannotAdvancePhaseOrClearNoProgress" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.006"/>
-  <testcase name="hasActiveIsKeyedAndReleasesOnTerminal" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.003"/>
-  <testcase name="executionRunsWithNoObserver" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.003"/>
+  <testcase name="cancelResolvedIsNotAnExecutionTerminal" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.002"/>
+  <testcase name="unsubscribeIsDetachOnlyAndNeverCancels" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
+  <testcase name="ambiguousPromptCannotOwnExecutionAndResolvedPromptDoesNotResume" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.003"/>
+  <testcase name="plausibleActivityCannotAdvancePhaseOrClearNoProgress" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.002"/>
+  <testcase name="hasActiveIsKeyedAndReleasesOnTerminal" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
+  <testcase name="executionRunsWithNoObserver" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.E5InvalidationBarrierTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-26T09:37:58.378Z" hostname="LAPTOP-5US7QL1L" time="0.694">
+  <properties/>
+  <testcase name="registryStopBetweenValidateAndCommit_commitRejectedAndRolledBack" classname="com.crush.mobile.engine.E5InvalidationBarrierTest" time="0.599"/>
+  <testcase name="probeForwardsEveryInvalidationSourceVocabulary" classname="com.crush.mobile.engine.E5InvalidationBarrierTest" time="0.059"/>
+  <testcase name="invalidationBeforeValidation_commitsAgainstNewEpochOnly" classname="com.crush.mobile.engine.E5InvalidationBarrierTest" time="0.002"/>
+  <testcase name="noInvalidation_commitSucceeds" classname="com.crush.mobile.engine.E5InvalidationBarrierTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

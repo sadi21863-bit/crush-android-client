@@ -160,6 +160,8 @@ class EngineSupervisor(
     }
 
     fun stop() {
+        // E5-R6 test seam; no-op in production.
+        EngineInvalidationProbe.fire("supervisor.stop", instanceKey)
         synchronized(sync) {
             com.crush.mobile.util.AppLog.i(TAG, "[$instanceKey] stop() requested")
             wanted = false
@@ -186,6 +188,8 @@ class EngineSupervisor(
      * down is a plain [start].
      */
     fun restart(reason: String) {
+        // E5-R6 test seam; no-op in production.
+        EngineInvalidationProbe.fire("supervisor.restart", instanceKey)
         val wasWanted = synchronized(sync) { wanted }
         if (!wasWanted) {
             Log.i(TAG, "restart($reason) ignored: supervisor not running")
@@ -263,6 +267,7 @@ class EngineSupervisor(
                 // without a context reads probeOk=true (none exist today;
                 // AppContainer always passes one).
                 val probeOk = probeVersion(healthSocketFile())
+                EngineInvalidationProbe.fire("supervisor.watchdog", instanceKey)
                 engine.stopBlocking()
                 val elapsedMs = android.os.SystemClock.elapsedRealtime() - attemptStartMono
                 when (startingWatchdogShouldRestart(elapsedMs, probeOk, wedgeRestarts)) {
@@ -409,6 +414,7 @@ class EngineSupervisor(
                                     "without ever staying Running " +
                                     "${MIN_HEALTHY_RUN_MS / 1000}s; giving up"
                             )
+                            EngineInvalidationProbe.fire("supervisor.recovery", instanceKey)
                             engine.stopBlocking()
                             _state.value = EngineState.Failed(
                                 reason = "Engine repeatedly failed to stay running",
@@ -421,6 +427,7 @@ class EngineSupervisor(
                     } else {
                         wedgeRestarts = 0
                     }
+                    EngineInvalidationProbe.fire("supervisor.recovery", instanceKey)
                     engine.stopBlocking()
                     delay(RESTART_DELAY_MS)
                 }
@@ -464,6 +471,7 @@ class EngineSupervisor(
                         // budget just ran out. This mirrors the watchdog and
                         // wedge terminal paths above; it runs BEFORE the
                         // terminal state is published.
+                        EngineInvalidationProbe.fire("supervisor.recovery", instanceKey)
                         engine.stopBlocking()
                         _state.value = if (result.willRetry) result.copy(willRetry = false) else result
                         return
@@ -658,7 +666,11 @@ private suspend fun monitorUntilUnhealthy(socketFile: File?): Boolean {
      * which is the only way to simulate a crash on Android (adb cannot signal
      * app-owned processes). The supervisor loop must notice and respawn it.
      */
-    fun killEngineForFaultInjection(): Boolean = engine.killForFaultInjection()
+    fun killEngineForFaultInjection(): Boolean {
+        // E5-R6 test seam; no-op in production.
+        EngineInvalidationProbe.fire("debug.kill_engine", instanceKey)
+        return engine.killForFaultInjection()
+    }
 
     fun setWorkActive(active: Boolean) {
         workActive = active

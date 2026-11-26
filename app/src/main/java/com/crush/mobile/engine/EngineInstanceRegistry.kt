@@ -203,6 +203,10 @@ class EngineInstanceRegistry<R>(
             )
             return false
         }
+        // E5-R6 test seam: no-op in production (listener is null). Makes the
+        // binding-switch / project-removal invalidation observable to the
+        // deterministic barrier test before any engine teardown begins.
+        EngineInvalidationProbe.fire("registry.stop", key)
         node.grain = Grain.STOPPING
         try {
             stopRuntime(node.runtime)

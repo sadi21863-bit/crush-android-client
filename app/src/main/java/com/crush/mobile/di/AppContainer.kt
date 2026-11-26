@@ -16,6 +16,7 @@ import com.crush.mobile.domain.model.DeviceProfile
 import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.CrushEngine
 import com.crush.mobile.engine.EngineInstanceRegistry
+import com.crush.mobile.engine.EngineInvalidationProbe
 import com.crush.mobile.engine.EnginePaths
 import com.crush.mobile.engine.EngineState
 import com.crush.mobile.engine.EngineSupervisor
@@ -1008,10 +1009,18 @@ class AppContainer(context: Context) {
         val legacy = synchronized(this) { supervisorInstance }
         val projectStops = engineRegistry.inspect().map { snapshot ->
             val supervisor = snapshot.runtime.supervisor
-            { supervisor.stop() }
+            {
+                EngineInvalidationProbe.fire("shutdown", snapshot.key)
+                supervisor.stop()
+            }
         }
         return ShutdownPlan(
-            legacy = legacy?.let { supervisor -> { supervisor.stop() } },
+            legacy = legacy?.let { supervisor ->
+                {
+                    EngineInvalidationProbe.fire("shutdown", "")
+                    supervisor.stop()
+                }
+            },
             projects = projectStops,
             onFailure = { what, failure ->
                 com.crush.mobile.util.AppLog.w(

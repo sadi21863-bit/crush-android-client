@@ -108,6 +108,27 @@ class ExecutionControllerTest {
     }
 
     @Test
+    fun confirmedRunCompleteIsTheOnlyTerminalEngineEvidence() {
+        val c = ExecutionController()
+        val e = c.onIntent(target(), "run-1")
+        c.markSubmissionAcknowledged(e.executionId)
+
+        val unconfirmed = ExecutionEvent(
+            ExecutionEvent.Type.RUN_COMPLETE, Attribution.UNATTRIBUTED, runId = "run-1"
+        )
+        c.onConfirmedEvent("pA", unconfirmed)
+        assertFalse(c.executions.value[e.executionId]!!.isTerminal)
+
+        val confirmed = ExecutionEvent(
+            ExecutionEvent.Type.RUN_COMPLETE, Attribution.CONFIRMED, runId = "run-1"
+        )
+        c.onConfirmedEvent("pA", confirmed)
+        val view = c.executions.value[e.executionId]!!
+        assertEquals(ExecutionLifecycle.COMPLETED, view.lifecycle)
+        assertEquals("confirmed_completion", view.reasonCode)
+    }
+
+    @Test
     fun intentIsRegisteredBeforePostAndAmbiguousOutcomeStaysUnknown() {
         val c = ExecutionController()
         val e = c.onIntent(target(), "run-1")

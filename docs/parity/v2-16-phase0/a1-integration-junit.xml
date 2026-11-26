@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.crush.mobile.di.AppContainerExecutionInvalidationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-26T22:05:13.259Z" hostname="LAPTOP-5US7QL1L" time="356.502">
+<testsuite name="com.crush.mobile.di.AppContainerExecutionInvalidationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-26T23:02:50.251Z" hostname="LAPTOP-5US7QL1L" time="31.244">
   <properties/>
-  <testcase name="adapterCloseMarksTheExecutionUnknownThroughTheContainerListener" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="344.7"/>
-  <testcase name="adapterStopMarksTheExecutionUnknownThroughTheContainerListener" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="4.687"/>
-  <testcase name="invalidationBumpsThePerInstanceEpoch" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="4.484"/>
+  <testcase name="adapterCloseMarksTheExecutionUnknownThroughTheContainerListener" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="29.434"/>
+  <testcase name="adapterStopMarksTheExecutionUnknownThroughTheContainerListener" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="0.495"/>
+  <testcase name="invalidationBumpsThePerInstanceEpoch" classname="com.crush.mobile.di.AppContainerExecutionInvalidationTest" time="0.328"/>
   <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
 W/OverlayConfig: partition_order.xml does not exist.
 V/Configuration: Updating configuration, locales updated from [] to [en_US]

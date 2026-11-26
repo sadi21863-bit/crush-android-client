@@ -12,8 +12,10 @@ import kotlin.concurrent.withLock
 /**
  * E5-R6: deterministic invalidation barrier (no sleeps, no timing windows).
  *
- * Scope / honesty note: A1 is closed, so there is no production
- * ExecutionController attachment to commit against. This test proves two
+ * Scope / honesty note: the guard below is a TEST harness standing in for the
+ * process controller's token protocol (A1 now exists in production source, but
+ * this test still exercises its own harness rather than that controller). It
+ * proves two
  * things and no more:
  *
  *  1. the production binding-switch / project-removal path

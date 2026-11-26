@@ -97,6 +97,27 @@ class ExecutionController(
         return mutate(id) { it.copy(lifecycle = ExecutionLifecycle.RUNNING) }
     }
 
+    /** Confirmed routed events are the only engine-side phase authority. */
+    fun onConfirmedEvent(instanceKey: String, event: ExecutionEvent) {
+        if (event.attribution != Attribution.CONFIRMED) return
+        val id = synchronized(records) {
+            activeByKey[instanceKey]?.firstOrNull { records[it]?.runId == event.runId }
+        } ?: return
+        when (event.type) {
+            ExecutionEvent.Type.RUN_COMPLETE -> {
+                markRunning(id, Attribution.CONFIRMED)
+                markTerminal(id, ExecutionLifecycle.COMPLETED, "confirmed_completion")
+            }
+            ExecutionEvent.Type.MESSAGE, ExecutionEvent.Type.TOOL_CALL,
+            ExecutionEvent.Type.TOOL_RESULT, ExecutionEvent.Type.PERMISSION,
+            ExecutionEvent.Type.QUESTION -> {
+                markRunning(id, Attribution.CONFIRMED)
+                observeProgress(id, Attribution.CONFIRMED)
+            }
+            else -> observeProgress(id, Attribution.CONFIRMED)
+        }
+    }
+
     /** Plausible activity updates observation freshness only, never phase. */
     fun observeProgress(id: String, attribution: Attribution, at: Long = clock()): Boolean {
         if (attribution == Attribution.UNATTRIBUTED) return false

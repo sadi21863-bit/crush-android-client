@@ -56,6 +56,7 @@ class ExecutionEventAdapter(
     ) -> Unit = { _, _, _, _ -> },
     private val revokeFromRegistry: (String, Long, String) -> Unit = { _, _, _ -> },
     private val isSupersededInRegistry: (String, Long) -> Boolean = { _, _ -> false },
+    private val onConfirmedEvent: (String, ExecutionEvent) -> Unit = { _, _ -> },
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) {
     private class ConnectionEntry(
@@ -275,14 +276,22 @@ class ExecutionEventAdapter(
             "ExecutionEventAdapter",
             "feed key=$key type=${frame.type.name} attribution=$attribution epoch=${entry.epoch}",
         )
-        val type = when (frame.type.name) {
-            "MESSAGE" -> ExecutionEvent.Type.MESSAGE
-            "RUN_COMPLETE" -> ExecutionEvent.Type.RUN_COMPLETE
-            "PERMISSION_REQUEST" -> ExecutionEvent.Type.PERMISSION
-            "QUESTION_REQUEST" -> ExecutionEvent.Type.QUESTION
-            else -> ExecutionEvent.Type.OTHER
-        }
-        return onEvent(key, ExecutionEvent(type, attribution, runId = runId, detail = frame.type.name))
+        // Only CONFIRMED events may change execution state. The app must call
+        // declare(key, runId) before the POST for ordinary frames to qualify.
+        val event = ExecutionEvent(
+            type = when (frame.type.name) {
+                "MESSAGE" -> ExecutionEvent.Type.MESSAGE
+                "RUN_COMPLETE" -> ExecutionEvent.Type.RUN_COMPLETE
+                "PERMISSION_REQUEST" -> ExecutionEvent.Type.PERMISSION
+                "QUESTION_REQUEST" -> ExecutionEvent.Type.QUESTION
+                else -> ExecutionEvent.Type.OTHER
+            },
+            attribution = attribution,
+            runId = runId,
+            detail = frame.type.name,
+        )
+        if (attribution == Attribution.CONFIRMED) onConfirmedEvent(key, event)
+        return onEvent(key, event)
     }
 
     private fun dispatch(key: String, event: ExecutionEvent): Boolean {

@@ -2,6 +2,7 @@ package com.crush.mobile.engine
 
 import android.content.Context
 import com.crush.mobile.domain.model.DeviceProfile
+import com.crush.mobile.engine.EngineInvalidationProbe
 import com.crush.mobile.domain.model.TuningPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,15 @@ class EngineTerminalStartupCleanupTest {
             throw IOException("injected exec failure")
         }
 
+        // A1.3: the terminal start-failure branch must fire the production
+        // invalidation label before teardown.
+        val installed = EngineInvalidationProbe.listener
+        val labels = mutableListOf<String>()
+        EngineInvalidationProbe.listener = { source, instanceKey ->
+            labels += "$source:$instanceKey"
+            installed?.invoke(source, instanceKey)
+        }
+
         val supervisor = EngineSupervisor(
             engine = engine,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
@@ -86,6 +96,11 @@ class EngineTerminalStartupCleanupTest {
         withTimeout(5_000) {
             while (supervisor.hasActiveSupervisionForTest()) delay(10)
         }
+        assertTrue(
+            "terminal recovery must fire the probe: $labels",
+            labels.any { it == "supervisor.recovery:$key" },
+        )
+        EngineInvalidationProbe.listener = installed
     }
 
     /**

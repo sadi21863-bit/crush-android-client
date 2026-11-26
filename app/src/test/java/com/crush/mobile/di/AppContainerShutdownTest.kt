@@ -1,6 +1,7 @@
 package com.crush.mobile.di
 
 import android.app.Application
+import com.crush.mobile.engine.EngineInvalidationProbe
 import com.crush.mobile.engine.EngineState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -31,6 +32,14 @@ class AppContainerShutdownTest {
     @Test
     fun `shutdown snapshots the legacy supervisor and every registered project once`() {
         val container = AppContainer(RuntimeEnvironment.getApplication())
+        // A1: observe the container's real listener without replacing its
+        // behavior; the probe is NOT a no-op once an AppContainer exists.
+        val installed = EngineInvalidationProbe.listener
+        val labels = mutableListOf<Pair<String, String>>()
+        EngineInvalidationProbe.listener = { source, key ->
+            labels += source to key
+            installed?.invoke(source, key)
+        }
         val legacy = container.engineSupervisor // force the lazy legacy singleton
         val p1 = container.runtimeFor("p1")
         val p2 = container.runtimeFor("p2")
@@ -49,5 +58,23 @@ class AppContainerShutdownTest {
         assertFalse("p2 holds no child", p2.engine.isAlive())
 
         assertEquals("the shutdown plan is one-shot", 0, container.shutdown())
+
+        assertEquals(
+            "shutdown must fire for each project key",
+            true,
+            labels.any { it.first == "shutdown" && it.second == "p1" } &&
+                labels.any { it.first == "shutdown" && it.second == "p2" },
+        )
+        assertEquals(
+            "shutdown must fire for the legacy key",
+            true,
+            labels.any { it.first == "shutdown" && it.second == "" },
+        )
+        assertEquals(
+            "each shutdown also reaches supervisor.stop",
+            true,
+            labels.count { it.first == "supervisor.stop" } >= 3,
+        )
+        EngineInvalidationProbe.listener = installed
     }
 }

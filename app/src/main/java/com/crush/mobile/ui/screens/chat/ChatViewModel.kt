@@ -3958,6 +3958,10 @@ class ChatViewModel(
                     ExecutionTarget(instanceKey, targetWs, targetSid),
                     runId,
                 )
+                // Let the adapter recognize this run's real frames as CONFIRMED
+                // and record this screen as an observer (detach is separate).
+                container.executionEventAdapter.declare(instanceKey, runId)
+                container.executionController.subscribe(execution.executionId, connectionOwnerEpoch)
                 // Subscribe BEFORE prompting, on the long-lived connection when
                 // it is healthy.
                 //

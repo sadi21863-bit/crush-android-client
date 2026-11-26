@@ -335,6 +335,7 @@ class AppContainer(context: Context) {
                 connectionRegistry.revokeIfOwn(key, epoch, reason)
             },
             isSupersededInRegistry = { key, epoch -> connectionRegistry.isSuperseded(key, epoch) },
+            onConfirmedEvent = { key, event -> executionController.onConfirmedEvent(key, event) },
             scope = containerScope,
         )
     }

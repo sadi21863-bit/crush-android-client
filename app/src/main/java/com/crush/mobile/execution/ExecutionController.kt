@@ -61,7 +61,8 @@ class ExecutionController(
         return true
     }
 
-    /** Mint a new execution. In-memory intent only until A2. */
+    /** Mint a new execution. The controller itself is in-memory; A2 slice 1
+     * writes the durable intent from the send path before this is called. */
     fun start(target: ExecutionTarget, runId: String = UUID.randomUUID().toString()): ExecutionView {
         val id = UUID.randomUUID().toString()
         val view = ExecutionView(
@@ -86,10 +87,46 @@ class ExecutionController(
     }
 
     /**
+     * A2 slice 1: adopt a row whose outcome startup reconciliation determined.
+     * This is observation of a DECIDED outcome - it never claims a live engine
+     * attach and never re-enters an already terminal phase. The controller
+     * still owns no I/O and starts/stops no engine.
+     */
+    fun onRecovered(
+        executionId: String,
+        runId: String,
+        target: ExecutionTarget,
+        lifecycle: ExecutionLifecycle,
+        reasonCode: String?,
+    ): ExecutionView {
+        val view = ExecutionView(
+            executionId = executionId,
+            runId = runId,
+            target = target,
+            lifecycle = lifecycle,
+            interaction = InteractionState.NONE,
+            observation = ObservationState.DETACHED,
+            cancellation = CancellationState.NOT_REQUESTED,
+            epoch = epochOf(target.instanceKey),
+            lastObservedProgressAt = clock(),
+            reasonCode = reasonCode,
+        )
+        synchronized(records) {
+            records[executionId] = view
+            activeByKey
+                .computeIfAbsent(target.instanceKey) { ConcurrentHashMap.newKeySet<String>() }
+                .add(executionId)
+        }
+        publish()
+        return view
+    }
+
+    /**
      * Registers the intent and the pre-send attempt marker BEFORE the HTTP
-     * call. A1 has no durable store: this is in-memory ordering, not crash
-     * consistency (A2). It prevents "engine accepted, app has no record" in
-     * the live process and never pretends the POST succeeded.
+     * call. The controller performs no I/O: A2 slice 1's durable intent write
+     * happens in the send path immediately before this call. This prevents
+     * "engine accepted, app has no record" in the live process and never
+     * pretends the POST succeeded.
      */
     fun onIntent(target: ExecutionTarget, runId: String): ExecutionView {
         val view = start(target, runId)

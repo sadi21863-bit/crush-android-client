@@ -3971,6 +3971,29 @@ class ChatViewModel(
                     ExecutionTarget(instanceKey, targetWs, targetSid),
                     runId,
                 )
+                // A2 slice 1, boundary 1: the durable intent MUST exist before
+                // any HTTP call. A failed write is a named failure - never a
+                // send-on-belief. Generation/lease are deliberately NULL: they
+                // are not captured at send time, and recovery fails closed
+                // rather than guessing them (§7/§17.1).
+                val durable = runCatching {
+                    container.executionStore.persistIntent(
+                        executionId = execution.executionId,
+                        runId = runId,
+                        target = ExecutionTarget(instanceKey, targetWs, targetSid),
+                        engineKeyToken = AppContainer.bindingToToken(container.activeBinding.value),
+                        workspacePath = workspacePathFor(),
+                        generation = null,
+                        leaseAtMs = null,
+                    )
+                }
+                if (durable.isFailure) {
+                    val why = "durable intent failed: ${durable.exceptionOrNull()?.message}"
+                    AppLog.e(TAG, why)
+                    container.executionController.markSubmitRejected(execution.executionId, why)
+                    failure = why
+                    break
+                }
                 // Let the adapter recognize this run's real frames as CONFIRMED
                 // and record this screen as an observer (detach is separate).
                 container.executionEventAdapter.declare(instanceKey, runId)
@@ -4006,6 +4029,16 @@ class ChatViewModel(
                 // coroutine, so an exception thrown by api.send() escapes the
                 // surrounding try/catch and kills the process. That is exactly
                 // how a 404 closed the app with no visible error.
+                // A2 slice 1, boundary 1→2: record the send attempt before the
+                // POST. If the marker cannot be written the POST is not made.
+                val marked = runCatching { container.executionStore.markSent(execution.executionId) }
+                if (marked.isFailure) {
+                    val why = "durable send marker failed: ${marked.exceptionOrNull()?.message}"
+                    AppLog.e(TAG, why)
+                    container.executionController.markSubmitRejected(execution.executionId, why)
+                    failure = why
+                    break
+                }
                 val sent = withTimeoutOrNull(SEND_TIMEOUT_MS) {
                     // CAPTURE THE WORKSPACE JUST BEFORE THE PROMPT.
                     //
@@ -4038,7 +4071,10 @@ class ChatViewModel(
                     // Interpreting the resulting cancellation exception (the
                     // runCatching around api.send() catches it like any other
                     // failure) as a send error would rename the user's own
-                    // action into a model failure.
+                    // action into a model failure. A2: the POST may already
+                    // have landed, so the durable record becomes AMBIGUOUS -
+                    // never auto-resend, and no false "not sent" claim.
+                    runCatching { container.executionStore.markAmbiguous(execution.executionId) }
                     break
                 }
 
@@ -4049,6 +4085,9 @@ class ChatViewModel(
                     // A1: the intent already exists; only now do we record the
                     // documented acceptance. 202 is NOT running/completed.
                     container.executionController.markSubmissionAcknowledged(execution.executionId)
+                    // A2 slice 1, boundary 3: the acknowledgement is durable
+                    // before the state advances or frames are awaited.
+                    runCatching { container.executionStore.markAcked(execution.executionId) }
                     try {
                         awaitStream(events, runId, handle)
                     } finally {
@@ -4066,8 +4105,12 @@ class ChatViewModel(
                         msg.contains("session not found", true)
                     if (!retryableWire && msg.startsWith("HTTP 4", true)) {
                         container.executionController.markSubmitRejected(execution.executionId, msg)
+                        runCatching {
+                            container.executionStore.markRejected(execution.executionId, msg)
+                        }
                     } else {
                         container.executionController.markAmbiguousSend(execution.executionId, msg)
+                        runCatching { container.executionStore.markAmbiguous(execution.executionId) }
                     }
                     // A failed attempt must not leave a subscription behind.
                     sharedChannel?.let { eventRouter.unregister(runId, it) }

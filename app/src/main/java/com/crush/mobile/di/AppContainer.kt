@@ -20,6 +20,10 @@ import com.crush.mobile.engine.EngineInvalidationProbe
 import com.crush.mobile.execution.CrushConnectionPort
 import com.crush.mobile.execution.ExecutionController
 import com.crush.mobile.execution.ExecutionEventAdapter
+import com.crush.mobile.execution.ExecutionLifecycle
+import com.crush.mobile.execution.ExecutionReconciler
+import com.crush.mobile.execution.ExecutionStore
+import com.crush.mobile.execution.ExecutionTarget
 import com.crush.mobile.data.crush.CrushConnection
 import com.crush.mobile.data.crush.CrushEventRouter
 import com.google.gson.Gson
@@ -135,6 +139,18 @@ class AppContainer(context: Context) {
      * the ADR's slice-2 work and deliberately NOT here yet.
      */
     val projectStore: RoomProjectStore by lazy { RoomProjectStore(appContext) }
+
+    /**
+     * V2-16 A2 slice 1: the durable run record surface. Rides the SAME
+     * projects.db builder and migration chain as projects/handoffs - no second
+     * store. The controller stays in-memory; this is the send-path port.
+     */
+    val executionStore: ExecutionStore by lazy { ExecutionStore(projectStore.executionDao()) }
+
+    /** Startup reconciler for C1–C3; intentionally fail-closed (§7/§17.1). */
+    val executionReconciler: ExecutionReconciler by lazy {
+        ExecutionReconciler(projectStore.executionDao())
+    }
 
     /**
      * S-02 (2026-11-05): THE pre-bind consent gate for project engine
@@ -309,9 +325,9 @@ class AppContainer(context: Context) {
      */
     val connectionRegistry = ConnectionRegistry()
 
-    // A1: process-scoped execution ownership. In-memory only until A2 adds the
-    // durable record; the epoch map is the A1 stand-in for the D7 invalidation
-    // guard and is bumped by the production probe listener below.
+    // A1: process-scoped execution ownership. In-memory here by design; A2
+    // slice 1 writes the durable record from the send path. The epoch map is
+    // the D7 invalidation guard and is bumped by the production probe below.
     private val executionEpochs = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private fun executionEpochOf(key: String): Long = executionEpochs[key] ?: 0L
 
@@ -335,7 +351,17 @@ class AppContainer(context: Context) {
                 connectionRegistry.revokeIfOwn(key, epoch, reason)
             },
             isSupersededInRegistry = { key, epoch -> connectionRegistry.isSuperseded(key, epoch) },
-            onConfirmedEvent = { key, event -> executionController.onConfirmedEvent(key, event) },
+            onConfirmedEvent = { key, event ->
+                executionController.onConfirmedEvent(key, event)
+                // A2 slice 1, boundary 4: a confirmed frame is the only engine
+                // evidence that may advance the stored phase. The DAO guard
+                // requires ACKED, so repeat frames are harmless no-ops.
+                event.runId?.let { runId ->
+                    containerScope.launch {
+                        runCatching { executionStore.markRunningForRun(runId) }
+                    }
+                }
+            },
             scope = containerScope,
         )
     }
@@ -796,6 +822,44 @@ class AppContainer(context: Context) {
             // and this only acts when no binding landed (or the restore landed
             // the trace's own target).
             runCatching { openLastDispatchedHandoff() }
+        }
+
+        // A2 slice 1: one-shot startup reconciliation. Reads/writes Room only;
+        // NO engine is started or stopped. §7/§17.1 forbid attaching a recovered
+        // execution without an atomic validate+attach wrapper (absent), so the
+        // outcomes are named and visible rather than claimed as live.
+        containerScope.launch {
+            runCatching {
+                val summary = executionReconciler.reconcile()
+                summary.recovered.forEach { recovered ->
+                    val row = recovered.entity
+                    val lifecycle = when (recovered.outcome) {
+                        ExecutionReconciler.Outcome.UNSENT -> ExecutionLifecycle.UNSENT
+                        ExecutionReconciler.Outcome.AMBIGUOUS -> ExecutionLifecycle.SEND_ATTEMPTED
+                        ExecutionReconciler.Outcome.LOST -> ExecutionLifecycle.LOST
+                        ExecutionReconciler.Outcome.DEFERRED -> return@forEach
+                    }
+                    executionController.onRecovered(
+                        executionId = row.executionId,
+                        runId = row.runId,
+                        target = ExecutionTarget(
+                            row.engineKeyToken,
+                            row.workspacePath,
+                            row.sessionId,
+                        ),
+                        lifecycle = lifecycle,
+                        reasonCode = recovered.detail,
+                    )
+                }
+                com.crush.mobile.util.AppLog.i(
+                    "A2",
+                    "reconcile rows=${summary.recovered.size} unsent=${summary.unsent} " +
+                        "ambiguous=${summary.ambiguous} lost=${summary.lost} " +
+                        "deferred=${summary.deferred}",
+                )
+            }.onFailure { t ->
+                com.crush.mobile.util.AppLog.w("A2", "reconcile failed: ${t.message}")
+            }
         }
     }
 

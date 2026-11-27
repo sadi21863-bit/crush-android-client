@@ -6,12 +6,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.crush.mobile.data.handoff.HandoffDao
 import com.crush.mobile.data.handoff.HandoffEntity
+import com.crush.mobile.execution.ExecutionDao
+import com.crush.mobile.execution.ExecutionEntity
 
 /**
  * Version 2 of the projects registry (ADR-0001 P2, extended by S-02);
  * version 3 adds the Chat to Code handoff trace table (P6, 2026-11-08,
  * MIGRATION_2_3 below) as a plain additive CREATE TABLE beside it - no
- * existing row changes shape.
+ * existing row changes shape. Version 4 adds the V2-16 A2 executions run trace
+ * (MIGRATION_3_4), also additive.
  *
  * exportSchema=false was deliberately explicit for version 1 - "there is
  * nothing a schema JSON would protect". The S-02 trust columns are version
@@ -19,12 +22,19 @@ import com.crush.mobile.data.handoff.HandoffEntity
  * JSON stays off until a breaking (non-additive) change makes the export
  * worth its tooling, per this file's original accounting.
  */
-@Database(entities = [ProjectEntity::class, HandoffEntity::class], version = 3, exportSchema = false)
+@Database(
+    entities = [ProjectEntity::class, HandoffEntity::class, ExecutionEntity::class],
+    version = 4,
+    exportSchema = false,
+)
 abstract class ProjectDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
 
     /** The P6 handoff trace surface (see [HandoffDao]). */
     abstract fun handoffDao(): HandoffDao
+
+    /** V2-16 A2 slice 1: the additive executions table (see [ExecutionDao]). */
+    abstract fun executionDao(): ExecutionDao
 
     companion object {
 
@@ -74,6 +84,51 @@ abstract class ProjectDatabase : RoomDatabase() {
                         "sourceProvider TEXT NOT NULL, " +
                         "status TEXT NOT NULL CHECK (status IN " +
                         "('DRAFT','APPROVED','DISPATCHED','ABANDONED')))"
+                )
+            }
+        }
+
+        /**
+         * v3 -> v4 (V2-16 A2 slice 1): the additive `executions` run trace.
+         * Plain CREATE TABLE + indexes only - neither `projects` nor `handoffs`
+         * rows change shape. No ForeignKey/cascade: the trace survives project
+         * removal. The column names are the design §5 names verbatim and must
+         * stay identical to ExecutionEntity's @ColumnInfo values.
+         *
+         * NOTE: the design draft's leading `ALTER TABLE executions ...` is a
+         * typo - the table does not exist in v3. Only CREATE TABLE is valid,
+         * matching the v2->v3 precedent above.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS executions (" +
+                        "execution_id TEXT NOT NULL PRIMARY KEY, " +
+                        "run_id TEXT NOT NULL, " +
+                        "session_id TEXT NOT NULL, " +
+                        "engine_key_token TEXT NOT NULL, " +
+                        "workspace_path TEXT NOT NULL, " +
+                        "engine_generation INTEGER, " +
+                        "lease_at_ms INTEGER, " +
+                        "phase TEXT NOT NULL, " +
+                        "progress_at_ms INTEGER, " +
+                        "created_at_ms INTEGER NOT NULL, " +
+                        "updated_at_ms INTEGER NOT NULL, " +
+                        "prompt_ref TEXT, " +
+                        "terminal_reason TEXT, " +
+                        "ack_state TEXT NOT NULL" +
+                        ")"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS idx_exec_session " +
+                        "ON executions(session_id, updated_at_ms)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS idx_exec_engine " +
+                        "ON executions(engine_key_token, phase)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS idx_exec_path ON executions(workspace_path)"
                 )
             }
         }

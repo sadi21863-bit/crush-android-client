@@ -3,6 +3,7 @@ package com.crush.mobile.data.project
 import android.content.Context
 import androidx.room.Room
 import com.crush.mobile.data.handoff.HandoffDao
+import com.crush.mobile.execution.ExecutionDao
 import com.crush.mobile.project.ProjectRef
 import com.crush.mobile.project.ProjectStore
 import java.io.File
@@ -30,7 +31,11 @@ class RoomProjectStore(
 
     private val database: ProjectDatabase =
         Room.databaseBuilder(context.applicationContext, ProjectDatabase::class.java, dbName)
-            .addMigrations(ProjectDatabase.MIGRATION_1_2, ProjectDatabase.MIGRATION_2_3)
+            .addMigrations(
+                ProjectDatabase.MIGRATION_1_2,
+                ProjectDatabase.MIGRATION_2_3,
+                ProjectDatabase.MIGRATION_3_4,
+            )
             .build()
 
     private val dao: ProjectDao = database.projectDao()
@@ -43,6 +48,12 @@ class RoomProjectStore(
      * `AppContainer.projectStore`; the DI seam itself stays the store.
      */
     fun handoffDao(): HandoffDao = database.handoffDao()
+
+    /**
+     * The V2-16 A2 slice-1 executions surface. Same database file, builder and
+     * migration chain - no second store and no competing migration list.
+     */
+    fun executionDao(): ExecutionDao = database.executionDao()
 
     override suspend fun create(label: String, repoDir: File): ProjectRef {
         val dir = repoDir.apply { mkdirs() }

@@ -378,6 +378,12 @@ data class ChatUiState(
     val phase: String = "starting engine",
     val engineReady: Boolean = false,
     /**
+     * V2-16: the named reason a contextual engine start was refused. Null once
+     * a later start is attempted, so the list can never replay a stale refusal
+     * after the engine has since come up and gone down again.
+     */
+    val engineStartError: String? = null,
+    /**
      * A SETTLED bootstrap failure the send-preflight can recover from.
      *
      * 2026-11-03 wedge (user-measured): the beam-free catalog-drift incident
@@ -606,6 +612,8 @@ class ChatViewModel(
      * must target the bound instance, never hard-code the legacy singleton.
      */
     fun startEngine() {
+        // A new attempt invalidates any previous refusal reason.
+        _state.update { it.copy(engineStartError = null) }
         // Gate-7 §1 liveness budget (2026-11-05): at most TWO non-legacy
         // instances with live children - two non-legacy projects; chat runs on
         // the legacy key, which is outside this budget. The refusal is
@@ -616,7 +624,11 @@ class ChatViewModel(
         container.requestEngineStart(instanceKey)?.let { refusal ->
             AppLog.w(TAG, "engine start refused for instance '$instanceKey': $refusal")
             _state.update {
-                it.copy(phase = "engine failed: $refusal", engineReady = false)
+                it.copy(
+                    phase = "engine failed: $refusal",
+                    engineReady = false,
+                    engineStartError = refusal,
+                )
             }
             return
         }
@@ -792,6 +804,7 @@ class ChatViewModel(
             ChatAction.Stop -> stopStreaming()
 
             ChatAction.NewChat -> startChatSession()
+            ChatAction.StartEngine -> startEngine()
             ChatAction.OpenSessions -> loadSessions()
             ChatAction.OpenModels -> loadModels()
 

@@ -166,4 +166,54 @@ class ChatListContentTest {
             .assertIsDisplayed()
         compose.onAllNodesWithText("No chats yet").assertCountEquals(0)
     }
+
+    @Test
+    fun `a stopped project engine offers a Start engine action`() {
+        val actions = mutableListOf<ChatAction>()
+        setContent(
+            ChatFixtures.view(
+                bindingKind = BindingKind.Project,
+                projectLabel = "notes-app",
+                sessions = emptyList(),
+                sessionsUnavailable = true,
+                engineReady = false,
+                engineStartable = true,
+            ),
+            actions,
+        )
+
+        compose.onNodeWithText("Start engine").assertIsDisplayed().performClick()
+        assertEquals(listOf(ChatAction.StartEngine), actions)
+    }
+
+    @Test
+    fun `a live engine has no Start engine button`() {
+        setContent(
+            ChatFixtures.view(
+                bindingKind = BindingKind.Project,
+                projectLabel = "notes-app",
+                sessions = listOf(SessionItem("p1", "Fix the parser", isActive = true, isBusy = false)),
+            )
+        )
+
+        compose.onAllNodesWithText("Start engine").assertCountEquals(0)
+    }
+
+    @Test
+    fun `a refused start keeps the button and names the reason`() {
+        setContent(
+            ChatFixtures.view(
+                bindingKind = BindingKind.Project,
+                projectLabel = "notes-app",
+                sessions = emptyList(),
+                sessionsUnavailable = true,
+                engineReady = false,
+                engineStartable = true,
+                engineStartError = "at most 2 live projects",
+            )
+        )
+
+        compose.onNodeWithText("Start engine").assertIsDisplayed()
+        compose.onNodeWithText("at most 2 live projects").assertIsDisplayed()
+    }
 }

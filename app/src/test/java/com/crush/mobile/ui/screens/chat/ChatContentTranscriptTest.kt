@@ -376,6 +376,8 @@ internal object ChatFixtures {
         messages: List<ChatMessage> = emptyList(),
         phase: String = "ready",
         engineReady: Boolean = true,
+        engineStartable: Boolean = false,
+        engineStartError: String? = null,
         readiness: EngineReadiness? = null,
         streaming: Boolean = false,
         canType: Boolean = true,
@@ -416,6 +418,8 @@ internal object ChatFixtures {
             streaming = streaming,
             stopNotice = null,
             engineReady = engineReady,
+            engineStartable = engineStartable,
+            engineStartError = engineStartError,
         ),
         model = ModelView(
             providerId = "opencode",

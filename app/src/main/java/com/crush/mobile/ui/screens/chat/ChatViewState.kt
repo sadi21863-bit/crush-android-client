@@ -4,6 +4,7 @@ import com.crush.mobile.data.crush.PermissionRequest
 import com.crush.mobile.data.crush.SubAgentReport
 import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.model.ReasoningDisplay
+import com.crush.mobile.engine.EngineState
 import com.crush.mobile.project.ProjectRef
 
 /**
@@ -82,6 +83,17 @@ data class RunView(
      * source-compatible.
      */
     val engineReady: Boolean = false,
+    /**
+     * V2-16: true when the bound instance has NO confirmed live engine, so the
+     * list can offer a dedicated Start action instead of forcing the user
+     * through "New session" or a first keystroke. False on the non-ready seed
+     * and false ONLY when the engine sample belongs to this instance and is
+     * [EngineState.Running] - a key mismatch is treated as "unknown", which
+     * biases toward offering the lever rather than hiding it.
+     */
+    val engineStartable: Boolean = false,
+    /** Named reason from the last refused start; null once a new start is tried. */
+    val engineStartError: String? = null,
 )
 
 /**
@@ -324,6 +336,10 @@ fun ChatUiState.toViewState(inputs: ChatHostInputs): ChatViewState {
             streaming = isStreaming,
             stopNotice = stopNotice,
             engineReady = engineReady,
+            engineStartable = inputs.snapshotReady &&
+                !(inputs.engineStateKey == inputs.instanceKey &&
+                    inputs.engineState is EngineState.Running),
+            engineStartError = engineStartError,
         ),
         model = ModelView(
             providerId = providerId,

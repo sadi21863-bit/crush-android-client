@@ -373,6 +373,62 @@ class ChatViewStateTest {
     }
 
     @Test
+    fun `start is hidden on the seed and on a confirmed Running sample for this instance`() {
+        val stopped = ChatUiState().toViewState(ChatHostInputs())
+        assertFalse(stopped.run.engineStartable)
+
+        val running = ChatUiState(engineReady = true).toViewState(
+            ChatHostInputs(
+                snapshotReady = true,
+                instanceKey = "p1",
+                engineStateKey = "p1",
+                engineState = EngineState.Running(123, 1, "{}", 10L),
+            )
+        )
+        assertFalse(running.run.engineStartable)
+    }
+
+    @Test
+    fun `start is offered for every non-Running state of the bound instance`() {
+        val states = listOf(
+            EngineState.Stopped,
+            EngineState.Starting(1),
+            EngineState.Failed("boom"),
+        )
+        states.forEach { state ->
+            val view = ChatUiState().toViewState(
+                ChatHostInputs(
+                    snapshotReady = true,
+                    instanceKey = "p1",
+                    engineStateKey = "p1",
+                    engineState = state,
+                )
+            )
+            assertTrue("expected a start lever for $state", view.run.engineStartable)
+        }
+    }
+
+    @Test
+    fun `a key mismatch biases toward offering the start lever`() {
+        val view = ChatUiState().toViewState(
+            ChatHostInputs(
+                snapshotReady = true,
+                instanceKey = "p2",
+                engineStateKey = "p1",
+                engineState = EngineState.Running(123, 1, "{}", 10L),
+            )
+        )
+        assertTrue(view.run.engineStartable)
+    }
+
+    @Test
+    fun `a named start refusal is projected verbatim`() {
+        val view = ChatUiState(engineStartError = "at most 2 live projects")
+            .toViewState(ChatHostInputs(snapshotReady = true))
+        assertEquals("at most 2 live projects", view.run.engineStartError)
+    }
+
+    @Test
     fun `the projection source imports no Android or forbidden packages`() {
         val source = findSource()
         val imports = source.readLines().filter { it.trimStart().startsWith("import ") }

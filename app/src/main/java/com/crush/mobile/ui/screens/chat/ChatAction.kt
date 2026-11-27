@@ -18,6 +18,12 @@ sealed interface ChatAction {
     data object Stop : ChatAction
 
     data object NewChat : ChatAction
+    /**
+     * Contextual engine start (V2-16): shown on the list whenever the bound
+     * instance has no confirmed live engine. ViewModel-owned - it must reach
+     * [ChatViewModel.startEngine], never become a host navigation effect.
+     */
+    data object StartEngine : ChatAction
     data object OpenSessions : ChatAction
     data object OpenModels : ChatAction
     data object OpenReview : ChatAction

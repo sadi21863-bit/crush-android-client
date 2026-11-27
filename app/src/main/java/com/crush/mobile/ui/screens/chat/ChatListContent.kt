@@ -104,6 +104,27 @@ fun ChatListContent(
             )
             Spacer(Modifier.height(CrushSpacing.md))
 
+            // V2-16: a dedicated recovery lever whenever the bound instance
+            // has no confirmed live engine. New session / first keystroke stay
+            // secondary paths. Hidden only on a Running sample for this key.
+            if (state.run.engineStartable) {
+                CrushButton(
+                    text = "Start engine",
+                    onClick = { onAction(ChatAction.StartEngine) },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = CrushButtonVariant.Secondary,
+                )
+                state.run.engineStartError?.let { reason ->
+                    Spacer(Modifier.height(CrushSpacing.sm))
+                    Text(
+                        reason,
+                        style = CrushType.metadata,
+                        color = LocalCrushColors.current.error,
+                    )
+                }
+                Spacer(Modifier.height(CrushSpacing.md))
+            }
+
             val list = state.session.list
             val engineReady = state.run.engineReady
             when {

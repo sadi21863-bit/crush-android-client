@@ -87,6 +87,12 @@ class ChatDispatchTest {
     }
 
     @Test
+    fun `StartEngine is ViewModel-owned and never a permission decision`() {
+        assertNull(ChatDispatch.hostEffect(ChatAction.StartEngine))
+        assertNull(ChatDispatch.permissionDecision(ChatAction.StartEngine))
+    }
+
+    @Test
     fun `the review action returns its explicit destination`() {
         assertEquals(
             ChatHostEffect.Navigate(HostDestination.Review),

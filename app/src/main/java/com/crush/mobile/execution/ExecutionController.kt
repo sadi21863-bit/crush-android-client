@@ -26,6 +26,13 @@ class ExecutionController(
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
     private val records = ConcurrentHashMap<String, ExecutionView>()
+    /**
+     * A concurrent SET per instance key, not a plain `mutableSetOf`. The map
+     * being concurrent is not enough: `start()` adds while `onInvalidated()`
+     * snapshots and `hasActive()` iterates, so the values must be safe to
+     * mutate/read concurrently as well. All compound operations additionally
+     * hold the `records` monitor so a start and an invalidation cannot interleave.
+     */
     private val activeByKey = ConcurrentHashMap<String, MutableSet<String>>()
     private val observerEpochs = ConcurrentHashMap<String, Long>()
     private val _executions = MutableStateFlow<Map<String, ExecutionView>>(emptyMap())
@@ -59,8 +66,12 @@ class ExecutionController(
             epoch = epochOf(target.instanceKey),
             lastObservedProgressAt = clock(),
         )
-        records[id] = view
-        activeByKey.computeIfAbsent(target.instanceKey) { mutableSetOf() }.add(id)
+        synchronized(records) {
+            records[id] = view
+            activeByKey
+                .computeIfAbsent(target.instanceKey) { ConcurrentHashMap.newKeySet<String>() }
+                .add(id)
+        }
         publish()
         return view
     }
@@ -196,8 +207,9 @@ class ExecutionController(
         }
     }
 
-    fun hasActive(instanceKey: String): Boolean =
+    fun hasActive(instanceKey: String): Boolean = synchronized(records) {
         activeByKey[instanceKey]?.any { id -> records[id]?.isTerminal == false } == true
+    }
 
     /** Called by the container's invalidation listener. Never claims completion. */
     fun onInvalidated(instanceKey: String, source: String) {
@@ -207,16 +219,22 @@ class ExecutionController(
             "ExecutionController",
             "invalidated key=$instanceKey source=$source epoch=${epochOf(instanceKey)}",
         )
-        val ids = activeByKey[instanceKey]?.toList() ?: return
-        ids.forEach { id ->
-            mutate(id) {
-                it.copy(
-                    epoch = epochOf(instanceKey),
-                    lifecycle = ExecutionLifecycle.UNKNOWN,
-                    reasonCode = "invalidated:$source",
-                )
+        // Snapshot and rewrite under one monitor: a start() on the same key
+        // cannot slip between the snapshot and the phase writes.
+        synchronized(records) {
+            val ids = activeByKey[instanceKey]?.toList().orEmpty()
+            ids.forEach { id ->
+                val current = records[id] ?: return@forEach
+                if (!current.isTerminal) {
+                    records[id] = current.copy(
+                        epoch = epochOf(instanceKey),
+                        lifecycle = ExecutionLifecycle.UNKNOWN,
+                        reasonCode = "invalidated:$source",
+                    )
+                }
             }
         }
+        publish()
     }
 
     private fun ExecutionLifecycle.isTerminal(): Boolean = when (this) {

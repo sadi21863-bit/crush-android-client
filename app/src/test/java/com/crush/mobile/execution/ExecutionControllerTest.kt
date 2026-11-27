@@ -1,5 +1,9 @@
 package com.crush.mobile.execution
 
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -194,5 +198,87 @@ class ExecutionControllerTest {
 
         assertEquals(ObservationState.OBSERVING, c.executions.value[e.executionId]?.observation)
         assertNull(c.executions.value["missing"])
+    }
+
+    @Test
+    fun concurrentStartsAndActiveChecksDoNotRace() {
+        val c = ExecutionController()
+        val n = 16
+        val ready = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(n + 2)
+        val ids = Collections.synchronizedList(mutableListOf<String>())
+        val errors = Collections.synchronizedList(mutableListOf<Throwable>())
+
+        val starters = (0 until n).map {
+            pool.submit {
+                try {
+                    ready.await()
+                    ids += c.start(target()).executionId
+                } catch (t: Throwable) {
+                    errors += t
+                }
+            }
+        }
+        val readers = (0 until 2).map {
+            pool.submit {
+                try {
+                    ready.await()
+                    repeat(200) { c.hasActive("pA") }
+                } catch (t: Throwable) {
+                    errors += t
+                }
+            }
+        }
+        ready.countDown()
+        (starters + readers).forEach { it.get(10, TimeUnit.SECONDS) }
+        pool.shutdownNow()
+
+        assertTrue(errors.toString(), errors.isEmpty())
+        assertEquals(n, ids.toSet().size)
+        assertEquals(n, c.executions.value.size)
+        assertTrue(c.hasActive("pA"))
+    }
+
+    @Test
+    fun invalidationDuringConcurrentStartsMarksEveryRegisteredExecution() {
+        val c = ExecutionController()
+        val n = 12
+        val ready = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(n + 1)
+        val ids = Collections.synchronizedList(mutableListOf<String>())
+        val errors = Collections.synchronizedList(mutableListOf<Throwable>())
+
+        val starters = (0 until n).map {
+            pool.submit {
+                try {
+                    ready.await()
+                    ids += c.start(target()).executionId
+                } catch (t: Throwable) {
+                    errors += t
+                }
+            }
+        }
+        val invalidator = pool.submit {
+            try {
+                ready.await()
+                repeat(50) { c.onInvalidated("pA", "registry.stop") }
+            } catch (t: Throwable) {
+                errors += t
+            }
+        }
+        ready.countDown()
+        (starters + invalidator).forEach { it.get(10, TimeUnit.SECONDS) }
+        pool.shutdownNow()
+        // Settle the ones that could only start after the last invalidation.
+        c.onInvalidated("pA", "registry.stop")
+
+        assertTrue(errors.toString(), errors.isEmpty())
+        assertEquals(n, ids.toSet().size)
+        ids.forEach { id ->
+            val view = c.executions.value[id]!!
+            assertEquals(ExecutionLifecycle.UNKNOWN, view.lifecycle)
+            assertEquals("invalidated:registry.stop", view.reasonCode)
+        }
+        assertFalse(c.hasActive("pA"))
     }
 }

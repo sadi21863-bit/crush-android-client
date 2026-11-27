@@ -24,6 +24,7 @@ A1**; A2, D1, D2, D4 and D7 remain open.
 | `a1-device-reattach.png` | device screenshot | session list after relaunch, 107 msgs; engine history showed exactly one `A1NOSTOP` prompt and final `A1NOSTOP` | execution-view UI (none exists yet) |
 | `a1-device-invalidation.log` | device `app.log` excerpt | binding switch with **no run in flight**: `registry.stop` epoch 1, `supervisor.stop` epoch 2 | adapter.stop/close on device, live-run recovery, delayed-frame rejection |
 | `a1-junit` XML set | JVM | controller transitions, provisional buffering/commit/rollback, real-router frame delivery with a **fake connection port**, stale epoch rejection, container listener wiring, shutdown and terminal-recovery probe labels | real socket transport, device lifecycle, two-ViewModel device race |
+| `a1-device-confirmed.log` | device `app.log` excerpt | real `declare` at 06:00:03, then `RUN_COMPLETE attribution=CONFIRMED epoch=1` and `ExecutionController: confirmed …` at 06:05:01 — the confirmed-event path runs on device | it was a short tool turn with a delayed permission grant; **not** a live-run project switch |
 | `e5-r6-junit.xml` | JVM harness | registry stop signal + token-protocol barrier | production controller attachment (A1 is now implemented, but this test still uses its own harness) |
 
 ## Honest scope statement

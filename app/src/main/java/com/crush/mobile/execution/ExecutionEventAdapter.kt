@@ -93,6 +93,11 @@ class ExecutionEventAdapter(
 
     fun declare(key: String, runId: String) {
         declaredRuns.computeIfAbsent(key) { mutableSetOf() }.add(runId)
+        // A1 device evidence: this run id is now attributable on the wire.
+        com.crush.mobile.util.AppLog.i(
+            "ExecutionEventAdapter",
+            "declare key=$key run=$runId",
+        )
     }
 
     /**

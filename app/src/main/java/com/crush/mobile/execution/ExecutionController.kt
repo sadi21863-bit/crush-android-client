@@ -103,6 +103,10 @@ class ExecutionController(
         val id = synchronized(records) {
             activeByKey[instanceKey]?.firstOrNull { records[it]?.runId == event.runId }
         } ?: return
+        com.crush.mobile.util.AppLog.i(
+            "ExecutionController",
+            "confirmed key=$instanceKey id=$id run=${event.runId} type=${event.type}",
+        )
         when (event.type) {
             ExecutionEvent.Type.RUN_COMPLETE -> {
                 markRunning(id, Attribution.CONFIRMED)

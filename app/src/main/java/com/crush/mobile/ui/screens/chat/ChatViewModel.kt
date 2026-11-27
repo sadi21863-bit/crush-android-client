@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.crush.mobile.execution.EventConnectionPort
+import com.crush.mobile.execution.ExecutionPersistenceGuard
+import com.crush.mobile.execution.ExecutionSendPolicy
 import com.crush.mobile.execution.ExecutionTarget
 import com.crush.mobile.data.api.LiveZenModel
 import com.crush.mobile.data.api.ZenModelsApi
@@ -763,11 +765,23 @@ class ChatViewModel(
                 providerDisplayName = Providers.byId(chat.providerId)?.displayName ?: chat.providerId,
             ),
         )
-    }.stateIn(
-        viewModelScope,
-        kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
-        ChatHostState.initial(),
-    )
+    }
+        // A2 remediation: recovered outcomes must reach the presentation
+        // state, not stop at the controller map. A second combine keeps each
+        // combine call within the typed five-flow limit.
+        .combine(container.executionController.executions) { host, executions ->
+            host.copy(
+                inputs = host.inputs.copy(
+                    recoveredOutcomes = executions.values
+                        .filter { it.recovered }
+                        .toRecoveredOutcomes(),
+                ),
+            )
+        }.stateIn(
+            viewModelScope,
+            kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+            ChatHostState.initial(),
+        )
 
     private fun AppContainer.EngineBinding.toBindingKind(): BindingKind = when (this) {
         is AppContainer.EngineBinding.Legacy -> BindingKind.Legacy
@@ -3974,8 +3988,9 @@ class ChatViewModel(
                 // A2 slice 1, boundary 1: the durable intent MUST exist before
                 // any HTTP call. A failed write is a named failure - never a
                 // send-on-belief. Generation/lease are deliberately NULL: they
-                // are not captured at send time, and recovery fails closed
-                // rather than guessing them (§7/§17.1).
+                // captured here from the live manager that owns the workspace.
+                // Generation is process-local, so recovery still treats a
+                // cross-process comparison as unavailable rather than guessing.
                 val durable = runCatching {
                     container.executionStore.persistIntent(
                         executionId = execution.executionId,
@@ -3983,11 +3998,11 @@ class ChatViewModel(
                         target = ExecutionTarget(instanceKey, targetWs, targetSid),
                         engineKeyToken = AppContainer.bindingToToken(container.activeBinding.value),
                         workspacePath = workspacePathFor(),
-                        generation = null,
-                        leaseAtMs = null,
+                        generation = WorkspaceManager.currentEngineGeneration(),
+                        leaseEpochMs = mgr.lastAttachedAtMs,
                     )
                 }
-                if (durable.isFailure) {
+                if (!ExecutionPersistenceGuard.committed(durable.map { 1 })) {
                     val why = "durable intent failed: ${durable.exceptionOrNull()?.message}"
                     AppLog.e(TAG, why)
                     container.executionController.markSubmitRejected(execution.executionId, why)
@@ -4032,8 +4047,10 @@ class ChatViewModel(
                 // A2 slice 1, boundary 1→2: record the send attempt before the
                 // POST. If the marker cannot be written the POST is not made.
                 val marked = runCatching { container.executionStore.markSent(execution.executionId) }
-                if (marked.isFailure) {
-                    val why = "durable send marker failed: ${marked.exceptionOrNull()?.message}"
+                if (!ExecutionPersistenceGuard.committed(marked)) {
+                    val why = marked.exceptionOrNull()?.let {
+                        "durable send marker failed: ${it.message}"
+                    } ?: "durable send marker refused (0 rows)"
                     AppLog.e(TAG, why)
                     container.executionController.markSubmitRejected(execution.executionId, why)
                     failure = why
@@ -4074,7 +4091,16 @@ class ChatViewModel(
                     // action into a model failure. A2: the POST may already
                     // have landed, so the durable record becomes AMBIGUOUS -
                     // never auto-resend, and no false "not sent" claim.
-                    runCatching { container.executionStore.markAmbiguous(execution.executionId) }
+                    val stoppedAmb = runCatching {
+                        container.executionStore.markAmbiguous(execution.executionId)
+                    }
+                    if (!ExecutionPersistenceGuard.committed(stoppedAmb)) {
+                        AppLog.e(
+                            TAG,
+                            "durable stop-during-send ambiguity not recorded: " +
+                                (stoppedAmb.exceptionOrNull()?.message ?: "0 rows"),
+                        )
+                    }
                     break
                 }
 
@@ -4082,12 +4108,23 @@ class ChatViewModel(
                     accepted = true
                     failure = null
                     acceptedSid = targetSid
-                    // A1: the intent already exists; only now do we record the
-                    // documented acceptance. 202 is NOT running/completed.
+                    // A2 remediation: the durable ack must COMMIT before the
+                    // in-memory controller is allowed to claim acknowledgement.
+                    // A refused (0-row) or failed write leaves an honest
+                    // ambiguous outcome and never advances the phase.
+                    val acked = runCatching { container.executionStore.markAcked(execution.executionId) }
+                    if (!ExecutionPersistenceGuard.committed(acked)) {
+                        val why = acked.exceptionOrNull()?.let {
+                            "durable ack failed: ${it.message}"
+                        } ?: "durable ack refused (0 rows)"
+                        AppLog.e(TAG, why)
+                        container.executionController.markAmbiguousSend(execution.executionId, why)
+                        runCatching { container.executionStore.markAmbiguous(execution.executionId) }
+                        failure = why
+                        break
+                    }
+                    // 202 is NOT running/completed; only now advance in memory.
                     container.executionController.markSubmissionAcknowledged(execution.executionId)
-                    // A2 slice 1, boundary 3: the acknowledgement is durable
-                    // before the state advances or frames are awaited.
-                    runCatching { container.executionStore.markAcked(execution.executionId) }
                     try {
                         awaitStream(events, runId, handle)
                     } finally {
@@ -4098,85 +4135,32 @@ class ChatViewModel(
                     }
                 } else {
                     failure = msg
-                    // A1 submission outcome: a documented 4xx rejection is a
-                    // proven failure; timeout/reset/unknown server outcomes stay
-                    // UNKNOWN. Nothing here auto-resends an ambiguous send.
-                    val retryableWire = msg.contains("workspace not found", true) ||
-                        msg.contains("session not found", true)
-                    if (!retryableWire && msg.startsWith("HTTP 4", true)) {
-                        container.executionController.markSubmitRejected(execution.executionId, msg)
-                        runCatching {
-                            container.executionStore.markRejected(execution.executionId, msg)
-                        }
-                    } else {
-                        container.executionController.markAmbiguousSend(execution.executionId, msg)
-                        runCatching { container.executionStore.markAmbiguous(execution.executionId) }
+                    // A2 remediation (Finding B): no engine contract in this
+                    // repo proves that a POST failure - including a 404 naming
+                    // a workspace or session - happened before dispatch. HTTP
+                    // status alone is not evidence of non-dispatch. Every
+                    // unacknowledged POST is therefore AMBIGUOUS, never a
+                    // proven rejection and never automatically re-sent.
+                    container.executionController.markAmbiguousSend(execution.executionId, msg)
+                    val amb = runCatching {
+                        container.executionStore.markAmbiguous(execution.executionId)
+                    }
+                    if (!ExecutionPersistenceGuard.committed(amb)) {
+                        AppLog.e(
+                            TAG,
+                            "durable ambiguity not recorded: " +
+                                (amb.exceptionOrNull()?.message ?: "0 rows"),
+                        )
                     }
                     // A failed attempt must not leave a subscription behind.
                     sharedChannel?.let { eventRouter.unregister(runId, it) }
-                    val workspaceGone = msg.contains("workspace not found", ignoreCase = true)
-                    if (workspaceGone && attempt == 0) {
-                        AppLog.w(TAG, "workspace reaped mid-send; re-attaching and retrying once")
-                        if (runCatching { mgr.reattachIfStale(force = true) }.getOrDefault(false)) {
-                            val ws2 = mgr.currentWorkspaceId
-                            if (ws2 != null) {
-                                // KEEP THE SAME SESSION.
-                                //
-                                // This used to mint a new one, with the comment
-                                // "a fresh session is required: the old one
-                                // belonged to the reaped workspace". That premise
-                                // is wrong and it silently destroyed conversation
-                                // continuity: sessions are persistent engine state
-                                // keyed by the workspace's cwd, while the workspace
-                                // is only an attachment handle that comes and goes
-                                // with the ~30s reap. So the old session id is still
-                                // valid after re-attaching, and replacing it meant a
-                                // user's 3rd message landed in a brand-new chat,
-                                // then their 4th in another - which looked exactly
-                                // like the app could only hold 2-3 messages.
-                                //
-                                // Only the WORKSPACE id changes here.
-                                targetWs = ws2
-                                wsId = ws2
-                                existingSessionWorkspace = ws2
-                                // Re-point the long-lived event connection at the
-                                // fresh workspace (analysis §4 P1-6). This turn's
-                                // retry subscribes with its own per-turn stream on
-                                // the next loop pass (routerUsedHere is already
-                                // true), so the re-point matters for every LATER
-                                // turn: without it the shared socket stays attached
-                                // to the workspace the engine just reaped and
-                                // publishes nothing we are addressed by.
-                                // eventConnection == null means no shared attach
-                                // exists at all, in which case silently skipping
-                                // is right - the per-turn fallback already governs
-                                // this and later turns.
-                                runCatching { eventConnection?.ensureAttached(ws2, mgr.clientId) }
-                                    .onFailure {
-                                        AppLog.w(
-                                            TAG,
-                                            "event re-attach after reap failed: ${it.message}"
-                                        )
-                                    }
-                                attempt++
-                                continue
-                            }
-                        }
-                    }
-                    // A 404 that names the SESSION (not the workspace) means the
-                    // session itself is genuinely gone, which is the one case
-                    // where starting over is correct.
-                    if (msg.contains("session not found", ignoreCase = true) && attempt == 0) {
-                        AppLog.w(TAG, "session gone; starting a new one")
-                        val sid2 = runCatching { mgr.newSession("chat").id }.getOrNull()
-                        if (sid2 != null) {
-                            targetSid = sid2
-                            sessionId = sid2
-                            attempt++
-                            continue
-                        }
-                    }
-                    break
+                    // A2 remediation (Finding B): a POST whose outcome is not
+                    // proven is AMBIGUOUS. No engine contract in this repo
+                    // establishes that a workspace/session 404 proves
+                    // non-dispatch, so there is NO automatic second POST and
+                    // no second execution/run identity. Pre-POST reattachment
+                    // (the LAZY preflight above) remains the only safe recovery.
+                    if (!ExecutionSendPolicy.mayAutoRetryAfterUnacknowledgedPost) break
                 }
             }
 

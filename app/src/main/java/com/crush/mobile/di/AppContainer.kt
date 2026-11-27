@@ -358,7 +358,13 @@ class AppContainer(context: Context) {
                 // requires ACKED, so repeat frames are harmless no-ops.
                 event.runId?.let { runId ->
                     containerScope.launch {
-                        runCatching { executionStore.markRunningForRun(runId) }
+                        val advanced = runCatching { executionStore.markRunningForRun(runId) }
+                        if (advanced.getOrNull() != 1 && advanced.getOrNull() != 0) {
+                            com.crush.mobile.util.AppLog.w(
+                                "A2",
+                                "durable running write failed: ${advanced.exceptionOrNull()?.message}",
+                            )
+                        }
                     }
                 }
             },
@@ -540,6 +546,21 @@ class AppContainer(context: Context) {
         const val TOKEN_LEGACY = "legacy"
         const val TOKEN_CHAT = "chat"
         private const val TOKEN_PROJECT_PREFIX = "proj:"
+
+        /**
+         * A2 remediation: convert a PERSISTED binding token back to the REAL
+         * engine instance key. The two vocabularies are not interchangeable:
+         * tokens are "legacy"/"chat"/"proj:<full uuid>"; instance keys are
+         * ""/"chat"/"p<first8>". Never feed a token straight into
+         * [ExecutionTarget.instanceKey].
+         */
+        fun instanceKeyForToken(token: String): String = when (token) {
+            TOKEN_LEGACY, "" -> ""
+            TOKEN_CHAT -> EnginePaths.CHAT_INSTANCE_KEY
+            // Same derivation as the instance helper; the companion cannot
+            // call it because that one is instance-scoped.
+            else -> tokenToProjectId(token)?.let { "p" + it.toString().substring(0, 8) } ?: ""
+        }
 
         /** The persisted form of a binding. Never null - legacy has a token. */
         fun bindingToToken(binding: EngineBinding): String = when (binding) {
@@ -835,16 +856,23 @@ class AppContainer(context: Context) {
                     val row = recovered.entity
                     val lifecycle = when (recovered.outcome) {
                         ExecutionReconciler.Outcome.UNSENT -> ExecutionLifecycle.UNSENT
-                        ExecutionReconciler.Outcome.AMBIGUOUS -> ExecutionLifecycle.SEND_ATTEMPTED
+                        ExecutionReconciler.Outcome.AMBIGUOUS -> ExecutionLifecycle.SEND_AMBIGUOUS
+                        ExecutionReconciler.Outcome.UNKNOWN -> ExecutionLifecycle.UNKNOWN
                         ExecutionReconciler.Outcome.LOST -> ExecutionLifecycle.LOST
+                        ExecutionReconciler.Outcome.COMPLETED -> ExecutionLifecycle.COMPLETED
+                        ExecutionReconciler.Outcome.FAILED -> ExecutionLifecycle.FAILED
                         ExecutionReconciler.Outcome.DEFERRED -> return@forEach
                     }
                     executionController.onRecovered(
                         executionId = row.executionId,
                         runId = row.runId,
+                        // A binding token is NOT an instance key, and a
+                        // filesystem path is NOT a workspace id. Map the token
+                        // explicitly; leave workspaceId unknown (never used for
+                        // an attach) rather than fabricating one from a path.
                         target = ExecutionTarget(
-                            row.engineKeyToken,
-                            row.workspacePath,
+                            instanceKeyForToken(row.engineKeyToken),
+                            "",
                             row.sessionId,
                         ),
                         lifecycle = lifecycle,
@@ -854,8 +882,9 @@ class AppContainer(context: Context) {
                 com.crush.mobile.util.AppLog.i(
                     "A2",
                     "reconcile rows=${summary.recovered.size} unsent=${summary.unsent} " +
-                        "ambiguous=${summary.ambiguous} lost=${summary.lost} " +
-                        "deferred=${summary.deferred}",
+                        "ambiguous=${summary.ambiguous} unknown=${summary.unknown} " +
+                        "lost=${summary.lost} completed=${summary.completed} " +
+                        "failed=${summary.failed} deferred=${summary.deferred}",
                 )
             }.onFailure { t ->
                 com.crush.mobile.util.AppLog.w("A2", "reconcile failed: ${t.message}")

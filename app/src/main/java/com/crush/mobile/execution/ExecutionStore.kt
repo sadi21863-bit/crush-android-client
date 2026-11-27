@@ -26,7 +26,7 @@ class ExecutionStore(
         engineKeyToken: String,
         workspacePath: String,
         generation: Long? = null,
-        leaseAtMs: Long? = null,
+        leaseEpochMs: Long? = null,
     ): ExecutionEntity {
         val now = clock()
         val row = ExecutionEntity(
@@ -36,7 +36,7 @@ class ExecutionStore(
             engineKeyToken = engineKeyToken,
             workspacePath = workspacePath,
             engineGeneration = generation,
-            leaseAtMs = leaseAtMs,
+            leaseEpochMs = leaseEpochMs,
             phase = ExecutionLifecycle.INTENT_RECORDED.name,
             progressAtMs = now,
             createdAtMs = now,

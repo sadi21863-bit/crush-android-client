@@ -35,6 +35,7 @@ class RoomProjectStore(
                 ProjectDatabase.MIGRATION_1_2,
                 ProjectDatabase.MIGRATION_2_3,
                 ProjectDatabase.MIGRATION_3_4,
+                ProjectDatabase.MIGRATION_4_5,
             )
             .build()
 

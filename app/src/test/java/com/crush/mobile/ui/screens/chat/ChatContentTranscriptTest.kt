@@ -398,6 +398,7 @@ internal object ChatFixtures {
         sessionsLoading: Boolean = false,
         sessionsUnavailable: Boolean = false,
         deleteError: String? = null,
+        recovered: List<RecoveredOutcomeView> = emptyList(),
         reasoningDisplay: ReasoningDisplay = ReasoningDisplay.COLLAPSED,
     ): ChatViewState = ChatViewState(
         session = SessionView(
@@ -449,7 +450,7 @@ internal object ChatFixtures {
         ),
         gate = GateView(permission = permission, question = question),
         handoff = handoff,
-        notice = NoticeView(deleteError = deleteError),
+        notice = NoticeView(deleteError = deleteError, recovered = recovered),
         reasoningDisplay = reasoningDisplay,
     )
 }

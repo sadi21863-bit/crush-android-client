@@ -216,4 +216,29 @@ class ChatListContentTest {
         compose.onNodeWithText("Start engine").assertIsDisplayed()
         compose.onNodeWithText("at most 2 live projects").assertIsDisplayed()
     }
+
+    @Test
+    fun `a recovered ambiguous run is visible as unresolved and detached`() {
+        setContent(
+            ChatFixtures.view(
+                bindingKind = BindingKind.Project,
+                projectLabel = "notes-app",
+                recovered = listOf(
+                    RecoveredOutcomeView(
+                        id = "e1",
+                        statusLabel = "send unclear",
+                        detail = "recovery:send_ambiguous",
+                        detached = true,
+                        requiresUserAction = true,
+                        active = false,
+                    ),
+                ),
+            )
+        )
+
+        compose.onNodeWithText(
+            "Recovered run: send unclear - detached from current engine - " +
+                "your decision needed - not active work (recovery:send_ambiguous)",
+        ).assertIsDisplayed()
+    }
 }

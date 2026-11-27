@@ -64,6 +64,8 @@ data class ChatHostInputs(
      */
     val reasoningDisplay: ReasoningDisplay = ReasoningDisplay.COLLAPSED,
     val providerDisplayName: String = "",
+    /** V2-16 A2: recovered run outcomes; host-resolved from the controller. */
+    val recoveredOutcomes: List<RecoveredOutcomeView> = emptyList(),
 ) {
 
     /** The existing surface wording, preserved verbatim for 2b.1 parity. */

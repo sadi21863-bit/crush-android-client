@@ -11,6 +11,8 @@ package com.crush.mobile.execution
 enum class ExecutionLifecycle {
     INTENT_RECORDED,
     SEND_ATTEMPTED,
+    /** Design §9 `send_ambiguous`: terminal for automation, never auto-re-sent. */
+    SEND_AMBIGUOUS,
     SUBMISSION_ACKNOWLEDGED,
     RUNNING,
     CANCELLING,
@@ -74,9 +76,12 @@ data class ExecutionView(
     val reasonCode: String? = null,
     val retrySourceExecutionId: String? = null,
     val provenanceGap: Boolean = false,
+    /** True only for an outcome adopted from startup reconciliation. */
+    val recovered: Boolean = false,
 ) {
     val isTerminal: Boolean
         get() = lifecycle == ExecutionLifecycle.UNSENT ||
+            lifecycle == ExecutionLifecycle.SEND_AMBIGUOUS ||
             lifecycle == ExecutionLifecycle.COMPLETED ||
             lifecycle == ExecutionLifecycle.FAILED ||
             lifecycle == ExecutionLifecycle.LOST ||

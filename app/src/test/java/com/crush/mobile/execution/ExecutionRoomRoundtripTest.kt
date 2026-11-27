@@ -70,6 +70,28 @@ class ExecutionRoomRoundtripTest {
                 "updated_at) VALUES (?, ?, ?, ?, ?, ?)",
             arrayOf<Any>(id.toString(), label, path, "L0_EMBEDDED", 111L, 222L)
         )
+        // G1: real handoff rows must exist BEFORE the v3→v4 migration so the
+        // test can prove they survive it, not just that the table exists.
+        db.execSQL(
+            "INSERT INTO handoffs (handoffId, sourceChatId, targetProjectId, " +
+                "targetCodeSessionId, summaryMarkdown, userApprovedAt, selectedReferences, " +
+                "projectTreeFingerprintAtHandoff, expiryPolicy, sourceProvider, status) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            arrayOf<Any>(
+                "h-full", "chat-1", id.toString(), "sess-9", "summary", 333L,
+                "[]", "digest-1", "none", "openrouter", "DISPATCHED",
+            )
+        )
+        db.execSQL(
+            "INSERT INTO handoffs (handoffId, sourceChatId, targetProjectId, " +
+                "targetCodeSessionId, summaryMarkdown, userApprovedAt, selectedReferences, " +
+                "projectTreeFingerprintAtHandoff, expiryPolicy, sourceProvider, status) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            arrayOf<Any?>(
+                "h-null", "chat-2", id.toString(), null, "draft", null,
+                "", null, "none", "openrouter", "DRAFT",
+            )
+        )
         db.version = 3
         db.close()
     }
@@ -93,20 +115,41 @@ class ExecutionRoomRoundtripTest {
     private val testEngineKeyToken = "proj:11111111-1111-1111-1111-111111111111"
 
     @Test(timeout = 120_000)
-    fun `migration 3 to 4 preserves existing rows and creates the executions table`() =
+    fun `migration chain preserves project and handoff rows and creates executions`() =
         runBlocking {
             val id = UUID.randomUUID()
             val path = File(context.filesDir, "exec-migrated/repo").absolutePath
             File(context.filesDir, "exec-migrated/repo").mkdirs()
             createV3Database("Migrated project", path, id)
 
-            // Opening at v4 with the full chain runs MIGRATION_3_4; with
-            // exportSchema=false this open IS the schema validation.
+            // Opening at the current version through the REAL registered chain
+            // runs 3→4 and 4→5. With exportSchema=false this open IS the
+            // schema validation.
             val store = RoomProjectStore(context, dbName)
             val preserved = store.byId(id)
             assertEquals("Migrated project", preserved?.label)
             assertEquals(path, preserved?.repoDir?.absolutePath)
+            assertEquals("L0_EMBEDDED", preserved?.environmentLevel?.name)
             assertNull(store.trustRecordOf(id)?.fingerprint)
+
+            val full = store.handoffDao().getById("h-full")!!
+            assertEquals("chat-1", full.sourceChatId)
+            assertEquals(id.toString(), full.targetProjectId)
+            assertEquals("sess-9", full.targetCodeSessionId)
+            assertEquals("summary", full.summaryMarkdown)
+            assertEquals(333L, full.userApprovedAt)
+            assertEquals("[]", full.selectedReferences)
+            assertEquals("digest-1", full.projectTreeFingerprintAtHandoff)
+            assertEquals("none", full.expiryPolicy)
+            assertEquals("openrouter", full.sourceProvider)
+            assertEquals("DISPATCHED", full.status)
+
+            val draft = store.handoffDao().getById("h-null")!!
+            assertEquals("draft", draft.summaryMarkdown)
+            assertNull(draft.targetCodeSessionId)
+            assertNull(draft.userApprovedAt)
+            assertNull(draft.projectTreeFingerprintAtHandoff)
+            assertEquals("DRAFT", draft.status)
 
             val raw = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)
             raw.rawQuery("SELECT sql FROM sqlite_master WHERE name = 'executions'", null).use { c ->
@@ -114,6 +157,13 @@ class ExecutionRoomRoundtripTest {
                 val ddl = c.getString(0)
                 assertTrue(ddl.contains("execution_id"))
                 assertTrue(ddl.contains("ack_state"))
+                assertTrue("canonical lease column missing", ddl.contains("lease_epoch_ms"))
+            }
+            raw.rawQuery("SELECT created_at, updated_at FROM projects WHERE id = ?",
+                arrayOf(id.toString())).use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(111L, c.getLong(0))
+                assertEquals(222L, c.getLong(1))
             }
             val indexes = raw.rawQuery(
                 "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'executions'",
@@ -188,5 +238,69 @@ class ExecutionRoomRoundtripTest {
         assertEquals(ExecutionLifecycle.LOST.name, dao.byId("exec-1")!!.phase)
         assertEquals(0, dao.markRunning("exec-1", 15_000L))
         assertTrue(store.executionDao().recoverableRows().isEmpty())
+    }
+
+    @Test(timeout = 120_000)
+    fun `stale writes cannot clobber ambiguity or an unknown outcome`() = runBlocking {
+        val dao = RoomProjectStore(context, dbName).executionDao()
+        dao.insert(
+            row("amb", ExecutionLifecycle.SEND_ATTEMPTED.name).copy(
+                ackState = ExecutionAckState.AMBIGUOUS.name,
+            )
+        )
+        dao.insert(
+            row("unk", ExecutionLifecycle.UNKNOWN.name).copy(
+                terminalReason = "recovery:evidence_unavailable",
+            )
+        )
+
+        assertEquals(0, dao.markRejected("amb", "late rejection", 30_000L))
+        assertEquals(0, dao.markUnsent("amb", "late unsent", 30_000L))
+        assertEquals(0, dao.markLost("unk", "late loss", 30_000L))
+        assertEquals(ExecutionAckState.AMBIGUOUS.name, dao.byId("amb")!!.ackState)
+        assertEquals(
+            "recovery:evidence_unavailable",
+            dao.byId("unk")!!.terminalReason,
+        )
+    }
+
+    @Test(timeout = 120_000)
+    fun `v4 to v5 copies the lease value into the canonical column`() = runBlocking {
+        val id = UUID.randomUUID()
+        createV3Database("v4 source", File(context.filesDir, "v4-source").absolutePath, id)
+
+        val raw = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)
+        // Same additive DDL as MIGRATION_3_4, applied directly so the fixture
+        // is a real v4 on-disk schema with a lease_at_ms value to copy.
+        raw.execSQL(
+            "CREATE TABLE IF NOT EXISTS executions (execution_id TEXT NOT NULL PRIMARY KEY, " +
+                "run_id TEXT NOT NULL, session_id TEXT NOT NULL, engine_key_token TEXT NOT NULL, " +
+                "workspace_path TEXT NOT NULL, engine_generation INTEGER, lease_at_ms INTEGER, " +
+                "phase TEXT NOT NULL, progress_at_ms INTEGER, created_at_ms INTEGER NOT NULL, " +
+                "updated_at_ms INTEGER NOT NULL, prompt_ref TEXT, terminal_reason TEXT, " +
+                "ack_state TEXT NOT NULL)"
+        )
+        raw.execSQL("CREATE INDEX IF NOT EXISTS idx_exec_session ON executions(session_id, updated_at_ms)")
+        raw.execSQL("CREATE INDEX IF NOT EXISTS idx_exec_engine ON executions(engine_key_token, phase)")
+        raw.execSQL("CREATE INDEX IF NOT EXISTS idx_exec_path ON executions(workspace_path)")
+        raw.version = 4
+        raw.execSQL(
+            "INSERT INTO executions (execution_id, run_id, session_id, engine_key_token, " +
+                "workspace_path, engine_generation, lease_at_ms, phase, created_at_ms, " +
+                "updated_at_ms, ack_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            arrayOf<Any>(
+                "v4row", "run-v4", "sess-1", "chat", "/workspace", 3L,
+                1_700_000_000L, "RUNNING", 1L, 2L, "ACKED",
+            )
+        )
+        raw.close()
+
+        val store = RoomProjectStore(context, dbName)
+        val loaded = store.executionDao().byId("v4row")!!
+        assertEquals(1_700_000_000L, loaded.leaseEpochMs)
+        assertEquals(3L, loaded.engineGeneration)
+
+        val second = RoomProjectStore(context, dbName)
+        assertEquals(loaded, second.executionDao().byId("v4row"))
     }
 }

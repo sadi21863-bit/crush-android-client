@@ -125,6 +125,17 @@ fun ChatListContent(
                 Spacer(Modifier.height(CrushSpacing.md))
             }
 
+            // A2 remediation: a recovered record is only honest if the user
+            // can see its outcome. Display-only run-side lines; no prompt UI.
+            state.notice.recovered.forEach { outcome ->
+                Text(
+                    text = recoveredLine(outcome),
+                    style = CrushType.metadata,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(CrushSpacing.sm))
+            }
+
             val list = state.session.list
             val engineReady = state.run.engineReady
             when {
@@ -231,4 +242,12 @@ private fun SessionRow(
             }
         }
     }
+}
+
+private fun recoveredLine(outcome: RecoveredOutcomeView): String = buildString {
+    append("Recovered run: ").append(outcome.statusLabel)
+    if (outcome.detached) append(" - detached from current engine")
+    if (outcome.requiresUserAction) append(" - your decision needed")
+    if (!outcome.active) append(" - not active work")
+    outcome.detail?.takeIf { it.isNotBlank() }?.let { append(" (").append(it).append(")") }
 }

@@ -35,6 +35,12 @@ data class ExecutionEntity(
     @ColumnInfo(name = "workspace_path") val workspacePath: String,
     /** Observed only; NULL means unknown, never a guessed value. */
     @ColumnInfo(name = "engine_generation") val engineGeneration: Long? = null,
+    /** Design §5 canonical name. NULL means unknown, never a guessed value. */
+    @ColumnInfo(name = "lease_epoch_ms") val leaseEpochMs: Long? = null,
+    /**
+     * Deprecated v4 name retained as an additive column so the shipped
+     * MIGRATION_3_4 is never rewritten in place. New writes use [leaseEpochMs].
+     */
     @ColumnInfo(name = "lease_at_ms") val leaseAtMs: Long? = null,
     /** [ExecutionLifecycle] name. */
     @ColumnInfo(name = "phase") val phase: String,

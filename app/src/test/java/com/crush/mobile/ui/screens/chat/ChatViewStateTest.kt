@@ -5,6 +5,7 @@ import com.crush.mobile.data.crush.Session
 import com.crush.mobile.data.crush.SubAgentReport
 import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.engine.EngineState
+import com.crush.mobile.execution.ExecutionLifecycle
 import com.crush.mobile.project.ProjectRef
 import com.google.gson.JsonParser
 import java.io.File
@@ -427,6 +428,58 @@ class ChatViewStateTest {
             .toViewState(ChatHostInputs(snapshotReady = true))
         assertEquals("at most 2 live projects", view.run.engineStartError)
     }
+
+    @Test
+    fun `recovered outcomes are honestly labelled and never claimed active`() {
+        val views = listOf(
+            recovered(ExecutionLifecycle.SEND_AMBIGUOUS, "recovery:send_ambiguous"),
+            recovered(ExecutionLifecycle.UNKNOWN, "recovery:evidence_unavailable"),
+            recovered(ExecutionLifecycle.COMPLETED, "history:completed"),
+        ).toRecoveredOutcomes()
+
+        assertEquals(3, views.size)
+        assertEquals("send unclear", views[0].statusLabel)
+        assertTrue(views[0].requiresUserAction)
+        assertFalse(views[0].active)
+        assertEquals("unknown - evidence incomplete", views[1].statusLabel)
+        assertFalse("an unknown outcome must not be displayed as lost", views[1].statusLabel == "lost")
+        assertTrue(views[1].detached)
+        assertEquals("completed", views[2].statusLabel)
+        assertFalse(views[2].requiresUserAction)
+    }
+
+    @Test
+    fun `recovered outcomes reach the presentation state`() {
+        val outcome = RecoveredOutcomeView(
+            id = "e1",
+            statusLabel = "send unclear",
+            detail = "recovery:send_ambiguous",
+            detached = true,
+            requiresUserAction = true,
+            active = false,
+        )
+        val view = ChatUiState().toViewState(
+            ChatHostInputs(snapshotReady = true, recoveredOutcomes = listOf(outcome))
+        )
+        assertEquals(listOf(outcome), view.notice.recovered)
+    }
+
+    private fun recovered(
+        lifecycle: ExecutionLifecycle,
+        reason: String,
+    ) = com.crush.mobile.execution.ExecutionView(
+        executionId = "e",
+        runId = "r",
+        target = com.crush.mobile.execution.ExecutionTarget("p1", "ws", "s"),
+        lifecycle = lifecycle,
+        interaction = com.crush.mobile.execution.InteractionState.NONE,
+        observation = com.crush.mobile.execution.ObservationState.DETACHED,
+        cancellation = com.crush.mobile.execution.CancellationState.NOT_REQUESTED,
+        epoch = 0L,
+        lastObservedProgressAt = 0L,
+        reasonCode = reason,
+        recovered = true,
+    )
 
     @Test
     fun `the projection source imports no Android or forbidden packages`() {

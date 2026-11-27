@@ -110,6 +110,7 @@ class ExecutionController(
             epoch = epochOf(target.instanceKey),
             lastObservedProgressAt = clock(),
             reasonCode = reasonCode,
+            recovered = true,
         )
         synchronized(records) {
             records[executionId] = view
@@ -284,7 +285,8 @@ class ExecutionController(
     }
 
     private fun ExecutionLifecycle.isTerminal(): Boolean = when (this) {
-        ExecutionLifecycle.UNSENT, ExecutionLifecycle.COMPLETED,
+        ExecutionLifecycle.UNSENT, ExecutionLifecycle.SEND_AMBIGUOUS,
+        ExecutionLifecycle.COMPLETED,
         ExecutionLifecycle.FAILED, ExecutionLifecycle.LOST, ExecutionLifecycle.UNKNOWN -> true
         else -> false
     }

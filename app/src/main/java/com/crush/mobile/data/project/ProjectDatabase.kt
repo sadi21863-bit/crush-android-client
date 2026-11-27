@@ -24,7 +24,7 @@ import com.crush.mobile.execution.ExecutionEntity
  */
 @Database(
     entities = [ProjectEntity::class, HandoffEntity::class, ExecutionEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class ProjectDatabase : RoomDatabase() {
@@ -130,6 +130,20 @@ abstract class ProjectDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS idx_exec_path ON executions(workspace_path)"
                 )
+            }
+        }
+
+        /**
+         * v4 -> v5 (A2 remediation): align the shipped table with design §5's
+         * canonical `lease_epoch_ms` name. ADD COLUMN + value copy is used
+         * instead of RENAME COLUMN because the API 29 SQLite in this app does
+         * not guarantee that syntax. The v4 column is retained, so this is
+         * purely additive and the already-shipped MIGRATION_3_4 is untouched.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE executions ADD COLUMN lease_epoch_ms INTEGER")
+                db.execSQL("UPDATE executions SET lease_epoch_ms = lease_at_ms")
             }
         }
     }

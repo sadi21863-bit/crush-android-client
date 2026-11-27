@@ -29,7 +29,7 @@ interface ExecutionDao {
     @Query(
         "SELECT * FROM executions WHERE phase IN " +
             "('INTENT_RECORDED','SEND_ATTEMPTED','SUBMISSION_ACKNOWLEDGED'," +
-            "'RUNNING','CANCELLING') ORDER BY created_at_ms DESC"
+            "'RUNNING','CANCELLING','UNKNOWN') ORDER BY created_at_ms DESC"
     )
     suspend fun recoverableRows(): List<ExecutionEntity>
 
@@ -62,7 +62,8 @@ interface ExecutionDao {
     /** Definitive server rejection (non-retryable 4xx). */
     @Query(
         "UPDATE executions SET phase = 'FAILED', terminal_reason = :reason, " +
-            "updated_at_ms = :at WHERE execution_id = :id AND phase = 'SEND_ATTEMPTED'"
+            "updated_at_ms = :at WHERE execution_id = :id AND phase = 'SEND_ATTEMPTED' " +
+            "AND ack_state = 'SENT_UNCONFIRMED'"
     )
     suspend fun markRejected(id: String, reason: String, at: Long): Int
 
@@ -99,16 +100,28 @@ interface ExecutionDao {
         "UPDATE executions SET phase = 'UNSENT', terminal_reason = :reason, " +
             "updated_at_ms = :at WHERE execution_id = :id " +
             "AND phase IN ('INTENT_RECORDED','SEND_ATTEMPTED') " +
-            "AND ack_state != 'ACKED'"
+            "AND ack_state NOT IN ('ACKED','AMBIGUOUS')"
     )
     suspend fun markUnsent(id: String, reason: String, at: Long): Int
 
-    /** C2/C3 fail-closed outcome when no atomic attach is possible. */
+    /**
+     * An evidence gap is NOT a loss. Named UNKNOWN keeps the row discoverable
+     * and honestly unresolved across restarts.
+     */
+    @Query(
+        "UPDATE executions SET phase = 'UNKNOWN', terminal_reason = :reason, " +
+            "updated_at_ms = :at WHERE execution_id = :id AND phase IN " +
+            "('INTENT_RECORDED','SEND_ATTEMPTED','SUBMISSION_ACKNOWLEDGED'," +
+            "'RUNNING','CANCELLING')"
+    )
+    suspend fun markUnknown(id: String, reason: String, at: Long): Int
+
+    /** A terminal row (including UNKNOWN) must never be rewritten as LOST. */
     @Query(
         "UPDATE executions SET phase = 'LOST', terminal_reason = :reason, " +
             "updated_at_ms = :at WHERE execution_id = :id AND phase IN " +
             "('INTENT_RECORDED','SEND_ATTEMPTED','SUBMISSION_ACKNOWLEDGED'," +
-            "'RUNNING','CANCELLING','UNKNOWN')"
+            "'RUNNING','CANCELLING')"
     )
     suspend fun markLost(id: String, reason: String, at: Long): Int
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.execution.ExecutionPersistenceGuardTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-27T15:05:53.958Z" hostname="LAPTOP-5US7QL1L" time="0.004">
+  <properties/>
+  <testcase name="markSent returning zero prevents the POST" classname="com.crush.mobile.execution.ExecutionPersistenceGuardTest" time="0.002"/>
+  <testcase name="markAcked zero or throw does not advance the controller state" classname="com.crush.mobile.execution.ExecutionPersistenceGuardTest" time="0.001"/>
+  <testcase name="markSent throwing prevents the POST" classname="com.crush.mobile.execution.ExecutionPersistenceGuardTest" time="0.0"/>
+  <testcase name="only one affected row counts as a committed write" classname="com.crush.mobile.execution.ExecutionPersistenceGuardTest" time="0.0"/>
+  <testcase name="a committed markSent permits the POST" classname="com.crush.mobile.execution.ExecutionPersistenceGuardTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

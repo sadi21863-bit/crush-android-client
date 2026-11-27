@@ -5,6 +5,9 @@ import com.crush.mobile.data.crush.SubAgentReport
 import com.crush.mobile.domain.file.FileChangeSet
 import com.crush.mobile.domain.model.ReasoningDisplay
 import com.crush.mobile.engine.EngineState
+import com.crush.mobile.execution.ExecutionLifecycle
+import com.crush.mobile.execution.ExecutionView
+import com.crush.mobile.execution.ObservationState
 import com.crush.mobile.project.ProjectRef
 
 /**
@@ -275,7 +278,44 @@ data class HandoffView(
 
 data class NoticeView(
     val deleteError: String?,
+    /** V2-16 A2 remediation: run-side startup outcomes only, display-only. */
+    val recovered: List<RecoveredOutcomeView> = emptyList(),
 )
+
+/**
+ * A recovered run outcome as one honest line of text. No prompt actions and
+ * no claim that execution resumed.
+ */
+data class RecoveredOutcomeView(
+    val id: String,
+    val statusLabel: String,
+    val detail: String?,
+    val detached: Boolean,
+    val requiresUserAction: Boolean,
+    val active: Boolean,
+)
+
+/** Pure projection of controller records; never touches Android or I/O. */
+fun List<ExecutionView>.toRecoveredOutcomes(): List<RecoveredOutcomeView> = map { e ->
+    RecoveredOutcomeView(
+        id = e.executionId,
+        statusLabel = when (e.lifecycle) {
+            ExecutionLifecycle.UNSENT -> "not sent"
+            ExecutionLifecycle.SEND_AMBIGUOUS -> "send unclear"
+            ExecutionLifecycle.UNKNOWN -> "unknown - evidence incomplete"
+            ExecutionLifecycle.LOST -> "lost"
+            ExecutionLifecycle.COMPLETED -> "completed"
+            ExecutionLifecycle.FAILED -> "failed"
+            else -> "unfinished"
+        },
+        detail = e.reasonCode,
+        detached = e.observation == ObservationState.DETACHED,
+        requiresUserAction = e.lifecycle == ExecutionLifecycle.SEND_AMBIGUOUS ||
+            e.lifecycle == ExecutionLifecycle.UNKNOWN ||
+            e.lifecycle == ExecutionLifecycle.UNSENT,
+        active = !e.isTerminal,
+    )
+}
 
 /**
  * The pure projection (V2 plan §5.2.2).
@@ -392,7 +432,10 @@ fun ChatUiState.toViewState(inputs: ChatHostInputs): ChatViewState {
             notice = handoffNotice,
             resume = handoffResumeHint,
         ),
-        notice = NoticeView(deleteError = deleteError),
+        notice = NoticeView(
+            deleteError = deleteError,
+            recovered = inputs.recoveredOutcomes,
+        ),
         reasoningDisplay = inputs.reasoningDisplay,
     )
 }

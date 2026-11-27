@@ -6,6 +6,7 @@ import com.crush.mobile.execution.Attribution
 import com.crush.mobile.execution.ExecutionLifecycle
 import com.crush.mobile.execution.ExecutionTarget
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -62,6 +63,22 @@ class AppContainerExecutionInvalidationTest {
         val view = container.executionController.executions.value[id]!!
         assertEquals(ExecutionLifecycle.UNKNOWN, view.lifecycle)
         assertEquals("invalidated:adapter.close", view.reasonCode)
+    }
+
+    @Test
+    fun bindingSwitchWithRunInFlightDoesNotCancelTheExecution() {
+        val container = container()
+        val key = "p-switch"
+        val id = runningExecution(container, key)
+        // The real ChatViewModel sets this marker at send; the binding guard
+        // reads it before stopping an outgoing engine.
+        container.reportRunInFlight(key, true)
+
+        container.setActiveChatPool()
+
+        val view = container.executionController.executions.value[id]!!
+        assertEquals(ExecutionLifecycle.RUNNING, view.lifecycle)
+        assertFalse(view.isTerminal)
     }
 
     @Test

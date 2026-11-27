@@ -34,7 +34,13 @@ A1**; A2, D1, D2, D4 and D7 remain open.
   `CONFIRMED` attribution is proven only in JVM tests.
 - Production now calls `declare`, `subscribe`, `markRunning` and terminal marking
   through the confirmed-event path; the durable/recoverable effects belong to A2.
-- No project-switch-with-live-run evidence, no device two-ViewModel stale-event
-  evidence, and no device evidence for watchdog/recovery/shutdown/debug-kill
-  routes. Those routes are source-wired and JVM-pinned where a seam exists.
+- No **device** project-switch-with-live-run evidence: attempts were defeated by
+  the ASK permission dialog and by an unreliable AUTO_APPROVE toggle on this
+  host. The invariant is instead proven with the real `AppContainer` in JVM:
+  `bindingSwitchWithRunInFlightDoesNotCancelTheExecution`
+  (`a1-integration-junit.xml`, 4 tests) sets the run-in-flight marker, calls
+  `setActiveChatPool()`, and asserts the execution remains `RUNNING`.
+- No device two-ViewModel stale-event evidence, and no device evidence for
+  watchdog/recovery/shutdown/debug-kill routes. Those routes are source-wired
+  and JVM-pinned where a seam exists.
 - Generated Gradle logs are not structured evidence; the XML reports are.

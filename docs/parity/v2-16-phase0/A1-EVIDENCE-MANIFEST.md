@@ -44,3 +44,7 @@ A1**; A2, D1, D2, D4 and D7 remain open.
   watchdog/recovery/shutdown/debug-kill routes. Those routes are source-wired
   and JVM-pinned where a seam exists.
 - Generated Gradle logs are not structured evidence; the XML reports are.
+
+Decision-facing summary: `A1-ACCEPTANCE-REPORT.md` (2026-11-27). It separates
+device-proven, JVM-proven, source-wired and not-performed gates and adds no new
+raw evidence.

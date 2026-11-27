@@ -4,6 +4,7 @@ import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -280,5 +281,50 @@ class ExecutionControllerTest {
             assertEquals("invalidated:registry.stop", view.reasonCode)
         }
         assertFalse(c.hasActive("pA"))
+    }
+
+    @Test
+    fun publishedSnapshotsNeverRegressDuringConcurrentStarts() {
+        val c = ExecutionController()
+        val n = 24
+        val ready = CountDownLatch(1)
+        val done = AtomicBoolean(false)
+        val pool = Executors.newFixedThreadPool(n + 1)
+        val errors = Collections.synchronizedList(mutableListOf<Throwable>())
+
+        val starters = (0 until n).map {
+            pool.submit {
+                try {
+                    ready.await()
+                    c.start(target())
+                } catch (t: Throwable) {
+                    errors += t
+                }
+            }
+        }
+        val observer = pool.submit {
+            try {
+                ready.await()
+                var last = 0
+                while (!done.get()) {
+                    val size = c.executions.value.size
+                    if (size < last) {
+                        errors += IllegalStateException("publication regressed: $last -> $size")
+                        break
+                    }
+                    last = size
+                }
+            } catch (t: Throwable) {
+                errors += t
+            }
+        }
+        ready.countDown()
+        starters.forEach { it.get(10, TimeUnit.SECONDS) }
+        done.set(true)
+        observer.get(10, TimeUnit.SECONDS)
+        pool.shutdownNow()
+
+        assertTrue(errors.toString(), errors.isEmpty())
+        assertEquals(n, c.executions.value.size)
     }
 }

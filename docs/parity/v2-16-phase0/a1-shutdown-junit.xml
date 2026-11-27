@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.di.AppContainerShutdownTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-27T09:41:52.486Z" hostname="LAPTOP-5US7QL1L" time="3.873">
+  <properties/>
+  <testcase name="shutdown snapshots the legacy supervisor and every registered project once" classname="com.crush.mobile.di.AppContainerShutdownTest" time="3.866"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+I/ExecutionController: invalidated key=p1 source=shutdown epoch=1
+I/ExecutionController: invalidated key=p1 source=supervisor.stop epoch=2
+I/EngineSupervisor: [p1] stop() requested
+D/EngineProxy: bridge stop
+I/ExecutionController: invalidated key=p2 source=shutdown epoch=1
+I/ExecutionController: invalidated key=p2 source=supervisor.stop epoch=2
+I/EngineSupervisor: [p2] stop() requested
+D/EngineProxy: bridge stop
+I/ExecutionController: invalidated key= source=shutdown epoch=1
+I/ExecutionController: invalidated key= source=supervisor.stop epoch=2
+I/EngineSupervisor: [] stop() requested
+D/EngineProxy: bridge stop
+]]></system-out>
+  <system-err><![CDATA[System.logW: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+java.lang.Throwable: Explicit termination method 'close' not called
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$openWithCallSite(CloseGuard.java:288)
+	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java)
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$open(CloseGuard.java:257)
+	at dalvik.system.CloseGuard.open(CloseGuard.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openInner(SQLiteDatabase.java:1192)
+	at android.database.sqlite.SQLiteDatabase.openInner(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$open(SQLiteDatabase.java:1171)
+	at android.database.sqlite.SQLiteDatabase.open(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:1035)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:1024)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getDatabaseLocked(SQLiteOpenHelper.java:394)
+	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getWritableDatabase(SQLiteOpenHelper.java:336)
+	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getWritableOrReadableDatabase(FrameworkSQLiteOpenHelper.android.kt:224)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.innerGetDatabase(FrameworkSQLiteOpenHelper.android.kt:167)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getSupportDatabase(FrameworkSQLiteOpenHelper.android.kt:141)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper.getWritableDatabase(FrameworkSQLiteOpenHelper.android.kt:96)
+	at androidx.sqlite.driver.SupportSQLiteDriver.open(SupportSQLiteDriver.android.kt:57)
+	at androidx.sqlite.driver.SupportSQLiteDriver.open(SupportSQLiteDriver.android.kt:33)
+	at androidx.room.coroutines.PassthroughConnectionPool.connection$lambda$0(PassthroughConnectionPool.kt:47)
+	at kotlin.SynchronizedLazyImpl.getValue(LazyJVM.kt:86)
+	at androidx.room.coroutines.PassthroughConnectionPool.useConnection(PassthroughConnectionPool.kt:58)
+	at androidx.room.RoomConnectionManager.useConnection(RoomConnectionManager.android.kt:138)
+	at androidx.room.RoomDatabase.useConnection(RoomDatabase.android.kt:620)
+	at androidx.room.util.DBUtil__DBUtil_androidKt$performSuspending$$inlined$compatCoroutineExecute$DBUtil__DBUtil_androidKt$1.invokeSuspend(DBUtil.android.kt:261)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+
+]]></system-err>
+</testsuite>

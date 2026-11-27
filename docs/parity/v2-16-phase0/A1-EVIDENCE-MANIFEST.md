@@ -48,3 +48,8 @@ A1**; A2, D1, D2, D4 and D7 remain open.
 Decision-facing summary: `A1-ACCEPTANCE-REPORT.md` (2026-11-27). It separates
 device-proven, JVM-proven, source-wired and not-performed gates and adds no new
 raw evidence.
+
+Refreshed gate artifacts (2026-11-27): `a1-fullgate-evidence.md` plus the six
+A1 XMLs in this folder were regenerated from the final run. The earlier
+`a1-controller-junit.xml` (12 tests) was stale and is no longer the evidence
+of record.

@@ -38,8 +38,17 @@ class ExecutionController(
     private val _executions = MutableStateFlow<Map<String, ExecutionView>>(emptyMap())
     val executions: StateFlow<Map<String, ExecutionView>> = _executions
 
+    /**
+     * Snapshot AND assign under the same monitor as every record mutation.
+     * Taking the snapshot outside the lock allowed an older snapshot to be
+     * assigned after a newer one had already been published, permanently
+     * regressing what observers see until the next publish. Reentrant: callers
+     * that already hold [records] simply re-enter it here.
+     */
     private fun publish() {
-        _executions.value = records.toMap()
+        synchronized(records) {
+            _executions.value = records.toMap()
+        }
     }
 
     private fun mutate(id: String, block: (ExecutionView) -> ExecutionView): Boolean {

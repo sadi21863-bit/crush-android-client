@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.EngineTerminalStartupCleanupTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-27T09:43:12.939Z" hostname="LAPTOP-5US7QL1L" time="3.859">
+  <properties/>
+  <testcase name="terminal exec failure after proxy startup releases the bridge" classname="com.crush.mobile.engine.EngineTerminalStartupCleanupTest" time="3.849"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+I/EngineSupervisor: [p-v2-15-terminal] start() activeJob=null
+I/EngineSupervisor: [p-v2-15-terminal] supervise loop start
+D/EngineSupervisor: [p-v2-15-terminal] starting attempt 1
+I/CrushEngine: provider catalogue override applied: 4 models
+D/EngineProxy: bridge up on 127.0.0.1:59443
+I/CrushEngine: egress bridge up port=59443
+I/CrushEngine: exec: C:\Users\aditya\AppData\Local\Temp\robolectric-EngineTerminalStartupCleanupTest_terminal_exec_failure_after_proxy_startup_releases_the_bridge15456304694094869305\com.crush.mobile-dataDir\cache\v2-15-terminal-native\libcrush.so server -H unix://C:\Users\aditya\AppData\Local\Temp\robolectric-EngineTerminalStartupCleanupTest_terminal_exec_failure_after_proxy_startup_releases_the_bridge15456304694094869305\com.crush.mobile-dataDir\files\crush-p-v2-15-terminal.sock -D C:\Users\aditya\AppData\Local\Temp\robolectric-EngineTerminalStartupCleanupTest_terminal_exec_failure_after_proxy_startup_releases_the_bridge15456304694094869305\com.crush.mobile-dataDir\files\crush-p-v2-15-terminal\state
+E/CrushEngine: exec failed
+java.io.IOException: injected exec failure
+	at com.crush.mobile.engine.EngineTerminalStartupCleanupTest$terminal exec failure after proxy startup releases the bridge$1.invokeSuspend$lambda$0(EngineTerminalStartupCleanupTest.kt:54)
+	at com.crush.mobile.engine.CrushEngine$start$2$1.invokeSuspend(CrushEngine.kt:420)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:798)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+W/EngineSupervisor: [p-v2-15-terminal] start Failed (retryable=false) after 1009ms, attempt=1: Could not launch engine
+E/EngineSupervisor: startup failed permanently after 1 attempts (budget 3): Could not launch engine
+E/EngineSupervisor: [p-v2-15-terminal] startup failed permanently after 1 attempts (budget 3): Could not launch engine
+D/EngineProxy: bridge stop
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

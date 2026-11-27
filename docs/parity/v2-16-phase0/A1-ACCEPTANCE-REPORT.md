@@ -20,13 +20,13 @@ device run, and a source-wired hook is not an exercised hook.
 | G2 | A real confirmed event can reach the controller on device | **device** | `a1-device-confirmed.log`: real `declare` 06:00:03 → `RUN_COMPLETE attribution=CONFIRMED epoch=1` → `ExecutionController: confirmed …` 06:05:01 | **proven**. Caveat: short turn with a delayed permission grant; not a live-run switch |
 | G3 | A production invalidation reaches the controller | **device** | `a1-device-invalidation.log`: binding switch with **no run in flight** → `registry.stop` epoch 1, `supervisor.stop` epoch 2; `ExecutionController: invalidated` logged | **proven for the idle switch**. Not a live-run switch |
 | G4 | A binding switch with a run in flight preserves the execution | **JVM, real container** | `AppContainerExecutionInvalidationTest.bindingSwitchWithRunInFlightDoesNotCancelTheExecution` — sets the run-in-flight marker, calls `setActiveChatPool()`, asserts the execution remains `RUNNING` (`a1-integration-junit.xml`) | **proven at real-container JVM scope**; **not performed on device** |
-| G5 | Controller state machine, intent/attempt ordering, terminal `UNKNOWN`, retry identity, detach-only observation, concurrent registry access | **JVM** | `ExecutionControllerTest` **14** (incl. 2 deterministic concurrency pins), `ExecutionEventAdapterTest` **11** (provisional buffer/commit/rollback, real router with a fake connection port, stale-epoch rejection) | **proven at JVM scope** |
+| G5 | Controller state machine, intent/attempt ordering, terminal `UNKNOWN`, retry identity, detach-only observation, concurrent registry access and publication ordering | **JVM** | `ExecutionControllerTest` **15** (incl. 3 deterministic concurrency pins), `ExecutionEventAdapterTest` **11** (provisional buffer/commit/rollback, real router with a fake connection port, stale-epoch rejection) | **proven at JVM scope** |
 | G6 | Shutdown and terminal-startup cleanup hooks are wired | **JVM** | `AppContainerShutdownTest` **1**, `EngineTerminalStartupCleanupTest` **1** | **proven at JVM scope** |
 | G7 | Registry stop signal + token-protocol barrier | **JVM harness** | `E5InvalidationBarrierTest` **4** (`e5-r6-junit.xml`) | **proven at deterministic harness scope**; production invalidation routes still need end-to-end proof |
-| G8 | Full regression gate | **JVM** | `app/build/test-results/testDebugUnitTest` from this run: **121 suites / 1128 tests / 0 failures / 0 errors / 0 skipped**; A1 subset is **35/35** | **green** |
+| G8 | Full regression gate | **JVM** | `app/build/test-results/testDebugUnitTest` from the final run: **121 suites / 1129 tests / 0 failures / 0 errors / 0 skipped**; A1 subset is **36/36**. Raw log and refreshed XMLs are in `a1-fullgate-evidence.md` | **green** |
 
-A1 subset arithmetic: 14 controller + 11 adapter + 4 container integration +
-1 shutdown + 1 terminal cleanup + 4 E5 barrier = **35**.
+A1 subset arithmetic: 15 controller + 11 adapter + 4 container integration +
+1 shutdown + 1 terminal cleanup + 4 E5 barrier = **36**.
 
 ### Post-review concurrency hardening (2026-11-27)
 
@@ -36,11 +36,19 @@ were plain `mutableSetOf()`: `start()` added outside the `records` monitor while
 `ConcurrentHashMap.newKeySet()` per instance key, and (b) holding the `records`
 monitor for every compound access — the record+set insert in `start()`, the
 snapshot+rewrite in `onInvalidated()`, and the keyed scan in `hasActive()`.
-Two deterministic pins were added to `ExecutionControllerTest`:
-`concurrentStartsAndActiveChecksDoNotRace` (16 starters + 2 readers) and
-`invalidationDuringConcurrentStartsMarksEveryRegisteredExecution` (12 starters
-+ a concurrent invalidator, settled by a final invalidation). All threads are
-released by one `CountDownLatch`; controller suite is now **14/14**.
+A second owner-review finding was that `publish()` snapshotted `records` and
+assigned the `StateFlow` outside the monitor, so an older snapshot could be
+assigned after a newer one had already been published. Snapshot and assignment
+now happen under the same `records` monitor. Three deterministic pins were
+added to `ExecutionControllerTest`: `concurrentStartsAndActiveChecksDoNotRace`
+(16 starters + 2 readers), `invalidationDuringConcurrentStartsMarksEveryRegisteredExecution`
+(12 starters + a concurrent invalidator, settled by a final invalidation), and
+`publishedSnapshotsNeverRegressDuringConcurrentStarts` (24 concurrent starts,
+observer asserts the published size never decreases). Threads are released by
+one `CountDownLatch`; controller suite is now **15/15**.
+
+The committed A1 XMLs were stale after the first fix (12 tests). They were
+regenerated from the final gate; see `a1-fullgate-evidence.md`.
 
 ## Source-wired (exercised only by the JVM probes above, or not at all)
 
@@ -106,8 +114,9 @@ Accepted as the A1 evidence set:
 - the real-container JVM proof of the live-run binding-switch invariant (G4);
 - device evidence for the three structural routes (G1 detach, G2 confirmed
   event, G3 idle invalidation), with their stated caveats;
-- the post-review concurrency hardening (14/14 controller pins);
-- the full gate at 121 suites / 1128 tests / 0 failures / 0 errors / 0 skipped.
+- the post-review concurrency hardening (15/15 controller pins);
+- the full gate at 121 suites / 1129 tests / 0 failures / 0 errors / 0 skipped,
+  with refreshed committed XMLs and raw log (`a1-fullgate-evidence.md`).
 
 Scoped limitations carried forward, not silently closed:
 

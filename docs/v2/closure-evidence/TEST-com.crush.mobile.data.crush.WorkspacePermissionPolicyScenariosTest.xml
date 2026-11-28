@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:52.272Z" hostname="LAPTOP-5US7QL1L" time="2.302">
+  <properties/>
+  <testcase name="transport failure during policy apply fails closed" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.095"/>
+  <testcase name="fresh-lease reattach waits for a concurrent YOLO open" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.213"/>
+  <testcase name="out-of-order ASK and YOLO apply the later intent last" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="1.078"/>
+  <testcase name="cancelled reopen does not let the old fresh lease skip the policy" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.191"/>
+  <testcase name="a failed reattach can be retried and then applies the policy" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.08"/>
+  <testcase name="accepted mode applies policy before init and sends no credentials" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.16"/>
+  <testcase name="engine restart between policy and init invalidates the id before key use" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.166"/>
+  <testcase name="two overlapping opens converge on one attached workspace" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.106"/>
+  <testcase name="cancelled policy apply leaves no claim and never initialises" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.081"/>
+  <testcase name="generation change during reattach reopens, and a rejected new policy fails closed" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.094"/>
+  <testcase name="repeated open after a rejection creates and applies again" classname="com.crush.mobile.data.crush.WorkspacePermissionPolicyScenariosTest" time="0.035"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

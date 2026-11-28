@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:50.183Z" hostname="LAPTOP-5US7QL1L" time="0.559">
+  <properties/>
+  <testcase name="creates the deny list when no config file exists yet" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.162"/>
+  <testcase name="failure reasons never echo file content that could carry a key" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.013"/>
+  <testcase name="second injection is byte-stable and reports the policy AlreadyVerified" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.035"/>
+  <testcase name="provider keys are preserved when the policy lands" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.031"/>
+  <testcase name="the deny list covers the tools the agent actually tried to hide" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.004"/>
+  <testcase name="every known engine catalogue is fully denied" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.004"/>
+  <testcase name="an existing member of the wrong shape fails closed too" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.017"/>
+  <testcase name="a write that cannot land is a policy failure" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.035"/>
+  <testcase name="a malformed file is a policy failure and is never rewritten" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.199"/>
+  <testcase name="existing disabled entries are unioned, not clobbered" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.015"/>
+  <testcase name="the catalogue manifest is consistent" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.003"/>
+  <testcase name="the readback verifier fails closed on absence and junk" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.004"/>
+  <testcase name="an unusable state dir is a policy failure, never a silent pass" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.028"/>
+  <testcase name="the readback verifier confirms a complete list and catches a stripped one" classname="com.crush.mobile.data.crush.EngineConfigInjectorChatPolicyTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

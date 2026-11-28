@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.EngineInstanceRegistryTest" tests="26" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:11.943Z" hostname="LAPTOP-5US7QL1L" time="0.436">
+  <properties/>
+  <testcase name="budget allows exactly the first two live non-legacy instances" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.002"/>
+  <testcase name="stop during STARTING releases the reservation" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.072"/>
+  <testcase name="a key with live child counts - child alive, Starting or Running" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.003"/>
+  <testcase name="a retrying start failure keeps the reservation" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.004"/>
+  <testcase name="requestStart reclaims its own slot - the key's own child never counts" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.002"/>
+  <testcase name="legacy start request is never budget-gated" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.002"/>
+  <testcase name="a STARTING reservation holds its slot before any child exists" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.004"/>
+  <testcase name="a terminal start failure releases the reservation" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.007"/>
+  <testcase name="repeated start requests for one key keep one reservation" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.022"/>
+  <testcase name="runtime construction is idempotent per key" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.004"/>
+  <testcase name="a budget of one refuses the second live instance" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.012"/>
+  <testcase name="stop racing requestStart for one key leaves a coherent budget" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.142"/>
+  <testcase name="a stale RUNNING grain after terminal failure does not consume a slot" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.004"/>
+  <testcase name="fifty distinct projects stay registered with one stopped node each" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.015"/>
+  <testcase name="a terminal failure does not block the key's own restart" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.006"/>
+  <testcase name="requestStart refuses the third live instance with a named reason" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.003"/>
+  <testcase name="a stopped key is restarted, never rebuilt" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.005"/>
+  <testcase name="the legacy key never stops and never carries a budget slot" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.001"/>
+  <testcase name="distinct keys construct distinct runtimes that stay resident" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.001"/>
+  <testcase name="simultaneous starts never both take the last non-legacy slot" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.074"/>
+  <testcase name="stop is lookup-or-noop for a key that was never registered" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.0"/>
+  <testcase name="ten simultaneous starts for ten keys admit exactly the two slots" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.018"/>
+  <testcase name="requestStart allows within budget and paints STARTING, then the start hook paints RUNNING" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.001"/>
+  <testcase name="a refusal never rewrites the grain" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.005"/>
+  <testcase name="tuning fan-out reaches registered STOPPED runtimes" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.005"/>
+  <testcase name="stop marks STOPPING while the stop runs and STOPPED after" classname="com.crush.mobile.engine.EngineInstanceRegistryTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

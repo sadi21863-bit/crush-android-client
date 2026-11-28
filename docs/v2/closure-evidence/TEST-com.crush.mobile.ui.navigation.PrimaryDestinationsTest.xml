@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.navigation.PrimaryDestinationsTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:54:06.728Z" hostname="LAPTOP-5US7QL1L" time="0.865">
+  <properties/>
+  <testcase name="bottom bar below 600dp" classname="com.crush.mobile.ui.navigation.PrimaryDestinationsTest" time="0.862"/>
+  <testcase name="exactly three primary destinations and nothing else" classname="com.crush.mobile.ui.navigation.PrimaryDestinationsTest" time="0.0"/>
+  <testcase name="rail from 600dp to 839dp" classname="com.crush.mobile.ui.navigation.PrimaryDestinationsTest" time="0.0"/>
+  <testcase name="non-primary routes hide the shell at every width" classname="com.crush.mobile.ui.navigation.PrimaryDestinationsTest" time="0.003"/>
+  <testcase name="extended rail at 840dp and above" classname="com.crush.mobile.ui.navigation.PrimaryDestinationsTest" time="0.0"/>
+  <testcase name="the three destinations have distinct routes and labels" classname="com.crush.mobile.ui.navigation.PrimaryDestinationsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

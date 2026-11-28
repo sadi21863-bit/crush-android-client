@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.api.EngineVisibleModelIdsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:45:42.678Z" hostname="LAPTOP-5US7QL1L" time="0.257">
+  <properties/>
+  <testcase name="providerEntryWithoutModelsBlockMeansNoVisibleIds" classname="com.crush.mobile.data.api.EngineVisibleModelIdsTest" time="0.163"/>
+  <testcase name="missingProviderEntryMeansNoVisibleIds" classname="com.crush.mobile.data.api.EngineVisibleModelIdsTest" time="0.003"/>
+  <testcase name="idsOutsideTheEnginePayloadAreDropped" classname="com.crush.mobile.data.api.EngineVisibleModelIdsTest" time="0.044"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

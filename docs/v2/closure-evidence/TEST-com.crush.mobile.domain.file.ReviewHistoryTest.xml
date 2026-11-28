@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.file.ReviewHistoryTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:06.247Z" hostname="LAPTOP-5US7QL1L" time="1.9">
+  <properties/>
+  <testcase name="a superseded card refuses revert and says so" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.166"/>
+  <testcase name="a record turn waits for a revert's file operation to finish" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.346"/>
+  <testcase name="beginTurn supersedes existing cards before the next record lands" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.14"/>
+  <testcase name="a refusal is kept as a note with its exact reason" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.142"/>
+  <testcase name="revert during a running turn is refused with a running sentence" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.094"/>
+  <testcase name="two concurrent reverts of one path stay serialized and honest" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.23"/>
+  <testcase name="the history keeps only the newest eight cards" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.042"/>
+  <testcase name="cards are newest first" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.007"/>
+  <testcase name="a reverted path is marked and a second revert is refused" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.12"/>
+  <testcase name="a path that is not part of the card is refused" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.116"/>
+  <testcase name="a new turn supersedes the previous card" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.158"/>
+  <testcase name="a not-measured turn is retained for Review" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.091"/>
+  <testcase name="an empty outcome is not recorded" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.007"/>
+  <testcase name="runSettled lowers the fly flag so revert proceeds" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.03"/>
+  <testcase name="a genuinely empty turn is still dropped" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.012"/>
+  <testcase name="an unknown card id is refused" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.09"/>
+  <testcase name="a turn in one root does not supersede or block another root" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.067"/>
+  <testcase name="the card cap is applied per root" classname="com.crush.mobile.domain.file.ReviewHistoryTest" time="0.038"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

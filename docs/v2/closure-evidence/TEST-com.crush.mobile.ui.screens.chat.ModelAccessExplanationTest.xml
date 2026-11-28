@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:51.947Z" hostname="LAPTOP-5US7QL1L" time="0.313">
+  <properties/>
+  <testcase name="the withdrawn-free-tier case names both status counts" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.144"/>
+  <testcase name="a purely denied catalogue still mentions model access" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.028"/>
+  <testcase name="a rejected key never claims the free tier was withdrawn" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.002"/>
+  <testcase name="the active provider is named, not the zen-era constant" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.004"/>
+  <testcase name="an all-payment catalogue does not blame the free tier" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.009"/>
+  <testcase name="nothing probed reports an unreachable service rather than a verdict" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.002"/>
+  <testcase name="retired models are reported separately from denied ones" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.003"/>
+  <testcase name="the withdrawn-free-tier case says the key works" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.002"/>
+  <testcase name="a rejected key still says to replace the key" classname="com.crush.mobile.ui.screens.chat.ModelAccessExplanationTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

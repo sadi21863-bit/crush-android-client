@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.file.FileChangeCollectorTest" tests="26" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:56.175Z" hostname="LAPTOP-5US7QL1L" time="0.976">
+  <properties/>
+  <testcase name="an empty tracked list yields an empty set" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.107"/>
+  <testcase name="a text file IS snapshot despite containing plenty of spaces" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.013"/>
+  <testcase name="a file the same size with the SAME mtime reuses the previous content" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.076"/>
+  <testcase name="an empty workspace snapshots without throwing" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.008"/>
+  <testcase name="a file created during the turn reads as all additions" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.152"/>
+  <testcase name="a file over the per-file cap is marked, not stored" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.01"/>
+  <testcase name="a file deleted during the turn reads as all removals" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.025"/>
+  <testcase name="a binary file is not snapshot as text" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.013"/>
+  <testcase name="an oversized tracked file is reported as unreadable rather than faked" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.016"/>
+  <testcase name="a file the engine names but we never saw is reported, not dropped" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.024"/>
+  <testcase name="a turn-deleted path carries a null after-image which still renders" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.015"/>
+  <testcase name="a file edited between snapshots is recaptured even when the size is unchanged" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.178"/>
+  <testcase name="an untouched file still serves the previous content and stat" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.016"/>
+  <testcase name="a nested file resolves through its relative path" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.113"/>
+  <testcase name="an edited file diffs against its real before-image" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.018"/>
+  <testcase name="build and dependency directories are skipped" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.031"/>
+  <testcase name="duplicate paths are deduplicated" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.02"/>
+  <testcase name="an unchanged tracked file produces neither diff nor after-image" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.016"/>
+  <testcase name="an absolute path under the workspace resolves, not renders as a creation" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.031"/>
+  <testcase name="the real budget reads back at the same ceiling" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.009"/>
+  <testcase name="collectFull carries the after-images the diff was formed from" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.017"/>
+  <testcase name="an absolute path outside the workspace is reported unreadable, not created" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.015"/>
+  <testcase name="an untouched file the engine names yields no diff" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.018"/>
+  <testcase name="a path escaping the workspace is refused" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.017"/>
+  <testcase name="a missing workspace root snapshots empty" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.006"/>
+  <testcase name="with no snapshot nothing is fabricated" classname="com.crush.mobile.domain.file.FileChangeCollectorTest" time="0.01"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

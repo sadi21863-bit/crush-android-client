@@ -4,6 +4,12 @@
 
 - Repository `sadi21863-bit/crush-android-client`, branch `v2-16-planning-baseline`.
 - Starting HEAD and reviewed checkpoint: `edac95d0458c684884a7e55e805ea7e5e7017da8`.
+- **Dated correction (2026-11-28):** this report was subsequently committed and
+  pushed. The branch advanced through `b647108` (this report, the traceability
+  register and the addenda) and `31715d0` (the production/test corrections and
+  archived evidence). The statement below that HEAD remained `edac95d` and no
+  commit/push had occurred was true at authoring time but is no longer true of
+  the remote. `main` remains `adc26c0…` and was not touched.
 - Remote branch matched at start; `main` = `origin/main` = `adc26c0…` and was not touched.
 - Worktree at start: clean except the pre-existing untracked `v2-66-phaseF-stuck.png` (preserved).
 - Toolchain: Gradle 9.8.0, AGP 9.4.1, Kotlin plugin 2.4.10, compileSdk 37 / targetSdk 36 / minSdk 29, JBR 25. Engine of record v0.100.0 (`libcrush.so` 99,418,406 bytes, SHA-256 `326206A5…7B78E`, AArch64 PIE).

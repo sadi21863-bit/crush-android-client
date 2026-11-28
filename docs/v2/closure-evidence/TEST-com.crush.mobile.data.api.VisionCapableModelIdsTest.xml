@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.api.VisionCapableModelIdsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:45:42.948Z" hostname="LAPTOP-5US7QL1L" time="0.033">
+  <properties/>
+  <testcase name="absence is not capability" classname="com.crush.mobile.data.api.VisionCapableModelIdsTest" time="0.025"/>
+  <testcase name="malformed capabilities cannot throw or invent capability" classname="com.crush.mobile.data.api.VisionCapableModelIdsTest" time="0.002"/>
+  <testcase name="missing provider or models block yields nothing" classname="com.crush.mobile.data.api.VisionCapableModelIdsTest" time="0.001"/>
+  <testcase name="nested capabilities vision is read" classname="com.crush.mobile.data.api.VisionCapableModelIdsTest" time="0.002"/>
+  <testcase name="legacy supports_images is still honored" classname="com.crush.mobile.data.api.VisionCapableModelIdsTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

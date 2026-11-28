@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatDenialNoteTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:11.625Z" hostname="LAPTOP-5US7QL1L" time="0.008">
+  <properties/>
+  <testcase name="replay and re-render never duplicate the hint" classname="com.crush.mobile.ui.screens.chat.ChatDenialNoteTest" time="0.004"/>
+  <testcase name="an auto-deny yields exactly one hint per turn" classname="com.crush.mobile.ui.screens.chat.ChatDenialNoteTest" time="0.001"/>
+  <testcase name="a blank tool name falls back to the generic wording" classname="com.crush.mobile.ui.screens.chat.ChatDenialNoteTest" time="0.0"/>
+  <testcase name="a turn without an auto-deny adds no hint" classname="com.crush.mobile.ui.screens.chat.ChatDenialNoteTest" time="0.001"/>
+  <testcase name="the hint is a system row that names the attempted tool" classname="com.crush.mobile.ui.screens.chat.ChatDenialNoteTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ProviderSwitchPolicyTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:52.633Z" hostname="LAPTOP-5US7QL1L" time="0.028">
+  <properties/>
+  <testcase name="a second switch during a run replaces the deferred one" classname="com.crush.mobile.ui.screens.chat.ProviderSwitchPolicyTest" time="0.006"/>
+  <testcase name="the deferred switch applies once the run has ended" classname="com.crush.mobile.ui.screens.chat.ProviderSwitchPolicyTest" time="0.003"/>
+  <testcase name="a switch while a turn is in flight is deferred, not applied" classname="com.crush.mobile.ui.screens.chat.ProviderSwitchPolicyTest" time="0.002"/>
+  <testcase name="a switch with no turn in flight applies immediately" classname="com.crush.mobile.ui.screens.chat.ProviderSwitchPolicyTest" time="0.0"/>
+  <testcase name="asking for the provider already active is a no-op" classname="com.crush.mobile.ui.screens.chat.ProviderSwitchPolicyTest" time="0.002"/>
+  <testcase name="same provider with nothing pending stays a no-op even during a run" classname="com.crush.mobile.ui.screens.chat.ProviderSwitchPolicyTest" time="0.003"/>
+  <testcase name="reverting to the already-active provider cancels a deferred switch" classname="com.crush.mobile.ui.screens.chat.ProviderSwitchPolicyTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

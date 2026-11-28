@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:58:30.511Z" hostname="LAPTOP-5US7QL1L" time="0.047">
+  <properties/>
+  <testcase name="a mid-write header with no trace is still worth showing" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.003"/>
+  <testcase name="the truncation marker only appears when lines were cut" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.009"/>
+  <testcase name="the newest uncaught trace stops at the next log entry" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.002"/>
+  <testcase name="a null probe is not rendered as a failure" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.001"/>
+  <testcase name="the LAST uncaught in the log wins" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.001"/>
+  <testcase name="a log without a crash yields no crash" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.003"/>
+  <testcase name="collection notes are shown and masked" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.001"/>
+  <testcase name="a key in the crash text is masked too" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.001"/>
+  <testcase name="the report keeps its whole-block order" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.002"/>
+  <testcase name="no crash renders an honest empty section" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.001"/>
+  <testcase name="a brand key in the log tail is masked on the way out" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsReportTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

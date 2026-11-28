@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.project.ProjectTrustServiceTest" tests="25" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:41.796Z" hostname="LAPTOP-5US7QL1L" time="2.032">
+  <properties/>
+  <testcase name="a dotted crushrc consents and then Allows" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.122"/>
+  <testcase name="no record with a crushrc present is Required first-consent" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.03"/>
+  <testcase name="allow-path record persists the OBSERVED fingerprint when the folder is unchanged" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.099"/>
+  <testcase name="recordConsent produces the exact known fingerprint for the bytes" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.046"/>
+  <testcase name="noConfig recorded then the file appears is Required first-consent" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.096"/>
+  <testcase name="the dotted and plain names do not share a fingerprint for identical bytes" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.098"/>
+  <testcase name="allow-path record refuses a crushrc that appeared in the gate-record window" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.142"/>
+  <testcase name="allow-path record with the file still absent persists the noConfig state" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.028"/>
+  <testcase name="no record with no crushrc is Allow and the gate writes nothing" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.057"/>
+  <testcase name="matching fingerprint consents to Allow" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.056"/>
+  <testcase name="a stale caller-carried fingerprint is not persisted by the allow-path record" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.104"/>
+  <testcase name="consent survives a folder where the file was removed and re-planted as changed bytes" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.079"/>
+  <testcase name="crushrc removed after consent is Required re-verify" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.068"/>
+  <testcase name="one consent covers both configs and changing either re-gates" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.046"/>
+  <testcase name="allow-path record refuses a crushrc that vanished in the gate-record window" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.113"/>
+  <testcase name="the allow-path record refuses a dotted crushrc that appeared in the window" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.089"/>
+  <testcase name="a dotted crushrc alone is Required first-consent" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.051"/>
+  <testcase name="renaming the consented plain file to the dotfile re-gates" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.044"/>
+  <testcase name="removing the dotted file after a two-file consent re-gates" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.03"/>
+  <testcase name="changed bytes after consent is Required fingerprint moved" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.264"/>
+  <testcase name="noConfig state stays Allow while the folder stays crushrc-less" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.061"/>
+  <testcase name="a pre-dotfile plain-crushrc consent keeps the legacy digest and Allows" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.09"/>
+  <testcase name="allow-path record refuses bytes that swapped in the gate-record window" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.094"/>
+  <testcase name="adding a dotted crushrc beside a consented plain file re-gates" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.064"/>
+  <testcase name="a fake binder never binds without a record and the gate never consents for free" classname="com.crush.mobile.data.project.ProjectTrustServiceTest" time="0.057"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

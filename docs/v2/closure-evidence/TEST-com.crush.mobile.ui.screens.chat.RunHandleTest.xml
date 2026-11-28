@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.RunHandleTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:58:29.253Z" hostname="LAPTOP-5US7QL1L" time="0.107">
+  <properties/>
+  <testcase name="a fresh turn may post" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.034"/>
+  <testcase name="stop cancels the preflight and stream jobs it was given" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.039"/>
+  <testcase name="stop before the target is frozen forbids the POST and reports nothing posted" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.0"/>
+  <testcase name="a failed tool_result marks the row failed" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.019"/>
+  <testcase name="an explicit failure frame is not held running" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.001"/>
+  <testcase name="completeTool is the only live completion and records the engine duration" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.0"/>
+  <testcase name="a target frozen after the stop cannot resurrect the turn" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.001"/>
+  <testcase name="the cancel action names the frozen target" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.009"/>
+  <testcase name="a second stop does nothing - including to jobs recorded after the first stop" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.001"/>
+  <testcase name="mergeTools keeps earlier steps and stamps only the first sighting" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.001"/>
+  <testcase name="a late republish cannot downgrade a completed tool row" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.0"/>
+  <testcase name="idle extensions start at zero" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.001"/>
+  <testcase name="completeTool ignores an unknown call id and invents no row" classname="com.crush.mobile.ui.screens.chat.RunHandleTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

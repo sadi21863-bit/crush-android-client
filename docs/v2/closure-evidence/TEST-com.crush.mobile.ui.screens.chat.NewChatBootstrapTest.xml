@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.NewChatBootstrapTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:52.520Z" hostname="LAPTOP-5US7QL1L" time="0.003">
+  <properties/>
+  <testcase name="no pending intent never mints" classname="com.crush.mobile.ui.screens.chat.NewChatBootstrapTest" time="0.0"/>
+  <testcase name="an overtaking binding cannot consume another instance's intent" classname="com.crush.mobile.ui.screens.chat.NewChatBootstrapTest" time="0.0"/>
+  <testcase name="the requesting instance consumes its intent" classname="com.crush.mobile.ui.screens.chat.NewChatBootstrapTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.local.LockStateTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:29.023Z" hostname="LAPTOP-5US7QL1L" time="0.005">
+  <properties/>
+  <testcase name="REGRESSION activity recreation cannot forget a fresh unlock" classname="com.crush.mobile.data.local.LockStateTest" time="0.001"/>
+  <testcase name="aged absence clears verification and asks the caller to drop the key" classname="com.crush.mobile.data.local.LockStateTest" time="0.001"/>
+  <testcase name="unlock after an absence is fresh with a restarted trust age" classname="com.crush.mobile.data.local.LockStateTest" time="0.0"/>
+  <testcase name="short absence never ages" classname="com.crush.mobile.data.local.LockStateTest" time="0.0"/>
+  <testcase name="reset clears all temporal state" classname="com.crush.mobile.data.local.LockStateTest" time="0.0"/>
+  <testcase name="a fresh unlock is never aged no matter how long the absence was" classname="com.crush.mobile.data.local.LockStateTest" time="0.0"/>
+  <testcase name="fresh process has nobody verified and no trust age" classname="com.crush.mobile.data.local.LockStateTest" time="0.0"/>
+  <testcase name="strict mode with zero grace still ages a pre-unlock absence" classname="com.crush.mobile.data.local.LockStateTest" time="0.0"/>
+  <testcase name="unlock before a pause is not fresh" classname="com.crush.mobile.data.local.LockStateTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ModelChoiceTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:52.409Z" hostname="LAPTOP-5US7QL1L" time="0.065">
+  <properties/>
+  <testcase name="a head the catalogue no longer lists is dropped, never invented" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="preferred ids that the provider does not list are ignored" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.0"/>
+  <testcase name="preferred ids sort first when the catalogue lists them" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="prices come from the named provider only" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.015"/>
+  <testcase name="shortlist drops blank ids and de-duplicates" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="describe separates unknown from free" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="a network failure does not accuse the key" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.004"/>
+  <testcase name="shortlist prefers zero-cost models but does not decide" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.0"/>
+  <testcase name="the persisted head goes first - ahead of the registry's preferred list" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="explicit null prices are unknown, not free" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="a model with no price fields is unknown, not free" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="the rejection names the ACTIVE provider, never the Zen constant" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="a zero in-cost with unknown out-cost is not known-free" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.003"/>
+  <testcase name="shortlist is empty when catalogue is empty" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.0"/>
+  <testcase name="a zero-cost model is free and a priced one is not" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.014"/>
+  <testcase name="a 401 is reported as a key problem not a network problem" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.0"/>
+  <testcase name="pick is only a fallback and returns first listed" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="unknown provider is not treated as free" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="both sides explicitly zero is free" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.006"/>
+  <testcase name="an all-dead shortlist is still returned so it can be probed" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.001"/>
+  <testcase name="preferred beats free-first ordering without duplicating" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.002"/>
+  <testcase name="missing provider yields no prices rather than guessing" classname="com.crush.mobile.ui.screens.chat.ModelChoiceTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

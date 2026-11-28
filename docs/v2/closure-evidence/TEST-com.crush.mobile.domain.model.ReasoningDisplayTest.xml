@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.model.ReasoningDisplayTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:08.501Z" hostname="LAPTOP-5US7QL1L" time="0.007">
+  <properties/>
+  <testcase name="the development-build hidden value maps to off" classname="com.crush.mobile.domain.model.ReasoningDisplayTest" time="0.003"/>
+  <testcase name="stored forms are stable" classname="com.crush.mobile.domain.model.ReasoningDisplayTest" time="0.0"/>
+  <testcase name="absent or junk values fail to collapsed" classname="com.crush.mobile.domain.model.ReasoningDisplayTest" time="0.0"/>
+  <testcase name="every stored form round trips" classname="com.crush.mobile.domain.model.ReasoningDisplayTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatHostInputsTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:14.304Z" hostname="LAPTOP-5US7QL1L" time="0.019">
+  <properties/>
+  <testcase name="a same-key binding update does not flap readiness" classname="com.crush.mobile.ui.screens.chat.ChatHostInputsTest" time="0.001"/>
+  <testcase name="the initial host seed is safe and never ready" classname="com.crush.mobile.ui.screens.chat.ChatHostInputsTest" time="0.004"/>
+  <testcase name="prewarm cannot fire before the coherent snapshot lands" classname="com.crush.mobile.ui.screens.chat.ChatHostInputsTest" time="0.001"/>
+  <testcase name="the initial Legacy binding keeps its surface label" classname="com.crush.mobile.ui.screens.chat.ChatHostInputsTest" time="0.0"/>
+  <testcase name="a project switch is switching until the new key reports" classname="com.crush.mobile.ui.screens.chat.ChatHostInputsTest" time="0.009"/>
+  <testcase name="the first coherent Legacy snapshot is starting until the engine is ready" classname="com.crush.mobile.ui.screens.chat.ChatHostInputsTest" time="0.0"/>
+  <testcase name="a mismatched key is switching for every engine state" classname="com.crush.mobile.ui.screens.chat.ChatHostInputsTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

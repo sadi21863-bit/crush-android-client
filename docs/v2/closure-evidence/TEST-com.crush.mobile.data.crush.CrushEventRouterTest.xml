@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.CrushEventRouterTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:48.970Z" hostname="LAPTOP-5US7QL1L" time="0.481">
+  <properties/>
+  <testcase name="a foreign run id in tool params or two plain levels deep does not bind" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.008"/>
+  <testcase name="malformed json yields null rather than throwing" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.001"/>
+  <testcase name="catch-all subscribers also receive run-scoped events" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.085"/>
+  <testcase name="dispatch after close is a no-op, not a crash" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.034"/>
+  <testcase name="completing a run closes only that run" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.033"/>
+  <testcase name="events only reach the run they belong to" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.036"/>
+  <testcase name="run id is read from the top level" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.001"/>
+  <testcase name="anonymous events reach every live run, scoped ones stay scoped" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.013"/>
+  <testcase name="a run-id-less message frame reaches the in-flight turn" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.004"/>
+  <testcase name="run id is found when nested inside a payload" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.001"/>
+  <testcase name="unregister removes the channel and stops delivery" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.003"/>
+  <testcase name="registering after close yields an already-closed channel" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.057"/>
+  <testcase name="two subscribers on one run both receive it" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.004"/>
+  <testcase name="close releases every outstanding subscriber" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.012"/>
+  <testcase name="a run-id-less permission request reaches the in-flight turn" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.074"/>
+  <testcase name="a run id inside an array element does not bind" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.001"/>
+  <testcase name="an event with no run id yields null rather than throwing" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.003"/>
+  <testcase name="subscribing before prompting means nothing is missed" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.018"/>
+  <testcase name="a run with no subscriber is dropped rather than queued forever" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.064"/>
+  <testcase name="an event delivered before collection is still buffered and not lost" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.004"/>
+  <testcase name="a frame whose only run id hides in tool params fans out anonymously" classname="com.crush.mobile.data.crush.CrushEventRouterTest" time="0.014"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

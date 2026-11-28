@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.CrushApiRestTransportTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:45:48.011Z" hostname="LAPTOP-5US7QL1L" time="0.763">
+  <properties/>
+  <testcase name="the base url never leaves the http 127 0 0 1 shape - no tcp scheme" classname="com.crush.mobile.data.crush.CrushApiRestTransportTest" time="0.224"/>
+  <testcase name="the test-only plain client is reachable and the only tcp selector" classname="com.crush.mobile.data.crush.CrushApiRestTransportTest" time="0.03"/>
+  <testcase name="socket absent yields no client and surfaces the typed unavailable honestly" classname="com.crush.mobile.data.crush.CrushApiRestTransportTest" time="0.075"/>
+  <testcase name="scrubbing keeps failure details free of the raw app dir prefix" classname="com.crush.mobile.data.crush.CrushApiRestTransportTest" time="0.001"/>
+  <testcase name="the transport heals on the same instance once the socket binds" classname="com.crush.mobile.data.crush.CrushApiRestTransportTest" time="0.43"/>
+  <testcase name="bare production construction is refused instead of a silent plain client" classname="com.crush.mobile.data.crush.CrushApiRestTransportTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

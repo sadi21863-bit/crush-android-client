@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.blocks.UiBlockLabTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:53:22.668Z" hostname="LAPTOP-5US7QL1L" time="0.032">
+  <properties/>
+  <testcase name="prose around the fence is not searched" classname="com.crush.mobile.ui.blocks.UiBlockLabTest" time="0.029"/>
+  <testcase name="an unterminated fence is unchanged" classname="com.crush.mobile.ui.blocks.UiBlockLabTest" time="0.001"/>
+  <testcase name="a bare fence is stripped" classname="com.crush.mobile.ui.blocks.UiBlockLabTest" time="0.001"/>
+  <testcase name="a single json fence is stripped" classname="com.crush.mobile.ui.blocks.UiBlockLabTest" time="0.001"/>
+  <testcase name="raw json is unchanged" classname="com.crush.mobile.ui.blocks.UiBlockLabTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

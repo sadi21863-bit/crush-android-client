@@ -23,11 +23,12 @@ OWNER-DECISION-REQUIRED.
 | B4 | Project deletion decision untested | Pure helper + JVM temp-dir test | JVM: imported folder survives, internal tree deleted | IN SCOPE — implement if feasible |
 | C4/5 | Plain `runCatching` swallows `CancellationException` despite claim | Use `runCatchingNonCancellation` in store/container/VM writes | JVM: fake DAO throws CancellationException → escapes, no state write | IN SCOPE — highest value |
 | C8 | `AlreadyApplied` does not reconcile controller | Read exact row, mark controller terminal with stored reason | JVM: row COMPLETED, controller RUNNING → controller COMPLETED | IN SCOPE |
-| C13 | Controller lookup ignores explicit executionId | Primary lookup by executionId, verify runId + key | JVM: two execs same key, colliding runId → correct view | IN SCOPE |
+| C13 | Controller lookup ignores explicit executionId | Explicit ID authoritative and fail-closed; run-ID fallback only when absent and unambiguous | `FoundationClosureTest` identity mismatch pin | FIXED-SOURCE + JVM-TESTED (2026-11-28 closure) |
 | C14 | Declaration replacement unsynchronised | Serialize declaration map operations per key | Latch test: one ACTIVE per key | IN SCOPE |
 | C1/15 | Superseded/retired events reach controller | Guard controller on `event.superseded`; permit terminal durable write only to own execution | Adapter→container→controller test | IN SCOPE |
 | C3 | Stale/Conflict/IntegrityFailure collapse to one reason | Explicit reason map | Parameterized test: 3 outcomes → 3 reasons | IN SCOPE |
-| C10/11/12 | Buffer head removal, clear sync, replay re-peek | Head-only removal, synchronized clear/tombstone, re-peek loop | Latch/order tests | IN SCOPE |
+| C10/11/12 | Buffer head removal, clear sync, replay re-peek | Head-only removal, single atomic lifecycle monitor, tombstone, re-peek loop | `FoundationClosureTest` latch/order tests + 5 existing buffer pins | FIXED-SOURCE + JVM-TESTED (2026-11-28 closure) |
+| C-replay | Deferred replay had no reliable retry trigger after ACK | `scheduleReplay` bounded delayed retries + startup re-drive + explicit invalidation on exhaustion | `FoundationClosureTest` unavailable-then-success; container scheduler source-verified only | FIXED-SOURCE + STORE JVM-TESTED; container scheduler NOT INTEGRATION-TESTED |
 | C6 | Per-turn finishError handles only Applied | Handle all typed outcomes | JVM store+controller per outcome | IN SCOPE |
 | C18 | Live chat bubble shows cancelled run as plain completion | Use `rc.cancelled` in bubble | Compose/state test | IN SCOPE |
 | E-04 | Send loop has no `attempt++` (unbounded if policy flips) | For-loop bounded to 2 | State test: exactly 2 POSTs with policy true | IN SCOPE |

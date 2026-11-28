@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.AppLockPolicyTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:53:22.585Z" hostname="LAPTOP-5US7QL1L" time="0.01">
+  <properties/>
+  <testcase name="no key in memory means no prompt is attempted" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.002"/>
+  <testcase name="resume inside the grace window does not prompt WHEN a key is held" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="unauthenticated prompt does not depend on elapsed time" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="fresh unlock after a long absence opens exactly once" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="backwards clock fails closed" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="grace window is never a licence to skip authentication" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.002"/>
+  <testcase name="auto prompt is capped so cancel cannot loop" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="strict mode still prompts after a fresh unlock" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="strict mode with zero grace prompts on every resume" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.001"/>
+  <testcase name="unlocked inside grace stays open regardless of how long ago the pause was" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="resume past the grace window prompts even when unlocked" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="unobserved pause fails closed" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.001"/>
+  <testcase name="cold start with a stored key always prompts" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="fresh install is never locked" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <testcase name="REGRESSION never open without a key no matter how brief the absence" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.002"/>
+  <testcase name="cold start always prompts even if a key is somehow held" classname="com.crush.mobile.ui.AppLockPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.StreamMessageTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:51.647Z" hostname="LAPTOP-5US7QL1L" time="0.053">
+  <properties/>
+  <testcase name="empty parts yields empty text not a crash" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.006"/>
+  <testcase name="malformed parts do not throw" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.01"/>
+  <testcase name="tool calls are listed" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.01"/>
+  <testcase name="an unknown part is surfaced as bounded text" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.004"/>
+  <testcase name="nested-object details is mined for its message, not thrown on" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.001"/>
+  <testcase name="array-valued details does not throw" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.0"/>
+  <testcase name="multiple text parts are concatenated" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.002"/>
+  <testcase name="malformed part shapes yield empty text rather than garbage" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.006"/>
+  <testcase name="extracts text from the documented part shape" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.002"/>
+  <testcase name="an error finish with no extractable text still reads as failed" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.0"/>
+  <testcase name="a hidden unknown part stays hidden" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.0"/>
+  <testcase name="a hidden text part suppresses the whole text" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.0"/>
+  <testcase name="object details without a string message contributes nothing" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.001"/>
+  <testcase name="reasoning parts are thinking not text" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.004"/>
+  <testcase name="a stop finish part is not an error" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.001"/>
+  <testcase name="a finish part with reason error is surfaced" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.001"/>
+  <testcase name="unknown part text is bounded" classname="com.crush.mobile.data.crush.StreamMessageTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

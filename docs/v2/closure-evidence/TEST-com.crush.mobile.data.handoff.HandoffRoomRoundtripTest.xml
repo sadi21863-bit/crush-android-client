@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.handoff.HandoffRoomRoundtripTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:24.585Z" hostname="LAPTOP-5US7QL1L" time="2.209">
+  <properties/>
+  <testcase name="a handoff walks the status machine and roundtrips a restart byte-faithfully" classname="com.crush.mobile.data.handoff.HandoffRoomRoundtripTest" time="0.511"/>
+  <testcase name="guarded transitions are no-ops against a state the row is not in" classname="com.crush.mobile.data.handoff.HandoffRoomRoundtripTest" time="0.604"/>
+  <testcase name="migration 2 to 3 preserves the project row and creates the checked handoffs table" classname="com.crush.mobile.data.handoff.HandoffRoomRoundtripTest" time="1.081"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/SQLiteConnection: Could not change the database journal mode of 'C:\Users\aditya\AppData\Local\Temp\robolectric-HandoffRoomRoundtripTest_migration_2_to_3_preserves_the_project_row_and_creates_the_checked_handoffs_table6157685222103797902\com.crush.mobile-dataDir\databases\handoffs-roundtrip-test.db' from 'wal' to 'MEMORY' because the database is locked.  This usually means that there are other open connections to the database which prevents the database from enabling or disabling write-ahead logging mode.  Proceeding without changing the journal mode.
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

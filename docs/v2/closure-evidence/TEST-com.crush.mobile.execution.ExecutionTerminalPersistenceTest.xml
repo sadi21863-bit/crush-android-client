@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:53:09.970Z" hostname="LAPTOP-5US7QL1L" time="12.367">
+  <properties/>
+  <testcase name="duplicate terminal event is idempotent" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="1.119"/>
+  <testcase name="late confirmed error corrects a generic COMPLETED but never cancellation" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="0.959"/>
+  <testcase name="confirmed completion persists COMPLETED and survives reopen" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="0.875"/>
+  <testcase name="confirmed error is FAILED and generic completion cannot overwrite it" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="2.76"/>
+  <testcase name="confirmed cancellation keeps COMPLETED lifecycle with cancelled reason" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="1.449"/>
+  <testcase name="stale generation and superseded declarations never terminate" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="1.627"/>
+  <testcase name="a wrong execution id cannot mutate another execution" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="0.673"/>
+  <testcase name="terminal event for an unknown execution changes nothing" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="1.021"/>
+  <testcase name="progress after terminal is NotApplicable and never regresses" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="0.638"/>
+  <testcase name="disconnect without terminal evidence fabricates no completion" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="0.575"/>
+  <testcase name="healthy progress on a RUNNING row is NotApplicable not buffered evidence" classname="com.crush.mobile.execution.ExecutionTerminalPersistenceTest" time="0.653"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

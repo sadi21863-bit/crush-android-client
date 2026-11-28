@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.EngineProtocolTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:51.506Z" hostname="LAPTOP-5US7QL1L" time="0.032">
+  <properties/>
+  <testcase name="mode mapping never sends sysadmin" classname="com.crush.mobile.data.crush.EngineProtocolTest" time="0.003"/>
+  <testcase name="wire family flips at 0_100_0" classname="com.crush.mobile.data.crush.EngineProtocolTest" time="0.019"/>
+  <testcase name="is at least compares numerically" classname="com.crush.mobile.data.crush.EngineProtocolTest" time="0.004"/>
+  <testcase name="versions parse with prefixes and suffixes" classname="com.crush.mobile.data.crush.EngineProtocolTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

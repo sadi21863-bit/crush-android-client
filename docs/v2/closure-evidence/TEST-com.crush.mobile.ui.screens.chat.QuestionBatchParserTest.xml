@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:52.946Z" hostname="LAPTOP-5US7QL1L" time="0.082">
+  <properties/>
+  <testcase name="the parser caps prompts and choices to the engine maxima" classname="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" time="0.072"/>
+  <testcase name="the legacy options alias is accepted" classname="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" time="0.002"/>
+  <testcase name="a full batch parses every question kind and its choices" classname="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" time="0.001"/>
+  <testcase name="a prompt without an id is skipped, and an all-skipped batch is null" classname="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" time="0.003"/>
+  <testcase name="a missing batch id cannot be answered and returns null" classname="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" time="0.0"/>
+  <testcase name="a choice question with no choices is unanswerable and stays UNKNOWN" classname="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" time="0.001"/>
+  <testcase name="an unknown type stays UNKNOWN rather than guessed" classname="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" time="0.001"/>
+  <testcase name="no questions returns null" classname="com.crush.mobile.ui.screens.chat.QuestionBatchParserTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

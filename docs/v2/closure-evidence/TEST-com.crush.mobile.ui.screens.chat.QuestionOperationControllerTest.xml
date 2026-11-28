@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:58:28.526Z" hostname="LAPTOP-5US7QL1L" time="0.717">
+  <properties/>
+  <testcase name="two submits for one batch admit exactly one" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.007"/>
+  <testcase name="null and empty batch ids are distinct identity keys" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.001"/>
+  <testcase name="cancel replaced during reattach sends no cancel" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.155"/>
+  <testcase name="submit replaced during reattach sends no answer" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.062"/>
+  <testcase name="failed cancel releases the guard and allows retry" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.064"/>
+  <testcase name="old submit success cannot clear a newer batch" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.058"/>
+  <testcase name="submit and cancel are mutually exclusive in both orders" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.0"/>
+  <testcase name="cancellation releases the guard" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.096"/>
+  <testcase name="old cancel success cannot clear a newer batch" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.051"/>
+  <testcase name="a claim for a non-current identity is rejected" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.0"/>
+  <testcase name="old completion cannot release a newer batch guard" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.039"/>
+  <testcase name="new batch is usable while an older request is unwinding" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.027"/>
+  <testcase name="two cancels for one batch admit exactly one" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.0"/>
+  <testcase name="failed submit releases the guard and allows retry" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.018"/>
+  <testcase name="newer operation state survives an older completion" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.07"/>
+  <testcase name="old failure cannot overwrite a newer batch error or operation" classname="com.crush.mobile.ui.screens.chat.QuestionOperationControllerTest" time="0.066"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

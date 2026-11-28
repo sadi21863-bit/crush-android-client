@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.EngineApiContractTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:50.129Z" hostname="LAPTOP-5US7QL1L" time="0.011">
+  <properties/>
+  <testcase name="the pinned surface has no gaps" classname="com.crush.mobile.data.crush.EngineApiContractTest" time="0.005"/>
+  <testcase name="both manifests know the same versions" classname="com.crush.mobile.data.crush.EngineApiContractTest" time="0.003"/>
+  <testcase name="the adapter speaks both permission families" classname="com.crush.mobile.data.crush.EngineApiContractTest" time="0.0"/>
+  <testcase name="the v0100 gaps are exactly the documented upgrade work" classname="com.crush.mobile.data.crush.EngineApiContractTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

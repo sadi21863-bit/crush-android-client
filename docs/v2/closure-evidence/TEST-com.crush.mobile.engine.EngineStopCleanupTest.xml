@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.EngineStopCleanupTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:17.608Z" hostname="LAPTOP-5US7QL1L" time="0.006">
+  <properties/>
+  <testcase name="child was stopped before a proxy failure is reported" classname="com.crush.mobile.engine.EngineStopCleanupTest" time="0.002"/>
+  <testcase name="proxy still stops when child teardown throws" classname="com.crush.mobile.engine.EngineStopCleanupTest" time="0.002"/>
+  <testcase name="no child still stops the proxy" classname="com.crush.mobile.engine.EngineStopCleanupTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

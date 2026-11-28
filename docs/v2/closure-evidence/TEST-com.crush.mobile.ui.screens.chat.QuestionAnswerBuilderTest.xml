@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.QuestionAnswerBuilderTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:52.789Z" hostname="LAPTOP-5US7QL1L" time="0.096">
+  <properties/>
+  <testcase name="an empty selection list is omitted rather than sent as empty" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerBuilderTest" time="0.091"/>
+  <testcase name="yes no keeps false as a real answer" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerBuilderTest" time="0.001"/>
+  <testcase name="a single and multi choice become selected ids in prompt order" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerBuilderTest" time="0.001"/>
+  <testcase name="free text is trimmed and a blank answer is omitted" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerBuilderTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

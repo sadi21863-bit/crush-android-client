@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" tests="28" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:58:29.490Z" hostname="LAPTOP-5US7QL1L" time="0.583">
+  <properties/>
+  <testcase name="a completed row with a path does not read as a bare tool name" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.468"/>
+  <testcase name="finished true is COMPLETED with args pretty-printed" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.01"/>
+  <testcase name="the summary names the target, not just the tool" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="non-object data does not crash" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.0"/>
+  <testcase name="the confirmed names win over the fallbacks when both are present" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="missing args yield an empty string, not the word null" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.0"/>
+  <testcase name="an unrecognised state is UNKNOWN and never COMPLETED" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.001"/>
+  <testcase name="completion states map to COMPLETED" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.001"/>
+  <testcase name="the spec-confirmed permission shape parses" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.034"/>
+  <testcase name="finished false with a reported state string still maps" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="a missing id still yields a stable synthesised one" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.004"/>
+  <testcase name="arguments are pretty-printed when they are a JSON string" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="the touched path is mined out of the arguments" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="name is found under any confirmed key" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="data null degrades to no tool rather than crashing" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.001"/>
+  <testcase name="running states map to RUNNING" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.001"/>
+  <testcase name="data scalar degrades to no tool rather than crashing" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.001"/>
+  <testcase name="a part with no name is dropped rather than shown blank" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="the known minimal shape still parses without inventing a target" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.001"/>
+  <testcase name="summary reflects state without inventing one" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.009"/>
+  <testcase name="very long output is truncated rather than rendered in full" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="id is stable so rows do not duplicate as state advances" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.005"/>
+  <testcase name="a streaming part without finished is RUNNING, never COMPLETED" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="a description is used when there is no path" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.006"/>
+  <testcase name="state arriving as an array of status objects is understood" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.007"/>
+  <testcase name="arguments are pretty-printed when they are already an object" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.001"/>
+  <testcase name="failure states map to FAILED" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <testcase name="the known minimal shape parses" classname="com.crush.mobile.ui.screens.chat.ToolActivityParserTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

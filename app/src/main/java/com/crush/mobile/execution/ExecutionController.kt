@@ -189,14 +189,23 @@ class ExecutionController(
         if (event.superseded) return
         val id = synchronized(records) {
             val candidates = activeByKey[instanceKey] ?: return@synchronized null
-            // Exact execution identity is primary; run id and key are checks,
-            // never a substitute for identity when run ids collide.
-            val byId = event.executionId?.let { candidates.firstOrNull { id -> id == it } }
-            val resolved = byId ?: candidates.firstOrNull { records[it]?.runId == event.runId }
-            val view = resolved?.let { records[it] }
-            if (view == null || view.runId != event.runId ||
-                view.target.instanceKey != instanceKey
-            ) null else resolved
+            // Explicit execution identity is authoritative: an id that cannot
+            // be resolved is REJECTED, never silently replaced by a run-id
+            // match. Run-id fallback is allowed only when the event has no
+            // execution id AND the match is unambiguous.
+            val explicit = event.executionId
+            if (explicit != null) {
+                if (!candidates.contains(explicit)) return@synchronized null
+                val view = records[explicit]
+                if (view == null || view.runId != event.runId ||
+                    view.target.instanceKey != instanceKey
+                ) null else explicit
+            } else {
+                val matches = candidates.filter { records[it]?.runId == event.runId }
+                val only = if (matches.size == 1) matches.first() else null
+                val view = only?.let { records[it] }
+                if (view == null || view.target.instanceKey != instanceKey) null else only
+            }
         } ?: return
         com.crush.mobile.util.AppLog.i(
             "ExecutionController",

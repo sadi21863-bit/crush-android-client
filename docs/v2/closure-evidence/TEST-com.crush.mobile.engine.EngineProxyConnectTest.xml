@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.EngineProxyConnectTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:13.696Z" hostname="LAPTOP-5US7QL1L" time="2.206">
+  <properties/>
+  <testcase name="restart after stop gets a fresh live accept loop" classname="com.crush.mobile.engine.EngineProxyConnectTest" time="1.42"/>
+  <testcase name="stop before start and repeated stop are safe" classname="com.crush.mobile.engine.EngineProxyConnectTest" time="0.577"/>
+  <testcase name="unresolvable target answers 502 and does not open a tunnel" classname="com.crush.mobile.engine.EngineProxyConnectTest" time="0.12"/>
+  <testcase name="connect handshake relays bytes both ways through the resolver seam" classname="com.crush.mobile.engine.EngineProxyConnectTest" time="0.085"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.model.TuningPolicyTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:08.513Z" hostname="LAPTOP-5US7QL1L" time="0.003">
+  <properties/>
+  <testcase name="user override wins and is marked MANUAL" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.0"/>
+  <testcase name="idle timeout is clamped to a safe range" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.001"/>
+  <testcase name="hang grace and health interval are clamped" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.0"/>
+  <testcase name="negative overrides cannot produce negative values" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.0"/>
+  <testcase name="no overrides means every value is AUTO" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.0"/>
+  <testcase name="user override equal to the auto value is still MANUAL" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.0"/>
+  <testcase name="low ram flag alone forces the entry tier" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.0"/>
+  <testcase name="empty overrides report as empty" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.0"/>
+  <testcase name="entry devices get the shortest idle timeout" classname="com.crush.mobile.domain.model.TuningPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

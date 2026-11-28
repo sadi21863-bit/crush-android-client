@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.provider.ProvidersTest" tests="24" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:26.410Z" hostname="LAPTOP-5US7QL1L" time="0.263">
+  <properties/>
+  <testcase name="an untested provider with a stored key stays offerable" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.097"/>
+  <testcase name="the free tier list is not empty and excludes paid providers" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.001"/>
+  <testcase name="every provider has a display name" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.04"/>
+  <testcase name="the pickers offer only providers tested on this build" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.004"/>
+  <testcase name="hyper is no longer advertised as free after the allowance retirement" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.001"/>
+  <testcase name="no id is a prefix of another, and opencode alone is not an id" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.004"/>
+  <testcase name="every provider carries a hint about where its key comes from" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="openrouter is offered because it has a real free tier" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="isUnknownToApp recognises an id this build has never seen" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.001"/>
+  <testcase name="deepseek and cerebras are not free tiers either" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="resolution is stable across repeated calls" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="copilot is listed but labelled as needing OAuth" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.016"/>
+  <testcase name="ids are unique" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.007"/>
+  <testcase name="a known id resolves to itself" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="the bare name opencode is not accepted" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.003"/>
+  <testcase name="opencode-zen is NOT advertised as having a free tier" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.001"/>
+  <testcase name="an unknown id resolves to the default rather than failing" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="every models base, when present, is a well formed https base" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="the default is the provider that has been verified" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.001"/>
+  <testcase name="a null id resolves to the default" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="opencode-go is known after the device-proven promotion" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="zen's models base matches the catalogue client's default" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.001"/>
+  <testcase name="groq stays free and carries its compat base" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.002"/>
+  <testcase name="openrouter carries the measured probe order and compat base" classname="com.crush.mobile.domain.provider.ProvidersTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

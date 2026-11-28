@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.local.KeyMaskTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:26.851Z" hostname="LAPTOP-5US7QL1L" time="0.003">
+  <properties/>
+  <testcase name="very short key is fully masked" classname="com.crush.mobile.data.local.KeyMaskTest" time="0.002"/>
+  <testcase name="hint shows only a short tail" classname="com.crush.mobile.data.local.KeyMaskTest" time="0.0"/>
+  <testcase name="fingerprint of nothing is explicit" classname="com.crush.mobile.data.local.KeyMaskTest" time="0.0"/>
+  <testcase name="fingerprint reveals length but not content" classname="com.crush.mobile.data.local.KeyMaskTest" time="0.001"/>
+  <testcase name="blank key yields no hint" classname="com.crush.mobile.data.local.KeyMaskTest" time="0.0"/>
+  <testcase name="hint never contains the body of the key" classname="com.crush.mobile.data.local.KeyMaskTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

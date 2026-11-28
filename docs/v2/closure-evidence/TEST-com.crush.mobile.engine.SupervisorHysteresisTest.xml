@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.SupervisorHysteresisTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:20.641Z" hostname="LAPTOP-5US7QL1L" time="0.244">
+  <properties/>
+  <testcase name="interleaved blips prevent relaxation entirely" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.006"/>
+  <testcase name="watchdog fires exactly at the threshold with a bound child" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.169"/>
+  <testcase name="watchdog keeps waiting just under the threshold" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.0"/>
+  <testcase name="the watchdog give-up respects the shared wedge budget and never resets it" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.001"/>
+  <testcase name="the start budget is finite - one past the cap gives up" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.001"/>
+  <testcase name="wedge budget tolerates cap-minus-one rapid restarts then refuses" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.002"/>
+  <testcase name="the first wedged episode restarts and a second one is terminal" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.001"/>
+  <testcase name="three consecutive calm samples DO relax" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.001"/>
+  <testcase name="one calm sample does NOT relax" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.002"/>
+  <testcase name="transient startup failures still retry within the budget" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.001"/>
+  <testcase name="a non-OK observation resets the calm run" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.002"/>
+  <testcase name="two calm samples do NOT relax" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.002"/>
+  <testcase name="a failing or missing socket is never a wedge" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.002"/>
+  <testcase name="escalation is immediate" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.001"/>
+  <testcase name="hard startup failures give up immediately regardless of budget" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.003"/>
+  <testcase name="the watchdog threshold stays above the bounded readiness window" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.003"/>
+  <testcase name="the policy constant matches the documented intent" classname="com.crush.mobile.engine.SupervisorHysteresisTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

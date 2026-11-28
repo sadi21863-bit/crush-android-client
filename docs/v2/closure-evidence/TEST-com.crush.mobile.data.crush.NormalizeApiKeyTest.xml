@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.NormalizeApiKeyTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:51.583Z" hostname="LAPTOP-5US7QL1L" time="0.026">
+  <properties/>
+  <testcase name="surrounding whitespace is trimmed" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="lowercase key with equals is not split" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.002"/>
+  <testcase name="env var with empty value keeps the original rather than returning blank" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="base64 padding at the end is NOT treated as an env var prefix" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="prefix with digits and underscores but lowercase is not an env name" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="env var form is stripped" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="other env var names are stripped too" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="bare key passes through untouched" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="value is never null and always trimmed" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.003"/>
+  <testcase name="an env-name prefix is stripped but a real key is not" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="multiple equals yields everything after the first" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <testcase name="empty and blank are safe" classname="com.crush.mobile.data.crush.NormalizeApiKeyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

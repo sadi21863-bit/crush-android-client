@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.api.ZenModelsApiBaseUrlTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:45:43.052Z" hostname="LAPTOP-5US7QL1L" time="3.332">
+  <properties/>
+  <testcase name="probe calls the constructed base's chat completions" classname="com.crush.mobile.data.api.ZenModelsApiBaseUrlTest" time="3.212"/>
+  <testcase name="fetch calls the constructed base and parses a groq shaped catalogue" classname="com.crush.mobile.data.api.ZenModelsApiBaseUrlTest" time="0.118"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.DeleteOutcomeTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:49.657Z" hostname="LAPTOP-5US7QL1L" time="0.467">
+  <properties/>
+  <testcase name="a dropped connection is Failed, not success" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.04"/>
+  <testcase name="the three outcomes are distinguishable" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.004"/>
+  <testcase name="a 500 is Failed, never success" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.017"/>
+  <testcase name="a 200 is also Deleted" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.068"/>
+  <testcase name="a 404 with an unverifiable workspace is Failed, not AlreadyGone" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.107"/>
+  <testcase name="a failure carries a reason the user can be shown" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.091"/>
+  <testcase name="a 404 whose session list omits the id is AlreadyGone" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.059"/>
+  <testcase name="a 204 is Deleted and the request really was issued" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.035"/>
+  <testcase name="a 404 whose session list STILL contains the id is Failed" classname="com.crush.mobile.data.crush.DeleteOutcomeTest" time="0.045"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

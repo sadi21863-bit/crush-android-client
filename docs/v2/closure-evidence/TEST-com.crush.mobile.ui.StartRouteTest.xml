@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.StartRouteTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:53:22.639Z" hostname="LAPTOP-5US7QL1L" time="0.017">
+  <properties/>
+  <testcase name="stored key goes to chat" classname="com.crush.mobile.ui.StartRouteTest" time="0.003"/>
+  <testcase name="a decrypted key with no stored ciphertext still routes to chat" classname="com.crush.mobile.ui.StartRouteTest" time="0.001"/>
+  <testcase name="ciphertext alone is enough to route to chat" classname="com.crush.mobile.ui.StartRouteTest" time="0.001"/>
+  <testcase name="no stored key goes to onboarding" classname="com.crush.mobile.ui.StartRouteTest" time="0.0"/>
+  <testcase name="all three signals absent routes to onboarding" classname="com.crush.mobile.ui.StartRouteTest" time="0.001"/>
+  <testcase name="any single signal is enough to route to chat" classname="com.crush.mobile.ui.StartRouteTest" time="0.003"/>
+  <testcase name="cleared app data routes to onboarding" classname="com.crush.mobile.ui.StartRouteTest" time="0.001"/>
+  <testcase name="blank decrypted value is treated as absent" classname="com.crush.mobile.ui.StartRouteTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

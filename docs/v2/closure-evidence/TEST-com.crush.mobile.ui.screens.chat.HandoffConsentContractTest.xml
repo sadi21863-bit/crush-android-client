@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:49.643Z" hostname="LAPTOP-5US7QL1L" time="0.484">
+  <properties/>
+  <testcase name="resume semantics - same rides changed replaces" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.325"/>
+  <testcase name="the dispatch composes the first turn with the deferred-null fingerprint" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.07"/>
+  <testcase name="every confirm seals a fresh package - two confirms yield two independent ids" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.002"/>
+  <testcase name="the stamp splits into a model id only when it is one" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.003"/>
+  <testcase name="sheet mode classification and exclusivity" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.003"/>
+  <testcase name="a prefix whose tail is not a completed answer degrades to the empty editable sheet" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.002"/>
+  <testcase name="confirm is enabled exactly when a destination is chosen - emptiness never blocks" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.002"/>
+  <testcase name="an approved row can never be re-sealed in place - a target change mints a NEW draft" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.002"/>
+  <testcase name="a re-opened untouched draft row's own text wins over the machine prefill" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.004"/>
+  <testcase name="tapping an older bubble prefills THE TAPPED text through Batch B's own contract" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.001"/>
+  <testcase name="the resume hint is table truth with a real view guard" classname="com.crush.mobile.ui.screens.chat.HandoffConsentContractTest" time="0.055"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.MarkdownParserTest" tests="28" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:51.321Z" hostname="LAPTOP-5US7QL1L" time="0.556">
+  <properties/>
+  <testcase name="a markdown link keeps label and url" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.018"/>
+  <testcase name="headings carry their level" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.057"/>
+  <testcase name="tilde fences work too" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.005"/>
+  <testcase name="a paragraph spanning several lines is one block" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.005"/>
+  <testcase name="nested bullets record their indent" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.017"/>
+  <testcase name="a lone asterisk does not eat the line" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.005"/>
+  <testcase name="an unpaired bracket flood trips the scan budget and stays lossless" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.118"/>
+  <testcase name="whitespace-only input produces no blocks" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.001"/>
+  <testcase name="a fence with no language is allowed" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.002"/>
+  <testcase name="a blockquote loses its marker" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.004"/>
+  <testcase name="text before a fence stays a separate paragraph" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.002"/>
+  <testcase name="bold and italic are separated" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.031"/>
+  <testcase name="bullet and numbered lists are recognised" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.016"/>
+  <testcase name="two code blocks stay separate" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.003"/>
+  <testcase name="empty input produces no blocks" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.001"/>
+  <testcase name="after the budget trips the remainder renders as one plain run" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.021"/>
+  <testcase name="a long healthy line is not throttled by the scan budget" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.191"/>
+  <testcase name="an empty unterminated fence is still a code block" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.002"/>
+  <testcase name="indentation inside code is preserved exactly" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.002"/>
+  <testcase name="a horizontal rule is not a bullet" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.003"/>
+  <testcase name="empty inline code does not vanish" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.002"/>
+  <testcase name="an unclosed bracket stays literal" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.003"/>
+  <testcase name="a backslash escapes the next character" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.004"/>
+  <testcase name="inline code is captured" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.002"/>
+  <testcase name="an unterminated fence still parses as code" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.004"/>
+  <testcase name="underscore emphasis works but snake_case survives" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.004"/>
+  <testcase name="an unterminated backtick stays literal" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.003"/>
+  <testcase name="a closed fenced block captures language and body" classname="com.crush.mobile.ui.screens.chat.MarkdownParserTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

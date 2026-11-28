@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.repository.SettingsVaultSnapshotTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:46.870Z" hostname="LAPTOP-5US7QL1L" time="1.148">
+  <properties/>
+  <testcase name="the snapshot reports every seeded slot" classname="com.crush.mobile.data.repository.SettingsVaultSnapshotTest" time="0.563"/>
+  <testcase name="an empty vault reports empty without touching the cipher" classname="com.crush.mobile.data.repository.SettingsVaultSnapshotTest" time="0.306"/>
+  <testcase name="the snapshot ignores non-ciphertext prefs entries" classname="com.crush.mobile.data.repository.SettingsVaultSnapshotTest" time="0.27"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

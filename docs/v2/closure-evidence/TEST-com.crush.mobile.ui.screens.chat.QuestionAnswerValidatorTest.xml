@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.QuestionAnswerValidatorTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:52.925Z" hostname="LAPTOP-5US7QL1L" time="0.015">
+  <properties/>
+  <testcase name="a complete well-shaped batch is valid and false yes is preserved" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerValidatorTest" time="0.004"/>
+  <testcase name="answer shape must match the prompt kind" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerValidatorTest" time="0.001"/>
+  <testcase name="duplicate selected ids in a multi choice are rejected" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerValidatorTest" time="0.001"/>
+  <testcase name="missing or duplicate prompt ids are rejected" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerValidatorTest" time="0.002"/>
+  <testcase name="an unexpected prompt id is rejected" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerValidatorTest" time="0.004"/>
+  <testcase name="an unknown prompt cannot be answered" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerValidatorTest" time="0.001"/>
+  <testcase name="a choice id outside its prompt is rejected" classname="com.crush.mobile.ui.screens.chat.QuestionAnswerValidatorTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

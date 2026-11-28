@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.EngineSocketsHostnameTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:16.926Z" hostname="LAPTOP-5US7QL1L" time="0.677">
+  <properties/>
+  <testcase name="okClient for a missing socket file is null" classname="com.crush.mobile.engine.EngineSocketsHostnameTest" time="0.196"/>
+  <testcase name="referencing the object sets the junixsocket hostname property" classname="com.crush.mobile.engine.EngineSocketsHostnameTest" time="0.276"/>
+  <testcase name="probe on missing adapter yields null" classname="com.crush.mobile.engine.EngineSocketsHostnameTest" time="0.204"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

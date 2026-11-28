@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.execution.FoundationClosureTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:53:22.349Z" hostname="LAPTOP-5US7QL1L" time="0.139">
+  <properties/>
+  <testcase name="removal is head only and preserves later evidence" classname="com.crush.mobile.execution.FoundationClosureTest" time="0.005"/>
+  <testcase name="add racing clear cannot resurrect evidence after invalidation" classname="com.crush.mobile.execution.FoundationClosureTest" time="0.093"/>
+  <testcase name="explicit execution id that does not resolve is rejected not run-id fallback" classname="com.crush.mobile.execution.FoundationClosureTest" time="0.0"/>
+  <testcase name="unavailable persistence keeps evidence pending and applies once on retry" classname="com.crush.mobile.execution.FoundationClosureTest" time="0.04"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

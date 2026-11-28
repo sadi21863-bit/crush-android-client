@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.CrushConnectionWorkspaceSwitchTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:48.839Z" hostname="LAPTOP-5US7QL1L" time="0.116">
+  <properties/>
+  <testcase name="reattaching the SAME workspace does not churn the reader" classname="com.crush.mobile.data.crush.CrushConnectionWorkspaceSwitchTest" time="0.027"/>
+  <testcase name="a change of client id on the same workspace still replaces the reader" classname="com.crush.mobile.data.crush.CrushConnectionWorkspaceSwitchTest" time="0.01"/>
+  <testcase name="the old socket is closed rather than left blocking" classname="com.crush.mobile.data.crush.CrushConnectionWorkspaceSwitchTest" time="0.047"/>
+  <testcase name="a 404 shutdown clears the reader so the SAME identity can reconnect" classname="com.crush.mobile.data.crush.CrushConnectionWorkspaceSwitchTest" time="0.02"/>
+  <testcase name="switching workspace replaces the reader rather than reusing it" classname="com.crush.mobile.data.crush.CrushConnectionWorkspaceSwitchTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

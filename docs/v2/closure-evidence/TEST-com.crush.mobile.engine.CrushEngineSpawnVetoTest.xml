@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.CrushEngineSpawnVetoTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:11.594Z" hostname="LAPTOP-5US7QL1L" time="0.009">
+  <properties/>
+  <testcase name="a throwing checkbox fails closed to a veto" classname="com.crush.mobile.engine.CrushEngineSpawnVetoTest" time="0.002"/>
+  <testcase name="the veto is a plain negation of the checkbox" classname="com.crush.mobile.engine.CrushEngineSpawnVetoTest" time="0.003"/>
+  <testcase name="a veto verdict is never cached - every birth section re-consults" classname="com.crush.mobile.engine.CrushEngineSpawnVetoTest" time="0.002"/>
+  <testcase name="the gate evaluates the checkbox lazily and exactly once" classname="com.crush.mobile.engine.CrushEngineSpawnVetoTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

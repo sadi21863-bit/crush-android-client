@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.PidConversionTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:20.602Z" hostname="LAPTOP-5US7QL1L" time="0.005">
+  <properties/>
+  <testcase name="a Long pid converts correctly" classname="com.crush.mobile.engine.PidConversionTest" time="0.001"/>
+  <testcase name="a value beyond Int range yields -1 instead of truncating" classname="com.crush.mobile.engine.PidConversionTest" time="0.0"/>
+  <testcase name="a non-numeric type yields -1" classname="com.crush.mobile.engine.PidConversionTest" time="0.0"/>
+  <testcase name="null yields -1 rather than throwing" classname="com.crush.mobile.engine.PidConversionTest" time="0.001"/>
+  <testcase name="zero and negatives yield -1" classname="com.crush.mobile.engine.PidConversionTest" time="0.0"/>
+  <testcase name="a realistic Android pid converts" classname="com.crush.mobile.engine.PidConversionTest" time="0.0"/>
+  <testcase name="an Int pid still converts" classname="com.crush.mobile.engine.PidConversionTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

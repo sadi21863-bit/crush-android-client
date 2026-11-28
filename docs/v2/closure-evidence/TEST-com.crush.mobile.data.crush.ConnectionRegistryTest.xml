@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.ConnectionRegistryTest" tests="26" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:45:47.828Z" hostname="LAPTOP-5US7QL1L" time="0.175">
+  <properties/>
+  <testcase name="an older epoch attach cannot evict the newer live reader" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.033"/>
+  <testcase name="revoke stops the current registration and a second revoke is a no-op" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.004"/>
+  <testcase name="a stale callback after revokeIfOwn returns false" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.002"/>
+  <testcase name="an old callback after replacement sees supersession with values only" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.007"/>
+  <testcase name="a deferred flush must not kill a newer VM's live registration" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.007"/>
+  <testcase name="two connection objects under one key are separated by owner epoch" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.003"/>
+  <testcase name="a newer owner revoked before the old callback is not permanent supersession" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.005"/>
+  <testcase name="two deferred stops for one key both complete at the run's end" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.013"/>
+  <testcase name="an abandoned observer with no newer owner is NOT scooped" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.005"/>
+  <testcase name="a stale epoch scooped by a newer one retires on its next touch" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.002"/>
+  <testcase name="no per-connection history remains after normal revoke" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.002"/>
+  <testcase name="a VM replacing its own connection is not a supersession" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.003"/>
+  <testcase name="the deferral rule mirrors the engine-stop guard byte-for-byte" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.001"/>
+  <testcase name="rebinding while a run is in flight keeps the old epoch superseded until flush" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.004"/>
+  <testcase name="revoking while the old router is alive does not scoop" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.003"/>
+  <testcase name="a delayed callback with no connection reference still resolves supersession" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.005"/>
+  <testcase name="identity is key plus epoch, not connection object equality" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.004"/>
+  <testcase name="an unknown key is not superseded" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.002"/>
+  <testcase name="revokeIfOwn for an unregistered key is a no-op" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.004"/>
+  <testcase name="concurrent attach and revoke leave at most one live owner" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.034"/>
+  <testcase name="the legacy empty key is superseded the same way" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.003"/>
+  <testcase name="attach supersedes the previous registration and stops its connection" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.002"/>
+  <testcase name="a deferred revocation pins the stop until the run's end flush runs it" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.004"/>
+  <testcase name="same key same epoch rebuild is not superseded" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.004"/>
+  <testcase name="revoke only acts on the key it was asked about" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.002"/>
+  <testcase name="revokeIfOwn only ever stops the caller's own registration" classname="com.crush.mobile.data.crush.ConnectionRegistryTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

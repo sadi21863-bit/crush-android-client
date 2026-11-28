@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.project.FolderUriDecoderTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:53:22.514Z" hostname="LAPTOP-5US7QL1L" time="0.041">
+  <properties/>
+  <testcase name="null and foreign shapes are refused" classname="com.crush.mobile.project.FolderUriDecoderTest" time="0.028"/>
+  <testcase name="the volume root is not an importable project" classname="com.crush.mobile.project.FolderUriDecoderTest" time="0.001"/>
+  <testcase name="folder with a space decodes verbatim" classname="com.crush.mobile.project.FolderUriDecoderTest" time="0.001"/>
+  <testcase name="nested path keeps its slashes" classname="com.crush.mobile.project.FolderUriDecoderTest" time="0.003"/>
+  <testcase name="display name is the last segment" classname="com.crush.mobile.project.FolderUriDecoderTest" time="0.001"/>
+  <testcase name="the primary root itself maps to the volume root" classname="com.crush.mobile.project.FolderUriDecoderTest" time="0.001"/>
+  <testcase name="non-primary volumes are refused" classname="com.crush.mobile.project.FolderUriDecoderTest" time="0.001"/>
+  <testcase name="traversal is refused outright" classname="com.crush.mobile.project.FolderUriDecoderTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

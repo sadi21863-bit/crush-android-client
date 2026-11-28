@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:12.499Z" hostname="LAPTOP-5US7QL1L" time="0.458">
+  <properties/>
+  <testcase name="a tool result carries the call id, failure flag and engine duration" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.005"/>
+  <testcase name="a finish-error assistant turn is kept and carries the error" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.388"/>
+  <testcase name="malformed or missing tool_result metadata yields no invented duration" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.002"/>
+  <testcase name="a parts-less user row is not replayed" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.001"/>
+  <testcase name="unknown parts survive replay as text" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.004"/>
+  <testcase name="off mode drops reasoning on replay" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.004"/>
+  <testcase name="a sub-agent report user row survives replay" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.009"/>
+  <testcase name="tool-only assistant rows are kept" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.02"/>
+  <testcase name="an empty-parts assistant turn is not fabricated into history" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.0"/>
+  <testcase name="reasoning survives replay on an assistant row" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.003"/>
+  <testcase name="normal user and assistant rows still replay" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.001"/>
+  <testcase name="an inverted start and end time yields no duration" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.002"/>
+  <testcase name="a failed sub-agent report keeps its failed flag and no model" classname="com.crush.mobile.ui.screens.chat.ChatHistoryReplayTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

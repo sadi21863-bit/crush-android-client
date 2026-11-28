@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.HandoffEntryChipTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:51.111Z" hostname="LAPTOP-5US7QL1L" time="0.03">
+  <properties/>
+  <testcase name="streaming, failed and empty rows are never eligible - the completed-only gate" classname="com.crush.mobile.ui.screens.chat.HandoffEntryChipTest" time="0.005"/>
+  <testcase name="the dispatch session title is the plan's Handoff HHmmss shape" classname="com.crush.mobile.ui.screens.chat.HandoffEntryChipTest" time="0.005"/>
+  <testcase name="the provider stamp prefers the model the chat ran on and falls back to the provider" classname="com.crush.mobile.ui.screens.chat.HandoffEntryChipTest" time="0.0"/>
+  <testcase name="the dispatch note is the transcript's own system line naming the project" classname="com.crush.mobile.ui.screens.chat.HandoffEntryChipTest" time="0.002"/>
+  <testcase name="the entry chip's gate is the Copy-gate's conjunction on a completed assistant row" classname="com.crush.mobile.ui.screens.chat.HandoffEntryChipTest" time="0.003"/>
+  <testcase name="the provenance stamp is dated-paper shape and refuses an absent clock" classname="com.crush.mobile.ui.screens.chat.HandoffEntryChipTest" time="0.002"/>
+  <testcase name="a system note row matches the conjunction - and stays structurally unreachable" classname="com.crush.mobile.ui.screens.chat.HandoffEntryChipTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

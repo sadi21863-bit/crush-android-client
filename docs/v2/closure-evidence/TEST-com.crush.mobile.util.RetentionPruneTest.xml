@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.util.RetentionPruneTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:59:18.077Z" hostname="LAPTOP-5US7QL1L" time="0.128">
+  <properties/>
+  <testcase name="a missing directory is not a crash" classname="com.crush.mobile.util.RetentionPruneTest" time="0.011"/>
+  <testcase name="an archive exactly at the boundary is kept" classname="com.crush.mobile.util.RetentionPruneTest" time="0.018"/>
+  <testcase name="archive names sort chronologically because they are date-stamped" classname="com.crush.mobile.util.RetentionPruneTest" time="0.011"/>
+  <testcase name="archives past the retention window are deleted" classname="com.crush.mobile.util.RetentionPruneTest" time="0.038"/>
+  <testcase name="the size cap evicts the oldest first" classname="com.crush.mobile.util.RetentionPruneTest" time="0.034"/>
+  <testcase name="files that are not dated archives are never touched" classname="com.crush.mobile.util.RetentionPruneTest" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

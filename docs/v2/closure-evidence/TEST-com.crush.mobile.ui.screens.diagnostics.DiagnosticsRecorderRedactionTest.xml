@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.diagnostics.DiagnosticsRecorderRedactionTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:58:30.107Z" hostname="LAPTOP-5US7QL1L" time="0.351">
+  <properties/>
+  <testcase name="a provider shaped secret in a throwable is masked in the archive" classname="com.crush.mobile.ui.screens.diagnostics.DiagnosticsRecorderRedactionTest" time="0.317"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

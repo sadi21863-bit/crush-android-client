@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.BootstrapOrderTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:45:46.407Z" hostname="LAPTOP-5US7QL1L" time="1.402">
+  <properties/>
+  <testcase name="reattach re-applies the SAME permission wire family (the live v0 100 404)" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.618"/>
+  <testcase name="retired model failure is surfaced in notes" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.134"/>
+  <testcase name="bootstrap sets key and model BEFORE the final agent init" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.088"/>
+  <testcase name="a failing init is recorded even when the agent reports ready" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.087"/>
+  <testcase name="NAME=value key is stripped before it hits the wire" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.142"/>
+  <testcase name="both large and small model slots are set" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.083"/>
+  <testcase name="reattach keeps the v0_99 skip family when opened with it" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.058"/>
+  <testcase name="provider key failure is reported but bootstrap still continues" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.098"/>
+  <testcase name="api key is sent as a quoted string never a byte array" classname="com.crush.mobile.data.crush.BootstrapOrderTest" time="0.089"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

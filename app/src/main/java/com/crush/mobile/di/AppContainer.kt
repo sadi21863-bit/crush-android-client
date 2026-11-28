@@ -153,6 +153,9 @@ class AppContainer(context: Context) {
     /** Bounded deferral for confirmed frames that beat the durable ack. */
     val confirmedEventBuffer: ConfirmedEventBuffer = ConfirmedEventBuffer()
 
+    /** Keys with a scheduled retry, so concurrent callbacks cannot pile up loops. */
+    private val scheduledReplays = java.util.concurrent.ConcurrentHashMap.newKeySet<Pair<String, String>>()
+
     /**
      * Replay deferred confirmed frames once ACKED is durable. A 0-row result
      * still means "not proven" and is left for reconciliation; ACKED is never
@@ -205,12 +208,48 @@ class AppContainer(context: Context) {
                             "replay unavailable for run=$runId; evidence kept pending: " +
                                 "${outcome.cause.message}",
                         )
+                        scheduleReplay(instanceKey, runId)
                         stop = true
                         break
                     }
                 }
             }
             if (stop) return
+        }
+    }
+
+    /**
+     * A real retry trigger for evidence still pending after ACK: bounded,
+     * delayed attempts, then explicit invalidation. The event is never
+     * discarded while an attempt remains, and no durable UNKNOWN is claimed
+     * when the database itself is unavailable.
+     */
+    private fun scheduleReplay(instanceKey: String, runId: String) {
+        val key = instanceKey to runId
+        if (!scheduledReplays.add(key)) return
+        containerScope.launch {
+            try {
+                for (attempt in 0..REPLAY_MAX_SCHEDULED_RETRIES) {
+                    if (attempt > 0) kotlinx.coroutines.delay(REPLAY_RETRY_DELAY_MS)
+                    replayConfirmedAfterAck(instanceKey, runId)
+                    if (confirmedEventBuffer.pendingCount(instanceKey, runId) == 0) {
+                        return@launch
+                    }
+                }
+                val pending = confirmedEventBuffer.peek(instanceKey, runId).firstOrNull()
+                if (pending != null) {
+                    invalidatePendingEvidence(
+                        instanceKey,
+                        runId,
+                        pending,
+                        ConfirmedApply.Unavailable(
+                            IllegalStateException("replay retries exhausted"),
+                        ),
+                    )
+                }
+            } finally {
+                scheduledReplays.remove(key)
+            }
         }
     }
 
@@ -480,6 +519,9 @@ class AppContainer(context: Context) {
                             ConfirmedApply.AlreadyApplied, ConfirmedApply.NotApplicable -> Unit
                             ConfirmedApply.Deferred, is ConfirmedApply.Unavailable -> {
                                 val kept = confirmedEventBuffer.add(key, runId, event)
+                                if (outcome is ConfirmedApply.Unavailable && kept) {
+                                    scheduleReplay(key, runId)
+                                }
                                 if (!kept) {
                                     val executionId = event.executionId
                                     if (executionId != null && executionId.isNotBlank()) {
@@ -686,6 +728,8 @@ class AppContainer(context: Context) {
      */
     companion object {
         private const val REPLAY_MAX_ATTEMPTS = 3
+        private const val REPLAY_MAX_SCHEDULED_RETRIES = 3
+        private const val REPLAY_RETRY_DELAY_MS = 2_000L
 
         const val TOKEN_LEGACY = "legacy"
         const val TOKEN_CHAT = "chat"
@@ -1031,6 +1075,11 @@ class AppContainer(context: Context) {
                         "lost=${summary.lost} completed=${summary.completed} " +
                         "failed=${summary.failed} deferred=${summary.deferred}",
                 )
+                // Startup re-drive: anything still pending from a previous
+                // process gets a bounded retry; nothing is silently dropped.
+                confirmedEventBuffer.pendingKeys().forEach { k ->
+                    scheduleReplay(k.instanceKey, k.runId)
+                }
             }.onFailure { t ->
                 com.crush.mobile.util.AppLog.w("A2", "reconcile failed: ${t.message}")
             }

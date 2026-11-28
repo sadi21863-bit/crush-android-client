@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.file.ProjectTreeFingerprintTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:05.829Z" hostname="LAPTOP-5US7QL1L" time="0.348">
+  <properties/>
+  <testcase name="a zero-byte file never looks like the unreadable marker" classname="com.crush.mobile.domain.file.ProjectTreeFingerprintTest" time="0.006"/>
+  <testcase name="same tree twice is the same digest" classname="com.crush.mobile.domain.file.ProjectTreeFingerprintTest" time="0.131"/>
+  <testcase name="empty tree is stable - and a real state, not an error" classname="com.crush.mobile.domain.file.ProjectTreeFingerprintTest" time="0.084"/>
+  <testcase name="noise dirs skip and the trust-relevant files stay counted" classname="com.crush.mobile.domain.file.ProjectTreeFingerprintTest" time="0.045"/>
+  <testcase name="rewrite rename and mtime drift flip the digest" classname="com.crush.mobile.domain.file.ProjectTreeFingerprintTest" time="0.039"/>
+  <testcase name="a missing or non-directory root is a deterministic empty digest" classname="com.crush.mobile.domain.file.ProjectTreeFingerprintTest" time="0.012"/>
+  <testcase name="unreadable file and dir take deterministic marker rows" classname="com.crush.mobile.domain.file.ProjectTreeFingerprintTest" time="0.03"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

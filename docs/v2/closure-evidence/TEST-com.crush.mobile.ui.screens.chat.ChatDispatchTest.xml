@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatDispatchTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:11.653Z" hostname="LAPTOP-5US7QL1L" time="0.419">
+  <properties/>
+  <testcase name="ViewModel-owned actions have no host effect and no permission decision" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.068"/>
+  <testcase name="the 35-row interaction ledger is complete and every row is owned" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.319"/>
+  <testcase name="a disabled composer dispatches nothing and starts nothing" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.002"/>
+  <testcase name="StartEngine is ViewModel-owned and never a permission decision" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.006"/>
+  <testcase name="the review action returns its explicit destination" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.0"/>
+  <testcase name="handoff and trust actions return explicit host effects" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.0"/>
+  <testcase name="prewarm on dispatches without a redundant start" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.001"/>
+  <testcase name="the three permission actions map to exactly three decisions" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.0"/>
+  <testcase name="prewarm off starts the engine once and dispatches once" classname="com.crush.mobile.ui.screens.chat.ChatDispatchTest" time="0.016"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

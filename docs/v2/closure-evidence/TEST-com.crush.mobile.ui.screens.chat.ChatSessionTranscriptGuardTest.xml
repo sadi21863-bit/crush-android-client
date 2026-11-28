@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatSessionTranscriptGuardTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:19.247Z" hostname="LAPTOP-5US7QL1L" time="0.0">
+  <properties/>
+  <testcase name="same session with no run in flight contributes nothing - engine history is the truth" classname="com.crush.mobile.ui.screens.chat.ChatSessionTranscriptGuardTest" time="0.0"/>
+  <testcase name="switching to a different session carries over nothing of the old chat" classname="com.crush.mobile.ui.screens.chat.ChatSessionTranscriptGuardTest" time="0.0"/>
+  <testcase name="opening a chat with no session previously on screen carries over nothing" classname="com.crush.mobile.ui.screens.chat.ChatSessionTranscriptGuardTest" time="0.0"/>
+  <testcase name="the same-session reopen during a live run keeps the in-flight rows - the R1 case" classname="com.crush.mobile.ui.screens.chat.ChatSessionTranscriptGuardTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

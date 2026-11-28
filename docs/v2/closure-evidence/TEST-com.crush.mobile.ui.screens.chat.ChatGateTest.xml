@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatGateTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:12.190Z" hostname="LAPTOP-5US7QL1L" time="0.232">
+  <properties/>
+  <testcase name="recoverable keeps sending armed when the engine is not ready" classname="com.crush.mobile.ui.screens.chat.ChatGateTest" time="0.2"/>
+  <testcase name="IME submit requires both gates" classname="com.crush.mobile.ui.screens.chat.ChatGateTest" time="0.0"/>
+  <testcase name="a prewarm-off cold start is typeable but not sendable" classname="com.crush.mobile.ui.screens.chat.ChatGateTest" time="0.001"/>
+  <testcase name="streaming disables typing and sending regardless of readiness" classname="com.crush.mobile.ui.screens.chat.ChatGateTest" time="0.0"/>
+  <testcase name="whitespace is not sendable" classname="com.crush.mobile.ui.screens.chat.ChatGateTest" time="0.001"/>
+  <testcase name="a pending permission or question does not disable the composer" classname="com.crush.mobile.ui.screens.chat.ChatGateTest" time="0.003"/>
+  <testcase name="the eight composer rows are exact" classname="com.crush.mobile.ui.screens.chat.ChatGateTest" time="0.026"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.TrackedFilesTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:51.706Z" hostname="LAPTOP-5US7QL1L" time="0.519">
+  <properties/>
+  <testcase name="malformed JSON is empty rather than an exception" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.042"/>
+  <testcase name="an empty body is empty rather than an exception" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.067"/>
+  <testcase name="an empty array is empty, not a crash" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.043"/>
+  <testcase name="a 500 is empty rather than an exception" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.026"/>
+  <testcase name="an object where an array was expected is empty" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.088"/>
+  <testcase name="a non-string element is skipped, not coerced" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.058"/>
+  <testcase name="nulls in the array are dropped rather than crashing" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.016"/>
+  <testcase name="the request targets the confirmed path" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.046"/>
+  <testcase name="a 404 is empty rather than an exception" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.036"/>
+  <testcase name="a list of paths is returned" classname="com.crush.mobile.data.crush.TrackedFilesTest" time="0.094"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

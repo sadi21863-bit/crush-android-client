@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.WorkspaceLeaseTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:52.250Z" hostname="LAPTOP-5US7QL1L" time="0.014">
+  <properties/>
+  <testcase name="unknown attach time reattaches" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.002"/>
+  <testcase name="fresh just inside the window" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.0"/>
+  <testcase name="zero window always reattaches" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.001"/>
+  <testcase name="workspace-not-found is matched case-insensitively" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.0"/>
+  <testcase name="other errors are not mislabelled as a workspace problem" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.001"/>
+  <testcase name="an id minted by the CURRENT engine run is the only trustworthy one" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.003"/>
+  <testcase name="unknown minting generation fails closed" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.001"/>
+  <testcase name="backwards clock reattaches" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.001"/>
+  <testcase name="just attached is fresh" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.0"/>
+  <testcase name="workspace-gone gets a human explanation" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.001"/>
+  <testcase name="a restart moves the generation monotonically" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.0"/>
+  <testcase name="an id minted by the PREVIOUS engine run is dead on arrival even if fresh" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.0"/>
+  <testcase name="window is shorter than the reap so a fresh id cannot expire mid-send" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.001"/>
+  <testcase name="stale past the measured reap boundary" classname="com.crush.mobile.data.crush.WorkspaceLeaseTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:08.238Z" hostname="LAPTOP-5US7QL1L" time="0.059">
+  <properties/>
+  <testcase name="a plain code walk-through summary is not flagged" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.051"/>
+  <testcase name="sealing requires the source chat id and carries the draft into the package" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <testcase name="blocked verdicts name the pattern and never echo the secret" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.003"/>
+  <testcase name="errors, streaming and empty last assistant turns degrade to the empty editable draft" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.001"/>
+  <testcase name="long hex runs are caught by the catch-all" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <testcase name="prefill carries the source chat provenance in both shapes of the open" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.001"/>
+  <testcase name="prefill takes the last completed assistant message's text as the summary" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <testcase name="references are gated with the same net" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <testcase name="vendor api key literals are blocked" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <testcase name="a standalone jwt is blocked" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.001"/>
+  <testcase name="an empty draft is green" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <testcase name="a pasted private key block is blocked" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <testcase name="non-assistant rows are ignored as candidates" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <testcase name="a bearer credential run is blocked" classname="com.crush.mobile.domain.handoff.HandoffPackageDraftTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

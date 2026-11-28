@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.EngineRuntimeLifecycleTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:15.926Z" hostname="LAPTOP-5US7QL1L" time="0.975">
+  <properties/>
+  <testcase name="a stopped supervisor has no active loop or child" classname="com.crush.mobile.engine.EngineRuntimeLifecycleTest" time="0.956"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+I/EngineSupervisor: [p-v2-15-runtime] stop() requested
+D/EngineProxy: bridge stop
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

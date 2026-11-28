@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.projects.ProjectsContentTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:58:44.938Z" hostname="LAPTOP-5US7QL1L" time="12.735">
+  <properties/>
+  <testcase name="a busy screen disables import" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.765"/>
+  <testcase name="an empty registry explains what the list is for" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.342"/>
+  <testcase name="the latest measured turn is shown in the row and home" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="2.977"/>
+  <testcase name="loading renders the progress copy" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.356"/>
+  <testcase name="the legacy workspace is not listed among Code projects" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.687"/>
+  <testcase name="a trusted project says its configuration is approved" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.322"/>
+  <testcase name="an internal project names the workspace folder it deletes" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.487"/>
+  <testcase name="registry and import errors are both surfaced" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.33"/>
+  <testcase name="the trust dialog renders the shared copy and confirms once" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.952"/>
+  <testcase name="an imported row remove is confirmed named and cancel-safe" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.794"/>
+  <testcase name="the active project is marked current by check word and semantics" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.334"/>
+  <testcase name="busy disables the removal confirm" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="1.347"/>
+  <testcase name="populated rows carry label path identity and trust" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.522"/>
+  <testcase name="import dispatches its host callback and a top-level screen has no back control" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="0.749"/>
+  <testcase name="a project row opens a home with identity and both Code actions" classname="com.crush.mobile.ui.screens.projects.ProjectsContentTest" time="1.713"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@51ba8d8a in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@51ba8d8a in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@51ba8d8a
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@51ba8d8a in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@51ba8d8a
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@51ba8d8a in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@51ba8d8a
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@51ba8d8a in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@51ba8d8a
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@51ba8d8a in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@51ba8d8a
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@51ba8d8a in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@7087b881
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5df212ed in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5df212ed in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@5df212ed
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5df212ed in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@5df212ed
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5df212ed in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@5df212ed
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5df212ed in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@5df212ed
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5df212ed in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@5df212ed
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5df212ed in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@21bf7f0b
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@7b955705 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@7b955705 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@7b955705
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@7b955705 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@7b955705
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@7b955705 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@7b955705
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@7b955705 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@7b955705
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@7b955705 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@7b955705
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@bfe7cc4
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@70281ae6
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@7b955705 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@315edc0a
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5ab1aeb3 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5ab1aeb3 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@5ab1aeb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5ab1aeb3 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@5ab1aeb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5ab1aeb3 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@5ab1aeb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5ab1aeb3 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@5ab1aeb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5ab1aeb3 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@5ab1aeb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@5ab1aeb3 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@31c44f30
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3cb35210 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3cb35210 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@3cb35210
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3cb35210 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@3cb35210
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3cb35210 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@3cb35210
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3cb35210 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@3cb35210
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3cb35210 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@3cb35210
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3cb35210 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@5df83e71
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@45d9f678 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@45d9f678 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@45d9f678
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@45d9f678 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@45d9f678
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@45d9f678 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@45d9f678
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@45d9f678 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@45d9f678
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@45d9f678 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@45d9f678
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@45d9f678 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@3a133b4b
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@245b18c9 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@245b18c9 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@245b18c9
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@245b18c9 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@245b18c9
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@245b18c9 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@245b18c9
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@245b18c9 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@245b18c9
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@245b18c9 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@245b18c9
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@632ae124
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@245b18c9 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@19c800d5
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@947a0ce in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@947a0ce in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@947a0ce
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@947a0ce in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@947a0ce
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@947a0ce in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@947a0ce
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@947a0ce in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@947a0ce
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@947a0ce in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@947a0ce
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@947a0ce in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@7a40b15e
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d03dfd2 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d03dfd2 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@d03dfd2
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d03dfd2 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@d03dfd2
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d03dfd2 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@d03dfd2
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d03dfd2 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@d03dfd2
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d03dfd2 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@d03dfd2
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@7ab0eb40
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d03dfd2 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@3faa048e
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@2f48e1af in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@2f48e1af in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@2f48e1af
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@2f48e1af in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@2f48e1af
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@2f48e1af in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@2f48e1af
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@2c10f496
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@34a65d3b
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@2f48e1af in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@2f48e1af
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@2f48e1af in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@2f48e1af
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@2f48e1af in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@5b5bbf78
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@62e337ab in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@62e337ab in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@62e337ab
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@62e337ab in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@62e337ab
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@62e337ab in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@62e337ab
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@62e337ab in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@62e337ab
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@62e337ab in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@62e337ab
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@62e337ab in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@50d7212
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@73c8a2df in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@73c8a2df in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@73c8a2df
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@73c8a2df in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@73c8a2df
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@73c8a2df in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@73c8a2df
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@73c8a2df in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@73c8a2df
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@73c8a2df in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@73c8a2df
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@365df183
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@73c8a2df in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@7cb81f1c
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@67c9fb3 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@67c9fb3 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@67c9fb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@67c9fb3 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@67c9fb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@67c9fb3 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@67c9fb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@67c9fb3 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@67c9fb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@67c9fb3 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@67c9fb3
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@67c9fb3 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@1bc4954e
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@66dc6096 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@66dc6096 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@66dc6096
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@66dc6096 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@66dc6096
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@66dc6096 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@66dc6096
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@66dc6096 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@66dc6096
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@66dc6096 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@66dc6096
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@66dc6096 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@5087dde9
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@1d838354 in: PRE_ON_CREATE
+V/ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@1d838354 in: CREATED
+V/ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@1d838354
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@1d838354 in: STARTED
+V/ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@1d838354
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@1d838354 in: RESUMED
+V/ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@1d838354
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@6d1da79d
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@53d2cbf0
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+W/WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@5aa61d06
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@5b43e4b5
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@1d838354 in: PAUSED
+V/ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@1d838354
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@1d838354 in: STOPPED
+V/ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@1d838354
+D/LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@1d838354 in: DESTROYED
+V/ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+W/WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$Lambda/0x0000000009baf4a0@21635d8e
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

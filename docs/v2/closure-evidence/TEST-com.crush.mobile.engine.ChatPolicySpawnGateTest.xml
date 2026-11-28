@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.ChatPolicySpawnGateTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:26.711Z" hostname="LAPTOP-5US7QL1L" time="0.378">
+  <properties/>
+  <testcase name="a real missing-file install flows to proceed with the readback verified" classname="com.crush.mobile.engine.ChatPolicySpawnGateTest" time="0.275"/>
+  <testcase name="a real malformed file flows to a fail-fast spawn block" classname="com.crush.mobile.engine.ChatPolicySpawnGateTest" time="0.084"/>
+  <testcase name="a policy failure blocks the spawn and surfaces the reason verbatim" classname="com.crush.mobile.engine.ChatPolicySpawnGateTest" time="0.004"/>
+  <testcase name="an already-verified policy lets the chat pool proceed" classname="com.crush.mobile.engine.ChatPolicySpawnGateTest" time="0.007"/>
+  <testcase name="an installed policy lets the chat pool proceed" classname="com.crush.mobile.engine.ChatPolicySpawnGateTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

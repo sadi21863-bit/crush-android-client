@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.LaunchRouteStateTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:53:22.602Z" hostname="LAPTOP-5US7QL1L" time="0.009">
+  <properties/>
+  <testcase name="the first decision is pinned even when the vault changes" classname="com.crush.mobile.ui.LaunchRouteStateTest" time="0.003"/>
+  <testcase name="a cold start without a key pins onboarding and stays there" classname="com.crush.mobile.ui.LaunchRouteStateTest" time="0.001"/>
+  <testcase name="a failed probe does not pin a decision" classname="com.crush.mobile.ui.LaunchRouteStateTest" time="0.001"/>
+  <testcase name="the vault is consulted exactly once" classname="com.crush.mobile.ui.LaunchRouteStateTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

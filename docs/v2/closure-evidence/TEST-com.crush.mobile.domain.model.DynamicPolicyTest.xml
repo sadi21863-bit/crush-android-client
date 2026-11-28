@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.model.DynamicPolicyTest" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:08.442Z" hostname="LAPTOP-5US7QL1L" time="0.035">
+  <properties/>
+  <testcase name="de-escalation waits for consecutive calm samples" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.021"/>
+  <testcase name="moderate thermal is elevated" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.002"/>
+  <testcase name="low memory still works when the os reports it" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="healthy phone reads OK" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="shedding resumes once work stops" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.008"/>
+  <testcase name="severe thermal is critical" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="critical level cuts idle timeout and disables prewarm" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.001"/>
+  <testcase name="user override of prewarm survives pressure" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="power saver alone is elevated" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="active work suppresses shedding entirely" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="idle timeout stays above the safe floor" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.001"/>
+  <testcase name="user override of idle timeout survives pressure" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="unknown total ram never reads as pressure" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="OK level leaves the resolved policy untouched" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="os low memory verdict is critical" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="escalation is immediate" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="free memory alone never invents pressure" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.001"/>
+  <testcase name="escalating mid-calm-run resets the optimism" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="hang grace is never reduced under pressure" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <testcase name="unknown thermal does not invent pressure" classname="com.crush.mobile.domain.model.DynamicPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

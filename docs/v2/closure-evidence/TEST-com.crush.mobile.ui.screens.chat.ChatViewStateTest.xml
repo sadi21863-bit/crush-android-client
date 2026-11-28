@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatViewStateTest" tests="26" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:48.365Z" hostname="LAPTOP-5US7QL1L" time="1.214">
+  <properties/>
+  <testcase name="projection is deterministic for equal inputs" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.413"/>
+  <testcase name="a question view carries its title and drops the raw payload" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.085"/>
+  <testcase name="the catalogue loading fact is projected" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.001"/>
+  <testcase name="a failed engine keeps its reason in the header" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.137"/>
+  <testcase name="a confirmed cancellation is never rendered as successful completion" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.031"/>
+  <testcase name="the empty state reports a settled failure and a recoverable agent" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.003"/>
+  <testcase name="an absent selected model keeps its id and is not an error" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.001"/>
+  <testcase name="the empty state never calls a prewarm-off cold start broken" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.002"/>
+  <testcase name="the projection is total over empty and missing inputs" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.004"/>
+  <testcase name="recovered outcomes reach the presentation state" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.001"/>
+  <testcase name="the header status is derived from readiness, not the stale phase" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.001"/>
+  <testcase name="handoff resume state and destinations survive projection" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.006"/>
+  <testcase name="a present selected model uses the catalogue name and image fact" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.001"/>
+  <testcase name="start is hidden on the seed and on a confirmed Running sample for this instance" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.001"/>
+  <testcase name="recovered outcomes are honestly labelled and never claimed active" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.001"/>
+  <testcase name="a parsed question batch survives projection while the raw payload is dropped" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.007"/>
+  <testcase name="a ready chat pool empty state says tools are off" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.0"/>
+  <testcase name="null file changes are not rendered as zero changes" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.075"/>
+  <testcase name="session label follows the active title then falls back honestly" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.018"/>
+  <testcase name="a named start refusal is projected verbatim" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.002"/>
+  <testcase name="start is offered for every non-Running state of the bound instance" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.018"/>
+  <testcase name="the session list projects the unavailable query state" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.003"/>
+  <testcase name="project identity stays in the header on a populated Code chat" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.007"/>
+  <testcase name="a chat pool binding keeps its no-tools hint with the status" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.002"/>
+  <testcase name="the projection source imports no Android or forbidden packages" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.336"/>
+  <testcase name="a key mismatch biases toward offering the start lever" classname="com.crush.mobile.ui.screens.chat.ChatViewStateTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

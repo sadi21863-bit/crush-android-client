@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.EngineCompatibilityTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:11.826Z" hostname="LAPTOP-5US7QL1L" time="0.058">
+  <properties/>
+  <testcase name="x86_64 emulator is refused with the arch named" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.02"/>
+  <testcase name="most modern phones report several abis and still pass" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.018"/>
+  <testcase name="missing engine binary is refused even on 64-bit" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.001"/>
+  <testcase name="64-bit device with the engine bundled is supported" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.001"/>
+  <testcase name="32-bit only device is refused with a human explanation" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.001"/>
+  <testcase name="empty abi list is refused not crashed on" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.002"/>
+  <testcase name="every reported arch produces a non-empty reason when refused" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.002"/>
+  <testcase name="strongbox note reflects real hardware" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.006"/>
+  <testcase name="legacy tier note is honest about api 29" classname="com.crush.mobile.engine.EngineCompatibilityTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

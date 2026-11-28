@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.handoff.FirstTurnTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:51:08.188Z" hostname="LAPTOP-5US7QL1L" time="0.024">
+  <properties/>
+  <testcase name="a real digest renders in the provenance line" classname="com.crush.mobile.domain.handoff.FirstTurnTest" time="0.009"/>
+  <testcase name="a null fingerprint and missing provenance render the documented forms" classname="com.crush.mobile.domain.handoff.FirstTurnTest" time="0.004"/>
+  <testcase name="no selected references renders the none wording" classname="com.crush.mobile.domain.handoff.FirstTurnTest" time="0.002"/>
+  <testcase name="placeholder-shaped user content passes through verbatim" classname="com.crush.mobile.domain.handoff.FirstTurnTest" time="0.003"/>
+  <testcase name="the first turn carries provenance, summary, references and the verify-first rules exactly once" classname="com.crush.mobile.domain.handoff.FirstTurnTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

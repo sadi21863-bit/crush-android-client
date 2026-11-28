@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.crush.EngineConfigInjectorTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:46:50.752Z" hostname="LAPTOP-5US7QL1L" time="0.748">
+  <properties/>
+  <testcase name="a malformed file is left alone, not truncated" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.016"/>
+  <testcase name="unknown provider gets no override" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.004"/>
+  <testcase name="a write during the engine's live window is refused and the file is untouched" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.019"/>
+  <testcase name="second identical call changes nothing" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.054"/>
+  <testcase name="creates the file with the full ordered list when none exists" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.306"/>
+  <testcase name="effort level display labels match catwalk v3 derivation" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.018"/>
+  <testcase name="allam's 4096 completion cap is encoded, not the 8192 default" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.004"/>
+  <testcase name="a non-reasoning injected model says so explicitly in both schemas" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.021"/>
+  <testcase name="empty override list touches nothing" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.007"/>
+  <testcase name="injected specs use the engine v0_100 nested capabilities and reasoning schema" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.017"/>
+  <testcase name="injected models claim NO cost - zero must never be written as a free claim" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.153"/>
+  <testcase name="preserves the provider key and unrelated providers when merging" classname="com.crush.mobile.data.crush.EngineConfigInjectorTest" time="0.101"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

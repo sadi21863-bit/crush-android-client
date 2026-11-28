@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.domain.file.FileReverterTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:57.199Z" hostname="LAPTOP-5US7QL1L" time="7.696">
+  <properties/>
+  <testcase name="a created file edited after the turn is refused" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.092"/>
+  <testcase name="an empty after-state restores the before text" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.152"/>
+  <testcase name="subfolder paths revert relative to the given root" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.018"/>
+  <testcase name="a path escaping the workspace is refused before any IO" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.016"/>
+  <testcase name="a deleted file is restored and its parent directories re-created" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.039"/>
+  <testcase name="a modified file that is now missing is refused" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.011"/>
+  <testcase name="a deleted path that exists again is refused" classname="com.crush.mobile.domain.file.FileReverterTest" time="7.295"/>
+  <testcase name="a created file that vanished after the turn is refused" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.009"/>
+  <testcase name="a created file is deleted" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.017"/>
+  <testcase name="no images on a path is refused" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.011"/>
+  <testcase name="a modified file whose content moved on since the turn is refused untouched" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.019"/>
+  <testcase name="a modified file is restored to its pre-turn text" classname="com.crush.mobile.domain.file.FileReverterTest" time="0.016"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

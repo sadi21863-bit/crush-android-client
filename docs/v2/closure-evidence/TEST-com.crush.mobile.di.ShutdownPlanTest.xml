@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.di.ShutdownPlanTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:56.074Z" hostname="LAPTOP-5US7QL1L" time="0.014">
+  <properties/>
+  <testcase name="a throwing project stop does not prevent the others or legacy" classname="com.crush.mobile.di.ShutdownPlanTest" time="0.005"/>
+  <testcase name="a throwing legacy stop still reports and leaves projects stopped" classname="com.crush.mobile.di.ShutdownPlanTest" time="0.002"/>
+  <testcase name="every project and the legacy supervisor stop once in order" classname="com.crush.mobile.di.ShutdownPlanTest" time="0.003"/>
+  <testcase name="an empty partial-init plan is safe and idempotent" classname="com.crush.mobile.di.ShutdownPlanTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

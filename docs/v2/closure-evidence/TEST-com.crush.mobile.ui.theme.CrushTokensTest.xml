@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.theme.CrushTokensTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:59:17.688Z" hostname="LAPTOP-5US7QL1L" time="0.338">
+  <properties/>
+  <testcase name="theTypeScaleMatchesTheApprovedSizes" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.091"/>
+  <testcase name="userBubbleTextIsReadableOnItsOwnFill" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.014"/>
+  <testcase name="accentTextClearsAaOnEveryBaseSurface" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.002"/>
+  <testcase name="statusTextClearsAa" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.021"/>
+  <testcase name="materialSlotsUseTheSameScale" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.072"/>
+  <testcase name="diffLinesClearAaOnTheirSurfaceAndOnTheirTint" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.002"/>
+  <testcase name="darkTextRolesClearWcagAa" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.002"/>
+  <testcase name="touchTargetsMeetTheDocumentedMinimums" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.007"/>
+  <testcase name="errorContainersCarryTheirOwnText" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.001"/>
+  <testcase name="diffColorsFollowTheCompiledThemeNotTheSystemTheme" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.118"/>
+  <testcase name="tertiaryAsTextClearsAa" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.001"/>
+  <testcase name="everyRoleTheAppReadsIsSpecifiedFromThePalette" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.0"/>
+  <testcase name="lightTextRolesClearWcagAa" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.002"/>
+  <testcase name="theAccentIsNeutralGraphiteNotTheOldPurple" classname="com.crush.mobile.ui.theme.CrushTokensTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

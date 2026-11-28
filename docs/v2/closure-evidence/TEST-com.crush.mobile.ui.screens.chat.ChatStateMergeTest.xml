@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatStateMergeTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:19.265Z" hostname="LAPTOP-5US7QL1L" time="0.001">
+  <properties/>
+  <testcase name="live rows the replay does not contain survive after it" classname="com.crush.mobile.ui.screens.chat.ChatStateMergeTest" time="0.0"/>
+  <testcase name="an empty replay keeps the live transcript whole" classname="com.crush.mobile.ui.screens.chat.ChatStateMergeTest" time="0.001"/>
+  <testcase name="a replay row is never duplicated by an identical live row" classname="com.crush.mobile.ui.screens.chat.ChatStateMergeTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

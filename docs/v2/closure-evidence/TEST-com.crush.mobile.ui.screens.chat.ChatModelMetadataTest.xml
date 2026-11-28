@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.ChatModelMetadataTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:55:19.213Z" hostname="LAPTOP-5US7QL1L" time="0.01">
+  <properties/>
+  <testcase name="T2A-04a a free model without the suffix shows no marker today" classname="com.crush.mobile.ui.screens.chat.ChatModelMetadataTest" time="0.008"/>
+  <testcase name="a present model keeps its catalogue name and image capability" classname="com.crush.mobile.ui.screens.chat.ChatModelMetadataTest" time="0.001"/>
+  <testcase name="a blank selection projects no selected model" classname="com.crush.mobile.ui.screens.chat.ChatModelMetadataTest" time="0.0"/>
+  <testcase name="no price or cost is synthesized on any model view" classname="com.crush.mobile.ui.screens.chat.ChatModelMetadataTest" time="0.001"/>
+  <testcase name="an absent selected model is identified by id and never throws" classname="com.crush.mobile.ui.screens.chat.ChatModelMetadataTest" time="0.0"/>
+  <testcase name="T2A-04a a paid model with the suffix shows the marker today" classname="com.crush.mobile.ui.screens.chat.ChatModelMetadataTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

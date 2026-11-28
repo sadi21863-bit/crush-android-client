@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.util.RotateKeepingTailTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:59:18.248Z" hostname="LAPTOP-5US7QL1L" time="1.362">
+  <properties/>
+  <testcase name="the archive holds the head and the live log holds the tail" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.296"/>
+  <testcase name="an empty log takes just the newest entry" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.009"/>
+  <testcase name="a non-existent log does not throw" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.009"/>
+  <testcase name="rotation is repeatable without growing the log" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.226"/>
+  <testcase name="a second rotation the same day appends and erases nothing" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.555"/>
+  <testcase name="the newest entry always survives rotation" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.024"/>
+  <testcase name="the rotated-out head is archived, not destroyed" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.163"/>
+  <testcase name="rotation keeps the tail and drops the head" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.025"/>
+  <testcase name="a single line larger than the budget is still kept" classname="com.crush.mobile.util.RotateKeepingTailTest" time="0.043"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

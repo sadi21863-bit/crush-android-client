@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.blocks.UiBlockParserTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:53:22.723Z" hostname="LAPTOP-5US7QL1L" time="0.223">
+  <properties/>
+  <testcase name="a mixed valid document parses every block type" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.158"/>
+  <testcase name="a single text block works" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.001"/>
+  <testcase name="too many table columns is rejected" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.05"/>
+  <testcase name="an unknown field is rejected even when the rest is valid" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.001"/>
+  <testcase name="a wrong version is rejected" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.0"/>
+  <testcase name="an unknown block type is rejected" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.0"/>
+  <testcase name="a key-value item without a key is rejected" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.004"/>
+  <testcase name="malformed JSON is rejected without throwing" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.002"/>
+  <testcase name="a source over the cap is rejected" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.001"/>
+  <testcase name="a table row with the wrong cell count is rejected" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.003"/>
+  <testcase name="an unknown root field is rejected" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.001"/>
+  <testcase name="a bad callout tone is rejected" classname="com.crush.mobile.ui.blocks.UiBlockParserTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

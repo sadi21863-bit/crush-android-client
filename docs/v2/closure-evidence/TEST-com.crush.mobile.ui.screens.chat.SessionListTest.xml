@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.SessionListTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:58:29.387Z" hostname="LAPTOP-5US7QL1L" time="0.05">
+  <properties/>
+  <testcase name="forks group under their parent" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.003"/>
+  <testcase name="zero timestamp is omitted not rendered as epoch" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.002"/>
+  <testcase name="relative time buckets" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.0"/>
+  <testcase name="busy session pins to top even when oldest" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.023"/>
+  <testcase name="blank title falls back to message count" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.0"/>
+  <testcase name="clock skew does not produce negative ages" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.0"/>
+  <testcase name="untouched session has empty detail" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.0"/>
+  <testcase name="paid session shows cost" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.003"/>
+  <testcase name="newest first" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.001"/>
+  <testcase name="busy session is labelled running" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.001"/>
+  <testcase name="top level sessions are not forks" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.001"/>
+  <testcase name="untitled empty session is not blank" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.001"/>
+  <testcase name="tokens sum both directions" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.001"/>
+  <testcase name="free session omits zero cost" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.002"/>
+  <testcase name="empty list stays empty" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.0"/>
+  <testcase name="auto title is used when present" classname="com.crush.mobile.ui.screens.chat.SessionListTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

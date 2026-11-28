@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.engine.EnginePathsLogTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:52:12.426Z" hostname="LAPTOP-5US7QL1L" time="0.961">
+  <properties/>
+  <testcase name="a unix-socket listener directory is a candidate too" classname="com.crush.mobile.engine.EnginePathsLogTest" time="0.233"/>
+  <testcase name="the newest log wins when several server directories exist" classname="com.crush.mobile.engine.EnginePathsLogTest" time="0.148"/>
+  <testcase name="the log inside the real port-embedded directory is found" classname="com.crush.mobile.engine.EnginePathsLogTest" time="0.175"/>
+  <testcase name="directories that do not look like server listeners are ignored" classname="com.crush.mobile.engine.EnginePathsLogTest" time="0.387"/>
+  <testcase name="a server directory without a crush log is not a candidate" classname="com.crush.mobile.engine.EnginePathsLogTest" time="0.007"/>
+  <testcase name="no server directory yields null" classname="com.crush.mobile.engine.EnginePathsLogTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

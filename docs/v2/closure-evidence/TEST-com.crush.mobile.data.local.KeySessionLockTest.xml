@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.data.local.KeySessionLockTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:50:26.949Z" hostname="LAPTOP-5US7QL1L" time="1.97">
+  <properties/>
+  <testcase name="a throwing store is contained" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.36"/>
+  <testcase name="require serves the key without unlocking" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.134"/>
+  <testcase name="an absent key yields empty, not null, and does not unlock" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.093"/>
+  <testcase name="only put unlocks" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.08"/>
+  <testcase name="require after clear re-reads but stays locked" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.172"/>
+  <testcase name="clear re-locks and drops the key from memory" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.137"/>
+  <testcase name="the gate and the key cannot disagree" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.136"/>
+  <testcase name="peek exposes the key only after put" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.098"/>
+  <testcase name="require does not cache, so it re-reads each time" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.188"/>
+  <testcase name="scoped clear drops only the named provider's cached key" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.118"/>
+  <testcase name="a blank key never unlocks" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.129"/>
+  <testcase name="peek exposes nothing while locked" classname="com.crush.mobile.data.local.KeySessionLockTest" time="0.256"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

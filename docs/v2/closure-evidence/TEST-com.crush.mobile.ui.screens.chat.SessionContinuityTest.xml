@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.ui.screens.chat.SessionContinuityTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-28T10:58:29.378Z" hostname="LAPTOP-5US7QL1L" time="0.003">
+  <properties/>
+  <testcase name="consecutive sends all stay in one session" classname="com.crush.mobile.ui.screens.chat.SessionContinuityTest" time="0.001"/>
+  <testcase name="workspace loss alone is not treated as session loss" classname="com.crush.mobile.ui.screens.chat.SessionContinuityTest" time="0.001"/>
+  <testcase name="no session at all means create one" classname="com.crush.mobile.ui.screens.chat.SessionContinuityTest" time="0.0"/>
+  <testcase name="the two 404s are not conflated" classname="com.crush.mobile.ui.screens.chat.SessionContinuityTest" time="0.0"/>
+  <testcase name="a held session is reused even after the workspace id changes" classname="com.crush.mobile.ui.screens.chat.SessionContinuityTest" time="0.001"/>
+  <testcase name="a real session 404 is distinguishable" classname="com.crush.mobile.ui.screens.chat.SessionContinuityTest" time="0.0"/>
+  <testcase name="a genuinely missing session is the only reason to start over" classname="com.crush.mobile.ui.screens.chat.SessionContinuityTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

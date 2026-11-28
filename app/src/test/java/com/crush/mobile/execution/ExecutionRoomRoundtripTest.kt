@@ -104,7 +104,7 @@ class ExecutionRoomRoundtripTest {
             engineKeyToken = testEngineKeyToken,
             workspacePath = "/storage/emulated/0/Test project folder 2",
             engineGeneration = 4L,
-            leaseAtMs = 1_700_000_000_000L,
+            leaseEpochMs = 1_700_000_000_000L,
             phase = phase,
             progressAtMs = 1_700_000_000_000L,
             createdAtMs = 1_700_000_000_000L,
@@ -189,7 +189,29 @@ class ExecutionRoomRoundtripTest {
         assertEquals(original, loaded)
         assertEquals(ExecutionAckState.INTENT_ONLY.name, loaded.ackState)
         assertEquals(4L, loaded.engineGeneration)
+        assertEquals(1_700_000_000_000L, loaded.leaseEpochMs)
         assertNull(loaded.promptRef)
+
+        // Fresh-install DDL must match the final entity: both lease columns
+        // and all three declared indexes.
+        val raw = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)
+        raw.rawQuery("SELECT sql FROM sqlite_master WHERE name = 'executions'", null).use { c ->
+            assertTrue(c.moveToFirst())
+            val ddl = c.getString(0)
+            assertTrue(ddl.contains("lease_epoch_ms"))
+            assertTrue(ddl.contains("lease_at_ms"))
+        }
+        raw.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'executions'",
+            null,
+        ).use { c ->
+            val names = mutableListOf<String>()
+            while (c.moveToNext()) names += c.getString(0)
+            assertTrue(names.contains("idx_exec_session"))
+            assertTrue(names.contains("idx_exec_engine"))
+            assertTrue(names.contains("idx_exec_path"))
+        }
+        raw.close()
     }
 
     @Test(timeout = 120_000)

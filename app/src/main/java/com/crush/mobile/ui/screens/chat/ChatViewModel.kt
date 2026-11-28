@@ -3987,10 +3987,11 @@ class ChatViewModel(
                 )
                 // A2 slice 1, boundary 1: the durable intent MUST exist before
                 // any HTTP call. A failed write is a named failure - never a
-                // send-on-belief. Generation/lease are deliberately NULL: they
-                // captured here from the live manager that owns the workspace.
-                // Generation is process-local, so recovery still treats a
-                // cross-process comparison as unavailable rather than guessing.
+                // send-on-belief. Generation is captured from the live manager
+                // and carried on the event so a stale frame can be rejected.
+                // It is process-local, so cross-process recovery still fails
+                // closed instead of guessing.
+                val generation = WorkspaceManager.currentEngineGeneration()
                 val durable = runCatching {
                     container.executionStore.persistIntent(
                         executionId = execution.executionId,
@@ -3998,7 +3999,7 @@ class ChatViewModel(
                         target = ExecutionTarget(instanceKey, targetWs, targetSid),
                         engineKeyToken = AppContainer.bindingToToken(container.activeBinding.value),
                         workspacePath = workspacePathFor(),
-                        generation = WorkspaceManager.currentEngineGeneration(),
+                        generation = generation,
                         leaseEpochMs = mgr.lastAttachedAtMs,
                     )
                 }
@@ -4011,7 +4012,7 @@ class ChatViewModel(
                 }
                 // Let the adapter recognize this run's real frames as CONFIRMED
                 // and record this screen as an observer (detach is separate).
-                container.executionEventAdapter.declare(instanceKey, runId)
+                container.executionEventAdapter.declare(instanceKey, runId, generation)
                 container.executionController.subscribe(execution.executionId, connectionOwnerEpoch)
                 // Subscribe BEFORE prompting, on the long-lived connection when
                 // it is healthy.
@@ -4119,12 +4120,24 @@ class ChatViewModel(
                         } ?: "durable ack refused (0 rows)"
                         AppLog.e(TAG, why)
                         container.executionController.markAmbiguousSend(execution.executionId, why)
-                        runCatching { container.executionStore.markAmbiguous(execution.executionId) }
+                        val fallbackAmb = runCatching {
+                            container.executionStore.markAmbiguous(execution.executionId)
+                        }
+                        if (!ExecutionPersistenceGuard.committed(fallbackAmb)) {
+                            AppLog.e(
+                                TAG,
+                                "durable fallback ambiguity not recorded: " +
+                                    (fallbackAmb.exceptionOrNull()?.message ?: "0 rows"),
+                            )
+                        }
                         failure = why
                         break
                     }
                     // 202 is NOT running/completed; only now advance in memory.
                     container.executionController.markSubmissionAcknowledged(execution.executionId)
+                    // A confirmed frame may have beaten the durable ack; replay
+                    // it now that the guard can accept it. Never manufacture ACKED.
+                    container.replayConfirmedAfterAck(instanceKey, runId)
                     try {
                         awaitStream(events, runId, handle)
                     } finally {

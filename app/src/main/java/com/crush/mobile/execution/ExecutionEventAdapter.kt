@@ -81,23 +81,35 @@ class ExecutionEventAdapter(
     private val provisional = ConcurrentHashMap<String, Provisional>()
     private val subscribers = ConcurrentHashMap<String, MutableList<Channel<ExecutionEvent>>>()
     private val declaredRuns = ConcurrentHashMap<String, MutableSet<String>>()
+    /** Generation observed when the run was declared; never guessed on the wire. */
+    private val declaredGenerations = ConcurrentHashMap<String, Pair<String, Long?>>()
     private val tokenSource = AtomicLong(0L)
 
     /** Starts a provisional attachment; returns its token. */
     fun begin(key: String): Long {
         val token = tokenSource.incrementAndGet()
         provisional[key] = Provisional(key, token, epochOf(key))
-        declaredRuns.putIfAbsent(key, mutableSetOf())
+        declaredRuns.putIfAbsent(key, ConcurrentHashMap.newKeySet<String>())
         return token
     }
 
-    fun declare(key: String, runId: String) {
-        declaredRuns.computeIfAbsent(key) { mutableSetOf() }.add(runId)
+    fun declare(key: String, runId: String, generation: Long? = null) {
+        declaredRuns.computeIfAbsent(key) { ConcurrentHashMap.newKeySet<String>() }.add(runId)
+        declaredGenerations[runId] = key to generation
         // A1 device evidence: this run id is now attributable on the wire.
         com.crush.mobile.util.AppLog.i(
             "ExecutionEventAdapter",
-            "declare key=$key run=$runId",
+            "declare key=$key run=$runId generation=$generation",
         )
+    }
+
+    /** The generation captured at declaration, or null when it was unknown. */
+    fun generationFor(runId: String): Long? = declaredGenerations[runId]?.second
+
+    /** Drop attribution when a connection is torn down; stale frames cannot qualify. */
+    fun forgetRun(key: String, runId: String) {
+        declaredRuns[key]?.remove(runId)
+        declaredGenerations.remove(runId)
     }
 
     /**
@@ -150,7 +162,7 @@ class ExecutionEventAdapter(
     fun register(key: String, runId: String): Channel<ExecutionEvent> {
         val ch = Channel<ExecutionEvent>(Channel.BUFFERED)
         subscribers.computeIfAbsent(key) { mutableListOf() }.add(ch)
-        declaredRuns.computeIfAbsent(key) { mutableSetOf() }.add(runId)
+        declaredRuns.computeIfAbsent(key) { ConcurrentHashMap.newKeySet<String>() }.add(runId)
         return ch
     }
 
@@ -241,6 +253,9 @@ class ExecutionEventAdapter(
     /** Stops the reader and closes the router, matching identity-change teardown. */
     fun close(key: String) {
         EngineInvalidationProbe.fire("adapter.close", key)
+        // A stale declared run id must not stay attributable after teardown.
+        declaredRuns.remove(key)
+        declaredGenerations.entries.removeIf { it.value.first == key }
         connections.remove(key)?.let { entry ->
             entry.feedJob?.cancel()
             entry.conn?.stop()
@@ -283,6 +298,15 @@ class ExecutionEventAdapter(
         )
         // Only CONFIRMED events may change execution state. The app must call
         // declare(key, runId) before the POST for ordinary frames to qualify.
+        val isRunComplete = frame.type.name == "RUN_COMPLETE"
+        // The engine's run_complete carries `cancelled`; do not invent a
+        // failure/stop event type. A cancelled completion is still terminal,
+        // but it must not be rendered as a successful completion.
+        val detail = if (isRunComplete) {
+            if (frame.cancelledOrNull() == true) "confirmed_cancelled" else "confirmed_completion"
+        } else {
+            frame.type.name
+        }
         val event = ExecutionEvent(
             type = when (frame.type.name) {
                 "MESSAGE" -> ExecutionEvent.Type.MESSAGE
@@ -293,10 +317,24 @@ class ExecutionEventAdapter(
             },
             attribution = attribution,
             runId = runId,
-            detail = frame.type.name,
+            detail = detail,
+            generation = runId?.let { declaredGenerations[it]?.second },
         )
         if (attribution == Attribution.CONFIRMED) onConfirmedEvent(key, event)
         return onEvent(key, event)
+    }
+
+    /** Bounded two-hop search; never guesses a field the wire does not carry. */
+    private fun CrushEvent.cancelledOrNull(): Boolean? {
+        fun child(obj: com.google.gson.JsonObject?, name: String) =
+            obj?.takeIf { it.has(name) && it.get(name).isJsonObject }
+                ?.getAsJsonObject(name)
+        val outer = child(body, "payload")
+        return listOfNotNull(body, outer, child(outer, "payload"))
+            .firstNotNullOfOrNull { obj ->
+                obj.takeIf { it.has("cancelled") && !it.get("cancelled").isJsonNull }
+                    ?.get("cancelled")?.asBoolean
+            }
     }
 
     private fun dispatch(key: String, event: ExecutionEvent): Boolean {

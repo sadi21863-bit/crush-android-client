@@ -98,13 +98,20 @@ class ExecutionReconciler(
                 if (terminal == ExecutionLifecycle.COMPLETED ||
                     terminal == ExecutionLifecycle.FAILED
                 ) {
+                    val outcome = if (terminal == ExecutionLifecycle.FAILED) {
+                        Outcome.FAILED
+                    } else {
+                        Outcome.COMPLETED
+                    }
                     val n = dao.markTerminal(row.executionId, terminal.name, ev.detail, now)
-                    Recovered(
-                        row,
-                        if (n > 0) Outcome.COMPLETED else Outcome.UNKNOWN,
-                        ev.detail,
-                        ev.result,
-                    )
+                    Recovered(row, if (n > 0) outcome else Outcome.UNKNOWN, ev.detail, ev.result)
+                } else if (terminal != null) {
+                    // A confirmed-live execution cannot be honestly rendered
+                    // as LOST and cannot be claimed as resumed without the
+                    // §7 atomic attach wrapper. Keep UNKNOWN.
+                    val detail = "recovery:confirmed_running_unattachable"
+                    val n = dao.markUnknown(row.executionId, detail, now)
+                    Recovered(row, Outcome.UNKNOWN, detail, ev.result)
                 } else {
                     // All required sources were queried successfully and no
                     // live execution exists: the only evidence-backed loss.

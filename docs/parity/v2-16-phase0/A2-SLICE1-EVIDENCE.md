@@ -4,6 +4,12 @@ Authorization boundary: `A2-SLICE1-SCOPE.md`. The owner authorized the run
 half only. C4/C5/C6, D1, D2, D4, D7, prompt policy, device fault work and
 `main` remain untouched. A1 stays accepted.
 
+> **2026-11-27 — dated schema-state correction.** Line 15 below describes the
+> initial slice (`version = 4`, `MIGRATION_3_4` only). Shipped HEAD `f99668c`
+> has `version = 5` with the additive `MIGRATION_4_5` aligning the canonical
+> `lease_epoch_ms` column; `MIGRATION_3_4` itself is unchanged. The historical
+> line stands as written.
+
 ## What was implemented
 
 | File | Change |

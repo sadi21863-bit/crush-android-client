@@ -56,6 +56,8 @@ data class ExecutionEvent(
     val sessionId: String? = null,
     val toolCallId: String? = null,
     val detail: String? = null,
+    /** Engine generation captured at declare time; NULL means unknown/unproven. */
+    val generation: Long? = null,
 ) {
     enum class Type {
         MESSAGE, TOOL_CALL, TOOL_RESULT, PERMISSION, QUESTION,

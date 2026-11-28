@@ -73,6 +73,38 @@ class ExecutionStore(
      */
     suspend fun markRunningForRun(runId: String) = dao.markRunningByRunId(runId, clock())
 
+    suspend fun byRunId(runId: String): ExecutionEntity? = dao.byRunId(runId)
+
+    /** Named, evidence-backed unknown state; never a fabricated terminal. */
+    suspend fun markUnknown(id: String, reason: String) = dao.markUnknown(id, reason, clock())
+
+    /**
+     * The production durable-event path. Scoped by run id, requires an ACKED
+     * live row, and refuses a generation mismatch. Terminal events write a
+     * terminal reason; everything else is progress only. Returns the affected
+     * row count: 0 means the event was NOT applied and must be deferred, not
+     * treated as proof of completion.
+     */
+    suspend fun applyConfirmedEvent(runId: String, event: ExecutionEvent): Int {
+        val row = dao.byRunId(runId) ?: return 0
+        val expected = event.generation
+        if (expected != null && row.engineGeneration != null && expected != row.engineGeneration) {
+            return 0
+        }
+        return when (event.type) {
+            ExecutionEvent.Type.RUN_COMPLETE -> {
+                val reason = event.detail?.takeIf { it.isNotBlank() } ?: "confirmed_completion"
+                dao.markTerminalByRunId(
+                    runId,
+                    ExecutionLifecycle.COMPLETED.name,
+                    reason,
+                    clock(),
+                )
+            }
+            else -> dao.markRunningByRunId(runId, clock())
+        }
+    }
+
     suspend fun markTerminal(id: String, phase: ExecutionLifecycle, reason: String?) =
         dao.markTerminal(id, phase.name, reason, clock())
 

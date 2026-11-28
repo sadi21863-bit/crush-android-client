@@ -86,6 +86,26 @@ interface ExecutionDao {
     )
     suspend fun markRunningByRunId(runId: String, at: Long): Int
 
+    @Query("SELECT * FROM executions WHERE run_id = :runId")
+    suspend fun byRunId(runId: String): ExecutionEntity?
+
+    /**
+     * Terminal evidence is scoped to an ACKED, still-live row for this exact
+     * run. A second terminal event returns 0 and cannot change reason or time.
+     */
+    @Query(
+        "UPDATE executions SET phase = :phase, terminal_reason = :reason, " +
+            "updated_at_ms = :at WHERE run_id = :runId " +
+            "AND phase IN ('SUBMISSION_ACKNOWLEDGED','RUNNING') " +
+            "AND ack_state = 'ACKED'"
+    )
+    suspend fun markTerminalByRunId(
+        runId: String,
+        phase: String,
+        reason: String,
+        at: Long,
+    ): Int
+
     /** General guarded terminal move for a still-live row. */
     @Query(
         "UPDATE executions SET phase = :phase, terminal_reason = :reason, " +

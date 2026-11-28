@@ -1,5 +1,21 @@
 # A2 slice 1 — post-implementation remediation report (2026-11-27)
 
+> **2026-11-27 — post-commit repository-state correction.** The statements in
+> §1 (HEAD `105843e`, "nothing was committed or pushed"), §5 ("not yet
+> committed") and the closing sentence of §7 accurately described this
+> report's authoring state but are **no longer true of HEAD**. Commit
+> `f99668c9292b4f3930ccb45ac7505b1ce5a9f60e` ("fix(v2-16): remediate A2 slice 1
+> persistence, recovery and UI evidence", 2026-11-27 20:53:09 +0530) DID commit
+> and push this report, the recon record, the production/test changes and all
+> archived XML/log artifacts to `origin/v2-16-planning-baseline`. Both local
+> HEAD and the remote branch were at `f99668c` when the second remediation pass
+> began. `main` was and remains untouched. Historical lines stand as written.
+>
+> **Archive qualification.** The archived `a2-rem-*-junit.xml` files sum to 74
+> tests; the targeted run's reported 85 included 11 adapter tests whose
+> run-specific XML was not archived in that pass. Full-gate totals derive from
+> Gradle output and are not independently re-derivable from the archive.
+
 ## 1. Repository state
 
 - Branch: `v2-16-planning-baseline`.

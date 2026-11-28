@@ -164,6 +164,7 @@ class ExecutionReconcilerTest {
             assertEquals(ObservationState.DETACHED, view.observation)
         }
 
+    /** Harness-only fake evidence; never wired to production. */
     private class FixedEvidence(
         private val result: ReconciliationResult,
         private val terminal: ExecutionLifecycle? = null,
@@ -292,6 +293,52 @@ class ExecutionReconcilerTest {
             assertEquals("cycle $cycle", ObservationState.DETACHED, view.observation)
         }
         assertEquals(ExecutionAckState.AMBIGUOUS.name, dao.byId("amb3")!!.ackState)
+    }
+
+    @Test(timeout = 120_000)
+    fun `confirmed failed history adopts FAILED not COMPLETED`() = runBlocking {
+        val dao = RoomProjectStore(context, dbName).executionDao()
+        dao.insert(row("failed", ExecutionLifecycle.RUNNING, ExecutionAckState.ACKED))
+
+        val summary = ExecutionReconciler(
+            dao,
+            FixedEvidence(
+                ReconciliationResult.CONFIRMED,
+                ExecutionLifecycle.FAILED,
+                "history:failed",
+            ),
+            clock = { 9_000L },
+        ).reconcile()
+        val recovered = summary.recovered.first { it.entity.executionId == "failed" }
+        assertEquals(ExecutionReconciler.Outcome.FAILED, recovered.outcome)
+        assertEquals(ExecutionLifecycle.FAILED.name, dao.byId("failed")!!.phase)
+
+        val controller = ExecutionController()
+        controller.onRecovered(
+            executionId = "failed",
+            runId = "run-failed",
+            target = ExecutionTarget("", "", "sess-1"),
+            lifecycle = ExecutionLifecycle.FAILED,
+            reasonCode = recovered.detail,
+        )
+        assertEquals(ExecutionLifecycle.FAILED, controller.executions.value["failed"]!!.lifecycle)
+    }
+
+    @Test(timeout = 120_000)
+    fun `confirmed running evidence stays unknown instead of becoming lost`() = runBlocking {
+        val dao = RoomProjectStore(context, dbName).executionDao()
+        dao.insert(row("live", ExecutionLifecycle.RUNNING, ExecutionAckState.ACKED))
+
+        val summary = ExecutionReconciler(
+            dao,
+            FixedEvidence(ReconciliationResult.CONFIRMED, ExecutionLifecycle.RUNNING),
+            clock = { 9_000L },
+        ).reconcile()
+        assertEquals(
+            ExecutionReconciler.Outcome.UNKNOWN,
+            summary.recovered.first { it.entity.executionId == "live" }.outcome,
+        )
+        assertEquals(ExecutionLifecycle.UNKNOWN.name, dao.byId("live")!!.phase)
     }
 
     @Test(timeout = 120_000)

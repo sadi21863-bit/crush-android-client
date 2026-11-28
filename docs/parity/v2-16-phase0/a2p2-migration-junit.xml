@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.execution.ExecutionRoomRoundtripTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-27T17:44:58.100Z" hostname="LAPTOP-5US7QL1L" time="7.753">
+  <properties/>
+  <testcase name="a confirmed run advances only an acknowledged row" classname="com.crush.mobile.execution.ExecutionRoomRoundtripTest" time="0.835"/>
+  <testcase name="an execution row roundtrips a restart byte-faithfully" classname="com.crush.mobile.execution.ExecutionRoomRoundtripTest" time="0.766"/>
+  <testcase name="migration chain preserves project and handoff rows and creates executions" classname="com.crush.mobile.execution.ExecutionRoomRoundtripTest" time="1.519"/>
+  <testcase name="stale phase writes are guarded no-ops" classname="com.crush.mobile.execution.ExecutionRoomRoundtripTest" time="1.057"/>
+  <testcase name="v4 to v5 copies the lease value into the canonical column" classname="com.crush.mobile.execution.ExecutionRoomRoundtripTest" time="2.055"/>
+  <testcase name="stale writes cannot clobber ambiguity or an unknown outcome" classname="com.crush.mobile.execution.ExecutionRoomRoundtripTest" time="1.491"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/SQLiteConnection: Could not change the database journal mode of 'C:\Users\aditya\AppData\Local\Temp\robolectric-ExecutionRoomRoundtripTest_an_execution_row_roundtrips_a_restart_byte-faithfully17074914858345208714\com.crush.mobile-dataDir\databases\executions-roundtrip-test.db' from 'wal' to 'MEMORY' because the database is locked.  This usually means that there are other open connections to the database which prevents the database from enabling or disabling write-ahead logging mode.  Proceeding without changing the journal mode.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/SQLiteConnection: Could not change the database journal mode of 'C:\Users\aditya\AppData\Local\Temp\robolectric-ExecutionRoomRoundtripTest_migration_chain_preserves_project_and_handoff_rows_and_creates_executions17718314861527733106\com.crush.mobile-dataDir\databases\executions-roundtrip-test.db' from 'wal' to 'MEMORY' because the database is locked.  This usually means that there are other open connections to the database which prevents the database from enabling or disabling write-ahead logging mode.  Proceeding without changing the journal mode.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

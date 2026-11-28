@@ -17,6 +17,7 @@ import com.crush.mobile.domain.model.TuningPolicy
 import com.crush.mobile.engine.CrushEngine
 import com.crush.mobile.engine.EngineInstanceRegistry
 import com.crush.mobile.engine.EngineInvalidationProbe
+import com.crush.mobile.execution.ConfirmedEventBuffer
 import com.crush.mobile.execution.CrushConnectionPort
 import com.crush.mobile.execution.ExecutionController
 import com.crush.mobile.execution.ExecutionEventAdapter
@@ -146,6 +147,27 @@ class AppContainer(context: Context) {
      * store. The controller stays in-memory; this is the send-path port.
      */
     val executionStore: ExecutionStore by lazy { ExecutionStore(projectStore.executionDao()) }
+
+    /** Bounded deferral for confirmed frames that beat the durable ack. */
+    val confirmedEventBuffer: ConfirmedEventBuffer = ConfirmedEventBuffer()
+
+    /**
+     * Replay deferred confirmed frames once ACKED is durable. A 0-row result
+     * still means "not proven" and is left for reconciliation; ACKED is never
+     * manufactured here.
+     */
+    suspend fun replayConfirmedAfterAck(instanceKey: String, runId: String) {
+        if (confirmedEventBuffer.isIncomplete(instanceKey, runId)) return
+        confirmedEventBuffer.drain(instanceKey, runId).forEach { event ->
+            val applied = runCatching { executionStore.applyConfirmedEvent(runId, event) }
+            if (applied.getOrDefault(0) == 1) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                    executionController.onConfirmedEvent(instanceKey, event)
+                }
+            }
+        }
+        executionEventAdapter.forgetRun(instanceKey, runId)
+    }
 
     /** Startup reconciler for C1–C3; intentionally fail-closed (§7/§17.1). */
     val executionReconciler: ExecutionReconciler by lazy {
@@ -352,17 +374,38 @@ class AppContainer(context: Context) {
             },
             isSupersededInRegistry = { key, epoch -> connectionRegistry.isSuperseded(key, epoch) },
             onConfirmedEvent = { key, event ->
-                executionController.onConfirmedEvent(key, event)
-                // A2 slice 1, boundary 4: a confirmed frame is the only engine
-                // evidence that may advance the stored phase. The DAO guard
-                // requires ACKED, so repeat frames are harmless no-ops.
                 event.runId?.let { runId ->
                     containerScope.launch {
-                        val advanced = runCatching { executionStore.markRunningForRun(runId) }
-                        if (advanced.getOrNull() != 1 && advanced.getOrNull() != 0) {
-                            com.crush.mobile.util.AppLog.w(
+                        // Durable first: the in-memory view must never claim a
+                        // phase the row cannot support. A 0-row guarded write
+                        // means "not yet applicable" (typically pre-ACK), so
+                        // the event is deferred, never silently discarded.
+                        val applied = runCatching { executionStore.applyConfirmedEvent(runId, event) }
+                        when (val n = applied.getOrNull()) {
+                            1 -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                                executionController.onConfirmedEvent(key, event)
+                            }
+                            0 -> {
+                                val kept = confirmedEventBuffer.add(key, runId, event)
+                                if (!kept) {
+                                    val row = runCatching { executionStore.byRunId(runId) }.getOrNull()
+                                    row?.let {
+                                        runCatching {
+                                            executionStore.markUnknown(
+                                                it.executionId,
+                                                "recovery:event_buffer_incomplete",
+                                            )
+                                        }
+                                    }
+                                    com.crush.mobile.util.AppLog.w(
+                                        "A2",
+                                        "confirmed event buffer overflow for run=$runId; INCOMPLETE recorded",
+                                    )
+                                }
+                            }
+                            else -> com.crush.mobile.util.AppLog.w(
                                 "A2",
-                                "durable running write failed: ${advanced.exceptionOrNull()?.message}",
+                                "durable confirmed write failed: ${applied.exceptionOrNull()?.message}",
                             )
                         }
                     }

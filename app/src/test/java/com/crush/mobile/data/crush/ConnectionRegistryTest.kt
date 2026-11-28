@@ -42,6 +42,20 @@ class ConnectionRegistryTest {
     // ------------------------------------------------------------------
 
     @Test
+    fun `an older epoch attach cannot evict the newer live reader`() {
+        val reg = newRegistry()
+        val newer = freshConnection()
+        val lateOlder = freshConnection()
+        reg.attach("pA", newer, ownerEpoch = 2)
+        reg.attach("pA", lateOlder, ownerEpoch = 1)
+
+        assertTrue("late conn must be stopped", stopped(lateOlder))
+        assertFalse("newer conn must survive", stopped(newer))
+        assertTrue("older owner must be superseded", reg.isSuperseded("pA", 1))
+        assertFalse("newer owner must remain current", reg.isSuperseded("pA", 2))
+    }
+
+    @Test
     fun `attach supersedes the previous registration and stops its connection`() {
         val reg = newRegistry()
         val older = freshConnection()

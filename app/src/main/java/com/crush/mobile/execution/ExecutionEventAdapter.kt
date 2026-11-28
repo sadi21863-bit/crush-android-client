@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.io.File
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -80,36 +81,97 @@ class ExecutionEventAdapter(
 
     private val provisional = ConcurrentHashMap<String, Provisional>()
     private val subscribers = ConcurrentHashMap<String, MutableList<Channel<ExecutionEvent>>>()
-    private val declaredRuns = ConcurrentHashMap<String, MutableSet<String>>()
-    /** Generation observed when the run was declared; never guessed on the wire. */
-    private val declaredGenerations = ConcurrentHashMap<String, Pair<String, Long?>>()
+    /**
+     * A declaration carries the EXACT execution identity. It is created before
+     * submission, retained after ACK, and retired only on a confirmed terminal
+     * observation or explicit invalidation — never at ACK time.
+     */
+    data class Declaration(
+        val key: String,
+        val executionId: String,
+        val runId: String,
+        val generation: Long?,
+        val state: State,
+    ) {
+        enum class State { ACTIVE, SUPERSEDED, RETIRED }
+    }
+
+    private val declarations = ConcurrentHashMap<Pair<String, String>, Declaration>()
+    /** Bounded read-only history so a late old-run frame maps to its own identity. */
+    private val retiredHistory =
+        ConcurrentHashMap<String, MutableList<Declaration>>()
     private val tokenSource = AtomicLong(0L)
+
+    private fun historyOf(key: String): MutableList<Declaration> =
+        retiredHistory.computeIfAbsent(key) { Collections.synchronizedList(mutableListOf()) }
+
+    private fun pushHistory(declaration: Declaration) {
+        val list = historyOf(declaration.key)
+        synchronized(list) {
+            list += declaration
+            while (list.size > DECLARATION_HISTORY_LIMIT) list.removeAt(0)
+        }
+    }
 
     /** Starts a provisional attachment; returns its token. */
     fun begin(key: String): Long {
         val token = tokenSource.incrementAndGet()
         provisional[key] = Provisional(key, token, epochOf(key))
-        declaredRuns.putIfAbsent(key, ConcurrentHashMap.newKeySet<String>())
         return token
     }
 
-    fun declare(key: String, runId: String, generation: Long? = null) {
-        declaredRuns.computeIfAbsent(key) { ConcurrentHashMap.newKeySet<String>() }.add(runId)
-        declaredGenerations[runId] = key to generation
-        // A1 device evidence: this run id is now attributable on the wire.
+    /**
+     * Declares a run before submission. Any prior ACTIVE declaration for the
+     * same instance key is superseded and moved to bounded read-only history;
+     * its late frames can resolve only to their own execution, never this one.
+     */
+    fun declare(
+        key: String,
+        runId: String,
+        generation: Long? = null,
+        executionId: String,
+    ) {
+        declarations.entries.toList().forEach { (k, d) ->
+            if (k.first == key && d.state == Declaration.State.ACTIVE) {
+                declarations.remove(k)
+                pushHistory(d.copy(state = Declaration.State.SUPERSEDED))
+            }
+        }
+        declarations[key to runId] = Declaration(
+            key, executionId, runId, generation, Declaration.State.ACTIVE,
+        )
         com.crush.mobile.util.AppLog.i(
             "ExecutionEventAdapter",
-            "declare key=$key run=$runId generation=$generation",
+            "declare key=$key run=$runId exec=$executionId generation=$generation",
         )
     }
 
-    /** The generation captured at declaration, or null when it was unknown. */
-    fun generationFor(runId: String): Long? = declaredGenerations[runId]?.second
+    /** Exact-resolution only: no latest-run or single-run fallback. */
+    fun resolveDeclaration(key: String, runId: String?): Declaration? {
+        if (runId == null) return null
+        declarations[key to runId]?.let { return it }
+        val list = historyOf(key)
+        return synchronized(list) { list.firstOrNull { it.runId == runId } }
+    }
 
-    /** Drop attribution when a connection is torn down; stale frames cannot qualify. */
+    fun generationFor(runId: String): Long? =
+        declarations.entries.firstOrNull { it.value.runId == runId }?.value?.generation
+
+    /** Explicit invalidation; never called merely because ACK became durable. */
     fun forgetRun(key: String, runId: String) {
-        declaredRuns[key]?.remove(runId)
-        declaredGenerations.remove(runId)
+        declarations.remove(key to runId)
+        val list = historyOf(key)
+        synchronized(list) { list.removeAll { it.runId == runId } }
+    }
+
+    /** Terminal observation: retain identity read-only, never mutate from it. */
+    fun retireRun(key: String, runId: String) {
+        val declaration = declarations.remove(key to runId) ?: return
+        pushHistory(declaration.copy(state = Declaration.State.RETIRED))
+    }
+
+    companion object {
+        private const val DECLARATION_HISTORY_LIMIT = 8
     }
 
     /**
@@ -162,19 +224,25 @@ class ExecutionEventAdapter(
     fun register(key: String, runId: String): Channel<ExecutionEvent> {
         val ch = Channel<ExecutionEvent>(Channel.BUFFERED)
         subscribers.computeIfAbsent(key) { mutableListOf() }.add(ch)
-        declaredRuns.computeIfAbsent(key) { ConcurrentHashMap.newKeySet<String>() }.add(runId)
+        // Test-only subscription path: no production caller. A blank execution
+        // id means this declaration can never authorize a durable mutation.
+        declarations.putIfAbsent(
+            key to runId,
+            Declaration(key, "", runId, null, Declaration.State.ACTIVE),
+        )
         return ch
     }
 
     fun unregister(key: String, runId: String, ch: Channel<ExecutionEvent>) {
-        declaredRuns[key]?.remove(runId)
+        declarations.remove(key to runId)
         subscribers[key]?.let { list ->
             synchronized(list) { list.remove(ch) }
         }
         ch.close()
     }
 
-    fun isDeclared(key: String, runId: String): Boolean = declaredRuns[key]?.contains(runId) == true
+    fun isDeclared(key: String, runId: String): Boolean =
+        resolveDeclaration(key, runId) != null
 
     // ---- real transport ownership -------------------------------------------------
 
@@ -253,9 +321,14 @@ class ExecutionEventAdapter(
     /** Stops the reader and closes the router, matching identity-change teardown. */
     fun close(key: String) {
         EngineInvalidationProbe.fire("adapter.close", key)
-        // A stale declared run id must not stay attributable after teardown.
-        declaredRuns.remove(key)
-        declaredGenerations.entries.removeIf { it.value.first == key }
+        // Teardown retires declarations to read-only history; a late frame can
+        // still resolve to its own identity but can never authorize a mutation.
+        declarations.entries.toList().forEach { (k, d) ->
+            if (k.first == key) {
+                declarations.remove(k)
+                pushHistory(d.copy(state = Declaration.State.RETIRED))
+            }
+        }
         connections.remove(key)?.let { entry ->
             entry.feedJob?.cancel()
             entry.conn?.stop()
@@ -285,7 +358,10 @@ class ExecutionEventAdapter(
         val entry = connections[key] ?: return false
         if (entry.epoch != epochOf(key)) return false
         val runId = frame.runIdOrNull()
-        val attribution = if (runId != null && isDeclared(key, runId)) {
+        // Exact resolution only. No latest-run or single-run fallback: an
+        // anonymous MESSAGE (including finishError) stays UNATTRIBUTED here.
+        val declaration = resolveDeclaration(key, runId)
+        val attribution = if (declaration != null) {
             Attribution.CONFIRMED
         } else {
             Attribution.UNATTRIBUTED
@@ -318,7 +394,11 @@ class ExecutionEventAdapter(
             attribution = attribution,
             runId = runId,
             detail = detail,
-            generation = runId?.let { declaredGenerations[it]?.second },
+            generation = declaration?.generation,
+            executionId = declaration?.executionId,
+            // Superseded/retired declarations are read-only: the event may be
+            // attributed to its own identity, but must never mutate a newer run.
+            superseded = declaration?.state != Declaration.State.ACTIVE,
         )
         if (attribution == Attribution.CONFIRMED) onConfirmedEvent(key, event)
         return onEvent(key, event)

@@ -168,7 +168,11 @@ class ExecutionController(
         when (event.type) {
             ExecutionEvent.Type.RUN_COMPLETE -> {
                 markRunning(id, Attribution.CONFIRMED)
-                markTerminal(id, ExecutionLifecycle.COMPLETED, "confirmed_completion")
+                // W1: the lifecycle stays COMPLETED per the approved contract,
+                // but the reason carries the machine-readable cancellation
+                // outcome. Never hard-code "success" over a cancelled wire event.
+                val reason = event.detail?.takeIf { it.isNotBlank() } ?: "confirmed_completion"
+                markTerminal(id, ExecutionLifecycle.COMPLETED, reason)
             }
             ExecutionEvent.Type.MESSAGE, ExecutionEvent.Type.TOOL_CALL,
             ExecutionEvent.Type.TOOL_RESULT, ExecutionEvent.Type.PERMISSION,

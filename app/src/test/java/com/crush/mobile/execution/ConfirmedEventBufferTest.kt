@@ -36,12 +36,15 @@ class ConfirmedEventBufferTest {
         type: ExecutionEvent.Type = ExecutionEvent.Type.RUN_COMPLETE,
         detail: String = "confirmed_completion",
         generation: Long? = 7L,
+        superseded: Boolean = false,
     ) = ExecutionEvent(
         type = type,
         attribution = Attribution.CONFIRMED,
         runId = "run-1",
         detail = detail,
         generation = generation,
+        executionId = "e1",
+        superseded = superseded,
     )
 
     private fun storeAt(clock: Long = 10L) =
@@ -60,20 +63,21 @@ class ConfirmedEventBufferTest {
     }
 
     @Test(timeout = 120_000)
-    fun `an event before ack is buffered then applied after ack`() = runBlocking {
+    fun `an event before ack is deferred then applied after ack`() = runBlocking {
         val store = storeAt()
         val buffer = ConfirmedEventBuffer()
         sentButNotAcked(store)
 
         val early = event()
-        // The DAO guard refuses it because ACKED is not durable yet.
-        assertEquals(0, store.applyConfirmedEvent("run-1", early))
+        assertEquals(ConfirmedApply.Deferred, store.applyConfirmedEvent(early))
         assertTrue(buffer.add("chat", "run-1", early))
 
         assertEquals(1, store.markAcked("e1"))
-        val replayed = buffer.drain("chat", "run-1")
-        assertEquals(1, replayed.size)
-        assertEquals(1, store.applyConfirmedEvent("run-1", replayed.first()))
+        val pending = buffer.peek("chat", "run-1")
+        assertEquals(1, pending.size)
+        assertEquals(ConfirmedApply.Applied, store.applyConfirmedEvent(pending.first()))
+        buffer.remove("chat", "run-1", pending.first())
+        assertEquals(0, buffer.pendingCount("chat", "run-1"))
         assertEquals(ExecutionLifecycle.COMPLETED.name, store.byId("e1")!!.phase)
         assertEquals("confirmed_completion", store.byId("e1")!!.terminalReason)
     }
@@ -85,29 +89,24 @@ class ConfirmedEventBufferTest {
         sentButNotAcked(store)
 
         assertTrue(buffer.add("chat", "run-1", event()))
-        // No ack was written, so a guarded durable event cannot apply.
-        assertEquals(0, store.applyConfirmedEvent("run-1", event()))
-        // The honest ambiguity write records the missing acknowledgement.
+        // No ack was written, so a guarded durable event stays deferred.
+        assertEquals(ConfirmedApply.Deferred, store.applyConfirmedEvent(event()))
         assertEquals(1, store.markAmbiguous("e1"))
 
         val row = store.byId("e1")!!
         assertEquals(ExecutionLifecycle.SEND_ATTEMPTED.name, row.phase)
         assertEquals(ExecutionAckState.AMBIGUOUS.name, row.ackState)
-        // No replay: ACK was never durable, so the buffered event stays unapplied.
         assertEquals(1, buffer.pendingCount("chat", "run-1"))
-        assertEquals(0, store.applyConfirmedEvent("run-1", event()))
     }
 
     @Test(timeout = 120_000)
-    fun `a stale generation event is never applied on replay`() = runBlocking {
+    fun `stale generation and superseded events are classified Stale`() = runBlocking {
         val store = storeAt()
-        val buffer = ConfirmedEventBuffer()
         sentButNotAcked(store)
-        assertTrue(buffer.add("chat", "run-1", event(generation = 99L)))
         assertEquals(1, store.markAcked("e1"))
 
-        assertEquals(1, buffer.drain("chat", "run-1").size)
-        assertEquals(0, store.applyConfirmedEvent("run-1", event(generation = 99L)))
+        assertEquals(ConfirmedApply.Stale, store.applyConfirmedEvent(event(generation = 99L)))
+        assertEquals(ConfirmedApply.Stale, store.applyConfirmedEvent(event(superseded = true)))
         assertEquals(ExecutionLifecycle.SUBMISSION_ACKNOWLEDGED.name, store.byId("e1")!!.phase)
     }
 
@@ -121,7 +120,7 @@ class ConfirmedEventBufferTest {
         assertTrue(buffer.add("chat", "run-1", event(detail = "MESSAGE", type = ExecutionEvent.Type.MESSAGE)))
         assertFalse(buffer.add("chat", "run-1", event(detail = "PERMISSION", type = ExecutionEvent.Type.PERMISSION)))
         assertTrue(buffer.isIncomplete("chat", "run-1"))
-        assertTrue(buffer.drain("chat", "run-1").isEmpty())
+        assertTrue(buffer.peek("chat", "run-1").isEmpty())
     }
 
     @Test(timeout = 120_000)
@@ -133,7 +132,8 @@ class ConfirmedEventBufferTest {
 
         assertEquals(ExecutionLifecycle.SEND_ATTEMPTED.name, store.byId("e1")!!.phase)
         assertEquals(1, store.markAcked("e1"))
-        assertEquals(1, store.applyConfirmedEvent("run-1", buffer.drain("chat", "run-1").first()))
+        val pending = buffer.peek("chat", "run-1")
+        assertEquals(ConfirmedApply.Applied, store.applyConfirmedEvent(pending.first()))
         assertEquals(ExecutionLifecycle.COMPLETED.name, store.byId("e1")!!.phase)
     }
 }

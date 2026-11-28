@@ -18,6 +18,7 @@ import com.crush.mobile.engine.CrushEngine
 import com.crush.mobile.engine.EngineInstanceRegistry
 import com.crush.mobile.engine.EngineInvalidationProbe
 import com.crush.mobile.execution.ConfirmedEventBuffer
+import com.crush.mobile.execution.ConfirmedApply
 import com.crush.mobile.execution.CrushConnectionPort
 import com.crush.mobile.execution.ExecutionController
 import com.crush.mobile.execution.ExecutionEventAdapter
@@ -158,15 +159,72 @@ class AppContainer(context: Context) {
      */
     suspend fun replayConfirmedAfterAck(instanceKey: String, runId: String) {
         if (confirmedEventBuffer.isIncomplete(instanceKey, runId)) return
-        confirmedEventBuffer.drain(instanceKey, runId).forEach { event ->
-            val applied = runCatching { executionStore.applyConfirmedEvent(runId, event) }
-            if (applied.getOrDefault(0) == 1) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
-                    executionController.onConfirmedEvent(instanceKey, event)
+        // peek, never drain: evidence is removed only after a classified success.
+        val pending = confirmedEventBuffer.peek(instanceKey, runId)
+        for (event in pending) {
+            var attempts = 0
+            var outcome: ConfirmedApply
+            while (true) {
+                // CancellationException must propagate, not become a DB failure.
+                outcome = executionStore.applyConfirmedEvent(event)
+                if (outcome !is ConfirmedApply.Unavailable) break
+                if (++attempts >= REPLAY_MAX_ATTEMPTS) break
+            }
+            when (outcome) {
+                ConfirmedApply.Applied -> {
+                    confirmedEventBuffer.remove(instanceKey, runId, event)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                        executionController.onConfirmedEvent(instanceKey, event)
+                    }
+                    if (event.type == com.crush.mobile.execution.ExecutionEvent.Type.RUN_COMPLETE) {
+                        executionEventAdapter.retireRun(instanceKey, runId)
+                    }
+                }
+                ConfirmedApply.AlreadyApplied, ConfirmedApply.NotApplicable ->
+                    confirmedEventBuffer.remove(instanceKey, runId, event)
+                ConfirmedApply.Deferred -> break // prerequisite still missing; keep head
+                ConfirmedApply.Stale, ConfirmedApply.Conflict,
+                ConfirmedApply.IntegrityFailure -> {
+                    invalidatePendingEvidence(instanceKey, runId, event, outcome)
+                    break
+                }
+                is ConfirmedApply.Unavailable -> {
+                    // Keep the event pending; surface honestly. No fabricated
+                    // durable UNKNOWN when the database could not be written.
+                    com.crush.mobile.util.AppLog.w(
+                        "A2",
+                        "replay unavailable for run=$runId; evidence kept pending: " +
+                            "${outcome.cause.message}",
+                    )
+                    break
                 }
             }
         }
-        executionEventAdapter.forgetRun(instanceKey, runId)
+    }
+
+    private suspend fun invalidatePendingEvidence(
+        instanceKey: String,
+        runId: String,
+        event: com.crush.mobile.execution.ExecutionEvent,
+        outcome: ConfirmedApply,
+    ) {
+        val reason = "recovery:replay_${outcome.javaClass.simpleName.lowercase()}"
+        val executionId = event.executionId
+        if (executionId != null && executionId.isNotBlank()) {
+            val written = runCatching { executionStore.markUnknown(executionId, reason) }
+            if (written.getOrNull() != 1) {
+                com.crush.mobile.util.AppLog.w(
+                    "A2",
+                    "durable invalidation not recorded for exec=$executionId run=$runId: " +
+                        (written.exceptionOrNull()?.message ?: "0 rows"),
+                )
+            }
+        } else {
+            com.crush.mobile.util.AppLog.w("A2", "no execution identity for run=$runId; " +
+                "cannot durably invalidate")
+        }
+        confirmedEventBuffer.clear(instanceKey, runId)
+        com.crush.mobile.util.AppLog.w("A2", "replay $outcome for run=$runId; evidence invalidated")
     }
 
     /** Startup reconciler for C1–C3; intentionally fail-closed (§7/§17.1). */
@@ -376,37 +434,48 @@ class AppContainer(context: Context) {
             onConfirmedEvent = { key, event ->
                 event.runId?.let { runId ->
                     containerScope.launch {
-                        // Durable first: the in-memory view must never claim a
-                        // phase the row cannot support. A 0-row guarded write
-                        // means "not yet applicable" (typically pre-ACK), so
-                        // the event is deferred, never silently discarded.
-                        val applied = runCatching { executionStore.applyConfirmedEvent(runId, event) }
-                        when (val n = applied.getOrNull()) {
-                            1 -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
-                                executionController.onConfirmedEvent(key, event)
+                        // Durable first; the in-memory view never claims a
+                        // phase the row cannot support. Every outcome is
+                        // classified — no bare 0 is treated as success.
+                        val outcome = executionStore.applyConfirmedEvent(event)
+                        when (outcome) {
+                            ConfirmedApply.Applied -> {
+                                kotlinx.coroutines.withContext(
+                                    kotlinx.coroutines.Dispatchers.Main.immediate,
+                                ) { executionController.onConfirmedEvent(key, event) }
+                                if (event.type == com.crush.mobile.execution.ExecutionEvent.Type.RUN_COMPLETE) {
+                                    executionEventAdapter.retireRun(key, runId)
+                                }
                             }
-                            0 -> {
+                            ConfirmedApply.AlreadyApplied, ConfirmedApply.NotApplicable -> Unit
+                            ConfirmedApply.Deferred, is ConfirmedApply.Unavailable -> {
                                 val kept = confirmedEventBuffer.add(key, runId, event)
                                 if (!kept) {
-                                    val row = runCatching { executionStore.byRunId(runId) }.getOrNull()
-                                    row?.let {
-                                        runCatching {
+                                    val executionId = event.executionId
+                                    if (executionId != null && executionId.isNotBlank()) {
+                                        val written = runCatching {
                                             executionStore.markUnknown(
-                                                it.executionId,
+                                                executionId,
                                                 "recovery:event_buffer_incomplete",
+                                            )
+                                        }
+                                        if (written.getOrNull() != 1) {
+                                            com.crush.mobile.util.AppLog.w(
+                                                "A2",
+                                                "durable INCOMPLETE not recorded for exec=$executionId: " +
+                                                    (written.exceptionOrNull()?.message ?: "0 rows"),
                                             )
                                         }
                                     }
                                     com.crush.mobile.util.AppLog.w(
                                         "A2",
-                                        "confirmed event buffer overflow for run=$runId; INCOMPLETE recorded",
+                                        "confirmed event buffer overflow for run=$runId; evidence invalidated",
                                     )
                                 }
                             }
-                            else -> com.crush.mobile.util.AppLog.w(
-                                "A2",
-                                "durable confirmed write failed: ${applied.exceptionOrNull()?.message}",
-                            )
+                            ConfirmedApply.Stale, ConfirmedApply.Conflict,
+                            ConfirmedApply.IntegrityFailure ->
+                                invalidatePendingEvidence(key, runId, event, outcome)
                         }
                     }
                 }
@@ -586,6 +655,8 @@ class AppContainer(context: Context) {
      * reconstructing an engine underneath a deleted directory.
      */
     companion object {
+        private const val REPLAY_MAX_ATTEMPTS = 3
+
         const val TOKEN_LEGACY = "legacy"
         const val TOKEN_CHAT = "chat"
         private const val TOKEN_PROJECT_PREFIX = "proj:"

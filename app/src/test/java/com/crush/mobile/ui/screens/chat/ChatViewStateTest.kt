@@ -449,6 +449,19 @@ class ChatViewStateTest {
     }
 
     @Test
+    fun `a confirmed cancellation is never rendered as successful completion`() {
+        val cancelled = recovered(ExecutionLifecycle.COMPLETED, "confirmed_cancelled")
+        val success = recovered(ExecutionLifecycle.COMPLETED, "confirmed_completion")
+        val views = listOf(cancelled, success).toRecoveredOutcomes()
+
+        assertEquals("Cancelled", views[0].statusLabel)
+        assertFalse(views[0].statusLabel == "completed")
+        assertEquals("completed", views[1].statusLabel)
+        assertTrue(cancelled.isCancelled)
+        assertFalse(success.isCancelled)
+    }
+
+    @Test
     fun `recovered outcomes reach the presentation state`() {
         val outcome = RecoveredOutcomeView(
             id = "e1",

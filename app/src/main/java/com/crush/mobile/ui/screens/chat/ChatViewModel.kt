@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
+import com.crush.mobile.execution.ConfirmedApply
 import com.crush.mobile.execution.EventConnectionPort
+import com.crush.mobile.execution.ExecutionLifecycle
 import com.crush.mobile.execution.ExecutionPersistenceGuard
 import com.crush.mobile.execution.ExecutionSendPolicy
 import com.crush.mobile.execution.ExecutionTarget
@@ -4012,7 +4014,12 @@ class ChatViewModel(
                 }
                 // Let the adapter recognize this run's real frames as CONFIRMED
                 // and record this screen as an observer (detach is separate).
-                container.executionEventAdapter.declare(instanceKey, runId, generation)
+                container.executionEventAdapter.declare(
+                    instanceKey,
+                    runId,
+                    generation,
+                    execution.executionId,
+                )
                 container.executionController.subscribe(execution.executionId, connectionOwnerEpoch)
                 // Subscribe BEFORE prompting, on the long-lived connection when
                 // it is healthy.
@@ -4139,7 +4146,7 @@ class ChatViewModel(
                     // it now that the guard can accept it. Never manufacture ACKED.
                     container.replayConfirmedAfterAck(instanceKey, runId)
                     try {
-                        awaitStream(events, runId, handle)
+                        awaitStream(events, runId, handle, execution.executionId, generation)
                     } finally {
                         // Release the subscription either way. Completing the run
                         // closes the channel; an abandoned one must be
@@ -4469,7 +4476,9 @@ class ChatViewModel(
     private suspend fun awaitStream(
         events: kotlinx.coroutines.flow.Flow<CrushEvent>,
         runId: String,
-        handle: RunHandle
+        handle: RunHandle,
+        executionId: String? = null,
+        generation: Long? = null,
     ) {
         coroutineScope {
                 // The two event sources have different shapes: the shared
@@ -4614,6 +4623,29 @@ class ChatViewModel(
                         when (ev.type) {
                             CrushEvent.PayloadType.MESSAGE -> {
                                 val m = gson.fromJson(ev.body, StreamMessage::class.java)
+                                // W2: the per-turn stream already owns the exact
+                                // execution/run/generation identity. A MESSAGE
+                                // has no wire run id, so this is the ONLY safe
+                                // path for a confirmed finish(error) write.
+                                val finishError = m.finishError
+                                if (finishError != null && executionId != null && generation != null) {
+                                    val applied = runCatching {
+                                        container.executionStore.applyConfirmedFailure(
+                                            executionId,
+                                            runId,
+                                            generation,
+                                            finishError,
+                                        )
+                                    }
+                                    if (applied.getOrNull() == ConfirmedApply.Applied) {
+                                        container.executionController.markTerminal(
+                                            executionId,
+                                            ExecutionLifecycle.FAILED,
+                                            finishError,
+                                        )
+                                        container.executionEventAdapter.retireRun(instanceKey, runId)
+                                    }
+                                }
                                 if (m.role == "assistant") {
                                     // Crush republishes the WHOLE message, so a
                                     // single frame's tool list REPLACES itself.

@@ -89,6 +89,73 @@ interface ExecutionDao {
     @Query("SELECT * FROM executions WHERE run_id = :runId")
     suspend fun byRunId(runId: String): ExecutionEntity?
 
+    @Query(
+        "SELECT * FROM executions WHERE execution_id = :executionId AND run_id = :runId"
+    )
+    suspend fun byExecutionAndRun(executionId: String, runId: String): ExecutionEntity?
+
+    /**
+     * Every event write is keyed by the exact execution AND run, with the
+     * declared generation. `run_id` alone is never an execution identity.
+     */
+    @Query(
+        "UPDATE executions SET phase = 'RUNNING', updated_at_ms = :at " +
+            "WHERE execution_id = :executionId AND run_id = :runId " +
+            "AND phase = 'SUBMISSION_ACKNOWLEDGED' AND ack_state = 'ACKED' " +
+            "AND engine_generation IS :generation"
+    )
+    suspend fun markRunningExact(
+        executionId: String,
+        runId: String,
+        generation: Long,
+        at: Long,
+    ): Int
+
+    @Query(
+        "UPDATE executions SET phase = :phase, terminal_reason = :reason, " +
+            "updated_at_ms = :at WHERE execution_id = :executionId AND run_id = :runId " +
+            "AND phase IN ('SUBMISSION_ACKNOWLEDGED','RUNNING') " +
+            "AND ack_state = 'ACKED' AND engine_generation IS :generation"
+    )
+    suspend fun markTerminalExact(
+        executionId: String,
+        runId: String,
+        generation: Long,
+        phase: String,
+        reason: String,
+        at: Long,
+    ): Int
+
+    /** Narrow exception to first-terminal-write-wins; see design addendum. */
+    @Query(
+        "UPDATE executions SET phase = 'FAILED', terminal_reason = :reason, " +
+            "updated_at_ms = :at WHERE execution_id = :executionId AND run_id = :runId " +
+            "AND phase = 'COMPLETED' AND terminal_reason = 'confirmed_completion' " +
+            "AND ack_state = 'ACKED' AND engine_generation IS :generation"
+    )
+    suspend fun correctGenericCompletionToFailed(
+        executionId: String,
+        runId: String,
+        generation: Long,
+        reason: String,
+        at: Long,
+    ): Int
+
+    /** Per-turn confirmed failure; never inferred from an anonymous frame. */
+    @Query(
+        "UPDATE executions SET phase = 'FAILED', terminal_reason = :reason, " +
+            "updated_at_ms = :at WHERE execution_id = :executionId AND run_id = :runId " +
+            "AND phase IN ('SUBMISSION_ACKNOWLEDGED','RUNNING') " +
+            "AND ack_state = 'ACKED' AND engine_generation IS :generation"
+    )
+    suspend fun markFailedExact(
+        executionId: String,
+        runId: String,
+        generation: Long,
+        reason: String,
+        at: Long,
+    ): Int
+
     /**
      * Terminal evidence is scoped to an ACKED, still-live row for this exact
      * run. A second terminal event returns 0 and cannot change reason or time.

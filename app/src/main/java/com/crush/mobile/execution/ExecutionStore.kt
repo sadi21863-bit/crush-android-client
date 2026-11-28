@@ -79,30 +79,133 @@ class ExecutionStore(
     suspend fun markUnknown(id: String, reason: String) = dao.markUnknown(id, reason, clock())
 
     /**
-     * The production durable-event path. Scoped by run id, requires an ACKED
-     * live row, and refuses a generation mismatch. Terminal events write a
-     * terminal reason; everything else is progress only. Returns the affected
-     * row count: 0 means the event was NOT applied and must be deferred, not
-     * treated as proof of completion.
+     * V2-16 A2 Stage 2: the classified durable-event path. Every write is
+     * keyed by (executionId, runId, generation) — never by run id alone. A
+     * zero-row DAO result is classified by re-reading the exact row; it is
+     * never silently treated as either success or a generic failure.
      */
-    suspend fun applyConfirmedEvent(runId: String, event: ExecutionEvent): Int {
-        val row = dao.byRunId(runId) ?: return 0
-        val expected = event.generation
-        if (expected != null && row.engineGeneration != null && expected != row.engineGeneration) {
-            return 0
+    suspend fun applyConfirmedEvent(event: ExecutionEvent): ConfirmedApply {
+        val executionId = event.executionId ?: return ConfirmedApply.Stale
+        val runId = event.runId ?: return ConfirmedApply.Stale
+        val generation = event.generation ?: return ConfirmedApply.Stale
+        // A superseded declaration is read-only for late events.
+        if (event.superseded) return ConfirmedApply.Stale
+
+        val row = runCatching { dao.byExecutionAndRun(executionId, runId) }
+            .getOrElse { return ConfirmedApply.Unavailable(it) }
+            ?: return ConfirmedApply.Conflict
+        if (row.engineGeneration == null || row.engineGeneration != generation) {
+            return ConfirmedApply.Stale
         }
-        return when (event.type) {
-            ExecutionEvent.Type.RUN_COMPLETE -> {
+        if (row.ackState != ExecutionAckState.ACKED.name) {
+            return if (row.phase == ExecutionLifecycle.INTENT_RECORDED.name ||
+                row.phase == ExecutionLifecycle.SEND_ATTEMPTED.name
+            ) ConfirmedApply.Deferred else ConfirmedApply.NotApplicable
+        }
+
+        val isTerminal = event.type == ExecutionEvent.Type.RUN_COMPLETE
+        if (row.isTerminalPhase()) {
+            // A late progress frame is harmless; a second terminal fact is a
+            // duplicate, never a rewrite of reason or timestamp.
+            return if (isTerminal) ConfirmedApply.AlreadyApplied else ConfirmedApply.NotApplicable
+        }
+        // Healthy progress on a row already RUNNING needs no persistence. It
+        // must NEVER take the deferred/buffer path and overflow into a false
+        // UNKNOWN — this is a distinct, non-error classification.
+        if (!isTerminal && row.phase == ExecutionLifecycle.RUNNING.name) {
+            return ConfirmedApply.NotApplicable
+        }
+
+        val result = runCatching {
+            if (isTerminal) {
                 val reason = event.detail?.takeIf { it.isNotBlank() } ?: "confirmed_completion"
-                dao.markTerminalByRunId(
+                dao.markTerminalExact(
+                    executionId,
                     runId,
+                    generation,
                     ExecutionLifecycle.COMPLETED.name,
                     reason,
                     clock(),
                 )
+            } else {
+                dao.markRunningExact(executionId, runId, generation, clock())
             }
-            else -> dao.markRunningByRunId(runId, clock())
+        }.getOrElse { return ConfirmedApply.Unavailable(it) }
+        return classifyCount(result, executionId, runId, generation, isTerminal)
+    }
+
+    /**
+     * W2: a confirmed error from the per-turn stream, where identity is
+     * explicit and validated. Never called from the adapter's anonymous path.
+     */
+    suspend fun applyConfirmedFailure(
+        executionId: String,
+        runId: String,
+        generation: Long,
+        reason: String,
+    ): ConfirmedApply {
+        val row = runCatching { dao.byExecutionAndRun(executionId, runId) }
+            .getOrElse { return ConfirmedApply.Unavailable(it) }
+            ?: return ConfirmedApply.Conflict
+        if (row.engineGeneration == null || row.engineGeneration != generation) {
+            return ConfirmedApply.Stale
         }
+        if (row.phase == ExecutionLifecycle.FAILED.name) return ConfirmedApply.AlreadyApplied
+        if (row.phase == ExecutionLifecycle.COMPLETED.name &&
+            row.terminalReason == "confirmed_cancelled"
+        ) return ConfirmedApply.Conflict
+        if (row.phase == ExecutionLifecycle.COMPLETED.name &&
+            row.terminalReason != "confirmed_completion"
+        ) return ConfirmedApply.Conflict
+
+        val result = runCatching {
+            if (row.phase == ExecutionLifecycle.COMPLETED.name) {
+                dao.correctGenericCompletionToFailed(
+                    executionId, runId, generation, reason, clock(),
+                )
+            } else if (row.ackState == ExecutionAckState.ACKED.name) {
+                dao.markFailedExact(executionId, runId, generation, reason, clock())
+            } else {
+                return ConfirmedApply.Deferred
+            }
+        }.getOrElse { return ConfirmedApply.Unavailable(it) }
+        return classifyCount(result, executionId, runId, generation, terminal = true)
+    }
+
+    private suspend fun classifyCount(
+        count: Int,
+        executionId: String,
+        runId: String,
+        generation: Long,
+        terminal: Boolean,
+    ): ConfirmedApply = when {
+        count == 1 -> ConfirmedApply.Applied
+        count > 1 -> ConfirmedApply.IntegrityFailure
+        else -> {
+            val current = runCatching { dao.byExecutionAndRun(executionId, runId) }
+                .getOrElse { return ConfirmedApply.Unavailable(it) }
+                ?: return ConfirmedApply.Conflict
+            if (current.engineGeneration == null || current.engineGeneration != generation) {
+                ConfirmedApply.Stale
+            } else if (current.isTerminalPhase()) {
+                if (terminal) ConfirmedApply.AlreadyApplied else ConfirmedApply.NotApplicable
+            } else if (current.ackState != ExecutionAckState.ACKED.name) {
+                ConfirmedApply.Deferred
+            } else {
+                ConfirmedApply.Conflict
+            }
+        }
+    }
+
+    private fun ExecutionEntity.isTerminalPhase(): Boolean = when (phase) {
+        ExecutionLifecycle.UNSENT.name,
+        ExecutionLifecycle.SEND_AMBIGUOUS.name,
+        ExecutionLifecycle.COMPLETED.name,
+        ExecutionLifecycle.FAILED.name,
+        ExecutionLifecycle.LOST.name,
+        ExecutionLifecycle.UNKNOWN.name,
+        -> true
+        else -> false
     }
 
     suspend fun markTerminal(id: String, phase: ExecutionLifecycle, reason: String?) =

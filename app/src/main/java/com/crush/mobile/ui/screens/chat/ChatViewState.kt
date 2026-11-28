@@ -304,7 +304,7 @@ fun List<ExecutionView>.toRecoveredOutcomes(): List<RecoveredOutcomeView> = map 
             ExecutionLifecycle.SEND_AMBIGUOUS -> "send unclear"
             ExecutionLifecycle.UNKNOWN -> "unknown - evidence incomplete"
             ExecutionLifecycle.LOST -> "lost"
-            ExecutionLifecycle.COMPLETED -> "completed"
+            ExecutionLifecycle.COMPLETED -> if (e.isCancelled) "Cancelled" else "completed"
             ExecutionLifecycle.FAILED -> "failed"
             else -> "unfinished"
         },

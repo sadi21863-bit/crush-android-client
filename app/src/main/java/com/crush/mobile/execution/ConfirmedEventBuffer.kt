@@ -44,7 +44,25 @@ class ConfirmedEventBuffer(
         return true
     }
 
-    /** Removes and returns buffered events; order of arrival is preserved. */
+    /**
+     * Read-only view under the SAME monitor as [add]. Evidence stays pending
+     * until its durable application is classified; nothing is removed here.
+     */
+    fun peek(instanceKey: String, runId: String): List<ExecutionEvent> {
+        val list = buffered[Key(instanceKey, runId)] ?: return emptyList()
+        return synchronized(list) { list.map { it.event } }
+    }
+
+    /** Removes one specific head entry only after a successful apply. */
+    fun remove(instanceKey: String, runId: String, event: ExecutionEvent) {
+        val list = buffered[Key(instanceKey, runId)] ?: return
+        synchronized(list) {
+            list.removeAll { it.event === event }
+            if (list.isEmpty()) buffered.remove(Key(instanceKey, runId), list)
+        }
+    }
+
+    /** Used by legacy tests only; production replay uses [peek]/[remove]. */
     fun drain(instanceKey: String, runId: String): List<ExecutionEvent> {
         val key = Key(instanceKey, runId)
         val list = buffered.remove(key) ?: return emptyList()

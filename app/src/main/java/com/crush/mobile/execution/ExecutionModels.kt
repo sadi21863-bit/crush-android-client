@@ -58,6 +58,10 @@ data class ExecutionEvent(
     val detail: String? = null,
     /** Engine generation captured at declare time; NULL means unknown/unproven. */
     val generation: Long? = null,
+    /** Explicit execution identity from the declaration; never inferred. */
+    val executionId: String? = null,
+    /** A late frame from a superseded declaration can never mutate a newer run. */
+    val superseded: Boolean = false,
 ) {
     enum class Type {
         MESSAGE, TOOL_CALL, TOOL_RESULT, PERMISSION, QUESTION,
@@ -88,6 +92,34 @@ data class ExecutionView(
             lifecycle == ExecutionLifecycle.FAILED ||
             lifecycle == ExecutionLifecycle.LOST ||
             lifecycle == ExecutionLifecycle.UNKNOWN
+
+    /**
+     * W1: the approved lifecycle keeps confirmed cancellation in COMPLETED,
+     * but that category must never be presented as success. The machine-readable
+     * distinction is the terminal reason, not a new phase value.
+     */
+    val isCancelled: Boolean
+        get() = lifecycle == ExecutionLifecycle.COMPLETED &&
+            reasonCode == "confirmed_cancelled"
+}
+
+/**
+ * V2-16 A2 Stage 2: a classified durable-event outcome. A bare affected-row
+ * count cannot distinguish a duplicate from a stale generation or a DB failure;
+ * replay must make that distinction without weakening any DAO guard.
+ */
+sealed interface ConfirmedApply {
+    data object Applied : ConfirmedApply
+    data object AlreadyApplied : ConfirmedApply
+    /** A valid event needing no write, e.g. progress on an already-RUNNING row. */
+    data object NotApplicable : ConfirmedApply
+    /** A prerequisite (durable ACK) is not yet satisfied. */
+    data object Deferred : ConfirmedApply
+    data object Stale : ConfirmedApply
+    /** Incompatible terminal evidence; never overwrite. */
+    data object Conflict : ConfirmedApply
+    data object IntegrityFailure : ConfirmedApply
+    data class Unavailable(val cause: Throwable) : ConfirmedApply
 }
 
 /** Result of a provisional attachment commit. */

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.execution.ExecutionReconcilerTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-28T06:15:11.684Z" hostname="LAPTOP-5US7QL1L" time="8.273">
+  <properties/>
+  <testcase name="C1 idle has no record and mints no execution" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.813"/>
+  <testcase name="prompt ambiguity is deferred untouched and reconciliation is idempotent" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.662"/>
+  <testcase name="an evidence gap is unknown not lost" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.858"/>
+  <testcase name="boundary two lost acknowledgement becomes ambiguous with no auto resend" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.635"/>
+  <testcase name="C2 C3 with no evidence are unknown not lost" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.571"/>
+  <testcase name="an ambiguous send stays visible through three restart cycles" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.82"/>
+  <testcase name="confirmed running evidence stays unknown instead of becoming lost" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.562"/>
+  <testcase name="confirmed failed history adopts FAILED not COMPLETED" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.852"/>
+  <testcase name="a failed probe is an evidence gap not a loss" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.623"/>
+  <testcase name="recovered outcomes can be adopted by the controller without claiming a live engine" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.45"/>
+  <testcase name="generation mismatch and missing generation never adopt into a replacement engine" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.493"/>
+  <testcase name="confirmed terminal history and confirmed absence are distinguished" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.376"/>
+  <testcase name="boundary one intent before send recovers as visibly unsent" classname="com.crush.mobile.execution.ExecutionReconcilerTest" time="0.515"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

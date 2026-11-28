@@ -29,7 +29,7 @@ class ExecutionEventAdapterTest {
         var epoch = 1L
         val adapter = ExecutionEventAdapter(epochOf = { epoch })
         val token = adapter.begin("pA")
-        adapter.declare("pA", "run-1")
+        adapter.declare("pA", "run-1", 7L, "e-1")
         adapter.onEvent("pA", event(attribution = Attribution.CONFIRMED, detail = "confirmed"))
         adapter.onEvent("pA", event(attribution = Attribution.PLAUSIBLE, detail = "plausible"))
         adapter.onEvent("pA", event(attribution = Attribution.UNATTRIBUTED, detail = "none"))
@@ -122,7 +122,7 @@ class ExecutionEventAdapterTest {
             newConnection = { _, _, _, _ -> port },
             scope = this,
         )
-        adapter.declare("pA", "run-1")
+        adapter.declare("pA", "run-1", 7L, "e-1")
         val stream = adapter.register("pA", "run-1")
         adapter.attach(
             key = "pA",
@@ -210,7 +210,7 @@ class ExecutionEventAdapterTest {
             newConnection = { _, _, _, _ -> FakePort() },
             scope = this,
         )
-        adapter.declare("pA", "run-1")
+        adapter.declare("pA", "run-1", 7L, "e-1")
         val stream = adapter.register("pA", "run-1")
         adapter.attach(
             key = "pA", workspaceId = "ws", clientId = "cid", port = 1,
@@ -237,7 +237,7 @@ class ExecutionEventAdapterTest {
             newConnection = { _, _, _, _ -> FakePort() },
             scope = this,
         )
-        adapter.declare("pA", "run-1")
+        adapter.declare("pA", "run-1", 7L, "e-1")
         val stream = adapter.register("pA", "run-1")
         adapter.attach(
             key = "pA", workspaceId = "ws", clientId = "cid", port = 1,

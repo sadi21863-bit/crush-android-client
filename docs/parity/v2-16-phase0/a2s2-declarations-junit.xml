@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.execution.RunDeclarationLifecycleTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-28T06:15:42.466Z" hostname="LAPTOP-5US7QL1L" time="0.018">
+  <properties/>
+  <testcase name="an evicted declaration fails closed" classname="com.crush.mobile.execution.RunDeclarationLifecycleTest" time="0.008"/>
+  <testcase name="declaration is retained and resolves to exact identity" classname="com.crush.mobile.execution.RunDeclarationLifecycleTest" time="0.001"/>
+  <testcase name="no latest-run fallback resolves an unknown run id" classname="com.crush.mobile.execution.RunDeclarationLifecycleTest" time="0.001"/>
+  <testcase name="forgetRun is explicit invalidation not an ACK side effect" classname="com.crush.mobile.execution.RunDeclarationLifecycleTest" time="0.003"/>
+  <testcase name="a superseding run keeps the old declaration read-only" classname="com.crush.mobile.execution.RunDeclarationLifecycleTest" time="0.004"/>
+  <testcase name="terminal observation retires instead of dropping identity" classname="com.crush.mobile.execution.RunDeclarationLifecycleTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

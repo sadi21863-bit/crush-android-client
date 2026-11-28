@@ -443,6 +443,9 @@ class CrushEngine(
                     ).also { process = it }
                 } catch (e: IOException) {
                     Log.e(TAG, "exec failed", e)
+                    // The bridge was started before exec; a caller that starts
+                    // CrushEngine directly (without a supervisor) would leak it.
+                    runCatching { egressBridge.stop() }
                     return@withContext EngineState.Failed(
                         reason = "Could not launch engine",
                         detail = "${e.javaClass.simpleName}: ${e.message}",

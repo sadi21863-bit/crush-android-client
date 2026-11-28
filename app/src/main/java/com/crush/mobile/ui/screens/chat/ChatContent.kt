@@ -1435,7 +1435,7 @@ private fun SessionSheet(
     onReview: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val now = remember { System.currentTimeMillis() }
+    val now = rememberTickingNowMs()
     var pendingDelete by remember { mutableStateOf<String?>(null) }
     val pendingLabel = pendingDelete?.let { id ->
         sessions.firstOrNull { it.id == id }?.label

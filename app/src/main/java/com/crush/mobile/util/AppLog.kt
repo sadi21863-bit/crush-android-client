@@ -146,11 +146,15 @@ object AppLog {
             safeTrace?.let { append('\n').append(it) }
         }
 
+        // Never pass the ORIGINAL throwable to logcat: its message/stack can
+        // carry a provider key even though the file sink is masked. Log the
+        // already-masked trace as text instead.
+        val logcatBody = safeTrace?.let { "$safeMsg\n$it" } ?: safeMsg
         when (level) {
-            "E" -> Log.e(tag, safeMsg, t)
-            "W" -> Log.w(tag, safeMsg, t)
-            "I" -> Log.i(tag, safeMsg, t)
-            else -> Log.d(tag, safeMsg, t)
+            "E" -> Log.e(tag, logcatBody)
+            "W" -> Log.w(tag, logcatBody)
+            "I" -> Log.i(tag, logcatBody)
+            else -> Log.d(tag, logcatBody)
         }
 
         val f = file ?: return

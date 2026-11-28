@@ -102,7 +102,9 @@ object DiagnosticsRecorder {
         // silently mangle every crash after the first.
         val entry = buildString {
             appendLine("$HEADER_PREFIX $stamp on '${thread.name}' $HEADER_SUFFIX")
-            appendLine(throwable.stackTraceToString())
+            // This file is also rendered on screen; mask at the choke point so
+            // a key-shaped string in an exception never reaches either sink.
+            appendLine(com.crush.mobile.util.AppLog.Masking.mask(throwable.stackTraceToString()))
         }
 
         // Read-modify-write of a tiny file. Not atomic across a crash loop, but

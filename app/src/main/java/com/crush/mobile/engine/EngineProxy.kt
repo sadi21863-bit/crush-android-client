@@ -143,6 +143,9 @@ class EngineProxy(
      */
     private fun serve(client: Socket, cs: CoroutineScope) {
         var upstream: Socket? = null
+        // Register before the handshake: stop() racing CONNECT must be able to
+        // close this socket rather than leak it until GC.
+        relays[client] = true
         try {
             client.tcpNoDelay = true
             client.soTimeout = 30_000
@@ -171,6 +174,7 @@ class EngineProxy(
             }
             val up = Socket()
             upstream = up
+            relays[up] = true
             up.connect(InetSocketAddress(addr, port), connectTimeoutMs)
             client.soTimeout = 0
             writeReply(client, "HTTP/1.1 200 Connection established\r\n\r\n")

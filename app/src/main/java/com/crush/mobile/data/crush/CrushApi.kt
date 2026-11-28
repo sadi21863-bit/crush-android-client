@@ -224,9 +224,16 @@ class CrushApi(
         }
     }
 
+    /**
+     * REST/POST client. A transport-level transparent replay of a POST whose
+     * response was lost would bypass the app's "never auto-resend an ambiguous
+     * submission" contract, so retry-on-connection-failure is disabled here
+     * and left enabled only on the long-lived SSE client.
+     */
     private val client: OkHttpClient
         get() = streamClient.newBuilder()
             .readTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)
             .build()
 
 private val json = "application/json".toMediaType()

@@ -179,7 +179,12 @@ open class SecureKeyStore(context: Context) {
                     Log.w(TAG, "keystore key invalidated; clearing")
                     clearAll()
                 }
-                else -> Log.w(TAG, "unexpected decrypt failure; key retained", e)
+                // Route through AppLog so the throwable text is masked before
+                // it reaches logcat.
+                else -> com.crush.mobile.util.AppLog.w(
+                    TAG,
+                    "unexpected decrypt failure; key retained: ${e.message}",
+                )
             }
             null
         }

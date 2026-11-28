@@ -102,6 +102,12 @@ class ConnectionRegistry(
     ) {
         synchronized(lock) {
             val previous = entries[key]
+            if (previous != null && previous.ownerEpoch > ownerEpoch) {
+                // Monotonic epochs: an older owner that finishes a slow
+                // bootstrap late must never evict the newer live reader.
+                stopConn(conn, "late attach epoch $ownerEpoch superseded by ${previous.ownerEpoch}")
+                return
+            }
             entries[key] = Entry(conn, ownerEpoch)
             if (previous != null && previous.conn !== conn && previous.ownerEpoch != ownerEpoch) {
                 // The previous registration is already OFF the map (replaced

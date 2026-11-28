@@ -22,11 +22,13 @@ class ConfirmedEventBuffer(
 
     private val buffered = ConcurrentHashMap<Key, MutableList<Entry>>()
     private val incomplete = ConcurrentHashMap.newKeySet<Key>()
+    /** Explicitly invalidated keys: late adds must fail closed, not reattach. */
+    private val tombstoned = ConcurrentHashMap.newKeySet<Key>()
 
     /** Returns false on overflow; the caller must then record INCOMPLETE. */
     fun add(instanceKey: String, runId: String, event: ExecutionEvent): Boolean {
         val key = Key(instanceKey, runId)
-        if (incomplete.contains(key)) return false
+        if (incomplete.contains(key) || tombstoned.contains(key)) return false
         val list = buffered.computeIfAbsent(key) { Collections.synchronizedList(mutableListOf()) }
         synchronized(list) {
             val size = (event.detail?.length ?: 0) + 64
@@ -53,12 +55,13 @@ class ConfirmedEventBuffer(
         return synchronized(list) { list.map { it.event } }
     }
 
-    /** Removes one specific head entry only after a successful apply. */
+    /** Head-only removal: a non-head event can never detach later evidence. */
     fun remove(instanceKey: String, runId: String, event: ExecutionEvent) {
-        val list = buffered[Key(instanceKey, runId)] ?: return
+        val key = Key(instanceKey, runId)
+        val list = buffered[key] ?: return
         synchronized(list) {
-            list.removeAll { it.event === event }
-            if (list.isEmpty()) buffered.remove(Key(instanceKey, runId), list)
+            if (list.firstOrNull()?.event === event) list.removeAt(0)
+            if (list.isEmpty()) buffered.remove(key, list)
         }
     }
 
@@ -72,10 +75,14 @@ class ConfirmedEventBuffer(
     fun isIncomplete(instanceKey: String, runId: String): Boolean =
         incomplete.contains(Key(instanceKey, runId))
 
+    /** Explicit invalidation: synchronized with add, and tombstoned. */
     fun clear(instanceKey: String, runId: String) {
         val key = Key(instanceKey, runId)
+        val list = buffered[key]
+        if (list != null) synchronized(list) { list.clear() }
         buffered.remove(key)
         incomplete.remove(key)
+        tombstoned.add(key)
     }
 
     /** Bounded view for diagnostics; no body or prompt text is exposed. */

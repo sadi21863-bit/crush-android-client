@@ -59,7 +59,7 @@ fun ChatListContent(
     } else {
         "Crush Chat"
     }
-    val now = remember { System.currentTimeMillis() }
+    val now = rememberTickingNowMs()
 
     Scaffold(
         topBar = {

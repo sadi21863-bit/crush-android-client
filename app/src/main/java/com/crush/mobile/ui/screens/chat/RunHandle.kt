@@ -30,7 +30,11 @@ import kotlinx.coroutines.Job
  * Cancellation of the local jobs happens inside [stop], so a caller cannot
  * forget it; the caller only decides what to do about the server side.
  */
-internal class RunHandle(val turnId: String) {
+internal class RunHandle(
+    val turnId: String,
+    /** Frozen at construction: a project switch must not retarget run cleanup. */
+    val instanceKey: String = "chat",
+) {
 
     private val stoppedFlag = AtomicBoolean(false)
 

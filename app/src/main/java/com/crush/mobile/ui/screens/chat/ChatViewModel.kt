@@ -43,6 +43,7 @@ import com.crush.mobile.data.crush.StreamMessage
 import com.crush.mobile.data.crush.WorkspaceLease
 import com.crush.mobile.data.crush.PermissionPolicyException
 import com.crush.mobile.data.crush.WorkspaceManager
+import com.crush.mobile.data.crush.runCatchingNonCancellation
 import com.crush.mobile.data.handoff.HandoffDao
 import com.crush.mobile.data.handoff.HandoffEntity
 import com.crush.mobile.data.local.SecureKeyStore
@@ -579,8 +580,8 @@ class ChatViewModel(
      * The URL host/port are shape-only - CrushApi routes them through
      * junixsocket's factory onto the socket file.
      */
-    private fun crushApi(port: Int): CrushApi =
-        CrushApi(port, socketPath = EngineSockets.socketPath(context, instanceKey))
+    private fun crushApi(port: Int, key: String = instanceKey): CrushApi =
+        CrushApi(port, socketPath = EngineSockets.socketPath(context, key))
 
     /**
      * The engine INSTANCE this session binds to (ADR-0001 accepted shape,
@@ -904,7 +905,9 @@ class ChatViewModel(
     private fun abandonRun(handle: RunHandle) {
         if (activeRun === handle) {
             activeRun = null
-            container.reportRunInFlight(instanceKey, false)
+            // Use the run's own frozen key: a project switch retargets the
+            // ViewModel field, not the run that is being abandoned.
+            container.reportRunInFlight(handle.instanceKey, false)
         }
     }
 
@@ -1303,7 +1306,7 @@ class ChatViewModel(
         // observed once - because bindProject()'s normal path deliberately
         // parks on port=null and waits for the next state emission, which
         // would end THIS boot without opening anything.
-        runCatching { container.restoreLastBinding() }
+        runCatchingNonCancellation { container.restoreLastBinding() }
         val boundKey = container.activeInstanceKey.value
         if (boundKey != instanceKey) {
             AppLog.i(TAG, "bootstrap adopting the container's binding '$boundKey' (was '$instanceKey')")
@@ -1357,7 +1360,7 @@ class ChatViewModel(
         // emitted at all we cannot configure safely: fall back to the mirror
         // (pre-race behaviour, warmed by the ViewModel's own collector) and log
         // loudly, because a wrong provider here undoes the whole handshake.
-        val persisted = runCatching {
+        val persisted = runCatchingNonCancellation {
             container.settingsRepository.settings.first()
         }
         val permissionMode = persisted.getOrNull()?.permissionMode
@@ -1552,7 +1555,7 @@ class ChatViewModel(
         // config" for exactly the id the app then configured. The visible set
         // below is what keeps retired-upstream ids out of the picker and out of
         // the probe shortlist.
-        val engineProviders = runCatching {
+        val engineProviders = runCatchingNonCancellation {
             api.providers(opened.workspaceId)
         }.getOrDefault(emptyList())
         val visibleEngineIds = ZenModelsApi.engineVisibleModelIds(engineProviders, providerId)
@@ -1564,12 +1567,12 @@ class ChatViewModel(
         // catalogue is in hand. No attachment UI ships in this stage; this is
         // what lets the transcript gate/explain image input later, and it is
         // logged as a count so the claim is checkable on device.
-        val visionIds = runCatching {
+        val visionIds = runCatchingNonCancellation {
             ZenModelsApi.visionCapableModelIds(engineProviders, providerId)
         }.getOrDefault(emptySet())
         engineVisionIdsCache = visionIds
         engineVisionProviderId = providerId
-        val prices = runCatching {
+        val prices = runCatchingNonCancellation {
             ZenModelsApi.pricesFromProviders(engineProviders, providerId)
         }.getOrDefault(emptyMap())
         if (prices.isNotEmpty()) {
@@ -1577,7 +1580,7 @@ class ChatViewModel(
         }
         AppLog.i(TAG, "catalogue prices loaded for ${prices.size} models")
 
-        val catalogue = runCatching { zen.fetch() }.getOrNull()
+        val catalogue = runCatchingNonCancellation { zen.fetch() }.getOrNull()
         // ONE bounded retry of the whole catalogue read (measured on device
         // 2026-11-02, traces 02:15 + 12:44): the same fetch succeeded seconds
         // later on both occasions, and a transient 200-empty/dial flake used to
@@ -1588,7 +1591,7 @@ class ChatViewModel(
         val usable = if (catalogue?.models.orEmpty().isEmpty()) {
             AppLog.w(TAG, "catalogue fetch unusable (${catalogue?.error}); retrying once")
             delay(1_200)
-            val retried = runCatching { zen.fetch() }.getOrNull()
+            val retried = runCatchingNonCancellation { zen.fetch() }.getOrNull()
             if (retried?.models.isNullOrEmpty()) catalogue else retried
         } else catalogue
         val models = usable?.models.orEmpty().let { listed ->
@@ -1654,7 +1657,7 @@ class ChatViewModel(
         // handoff, the stamped id ahead of it - now leads the shortlist,
         // while the probe keeps deciding: firstWorking stays fail-safe when
         // a preferred head is dead.
-        val persistedModel = runCatching {
+        val persistedModel = runCatchingNonCancellation {
             container.settingsRepository.settings.first().selectedModel
         }
             .onFailure { AppLog.w(TAG, "persisted model read failed: ${it.message}") }
@@ -1704,7 +1707,7 @@ class ChatViewModel(
         // restarted engine recreates the coordinator with its own default
         // (the build agent), which would silently undo the seating.
         val mainAgent = Providers.byId(providerId)?.mainAgent?.takeIf { it.isNotBlank() }
-        var init = runCatching {
+        var init = runCatchingNonCancellation {
             session.ensureAgentReady(key, providerId = providerId, modelId = chosen, mainAgent = mainAgent)
         }.getOrElse {
             AppLog.w(TAG, "init with probed model threw: ${it.message}")
@@ -1716,7 +1719,7 @@ class ChatViewModel(
             // force=true so the freshness shortcut cannot short-circuit this.
             // Without it the lease may still look fresh and we would "retry"
             // against the very id that just 404'd.
-            val back = runCatching { mgr.reattachIfStale(force = true) }
+            val back = runCatchingNonCancellation { mgr.reattachIfStale(force = true) }
                 .onFailure { AppLog.w(TAG, "re-open failed: ${it.message}") }
                 .getOrDefault(false)
             val freshWs = mgr.currentWorkspaceId
@@ -1767,18 +1770,18 @@ class ChatViewModel(
         val resumable: String? = if (mintFresh || wsForResume == null) {
             null
         } else {
-            runCatching { findSessionToResume(wsForResume) }
+            runCatchingNonCancellation { findSessionToResume(wsForResume) }
                 .onFailure { AppLog.w(TAG, "session resume lookup failed: ${it.message}") }
                 .getOrNull()
         }
 
         sessionId = if (mintFresh) {
             AppLog.i(TAG, "new chat: minting a fresh session on '$instanceKey'")
-            runCatching { mgr.newSession("chat").id }.getOrNull()
+            runCatchingNonCancellation { mgr.newSession("chat").id }.getOrNull()
         } else {
             resumable ?: run {
                 AppLog.i(TAG, "no prior session with content; creating one")
-                runCatching { mgr.newSession("chat").id }.getOrNull()
+                runCatchingNonCancellation { mgr.newSession("chat").id }.getOrNull()
             }
         }
         // A boot with nothing to resume is also a fresh surface: clear any
@@ -1940,7 +1943,7 @@ class ChatViewModel(
             val attempts = 4
             var lastFailure: String? = null
             for (n in 1..attempts) {
-                val outcome = runCatching { crushApi(p).currentSession(ws, mgr.clientId, sid.orEmpty()) }
+                val outcome = runCatchingNonCancellation { crushApi(p).currentSession(ws, mgr.clientId, sid.orEmpty()) }
                 if (outcome.isSuccess) {
                     AppLog.i(TAG, "current-session reported: ${sid?.take(8) ?: "(cleared)"}")
                     return@launch
@@ -1978,7 +1981,7 @@ class ChatViewModel(
      */
     private suspend fun findSessionToResume(ws: String): String? {
         val p = port ?: return null
-        val list = runCatching { crushApi(p).listSessions(ws) }
+        val list = runCatchingNonCancellation { crushApi(p).listSessions(ws) }
             .onFailure { AppLog.w(TAG, "listSessions failed: ${it.message}") }
             .getOrDefault(emptyList())
         if (list.isEmpty()) return null
@@ -2110,7 +2113,7 @@ class ChatViewModel(
         // emission - first() answers immediately because DataStore serves the
         // in-process cache after the first read - and keep the mirror only as
         // the fallback if DataStore itself errors.
-        val persisted = runCatching {
+        val persisted = runCatchingNonCancellation {
             container.settingsRepository.settings.first().providerId
         }.getOrNull()?.takeIf { it.isNotBlank() }
         return persisted
@@ -2229,7 +2232,7 @@ class ChatViewModel(
             // configure a model that fails every later turn with
             // "Model is unavailable" - the same class of failure as the original
             // hardcoded default, just user-triggered.
-            val key = runCatching { container.keySession.require(secureKeys, currentProviderId()) }
+            val key = runCatchingNonCancellation { container.keySession.require(secureKeys, currentProviderId()) }
                 .getOrNull()
             if (myTap != modelSelection) return@launch
             if (key == null) {
@@ -2287,7 +2290,7 @@ class ChatViewModel(
             // and their verification belongs to a selection nobody made.
             if (myTap != modelSelection) return@launch
             // Both slots: Crush uses the small one for session titles.
-            runCatching {
+            runCatchingNonCancellation {
                 val api = crushApi(p)
                 for (slot in listOf(SetModelRequest.LARGE, SetModelRequest.SMALL)) {
                     api.setModel(ws, slot, SelectedModel(model = id, provider = providerId))
@@ -2298,7 +2301,7 @@ class ChatViewModel(
             // used to reset on every relaunch/new instance (the honest note
             // capabilities carried), handing fresh instances to the pool's
             // static preferred probe and lately to haiku; this write closes it.
-            runCatching { container.settingsRepository.saveSelectedModel(id) }
+            runCatchingNonCancellation { container.settingsRepository.saveSelectedModel(id) }
                 .onFailure { AppLog.w(TAG, "persist model selection failed: ${it.message}") }
         }
     }
@@ -2336,12 +2339,12 @@ class ChatViewModel(
                 AppLog.i(TAG, "O11 session-list stall injected: ${stall}ms")
                 delay(stall)
             }
-            val ok = runCatching { mgr.reattachIfStale() }.getOrDefault(false)
+            val ok = runCatchingNonCancellation { mgr.reattachIfStale() }.getOrDefault(false)
             val ws = if (ok) mgr.currentWorkspaceId else null
             val list = if (ws == null) {
                 emptyList()
             } else {
-                runCatching { crushApi(p).listSessions(ws) }
+                runCatchingNonCancellation { crushApi(p).listSessions(ws) }
                     .onFailure { AppLog.w(TAG, "listSessions failed: ${it.message}") }
                     .getOrDefault(emptyList())
             }
@@ -2367,9 +2370,9 @@ class ChatViewModel(
         val p = port ?: return
         val epoch = ++sessionViewEpoch
         viewModelScope.launch {
-            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) return@launch
+            if (!runCatchingNonCancellation { mgr.reattachIfStale() }.getOrDefault(false)) return@launch
             val ws = mgr.currentWorkspaceId ?: return@launch
-            val history = runCatching { crushApi(p).messages(ws, sessionId) }
+            val history = runCatchingNonCancellation { crushApi(p).messages(ws, sessionId) }
                 .onFailure { AppLog.w(TAG, "history failed: ${it.message}") }
                 .getOrDefault(emptyList())
 
@@ -2524,14 +2527,14 @@ class ChatViewModel(
         }
         val epoch = ++sessionViewEpoch
         viewModelScope.launch {
-            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+            if (!runCatchingNonCancellation { mgr.reattachIfStale() }.getOrDefault(false)) {
                 pendingNewChatKey = instanceKey
                 bootstrap()
                 return@launch
             }
             pendingNewChatKey = null
             val ws = mgr.currentWorkspaceId ?: return@launch
-            val sid = runCatching { mgr.newSession("chat").id }.getOrNull() ?: return@launch
+            val sid = runCatchingNonCancellation { mgr.newSession("chat").id }.getOrNull() ?: return@launch
             // Same stale-switch contract as openSession: creating the engine
             // session across the network must not let a slower write of a
             // PREVIOUS switch overwrite the view the user is actually on.
@@ -2587,7 +2590,7 @@ class ChatViewModel(
             // Clear any previous failure banner at the start of a new attempt.
             _state.update { it.copy(deleteError = null) }
 
-            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+            if (!runCatchingNonCancellation { mgr.reattachIfStale() }.getOrDefault(false)) {
                 AppLog.w(TAG, "deleteSession: could not re-attach")
                 _state.update {
                     it.copy(deleteError = "Could not reach the engine. Try again.")
@@ -2608,7 +2611,7 @@ class ChatViewModel(
             var outcome = crushApi(p).deleteSession(ws, sessionId)
             if (outcome is DeleteOutcome.Failed) {
                 AppLog.w(TAG, "delete attempt 1 unknown: ${outcome.reason}")
-                val back = runCatching { mgr.reattachIfStale(force = true) }
+                val back = runCatchingNonCancellation { mgr.reattachIfStale(force = true) }
                     .onFailure { AppLog.w(TAG, "delete re-open failed: ${it.message}") }
                     .getOrDefault(false)
                 val ws2 = mgr.currentWorkspaceId
@@ -2679,7 +2682,7 @@ class ChatViewModel(
         val mgr = workspaces ?: return
         val p = port ?: return
         viewModelScope.launch {
-            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+            if (!runCatchingNonCancellation { mgr.reattachIfStale() }.getOrDefault(false)) {
                 AppLog.w(TAG, "grant aborted: could not re-attach; dialog kept open")
                 return@launch
             }
@@ -2692,7 +2695,7 @@ class ChatViewModel(
                 allowForSession -> PermissionGrant.ALLOW_SESSION
                 else -> PermissionGrant.ALLOW
             }
-            val granted = runCatching {
+            val granted = runCatchingNonCancellation {
                 crushApi(p).grant(ws, PermissionGrant(permission = req, action = action))
             }
             granted.onFailure {
@@ -2741,7 +2744,7 @@ class ChatViewModel(
                     val manager = mgr
                     if (manager == null) {
                         "No workspace is attached. The question is still open."
-                    } else if (!runCatching { manager.reattachIfStale() }.getOrDefault(false)) {
+                    } else if (!runCatchingNonCancellation { manager.reattachIfStale() }.getOrDefault(false)) {
                         AppLog.w(TAG, "question release aborted: could not re-attach; dialog kept open")
                         "Could not reach the engine. The question is still open."
                     } else {
@@ -2756,7 +2759,7 @@ class ChatViewModel(
                         AppLog.w(TAG, "question release aborted: no workspace attached; dialog kept open")
                         "No workspace is attached. The question is still open."
                     } else {
-                        val confirmed = runCatching { crushApi(portNow).cancelQuestions(ws) }
+                        val confirmed = runCatchingNonCancellation { crushApi(portNow).cancelQuestions(ws) }
                             .onFailure {
                                 AppLog.w(TAG, "question cancel failed: ${it.message}; dialog kept open")
                             }
@@ -2808,7 +2811,7 @@ class ChatViewModel(
                     val manager = mgr
                     if (manager == null) {
                         "No workspace is attached. The question is still open."
-                    } else if (!runCatching { manager.reattachIfStale() }.getOrDefault(false)) {
+                    } else if (!runCatchingNonCancellation { manager.reattachIfStale() }.getOrDefault(false)) {
                         AppLog.w(TAG, "question answer aborted: could not re-attach; dialog kept open")
                         "Could not reach the engine. The question is still open."
                     } else {
@@ -2827,7 +2830,7 @@ class ChatViewModel(
                             batchId = batch.batchId.ifBlank { q.id },
                             answers = answers,
                         )
-                        val sent = runCatching { crushApi(portNow).answerQuestions(ws, payload) }
+                        val sent = runCatchingNonCancellation { crushApi(portNow).answerQuestions(ws, payload) }
                             .onFailure {
                                 AppLog.w(TAG, "question answer failed: ${it.message}; dialog kept open")
                             }
@@ -2930,7 +2933,7 @@ class ChatViewModel(
             // ABANDONED head stays invisible here: a re-tap of the chip asks
             // for a FRESH handoff, and the trace rows were never deleted.
             val surfaces = sourceId?.let { id ->
-                runCatching { container.projectStore.handoffDao().rowsForSource(id) }
+                runCatchingNonCancellation { container.projectStore.handoffDao().rowsForSource(id) }
                     .onFailure { AppLog.w(TAG, "handoff trace read failed: ${it.message}") }
                     .getOrDefault(emptyList())
             } ?: emptyList()
@@ -2964,7 +2967,7 @@ class ChatViewModel(
     /** Refreshes the destination picker's rows (the projects table). */
     fun loadHandoffProjects() {
         viewModelScope.launch {
-            val rows = runCatching { container.projectStore.list() }
+            val rows = runCatchingNonCancellation { container.projectStore.list() }
                 .onFailure { AppLog.w(TAG, "handoff project rows read failed: ${it.message}") }
                 .getOrDefault(emptyList())
             _state.update { it.copy(handoffProjects = rows) }
@@ -2988,7 +2991,7 @@ class ChatViewModel(
             return
         }
         viewModelScope.launch {
-            val rows = runCatching { container.projectStore.handoffDao().rowsForSource(sourceId) }
+            val rows = runCatchingNonCancellation { container.projectStore.handoffDao().rowsForSource(sourceId) }
                 .onFailure { AppLog.w(TAG, "handoff hint read failed: ${it.message}") }
                 .getOrDefault(emptyList())
             val classified = handoffResumeHint(rows, sourceId) { it.targetCodeSessionId } ?: run {
@@ -3011,8 +3014,8 @@ class ChatViewModel(
     ): HandoffResumeHint {
         val projectId = rows.firstOrNull { it.handoffId == classified.handoffId }?.targetProjectId
         val label = projectId
-            ?.let { id -> runCatching { java.util.UUID.fromString(id) }.getOrNull() }
-            ?.let { id -> runCatching { container.projectStore.byId(id) }.getOrNull() }
+            ?.let { id -> runCatchingNonCancellation { java.util.UUID.fromString(id) }.getOrNull() }
+            ?.let { id -> runCatchingNonCancellation { container.projectStore.byId(id) }.getOrNull() }
             ?.label
             ?: "its project"
         return classified.copy(targetLabel = label)
@@ -3050,7 +3053,7 @@ class ChatViewModel(
             return
         }
         viewModelScope.launch {
-            val dao = runCatching { container.projectStore.handoffDao() }.getOrElse { failure ->
+            val dao = runCatchingNonCancellation { container.projectStore.handoffDao() }.getOrElse { failure ->
                 AppLog.e(TAG, "handoff store unavailable: ${failure.javaClass.simpleName}: ${failure.message}")
                 _state.update { it.copy(handoffNotice = "The handoff store is unavailable. Nothing approved.") }
                 return@launch
@@ -3099,9 +3102,9 @@ class ChatViewModel(
         goneNotice: String,
         onTrustRequired: (PendingProjectTrust) -> Unit,
     ): ProjectRef? {
-        val targetUuid = runCatching { java.util.UUID.fromString(destinationId) }.getOrNull()
+        val targetUuid = runCatchingNonCancellation { java.util.UUID.fromString(destinationId) }.getOrNull()
         val ref = targetUuid?.let { id ->
-            runCatching { container.projectStore.byId(id) }
+            runCatchingNonCancellation { container.projectStore.byId(id) }
                 .onFailure { AppLog.w(TAG, "handoff project read failed: ${it.message}") }
                 .getOrNull()
         }
@@ -3110,7 +3113,7 @@ class ChatViewModel(
             _state.update { it.copy(handoffNotice = goneNotice) }
             return null
         }
-        val verdict = runCatching { container.projectTrust.gate(ref) }.getOrElse { failure ->
+        val verdict = runCatchingNonCancellation { container.projectTrust.gate(ref) }.getOrElse { failure ->
             AppLog.w(TAG, "handoff trust gate failed: ${failure.javaClass.simpleName}: ${failure.message}")
             _state.update {
                 it.copy(handoffNotice = "Trust state unreadable - nothing was $label.")
@@ -3129,7 +3132,7 @@ class ChatViewModel(
             return null
         }
         val allow = verdict as TrustVerdict.Allow
-        val record = runCatching {
+        val record = runCatchingNonCancellation {
             container.projectTrust.confirmAtGate(ref, allow.observedFingerprint)
         }.getOrElse { failure ->
             AppLog.w(TAG, "handoff consent record failed: ${failure.javaClass.simpleName}: ${failure.message}")
@@ -3193,7 +3196,7 @@ class ChatViewModel(
             // The abandon is the ROW's record-keeping fact: status
             // ABANDONED, every other column untouched (the approval stamp
             // survives "what was approved, then replaced").
-            val replaced = runCatching { dao.abandon(row.handoffId) }
+            val replaced = runCatchingNonCancellation { dao.abandon(row.handoffId) }
                 .onFailure { AppLog.w(TAG, "handoff abandon (no-alias) failed: ${it.message}") }
                 .getOrDefault(0)
             if (replaced != 1) {
@@ -3210,7 +3213,7 @@ class ChatViewModel(
         // Belt, not ceremony: the classification was read at sheet-open time.
         // The guarded machine arbitrates anything that happened since - an
         // APPROVED row is the only state a dispatch accepts.
-        val live = runCatching { dao.getById(row.handoffId) }
+        val live = runCatchingNonCancellation { dao.getById(row.handoffId) }
             .onFailure { AppLog.w(TAG, "handoff trace read failed: ${it.message}") }
             .getOrNull()
         if (live == null || live.status != "APPROVED") {
@@ -3335,7 +3338,7 @@ class ChatViewModel(
             pkg.copy(userApprovedAt = approvedAtMs)
         }
         val sealedId = packageForTurn.handoffId
-        val approved = runCatching { dao.markApproved(sealedId, approvedAtMs) }
+        val approved = runCatchingNonCancellation { dao.markApproved(sealedId, approvedAtMs) }
             .onFailure { AppLog.w(TAG, "handoff approve failed: ${it.message}") }
             .getOrDefault(0)
         if (approved != 1) {
@@ -3380,14 +3383,14 @@ class ChatViewModel(
         val sheet = _state.value.handoffSheet ?: return
         val rowId = sheet.approvedRow?.handoffId ?: sheet.existingDraft?.handoffId ?: return
         viewModelScope.launch {
-            val dao = runCatching { container.projectStore.handoffDao() }.getOrElse { failure ->
+            val dao = runCatchingNonCancellation { container.projectStore.handoffDao() }.getOrElse { failure ->
                 AppLog.e(TAG, "handoff store unavailable: ${failure.javaClass.simpleName}: ${failure.message}")
                 _state.update {
                     it.copy(handoffNotice = "The handoff store is unavailable. Nothing was discarded.")
                 }
                 return@launch
             }
-            val moved = runCatching { dao.abandon(rowId) }
+            val moved = runCatchingNonCancellation { dao.abandon(rowId) }
                 .onFailure { AppLog.w(TAG, "handoff abandon failed: ${it.message}") }
                 .getOrDefault(0)
             if (moved == 1) {
@@ -3464,12 +3467,12 @@ class ChatViewModel(
             return
         }
         viewModelScope.launch {
-            val dao = runCatching { container.projectStore.handoffDao() }.getOrElse { failure ->
+            val dao = runCatchingNonCancellation { container.projectStore.handoffDao() }.getOrElse { failure ->
                 AppLog.e(TAG, "handoff store unavailable: ${failure.javaClass.simpleName}: ${failure.message}")
                 _state.update { it.copy(handoffNotice = "The handoff store is unavailable.") }
                 return@launch
             }
-            val row = runCatching { dao.rowsForSource(sourceId).firstOrNull { it.status == "DISPATCHED" } }
+            val row = runCatchingNonCancellation { dao.rowsForSource(sourceId).firstOrNull { it.status == "DISPATCHED" } }
                 .onFailure { AppLog.w(TAG, "handoff trace read failed: ${it.message}") }
                 .getOrNull()
             if (row == null) {
@@ -3493,9 +3496,9 @@ class ChatViewModel(
                 }
                 return@launch
             }
-            val targetUuid = runCatching { java.util.UUID.fromString(row.targetProjectId) }.getOrNull()
+            val targetUuid = runCatchingNonCancellation { java.util.UUID.fromString(row.targetProjectId) }.getOrNull()
             val ref = targetUuid?.let { id ->
-                runCatching { container.projectStore.byId(id) }
+                runCatchingNonCancellation { container.projectStore.byId(id) }
                     .onFailure { AppLog.w(TAG, "handoff project read failed: ${it.message}") }
                     .getOrNull()
             }
@@ -3509,7 +3512,7 @@ class ChatViewModel(
                 }
                 return@launch
             }
-            val verdict = runCatching { container.projectTrust.gate(ref) }.getOrElse { failure ->
+            val verdict = runCatchingNonCancellation { container.projectTrust.gate(ref) }.getOrElse { failure ->
                 AppLog.w(TAG, "handoff trust gate failed: ${failure.javaClass.simpleName}: ${failure.message}")
                 _state.update {
                     it.copy(handoffNotice = "Trust state unreadable - the session was not opened.")
@@ -3523,7 +3526,7 @@ class ChatViewModel(
                 return@launch
             }
             val allow = verdict as TrustVerdict.Allow
-            val record = runCatching {
+            val record = runCatchingNonCancellation {
                 container.projectTrust.confirmAtGate(ref, allow.observedFingerprint)
             }.getOrElse { failure ->
                 AppLog.w(TAG, "handoff consent record failed: ${failure.javaClass.simpleName}: ${failure.message}")
@@ -3586,14 +3589,14 @@ class ChatViewModel(
         )
         val mgr = bindCodeForHandoff(ref) ?: return null
         // (e1) THE dispatch session - the plan's exact API and title shape.
-        if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+        if (!runCatchingNonCancellation { mgr.reattachIfStale() }.getOrDefault(false)) {
             AppLog.w(TAG, "handoff: workspace re-attach failed before session creation")
             _state.update {
                 it.copy(handoffNotice = "Could not reach the workspace in \"${ref.label}\".")
             }
             return null
         }
-        val target = runCatching { mgr.newSession(handoffSessionTitle(java.time.LocalTime.now())) }
+        val target = runCatchingNonCancellation { mgr.newSession(handoffSessionTitle(java.time.LocalTime.now())) }
             .getOrElse { failure ->
                 AppLog.w(TAG, "handoff session creation failed: ${failure.message}")
                 _state.update {
@@ -3610,10 +3613,10 @@ class ChatViewModel(
         // provenance line. Fail-soft: a walk that cannot run stores null -
         // the "(not recorded)" degradation stays owned by the walk's
         // failure, never a forged digest.
-        val treeDigest = runCatching { ProjectTreeFingerprint.of(ref.repoDir) }
+        val treeDigest = runCatchingNonCancellation { ProjectTreeFingerprint.of(ref.repoDir) }
             .onFailure { AppLog.w(TAG, "handoff tree fingerprint walk failed: ${it.message}") }
             .getOrNull()
-        val moved = runCatching {
+        val moved = runCatchingNonCancellation {
             container.projectStore.handoffDao().markDispatched(handoffId, target.id, treeDigest)
         }.onFailure { AppLog.w(TAG, "handoff dispatch stamp failed: ${it.message}") }.getOrDefault(0)
         if (moved != 1) {
@@ -3758,7 +3761,10 @@ class ChatViewModel(
 
         // The stop identity for this turn, created before any work starts so a
         // Stop can never race a half-initialised run (audit P1-05).
-        val handle = RunHandle(turnId = UUID.randomUUID().toString())
+        val handle = RunHandle(
+            turnId = UUID.randomUUID().toString(),
+            instanceKey = instanceKey,
+        )
         activeRun = handle
         // Give the container the in-flight signal while THIS instance runs
         // (the run-in-flight guard for the container-owned stop on switch).
@@ -3775,7 +3781,7 @@ class ChatViewModel(
             // Crush reaps an unattached workspace after ~30s (MEASURED: alive at
             // 15s, gone at 30s). The id captured at bootstrap is therefore
             // normally dead before the user finishes typing, so re-attach first.
-            if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+            if (!runCatchingNonCancellation { mgr.reattachIfStale() }.getOrDefault(false)) {
                 AppLog.w(TAG, "could not re-attach workspace; re-bootstrapping")
                 workspaces = null
                 wsId = null
@@ -3803,15 +3809,15 @@ class ChatViewModel(
             // key + both model slots + coordinator right here, using the same
             // probe-verified model bootstrap chose.
             if (_state.value.selectedModel.isNotBlank()) {
-                val precheck = runCatching { crushApi(p).agentInfo(ws) }.getOrNull()
+                val precheck = runCatchingNonCancellation { crushApi(p).agentInfo(ws) }.getOrNull()
                 if (precheck?.isReady != true) {
                     AppLog.w(TAG, "send preflight: agent not ready, re-configuring")
-                    val key = runCatching {
+                    val key = runCatchingNonCancellation {
                         container.keySession.require(secureKeys, currentProviderId())
                     }.getOrNull()
                     val providerId = Providers.resolve(_state.value.providerId).id
                     if (key != null) {
-                        val healed = runCatching {
+                        val healed = runCatchingNonCancellation {
                             CrushSession(crushApi(p), mgr).ensureAgentReady(
                                 key,
                                 providerId = providerId,
@@ -3850,7 +3856,7 @@ class ChatViewModel(
             // is whether we have one. If the server has genuinely lost it, the
             // send path detects "session not found" and starts a new one there.
             val existing = sessionId
-            val sid = existing ?: runCatching { mgr.newSession("chat").id }.getOrNull()
+            val sid = existing ?: runCatchingNonCancellation { mgr.newSession("chat").id }.getOrNull()
             if (sid == null) {
                 AppLog.w(TAG, "could not obtain a session; re-bootstrapping")
                 abandonRun(handle)
@@ -3963,7 +3969,6 @@ class ChatViewModel(
             val api = crushApi(p)
             var targetWs = ws
             var targetSid = sid
-            var attempt = 0
             var failure: String? = null
             var accepted = false
             // A retried turn must not keep consuming the first attempt's
@@ -3977,7 +3982,11 @@ class ChatViewModel(
             // mayPost() is re-checked per attempt: a turn stopped during
             // preflight must never reach the engine, and a stop that lands
             // between attempts must not retry (audit P1-05).
-            while (attempt < 2 && !accepted && handle.mayPost()) {
+            // for-loop enforces the documented two-attempt ceiling even if the
+            // retry policy flag is ever enabled; a while without attempt++
+            // would spin forever in that case.
+            for (attempt in 0 until 2) {
+                if (accepted || !handle.mayPost()) break
                 val runId = UUID.randomUUID().toString()
                 // A1 submission ordering: register the in-memory intent and the
                 // pre-send attempt marker BEFORE any HTTP call, so an engine
@@ -3994,7 +4003,7 @@ class ChatViewModel(
                 // It is process-local, so cross-process recovery still fails
                 // closed instead of guessing.
                 val generation = WorkspaceManager.currentEngineGeneration()
-                val durable = runCatching {
+                val durable = runCatchingNonCancellation {
                     container.executionStore.persistIntent(
                         executionId = execution.executionId,
                         runId = runId,
@@ -4054,7 +4063,7 @@ class ChatViewModel(
                 // how a 404 closed the app with no visible error.
                 // A2 slice 1, boundary 1→2: record the send attempt before the
                 // POST. If the marker cannot be written the POST is not made.
-                val marked = runCatching { container.executionStore.markSent(execution.executionId) }
+                val marked = runCatchingNonCancellation { container.executionStore.markSent(execution.executionId) }
                 if (!ExecutionPersistenceGuard.committed(marked)) {
                     val why = marked.exceptionOrNull()?.let {
                         "durable send marker failed: ${it.message}"
@@ -4081,7 +4090,7 @@ class ChatViewModel(
                         workspaceSnapshot
                     )
                     _state.update { it.copy(fileChanges = null) }
-                    runCatching { api.send(targetWs, AgentMessageRequest(targetSid, text, runId)) }
+                    runCatchingNonCancellation { api.send(targetWs, AgentMessageRequest(targetSid, text, runId)) }
                 }
                 val msg = when {
                     sent == null -> "send timed out"
@@ -4099,7 +4108,7 @@ class ChatViewModel(
                     // action into a model failure. A2: the POST may already
                     // have landed, so the durable record becomes AMBIGUOUS -
                     // never auto-resend, and no false "not sent" claim.
-                    val stoppedAmb = runCatching {
+                    val stoppedAmb = runCatchingNonCancellation {
                         container.executionStore.markAmbiguous(execution.executionId)
                     }
                     if (!ExecutionPersistenceGuard.committed(stoppedAmb)) {
@@ -4120,14 +4129,14 @@ class ChatViewModel(
                     // in-memory controller is allowed to claim acknowledgement.
                     // A refused (0-row) or failed write leaves an honest
                     // ambiguous outcome and never advances the phase.
-                    val acked = runCatching { container.executionStore.markAcked(execution.executionId) }
+                    val acked = runCatchingNonCancellation { container.executionStore.markAcked(execution.executionId) }
                     if (!ExecutionPersistenceGuard.committed(acked)) {
                         val why = acked.exceptionOrNull()?.let {
                             "durable ack failed: ${it.message}"
                         } ?: "durable ack refused (0 rows)"
                         AppLog.e(TAG, why)
                         container.executionController.markAmbiguousSend(execution.executionId, why)
-                        val fallbackAmb = runCatching {
+                        val fallbackAmb = runCatchingNonCancellation {
                             container.executionStore.markAmbiguous(execution.executionId)
                         }
                         if (!ExecutionPersistenceGuard.committed(fallbackAmb)) {
@@ -4162,7 +4171,7 @@ class ChatViewModel(
                     // unacknowledged POST is therefore AMBIGUOUS, never a
                     // proven rejection and never automatically re-sent.
                     container.executionController.markAmbiguousSend(execution.executionId, msg)
-                    val amb = runCatching {
+                    val amb = runCatchingNonCancellation {
                         container.executionStore.markAmbiguous(execution.executionId)
                     }
                     if (!ExecutionPersistenceGuard.committed(amb)) {
@@ -4221,7 +4230,9 @@ class ChatViewModel(
             // here - the moment the local job unwinds - would let hang
             // detection judge the engine idle while it is still working on the
             // run we just asked it to stop.
-            if (!handle.isStopped) engineSupervisorFor.setWorkActive(false)
+            if (!handle.isStopped) {
+                container.runtimeFor(handle.instanceKey).supervisor.setWorkActive(false)
+            }
             abandonRun(handle)
             // The turn is over in every sense: any permission or question this
             // run raised is addressed to a run that no longer exists, and once
@@ -4382,8 +4393,8 @@ class ChatViewModel(
             return
         }
 
-        val result = runCatching {
-            val api = crushApi(port ?: return@runCatching null)
+        val result = runCatchingNonCancellation {
+            val api = crushApi(port ?: return@runCatchingNonCancellation null)
             val tracked = api.trackedFiles(ws, sid)
             collector.collectFull(runFileRoot ?: workspaceRoot(), tracked, snap)
         }.getOrNull()
@@ -4580,7 +4591,7 @@ class ChatViewModel(
                                 val p = handle.port
                                 val w = handle.ws
                                 val busy = if (p != null && w != null) {
-                                    runCatching { crushApi(p).agentInfo(w).isBusy }
+                                    runCatchingNonCancellation { crushApi(p).agentInfo(w).isBusy }
                                         .getOrNull()
                                 } else {
                                     null
@@ -4629,7 +4640,7 @@ class ChatViewModel(
                                 // path for a confirmed finish(error) write.
                                 val finishError = m.finishError
                                 if (finishError != null && executionId != null && generation != null) {
-                                    val applied = runCatching {
+                                    val applied = runCatchingNonCancellation {
                                         container.executionStore.applyConfirmedFailure(
                                             executionId,
                                             runId,
@@ -4637,13 +4648,36 @@ class ChatViewModel(
                                             finishError,
                                         )
                                     }
-                                    if (applied.getOrNull() == ConfirmedApply.Applied) {
-                                        container.executionController.markTerminal(
-                                            executionId,
-                                            ExecutionLifecycle.FAILED,
-                                            finishError,
-                                        )
-                                        container.executionEventAdapter.retireRun(instanceKey, runId)
+                                    when (val result = applied.getOrNull()) {
+                                        ConfirmedApply.Applied, ConfirmedApply.AlreadyApplied -> {
+                                            // A duplicate durable failure still
+                                            // has to reach the in-memory view.
+                                            container.executionController.markTerminal(
+                                                executionId,
+                                                ExecutionLifecycle.FAILED,
+                                                finishError,
+                                            )
+                                            container.executionEventAdapter.retireRun(instanceKey, runId)
+                                        }
+                                        ConfirmedApply.NotApplicable -> Unit
+                                        ConfirmedApply.Deferred, is ConfirmedApply.Unavailable -> {
+                                            // The bubble already carries finishError;
+                                            // keep it visible without claiming a
+                                            // durable terminal state.
+                                        }
+                                        ConfirmedApply.Stale, ConfirmedApply.Conflict,
+                                        ConfirmedApply.IntegrityFailure -> {
+                                            val reason = "recovery:finish_error_${result.toString().lowercase()}"
+                                            runCatchingNonCancellation {
+                                                container.executionStore.markUnknown(executionId, reason)
+                                            }
+                                            container.executionController.markTerminal(
+                                                executionId,
+                                                ExecutionLifecycle.UNKNOWN,
+                                                reason,
+                                            )
+                                        }
+                                        null -> Unit
                                     }
                                 }
                                 if (m.role == "assistant") {
@@ -4826,6 +4860,10 @@ class ChatViewModel(
                                         it.copy(
                                             isStreaming = false,
                                             text = rc.text.ifBlank { it.text },
+                                            // C18: a cancelled completion is not
+                                            // a successful answer. Keep the
+                                            // truthful label on the live bubble.
+                                            error = if (rc.cancelled) "Cancelled" else it.error,
                                             tools = it.tools.map { t ->
                                                 if (t.isRunning) {
                                                     t.copy(
@@ -4882,7 +4920,7 @@ class ChatViewModel(
         val w = handle.ws ?: return
         val s = handle.sid ?: return
         if (handle.isStopped) return
-        runCatching { crushApi(p).cancel(w, s) }
+        runCatchingNonCancellation { crushApi(p).cancel(w, s) }
             .onFailure { AppLog.w(TAG, "expiry cancel not confirmed for $s: ${it.message}") }
     }
 
@@ -4973,11 +5011,11 @@ class ChatViewModel(
                 // The workspace is an attachment handle that reaps (~30 s) even
                 // though the session persists under the project's cwd, so every
                 // poll re-attaches first - the same contract as openSession.
-                if (!runCatching { mgr.reattachIfStale() }.getOrDefault(false)) {
+                if (!runCatchingNonCancellation { mgr.reattachIfStale() }.getOrDefault(false)) {
                     return@repeat
                 }
                 val ws = mgr.currentWorkspaceId ?: return@repeat
-                val history = runCatching { crushApi(port).messages(ws, sid) }
+                val history = runCatchingNonCancellation { crushApi(port).messages(ws, sid) }
                     .onFailure { AppLog.w(TAG, "late report refresh failed: ${it.message}") }
                     .getOrNull() ?: return@repeat
                 val replayed = history.mapNotNull { m ->
@@ -5041,7 +5079,7 @@ class ChatViewModel(
                 // Preflight window: nothing was posted, no bubble exists, and
                 // mayPost() keeps it that way. Local cancellation is complete.
                 abandonRun(handle)
-                engineSupervisorFor.setWorkActive(false)
+                container.runtimeFor(handle.instanceKey).supervisor.setWorkActive(false)
                 // A prompt raised during preflight belongs to a run that was
                 // never posted and can never be answered; retire it (P1-7).
                 _state.update {
@@ -5064,8 +5102,8 @@ class ChatViewModel(
                 // transient failure here must not be reported to the user as
                 // "stopped".
                 viewModelScope.launch {
-                    val confirmed = runCatching {
-                        crushApi(action.port).cancel(action.ws, action.sid)
+                    val confirmed = runCatchingNonCancellation {
+                        crushApi(action.port, handle.instanceKey).cancel(action.ws, action.sid)
                     }.isSuccess
                     if (!confirmed) {
                         AppLog.w(TAG, "stop: server cancel not confirmed for ${action.sid}")

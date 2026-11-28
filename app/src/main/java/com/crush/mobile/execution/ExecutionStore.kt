@@ -1,5 +1,7 @@
 package com.crush.mobile.execution
 
+import com.crush.mobile.data.crush.runCatchingNonCancellation
+
 /**
  * V2-16 A2 slice 1: the durable half of execution ownership.
  *
@@ -91,7 +93,7 @@ class ExecutionStore(
         // A superseded declaration is read-only for late events.
         if (event.superseded) return ConfirmedApply.Stale
 
-        val row = runCatching { dao.byExecutionAndRun(executionId, runId) }
+        val row = runCatchingNonCancellation { dao.byExecutionAndRun(executionId, runId) }
             .getOrElse { return ConfirmedApply.Unavailable(it) }
             ?: return ConfirmedApply.Conflict
         if (row.engineGeneration == null || row.engineGeneration != generation) {
@@ -116,7 +118,7 @@ class ExecutionStore(
             return ConfirmedApply.NotApplicable
         }
 
-        val result = runCatching {
+        val result = runCatchingNonCancellation {
             if (isTerminal) {
                 val reason = event.detail?.takeIf { it.isNotBlank() } ?: "confirmed_completion"
                 dao.markTerminalExact(
@@ -144,7 +146,7 @@ class ExecutionStore(
         generation: Long,
         reason: String,
     ): ConfirmedApply {
-        val row = runCatching { dao.byExecutionAndRun(executionId, runId) }
+        val row = runCatchingNonCancellation { dao.byExecutionAndRun(executionId, runId) }
             .getOrElse { return ConfirmedApply.Unavailable(it) }
             ?: return ConfirmedApply.Conflict
         if (row.engineGeneration == null || row.engineGeneration != generation) {
@@ -158,7 +160,7 @@ class ExecutionStore(
             row.terminalReason != "confirmed_completion"
         ) return ConfirmedApply.Conflict
 
-        val result = runCatching {
+        val result = runCatchingNonCancellation {
             if (row.phase == ExecutionLifecycle.COMPLETED.name) {
                 dao.correctGenericCompletionToFailed(
                     executionId, runId, generation, reason, clock(),
@@ -182,7 +184,7 @@ class ExecutionStore(
         count == 1 -> ConfirmedApply.Applied
         count > 1 -> ConfirmedApply.IntegrityFailure
         else -> {
-            val current = runCatching { dao.byExecutionAndRun(executionId, runId) }
+            val current = runCatchingNonCancellation { dao.byExecutionAndRun(executionId, runId) }
                 .getOrElse { return ConfirmedApply.Unavailable(it) }
                 ?: return ConfirmedApply.Conflict
             if (current.engineGeneration == null || current.engineGeneration != generation) {

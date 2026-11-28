@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.execution.ExecutionControllerTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-11-28T08:53:45.915Z" hostname="LAPTOP-5US7QL1L" time="0.25">
+  <properties/>
+  <testcase name="invalidationMarksActiveExecutionsUnknownWithReason" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.083"/>
+  <testcase name="staleObserverCannotDetachAnotherObserver" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.011"/>
+  <testcase name="confirmedRunCompleteIsTheOnlyTerminalEngineEvidence" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.014"/>
+  <testcase name="definitiveRejectionIsFailedAndAcknowledgementIsNotRunning" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
+  <testcase name="concurrentStartsAndActiveChecksDoNotRace" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.014"/>
+  <testcase name="intentIsRegisteredBeforePostAndAmbiguousOutcomeStaysUnknown" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
+  <testcase name="retryCreatesNewIdentityAndKeepsOldRecord" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.0"/>
+  <testcase name="cancelResolvedIsNotAnExecutionTerminal" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.006"/>
+  <testcase name="unsubscribeIsDetachOnlyAndNeverCancels" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.002"/>
+  <testcase name="ambiguousPromptCannotOwnExecutionAndResolvedPromptDoesNotResume" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.002"/>
+  <testcase name="plausibleActivityCannotAdvancePhaseOrClearNoProgress" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.009"/>
+  <testcase name="publishedSnapshotsNeverRegressDuringConcurrentStarts" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.021"/>
+  <testcase name="hasActiveIsKeyedAndReleasesOnTerminal" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
+  <testcase name="executionRunsWithNoObserver" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.001"/>
+  <testcase name="invalidationDuringConcurrentStartsMarksEveryRegisteredExecution" classname="com.crush.mobile.execution.ExecutionControllerTest" time="0.079"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -97,6 +97,8 @@ class ExecutionEventAdapter(
     }
 
     private val declarations = ConcurrentHashMap<Pair<String, String>, Declaration>()
+    /** Serializes replacement/retirement per instance key. */
+    private val declarationLock = Any()
     /** Bounded read-only history so a late old-run frame maps to its own identity. */
     private val retiredHistory =
         ConcurrentHashMap<String, MutableList<Declaration>>()
@@ -131,15 +133,17 @@ class ExecutionEventAdapter(
         generation: Long? = null,
         executionId: String,
     ) {
-        declarations.entries.toList().forEach { (k, d) ->
-            if (k.first == key && d.state == Declaration.State.ACTIVE) {
-                declarations.remove(k)
-                pushHistory(d.copy(state = Declaration.State.SUPERSEDED))
+        synchronized(declarationLock) {
+            declarations.entries.toList().forEach { (k, d) ->
+                if (k.first == key && d.state == Declaration.State.ACTIVE) {
+                    declarations.remove(k)
+                    pushHistory(d.copy(state = Declaration.State.SUPERSEDED))
+                }
             }
+            declarations[key to runId] = Declaration(
+                key, executionId, runId, generation, Declaration.State.ACTIVE,
+            )
         }
-        declarations[key to runId] = Declaration(
-            key, executionId, runId, generation, Declaration.State.ACTIVE,
-        )
         com.crush.mobile.util.AppLog.i(
             "ExecutionEventAdapter",
             "declare key=$key run=$runId exec=$executionId generation=$generation",
@@ -159,15 +163,19 @@ class ExecutionEventAdapter(
 
     /** Explicit invalidation; never called merely because ACK became durable. */
     fun forgetRun(key: String, runId: String) {
-        declarations.remove(key to runId)
-        val list = historyOf(key)
-        synchronized(list) { list.removeAll { it.runId == runId } }
+        synchronized(declarationLock) {
+            declarations.remove(key to runId)
+            val list = historyOf(key)
+            synchronized(list) { list.removeAll { it.runId == runId } }
+        }
     }
 
     /** Terminal observation: retain identity read-only, never mutate from it. */
     fun retireRun(key: String, runId: String) {
-        val declaration = declarations.remove(key to runId) ?: return
-        pushHistory(declaration.copy(state = Declaration.State.RETIRED))
+        synchronized(declarationLock) {
+            val declaration = declarations.remove(key to runId) ?: return
+            pushHistory(declaration.copy(state = Declaration.State.RETIRED))
+        }
     }
 
     companion object {
@@ -323,10 +331,12 @@ class ExecutionEventAdapter(
         EngineInvalidationProbe.fire("adapter.close", key)
         // Teardown retires declarations to read-only history; a late frame can
         // still resolve to its own identity but can never authorize a mutation.
-        declarations.entries.toList().forEach { (k, d) ->
-            if (k.first == key) {
-                declarations.remove(k)
-                pushHistory(d.copy(state = Declaration.State.RETIRED))
+        synchronized(declarationLock) {
+            declarations.entries.toList().forEach { (k, d) ->
+                if (k.first == key) {
+                    declarations.remove(k)
+                    pushHistory(d.copy(state = Declaration.State.RETIRED))
+                }
             }
         }
         connections.remove(key)?.let { entry ->

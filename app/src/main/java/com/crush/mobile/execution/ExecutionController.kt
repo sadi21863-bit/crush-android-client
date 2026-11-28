@@ -51,6 +51,29 @@ class ExecutionController(
         }
     }
 
+    /**
+     * I-01: terminal records are kept for a bounded recovery window, then
+     * evicted oldest-first. Active/in-flight records are never touched. Called
+     * under the [records] monitor from every insertion point.
+     */
+    private fun pruneTerminalLocked() {
+        val overflow = records.size - MAX_RECORDS
+        if (overflow <= 0) return
+        records.entries
+            .filter { it.value.isTerminal }
+            .sortedBy { it.value.lastObservedProgressAt }
+            .take(overflow)
+            .forEach { (id, _) ->
+                records.remove(id)
+                observerEpochs.remove(id)
+                activeByKey.entries.forEach { it.value.remove(id) }
+            }
+    }
+
+    companion object {
+        private const val MAX_RECORDS = 128
+    }
+
     private fun mutate(id: String, block: (ExecutionView) -> ExecutionView): Boolean {
         synchronized(records) {
             val current = records[id] ?: return false
@@ -81,6 +104,7 @@ class ExecutionController(
             activeByKey
                 .computeIfAbsent(target.instanceKey) { ConcurrentHashMap.newKeySet<String>() }
                 .add(id)
+            pruneTerminalLocked()
         }
         publish()
         return view
@@ -117,6 +141,7 @@ class ExecutionController(
             activeByKey
                 .computeIfAbsent(target.instanceKey) { ConcurrentHashMap.newKeySet<String>() }
                 .add(executionId)
+            pruneTerminalLocked()
         }
         publish()
         return view
@@ -158,8 +183,20 @@ class ExecutionController(
     /** Confirmed routed events are the only engine-side phase authority. */
     fun onConfirmedEvent(instanceKey: String, event: ExecutionEvent) {
         if (event.attribution != Attribution.CONFIRMED) return
+        // A superseded/retired declaration is read-only: its late frame may
+        // resolve to its own identity durably, but must never mutate a newer
+        // execution's in-memory view.
+        if (event.superseded) return
         val id = synchronized(records) {
-            activeByKey[instanceKey]?.firstOrNull { records[it]?.runId == event.runId }
+            val candidates = activeByKey[instanceKey] ?: return@synchronized null
+            // Exact execution identity is primary; run id and key are checks,
+            // never a substitute for identity when run ids collide.
+            val byId = event.executionId?.let { candidates.firstOrNull { id -> id == it } }
+            val resolved = byId ?: candidates.firstOrNull { records[it]?.runId == event.runId }
+            val view = resolved?.let { records[it] }
+            if (view == null || view.runId != event.runId ||
+                view.target.instanceKey != instanceKey
+            ) null else resolved
         } ?: return
         com.crush.mobile.util.AppLog.i(
             "ExecutionController",

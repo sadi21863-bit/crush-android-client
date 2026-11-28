@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.crush.mobile.execution.ConfirmedEventBufferTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-28T08:53:41.937Z" hostname="LAPTOP-5US7QL1L" time="3.964">
+  <properties/>
+  <testcase name="an event before ack is deferred then applied after ack" classname="com.crush.mobile.execution.ConfirmedEventBufferTest" time="2.05"/>
+  <testcase name="a terminal event before ack is not lost and not claimed complete" classname="com.crush.mobile.execution.ConfirmedEventBufferTest" time="0.654"/>
+  <testcase name="a failed ack never manufactures an acknowledged durable state" classname="com.crush.mobile.execution.ConfirmedEventBufferTest" time="0.574"/>
+  <testcase name="stale generation and superseded events are classified Stale" classname="com.crush.mobile.execution.ConfirmedEventBufferTest" time="0.538"/>
+  <testcase name="overflow is explicit and duplicates do not multiply evidence" classname="com.crush.mobile.execution.ConfirmedEventBufferTest" time="0.12"/>
+  <system-out><![CDATA[V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+W/OverlayConfig: partition_order.xml does not exist.
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+V/Configuration: Updating configuration, locales updated from [] to [en_US]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

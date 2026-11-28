@@ -27,6 +27,7 @@ import com.crush.mobile.execution.ExecutionReconciler
 import com.crush.mobile.execution.ExecutionStore
 import com.crush.mobile.execution.ExecutionTarget
 import com.crush.mobile.data.crush.CrushConnection
+import com.crush.mobile.data.crush.runCatchingNonCancellation
 import com.crush.mobile.data.crush.CrushEventRouter
 import com.google.gson.Gson
 import com.crush.mobile.engine.EnginePaths
@@ -79,12 +80,12 @@ internal class ShutdownPlan(
         if (!started.compareAndSet(false, true)) return 0
         var stopped = 0
         projects.forEachIndexed { index, stop ->
-            runCatching { stop() }
+            runCatchingNonCancellation { stop() }
                 .onSuccess { stopped++ }
                 .onFailure { onFailure("project[$index]", it) }
         }
         legacy?.let { stop ->
-            runCatching { stop() }
+            runCatchingNonCancellation { stop() }
                 .onSuccess { stopped++ }
                 .onFailure { onFailure("legacy", it) }
         }
@@ -159,46 +160,70 @@ class AppContainer(context: Context) {
      */
     suspend fun replayConfirmedAfterAck(instanceKey: String, runId: String) {
         if (confirmedEventBuffer.isIncomplete(instanceKey, runId)) return
-        // peek, never drain: evidence is removed only after a classified success.
-        val pending = confirmedEventBuffer.peek(instanceKey, runId)
-        for (event in pending) {
-            var attempts = 0
-            var outcome: ConfirmedApply
-            while (true) {
-                // CancellationException must propagate, not become a DB failure.
-                outcome = executionStore.applyConfirmedEvent(event)
-                if (outcome !is ConfirmedApply.Unavailable) break
-                if (++attempts >= REPLAY_MAX_ATTEMPTS) break
-            }
-            when (outcome) {
-                ConfirmedApply.Applied -> {
-                    confirmedEventBuffer.remove(instanceKey, runId, event)
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
-                        executionController.onConfirmedEvent(instanceKey, event)
+        // Re-peek after each pass: a frame arriving mid-replay must be applied
+        // in wire order, not stranded behind the original snapshot.
+        while (true) {
+            val pending = confirmedEventBuffer.peek(instanceKey, runId)
+            if (pending.isEmpty()) return
+            var stop = false
+            for (event in pending) {
+                var attempts = 0
+                var outcome: ConfirmedApply
+                while (true) {
+                    // CancellationException propagates from the store; it is
+                    // never converted into Unavailable or a terminal write.
+                    outcome = executionStore.applyConfirmedEvent(event)
+                    if (outcome !is ConfirmedApply.Unavailable) break
+                    if (++attempts >= REPLAY_MAX_ATTEMPTS) break
+                }
+                when (outcome) {
+                    ConfirmedApply.Applied -> {
+                        confirmedEventBuffer.remove(instanceKey, runId, event)
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                            executionController.onConfirmedEvent(instanceKey, event)
+                        }
+                        if (event.type == com.crush.mobile.execution.ExecutionEvent.Type.RUN_COMPLETE) {
+                            executionEventAdapter.retireRun(instanceKey, runId)
+                        }
                     }
-                    if (event.type == com.crush.mobile.execution.ExecutionEvent.Type.RUN_COMPLETE) {
-                        executionEventAdapter.retireRun(instanceKey, runId)
+                    ConfirmedApply.AlreadyApplied -> {
+                        confirmedEventBuffer.remove(instanceKey, runId, event)
+                        reconcileTerminalView(event.executionId)
+                    }
+                    ConfirmedApply.NotApplicable ->
+                        confirmedEventBuffer.remove(instanceKey, runId, event)
+                    ConfirmedApply.Deferred -> { stop = true; break }
+                    ConfirmedApply.Stale, ConfirmedApply.Conflict,
+                    ConfirmedApply.IntegrityFailure -> {
+                        invalidatePendingEvidence(instanceKey, runId, event, outcome)
+                        stop = true
+                        break
+                    }
+                    is ConfirmedApply.Unavailable -> {
+                        com.crush.mobile.util.AppLog.w(
+                            "A2",
+                            "replay unavailable for run=$runId; evidence kept pending: " +
+                                "${outcome.cause.message}",
+                        )
+                        stop = true
+                        break
                     }
                 }
-                ConfirmedApply.AlreadyApplied, ConfirmedApply.NotApplicable ->
-                    confirmedEventBuffer.remove(instanceKey, runId, event)
-                ConfirmedApply.Deferred -> break // prerequisite still missing; keep head
-                ConfirmedApply.Stale, ConfirmedApply.Conflict,
-                ConfirmedApply.IntegrityFailure -> {
-                    invalidatePendingEvidence(instanceKey, runId, event, outcome)
-                    break
-                }
-                is ConfirmedApply.Unavailable -> {
-                    // Keep the event pending; surface honestly. No fabricated
-                    // durable UNKNOWN when the database could not be written.
-                    com.crush.mobile.util.AppLog.w(
-                        "A2",
-                        "replay unavailable for run=$runId; evidence kept pending: " +
-                            "${outcome.cause.message}",
-                    )
-                    break
-                }
             }
+            if (stop) return
+        }
+    }
+
+    /** A duplicate durable terminal fact must be reflected in the in-memory view. */
+    private suspend fun reconcileTerminalView(executionId: String?) {
+        if (executionId == null) return
+        val row = runCatchingNonCancellation { executionStore.byId(executionId) }.getOrNull()
+            ?: return
+        val lifecycle = runCatching {
+            ExecutionLifecycle.valueOf(row.phase)
+        }.getOrNull() ?: return
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+            executionController.markTerminal(executionId, lifecycle, row.terminalReason)
         }
     }
 
@@ -208,10 +233,15 @@ class AppContainer(context: Context) {
         event: com.crush.mobile.execution.ExecutionEvent,
         outcome: ConfirmedApply,
     ) {
-        val reason = "recovery:replay_${outcome.javaClass.simpleName.lowercase()}"
+        val reason = when (outcome) {
+            ConfirmedApply.Stale -> "recovery:replay_stale"
+            ConfirmedApply.Conflict -> "recovery:replay_conflict"
+            ConfirmedApply.IntegrityFailure -> "recovery:replay_integrity_failure"
+            else -> "recovery:replay_unproven"
+        }
         val executionId = event.executionId
         if (executionId != null && executionId.isNotBlank()) {
-            val written = runCatching { executionStore.markUnknown(executionId, reason) }
+            val written = runCatchingNonCancellation { executionStore.markUnknown(executionId, reason) }
             if (written.getOrNull() != 1) {
                 com.crush.mobile.util.AppLog.w(
                     "A2",
@@ -453,7 +483,7 @@ class AppContainer(context: Context) {
                                 if (!kept) {
                                     val executionId = event.executionId
                                     if (executionId != null && executionId.isNotBlank()) {
-                                        val written = runCatching {
+                                        val written = runCatchingNonCancellation {
                                             executionStore.markUnknown(
                                                 executionId,
                                                 "recovery:event_buffer_incomplete",
@@ -615,7 +645,7 @@ class AppContainer(context: Context) {
     fun approvePendingProjectTrust() {
         val pending = _pendingProjectTrust.value ?: return
         containerScope.launch {
-            runCatching { projectTrust.recordConsent(pending.ref) }
+            runCatchingNonCancellation { projectTrust.recordConsent(pending.ref) }
                 .onSuccess {
                     // The request is consumed so the dialog host stops
                     // showing it in the same breath as the bind.
@@ -691,7 +721,7 @@ class AppContainer(context: Context) {
          */
         fun tokenToProjectId(token: String): java.util.UUID? =
             if (token.startsWith(TOKEN_PROJECT_PREFIX))
-                runCatching {
+                runCatchingNonCancellation {
                     java.util.UUID.fromString(token.removePrefix(TOKEN_PROJECT_PREFIX))
                 }.getOrNull()
             else null
@@ -733,7 +763,7 @@ class AppContainer(context: Context) {
         if (bindingRestored) return
         bindingRestored = true
         if (_activeInstanceKey.value != "") return
-        val token = runCatching { settingsRepository.readLastBinding() }.getOrDefault("")
+        val token = runCatchingNonCancellation { settingsRepository.readLastBinding() }.getOrDefault("")
         if (token.isEmpty() || token == TOKEN_LEGACY) return
         if (token == TOKEN_CHAT) {
             com.crush.mobile.util.AppLog.i("Lifecycle", "restoring last binding: chat pool")
@@ -741,7 +771,7 @@ class AppContainer(context: Context) {
             return
         }
         val ref = tokenToProjectId(token)?.let { pid ->
-            runCatching { projectStore.byId(pid) }.getOrNull()
+            runCatchingNonCancellation { projectStore.byId(pid) }.getOrNull()
         }
         if (ref == null) {
             com.crush.mobile.util.AppLog.w(
@@ -752,7 +782,7 @@ class AppContainer(context: Context) {
         }
         // S-02: gate BEFORE any bind decision. `return` inside the getOrElse
         // is the fail-closed corner (unreadable trust state = never bind).
-        val verdict = runCatching { projectTrust.gate(ref) }
+        val verdict = runCatchingNonCancellation { projectTrust.gate(ref) }
             .getOrElse { failure ->
                 val why = failure.message ?: failure.javaClass.simpleName
                 Log.w("Lifecycle", "last-binding restore blocked: trust state unreadable ($why)")
@@ -775,7 +805,7 @@ class AppContainer(context: Context) {
                 // when the folder moved inside the gate->record window (a
                 // crushrc planted or swapped while the restore ran), so the
                 // recorded state can never be a gate-never-saw surprise.
-                val outcome = runCatching {
+                val outcome = runCatchingNonCancellation {
                     projectTrust.confirmAtGate(ref, verdict.observedFingerprint)
                 }
                     .onFailure { failure ->
@@ -845,14 +875,14 @@ class AppContainer(context: Context) {
     suspend fun openLastDispatchedHandoff() {
         if (handoffResumeTried) return
         handoffResumeTried = true
-        val dao = runCatching { projectStore.handoffDao() }.getOrElse { failure ->
+        val dao = runCatchingNonCancellation { projectStore.handoffDao() }.getOrElse { failure ->
             com.crush.mobile.util.AppLog.w(
                 "Lifecycle",
                 "handoff resume skipped: handoff store unavailable (${failure.javaClass.simpleName})"
             )
             return
         }
-        val row = runCatching { dao.latestDispatched() }.getOrElse { failure ->
+        val row = runCatchingNonCancellation { dao.latestDispatched() }.getOrElse { failure ->
             com.crush.mobile.util.AppLog.w(
                 "Lifecycle",
                 "handoff resume skipped: trace read failed (${failure.javaClass.simpleName})"
@@ -860,7 +890,7 @@ class AppContainer(context: Context) {
             return
         } ?: return
         val targetSession = row.targetCodeSessionId ?: return
-        val ref = runCatching {
+        val ref = runCatchingNonCancellation {
             projectStore.byId(java.util.UUID.fromString(row.targetProjectId))
         }.getOrNull()
         if (ref == null) {
@@ -889,7 +919,7 @@ class AppContainer(context: Context) {
             )
             return
         }
-        val verdict = runCatching { projectTrust.gate(ref) }.getOrElse { failure ->
+        val verdict = runCatchingNonCancellation { projectTrust.gate(ref) }.getOrElse { failure ->
             val why = failure.message ?: failure.javaClass.simpleName
             Log.w("Lifecycle", "handoff resume blocked: trust state unreadable ($why)")
             com.crush.mobile.util.AppLog.w(
@@ -900,7 +930,7 @@ class AppContainer(context: Context) {
         }
         when (verdict) {
             is TrustVerdict.Allow -> {
-                val outcome = runCatching {
+                val outcome = runCatchingNonCancellation {
                     projectTrust.confirmAtGate(ref, verdict.observedFingerprint)
                 }.getOrNull()
                 val movedTo = outcome?.movedTo
@@ -941,7 +971,8 @@ class AppContainer(context: Context) {
         // committing after the invalidation sees the new epoch and rejects.
         // No engine is started or stopped here.
         EngineInvalidationProbe.listener = { source, key ->
-            executionEpochs[key] = (executionEpochs[key] ?: 0L) + 1L
+            // Atomic bump: two concurrent invalidations must not lose a step.
+            executionEpochs.compute(key) { _, prev -> (prev ?: 0L) + 1L }
             executionController.onInvalidated(key, source)
         }
 
@@ -951,12 +982,12 @@ class AppContainer(context: Context) {
         // but bootstraps that read the binding should not have to wait for
         // frame timing.
         containerScope.launch {
-            runCatching { restoreLastBinding() }
+            runCatchingNonCancellation { restoreLastBinding() }
             // Batch G (plan §9 g2): the DISPATCHED trace's resume runs BESIDE
             // the restore, after it - restoreLastBinding's bytes are untouched,
             // and this only acts when no binding landed (or the restore landed
             // the trace's own target).
-            runCatching { openLastDispatchedHandoff() }
+            runCatchingNonCancellation { openLastDispatchedHandoff() }
         }
 
         // A2 slice 1: one-shot startup reconciliation. Reads/writes Room only;
@@ -964,7 +995,7 @@ class AppContainer(context: Context) {
         // execution without an atomic validate+attach wrapper (absent), so the
         // outcomes are named and visible rather than claimed as live.
         containerScope.launch {
-            runCatching {
+            runCatchingNonCancellation {
                 val summary = executionReconciler.reconcile()
                 summary.recovered.forEach { recovered ->
                     val row = recovered.entity
@@ -1008,6 +1039,10 @@ class AppContainer(context: Context) {
 
     private fun applyBinding(binding: EngineBinding) {
         val oldKey = _activeInstanceKey.value
+        // B1: "p"+first8 is lossy. Two different project ids that collide on
+        // that prefix must be treated as a real switch, not an equal-key no-op
+        // that would share a runtime, socket and state dir.
+        val oldRefId = activeProjectRef?.id
         activeProjectRef = (binding as? EngineBinding.Project)?.ref
         _activeBinding.value = binding
         val newKey = keyFor(binding)
@@ -1015,7 +1050,8 @@ class AppContainer(context: Context) {
         // return: a same-key binding update must still move the label, and a
         // projection must never pair this binding with the previous key.
         _bindingSnapshot.value = BindingSnapshot(binding, newKey)
-        if (newKey == oldKey) return
+        val newRefId = (binding as? EngineBinding.Project)?.ref?.id
+        if (newKey == oldKey && newRefId == oldRefId) return
         _activeInstanceKey.value = newKey
         // A11/A12: make the binding change durable the same moment it lands.
         // Fire-and-forget: the launch queue on the container's main-immediate
@@ -1024,7 +1060,7 @@ class AppContainer(context: Context) {
         // last binding, at every realistic tap rate.
         val lastBindingToken = bindingToToken(binding)
         containerScope.launch {
-            runCatching { settingsRepository.saveLastBinding(lastBindingToken) }
+            runCatchingNonCancellation { settingsRepository.saveLastBinding(lastBindingToken) }
                 .onFailure {
                     com.crush.mobile.util.AppLog.w(
                         "Lifecycle", "last-binding persist failed: ${it.message}"
